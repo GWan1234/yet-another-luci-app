@@ -33,12 +33,12 @@ By participating in this project, you agree to abide by our Code of Conduct. Ple
 1. Fork the repository on GitHub
 2. Clone your fork locally:
    ```bash
-   git clone https://github.com/cogwheel0/luci-mobile.git
-   cd luci-mobile
+   git clone https://github.com/nightcodex7/yet-another-luci-app.git
+   cd yet-another-luci-app
    ```
 3. Add the upstream repository:
    ```bash
-   git remote add upstream https://github.com/cogwheel0/luci-mobile.git
+   git remote add upstream https://github.com/nightcodex7/yet-another-luci-app.git
    ```
 
 ## Development Setup
@@ -125,9 +125,8 @@ flutter analyze
 # Format code
 dart format .
 
-# Build for different platforms
+# Build Android APK
 flutter build apk
-flutter build ios
 ```
 
 ### 4. Commit Your Changes

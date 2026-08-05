@@ -87,7 +87,8 @@ class _RouterDashboardSettingsScreenState
     final wirelessRadios = dashboardData['wireless'] as Map<String, dynamic>?;
     if (wirelessRadios != null) {
       wirelessRadios.forEach((radioName, radioData) {
-        final interfaces = radioData['interfaces'] as List<dynamic>?;
+        final rawIfaces = radioData['interfaces'];
+        final interfaces = rawIfaces is List ? rawIfaces : (rawIfaces is Map ? rawIfaces.values.toList() : null);
         if (interfaces != null) {
           for (var interface in interfaces) {
             final config = interface['config'] ?? {};
@@ -104,8 +105,8 @@ class _RouterDashboardSettingsScreenState
       });
     }
 
-    final interfaces =
-        dashboardData['interfaceDump']?['interface'] as List<dynamic>?;
+    final rawDump = dashboardData['interfaceDump']?['interface'];
+    final interfaces = rawDump is List ? rawDump : (rawDump is Map ? rawDump.values.toList() : null);
     if (interfaces != null) {
       for (var item in interfaces) {
         final interface = item as Map<String, dynamic>;

@@ -2,13 +2,13 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:enableOnBackInvokedCallback="true"
-        android:label="LuCI Mobile"
+        android:label="Yet Another LuCI"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher">
 
         <activity
-            android:name="com.cogwheel.LuCIMobile.MainActivity"
+            android:name="com.nightcode.luci.MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""

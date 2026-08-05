@@ -904,4 +904,17 @@ class MockApiService implements IApiService {
     // For mock service, just delegate to fetchAssociatedStations
     return await fetchAssociatedStations();
   }
+
+  @override
+  Future<Map<String, Map<String, dynamic>>> fetchHostHintsWithContext({
+    required String ipAddress,
+    required String sysauth,
+    required bool useHttps,
+    BuildContext? context,
+  }) async {
+    return {
+      'AA:BB:CC:11:22:33': {'name': 'iPhone-John', 'ipaddrs': ['192.168.1.100']},
+      'AA:BB:CC:44:55:66': {'name': 'MacBook-Pro', 'ipaddrs': ['192.168.1.101']},
+    };
+  }
 }

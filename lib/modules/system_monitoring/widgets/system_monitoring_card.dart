@@ -1,0 +1,125 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:luci_mobile/main.dart';
+import '../models/system_metrics.dart';
+
+class SystemMonitoringCard extends ConsumerWidget {
+  const SystemMonitoringCard({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final appState = ref.watch(appStateProvider);
+    final sysInfo = appState.dashboardData?['sysInfo'] as Map<String, dynamic>?;
+    final metrics = SystemMetrics.fromSysInfo(sysInfo);
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 0),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12.0, left: 4.0),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.monitor_heart_outlined,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'System Vitals',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildMetricTile(
+                    context,
+                    label: 'CPU Load',
+                    value: '${metrics.cpuUsagePercent.toStringAsFixed(0)}%',
+                    icon: Icons.memory_outlined,
+                    color: Colors.orange,
+                  ),
+                ),
+                Expanded(
+                  child: _buildMetricTile(
+                    context,
+                    label: 'RAM Usage',
+                    value: metrics.totalMemoryBytes > 0
+                        ? '${metrics.memoryUsagePercent.toStringAsFixed(0)}%'
+                        : 'N/A',
+                    icon: Icons.pie_chart_outline,
+                    color: Colors.blue,
+                  ),
+                ),
+                Expanded(
+                  child: _buildMetricTile(
+                    context,
+                    label: 'Load Avg',
+                    value: metrics.load1m.toStringAsFixed(2),
+                    icon: Icons.speed_outlined,
+                    color: Colors.purple,
+                  ),
+                ),
+                Expanded(
+                  child: _buildMetricTile(
+                    context,
+                    label: 'Uptime',
+                    value: metrics.formattedUptime,
+                    icon: Icons.timer_outlined,
+                    color: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetricTile(
+    BuildContext context, {
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 22, color: color),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            fontSize: 11,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}

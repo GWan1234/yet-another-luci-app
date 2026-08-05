@@ -18,6 +18,7 @@ import 'package:luci_mobile/services/service_factory.dart';
 import 'package:luci_mobile/config/app_config.dart';
 import 'package:luci_mobile/utils/http_client_manager.dart';
 import 'package:luci_mobile/utils/logger.dart';
+import 'package:luci_mobile/modules/package_manager/models/package_info.dart';
 
 class AppState extends ChangeNotifier {
   static AppState? _instance;
@@ -563,18 +564,280 @@ class AppState extends ChangeNotifier {
         }
       }
 
+      // Helper to safely extract data and handle errors from LuCI's [status, data] responses
+      dynamic getData(dynamic result) {
+        if (result is List && result.length > 1) {
+          if (result[0] == 0) {
+            return result[1]; // Success
+          } else {
+            final errorMessage = result[1] is String
+                ? result[1]
+                : 'Unknown API Error';
+            throw Exception(errorMessage);
+          }
+        }
+        return result;
+      }
+
+      dynamic getOptionalData(dynamic result, String label) {
+        try {
+          return getData(result);
+        } catch (e) {
+          Logger.warning('Optional RPC $label returned error: $e');
+          return null;
+        }
+      }
+
       final wirelessFuture = callOptionalRpc(
         object: 'luci-rpc',
         method: 'getWirelessDevices',
         params: {},
       );
 
-      // UCI wireless config is optional — wired-only routers may not have it
+      // UCI dhcp, firewall, and wireless configs (optional)
       final uciWirelessFuture = callOptionalRpc(
         object: 'uci',
         method: 'get',
         params: {'config': 'wireless'},
       );
+
+      final uciDhcpFuture = callOptionalRpc(
+        object: 'uci',
+        method: 'get',
+        params: {'config': 'dhcp'},
+      );
+
+      final uciFirewallFuture = callOptionalRpc(
+        object: 'uci',
+        method: 'get',
+        params: {'config': 'firewall'},
+      );
+
+      Future<dynamic> fetchPackagesData() async {
+        try {
+          // 1. Try command execution opkg list-installed
+          final resOpkgExec = await callOptionalRpc(
+            object: 'file',
+            method: 'exec',
+            params: {'command': 'opkg', 'args': ['list-installed']},
+          );
+          final dataOpkgExec = getOptionalData(resOpkgExec, 'file.exec.opkg');
+          if (dataOpkgExec is Map && dataOpkgExec['stdout'] != null && (dataOpkgExec['stdout'] as String).trim().isNotEmpty) {
+            return dataOpkgExec['stdout'];
+          }
+
+          // 2. Try command execution apk info / apk list --installed
+          final resApkExec1 = await callOptionalRpc(
+            object: 'file',
+            method: 'exec',
+            params: {'command': 'apk', 'args': ['info']},
+          );
+          final dataApkExec1 = getOptionalData(resApkExec1, 'file.exec.apk1');
+          if (dataApkExec1 is Map && dataApkExec1['stdout'] != null && (dataApkExec1['stdout'] as String).trim().isNotEmpty) {
+            return dataApkExec1['stdout'];
+          }
+
+          final resApkExec2 = await callOptionalRpc(
+            object: 'file',
+            method: 'exec',
+            params: {'command': 'apk', 'args': ['list', '--installed']},
+          );
+          final dataApkExec2 = getOptionalData(resApkExec2, 'file.exec.apk2');
+          if (dataApkExec2 is Map && dataApkExec2['stdout'] != null && (dataApkExec2['stdout'] as String).trim().isNotEmpty) {
+            return dataApkExec2['stdout'];
+          }
+
+          // 3. Try reading status file /usr/lib/opkg/status or /var/lib/opkg/status
+          final resOpkgStatus1 = await callOptionalRpc(
+            object: 'file',
+            method: 'read',
+            params: {'path': '/usr/lib/opkg/status'},
+          );
+          final dataOpkg1 = getOptionalData(resOpkgStatus1, 'file.read.opkg1');
+          if (dataOpkg1 is Map && dataOpkg1['data'] != null && (dataOpkg1['data'] as String).trim().isNotEmpty) {
+            return dataOpkg1['data'];
+          }
+
+          final resOpkgStatus2 = await callOptionalRpc(
+            object: 'file',
+            method: 'read',
+            params: {'path': '/var/lib/opkg/status'},
+          );
+          final dataOpkg2 = getOptionalData(resOpkgStatus2, 'file.read.opkg2');
+          if (dataOpkg2 is Map && dataOpkg2['data'] != null && (dataOpkg2['data'] as String).trim().isNotEmpty) {
+            return dataOpkg2['data'];
+          }
+
+          // 4. Try reading APK DB /lib/apk/db/installed
+          final resApkDb = await callOptionalRpc(
+            object: 'file',
+            method: 'read',
+            params: {'path': '/lib/apk/db/installed'},
+          );
+          final dataApk = getOptionalData(resApkDb, 'file.read.apk');
+          if (dataApk is Map && dataApk['data'] != null && (dataApk['data'] as String).trim().isNotEmpty) {
+            return dataApk['data'];
+          }
+
+          // 5. Try luci-rpc listPackages as fallback if it returns actual package entries
+          final res1 = await callOptionalRpc(
+            object: 'luci-rpc',
+            method: 'listPackages',
+            params: {},
+          );
+          final data1 = getOptionalData(res1, 'luci-rpc.listPackages');
+          if (data1 != null) {
+            if (data1 is Map && (data1.containsKey('packages') || data1.containsKey('result') || data1.length > 2)) {
+              return data1;
+            }
+            if (data1 is List && data1.isNotEmpty) {
+              return data1;
+            }
+          }
+        } catch (_) {}
+        return null;
+      }
+
+      Future<dynamic> fetchAvailablePackagesData() async {
+        try {
+          final res1 = await callOptionalRpc(
+            object: 'file',
+            method: 'exec',
+            params: {'command': 'opkg', 'args': ['list']},
+          );
+          final data1 = getOptionalData(res1, 'file.exec.opkg_avail');
+          if (data1 is Map && data1['stdout'] != null && (data1['stdout'] as String).trim().isNotEmpty) {
+            return data1['stdout'];
+          }
+
+          final res2 = await callOptionalRpc(
+            object: 'file',
+            method: 'exec',
+            params: {'command': 'apk', 'args': ['list']},
+          );
+          final data2 = getOptionalData(res2, 'file.exec.apk_avail');
+          if (data2 is Map && data2['stdout'] != null && (data2['stdout'] as String).trim().isNotEmpty) {
+            return data2['stdout'];
+          }
+        } catch (_) {}
+        return null;
+      }
+
+      Future<dynamic> fetchCronData() async {
+        try {
+          final res1 = await callOptionalRpc(
+            object: 'file',
+            method: 'read',
+            params: {'path': '/etc/crontabs/root'},
+          );
+          final data1 = getOptionalData(res1, 'file.read.cron');
+          if (data1 is Map && data1['data'] != null) {
+            return (data1['data'] as String).split('\n');
+          }
+
+          final res2 = await callOptionalRpc(
+            object: 'file',
+            method: 'exec',
+            params: {'command': 'crontab', 'args': ['-l']},
+          );
+          final data2 = getOptionalData(res2, 'file.exec.cron');
+          if (data2 is Map && data2['stdout'] != null) {
+            return (data2['stdout'] as String).split('\n');
+          }
+        } catch (_) {}
+        return null;
+      }
+
+      Future<dynamic> fetchDhcpLeasesData() async {
+        try {
+          final res1 = await callOptionalRpc(
+            object: 'luci-rpc',
+            method: 'getDHCPLeases',
+            params: {},
+          );
+          final data1 = getOptionalData(res1, 'luci-rpc.getDHCPLeases');
+          if (data1 != null) return data1;
+
+          final res2 = await callOptionalRpc(
+            object: 'file',
+            method: 'read',
+            params: {'path': '/tmp/dhcp.leases'},
+          );
+          final data2 = getOptionalData(res2, 'file.read.dhcp');
+          if (data2 is Map && data2['data'] != null) {
+            return _processDhcpLeases(Map<String, dynamic>.from(data2));
+          }
+
+          final res3 = await callOptionalRpc(
+            object: 'file',
+            method: 'read',
+            params: {'path': '/var/dhcp.leases'},
+          );
+          final data3 = getOptionalData(res3, 'file.read.dhcp2');
+          if (data3 is Map && data3['data'] != null) {
+            return _processDhcpLeases(Map<String, dynamic>.from(data3));
+          }
+        } catch (_) {}
+        return null;
+      }
+
+      final packagesFuture = fetchPackagesData();
+      final availablePackagesFuture = fetchAvailablePackagesData();
+      final cronFuture = fetchCronData();
+      final dhcpLeasesFuture = fetchDhcpLeasesData();
+
+      final servicesFuture = callOptionalRpc(
+        object: 'service',
+        method: 'list',
+        params: {},
+      );
+
+      final initScriptsFuture = callOptionalRpc(
+        object: 'rc',
+        method: 'list',
+        params: {},
+      );
+
+      Future<dynamic> fetchStorageData() async {
+        try {
+          final res1 = await callOptionalRpc(
+            object: 'luci-rpc',
+            method: 'getMountPoints',
+            params: {},
+          );
+          final data1 = getOptionalData(res1, 'luci-rpc.getMountPoints');
+          if (data1 != null) return data1;
+
+          final res2 = await callOptionalRpc(
+            object: 'system',
+            method: 'mounts',
+            params: {},
+          );
+          final data2 = getOptionalData(res2, 'system.mounts');
+          if (data2 != null) return data2;
+
+          final res3 = await callOptionalRpc(
+            object: 'luci',
+            method: 'getMountPoints',
+            params: {},
+          );
+          final data3 = getOptionalData(res3, 'luci.getMountPoints');
+          if (data3 != null) return data3;
+
+          final res4 = await callOptionalRpc(
+            object: 'file',
+            method: 'exec',
+            params: {'command': 'df', 'args': ['-k']},
+          );
+          final data4 = getOptionalData(res4, 'file.exec.df');
+          if (data4 is Map && data4['stdout'] != null) {
+            return data4['stdout'];
+          }
+        } catch (_) {}
+        return null;
+      }
+
+      final mountPointsFuture = fetchStorageData();
 
       final results = await Future.wait([
         _apiService!.call(
@@ -609,53 +872,38 @@ class AppState extends ChangeNotifier {
           method: 'dump',
           params: {},
         ),
-        _apiService!.call(
-          ip,
-          _authService!.sysauth!,
-          useHttps,
-          object: 'luci-rpc',
-          method: 'getDHCPLeases',
-          params: {},
-        ),
       ]);
-
-      // Helper to safely extract data and handle errors from LuCI's [status, data] responses
-      dynamic getData(dynamic result) {
-        if (result is List && result.length > 1) {
-          if (result[0] == 0) {
-            return result[1]; // Success
-          } else {
-            // Throw an exception with the error message from the API
-            final errorMessage = result[1] is String
-                ? result[1]
-                : 'Unknown API Error';
-            throw Exception(errorMessage);
-          }
-        }
-        // Handle cases where the result is not in the expected format
-        return result;
-      }
-
-      dynamic getOptionalData(dynamic result, String label) {
-        try {
-          return getData(result);
-        } catch (e) {
-          Logger.warning('Optional RPC $label returned error: $e');
-          return null;
-        }
-      }
 
       final boardInfoData = getData(results[0]);
       final sysInfoData = getData(results[1]);
       final networkData = getData(results[2]) as Map<String, dynamic>?;
       final interfaceDump = getData(results[3]) as Map<String, dynamic>?;
-      final dhcpLeases = getData(results[4]) as Map<String, dynamic>?;
 
-      // Await optional wireless futures in parallel (won't throw — wired-only routers are fine)
-      final optionalResults =
-          await Future.wait([wirelessFuture, uciWirelessFuture]);
+      // Await optional futures in parallel
+      final optionalResults = await Future.wait([
+        wirelessFuture,
+        uciWirelessFuture,
+        uciDhcpFuture,
+        uciFirewallFuture,
+        packagesFuture,
+        availablePackagesFuture,
+        servicesFuture,
+        initScriptsFuture,
+        mountPointsFuture,
+        cronFuture,
+        dhcpLeasesFuture,
+      ]);
       final wirelessRaw = optionalResults[0];
       final uciWirelessRaw = optionalResults[1];
+      final uciDhcpRaw = optionalResults[2];
+      final uciFirewallRaw = optionalResults[3];
+      final packagesRaw = optionalResults[4];
+      final availablePackagesRaw = optionalResults[5];
+      final servicesRaw = optionalResults[6];
+      final initScriptsRaw = optionalResults[7];
+      final mountPointsRaw = optionalResults[8];
+      final cronRaw = optionalResults[9];
+      final dhcpLeasesRaw = optionalResults[10];
 
       Map<String, dynamic>? wirelessData;
       if (wirelessRaw != null) {
@@ -670,6 +918,42 @@ class AppState extends ChangeNotifier {
       if (uciWirelessRaw != null) {
         uciWirelessConfig =
             getOptionalData(uciWirelessRaw, 'uci.get wireless');
+      }
+
+      dynamic uciDhcpConfig;
+      if (uciDhcpRaw != null) {
+        uciDhcpConfig = getOptionalData(uciDhcpRaw, 'uci.get dhcp');
+      }
+
+      dynamic uciFirewallConfig;
+      if (uciFirewallRaw != null) {
+        uciFirewallConfig = getOptionalData(uciFirewallRaw, 'uci.get firewall');
+      }
+
+      dynamic installedPackagesData = packagesRaw;
+      dynamic availablePackagesData = availablePackagesRaw;
+
+      dynamic servicesData;
+      if (servicesRaw != null) {
+        servicesData = getOptionalData(servicesRaw, 'service.list');
+      }
+
+      dynamic initScriptsData;
+      if (initScriptsRaw != null) {
+        initScriptsData = getOptionalData(initScriptsRaw, 'rc.list');
+      }
+
+      dynamic mountPointsData = mountPointsRaw;
+
+      // Determine Package Manager type (opkg vs apk)
+      String pkgMgrType = 'opkg';
+      if (boardInfoData is Map<String, dynamic>) {
+        final release = boardInfoData['release'] as Map<String, dynamic>?;
+        final version = release?['version']?.toString().toLowerCase() ?? '';
+        final target = release?['target']?.toString().toLowerCase() ?? '';
+        if (version.contains('24.') || version.contains('25.') || version.contains('apk') || target.contains('apk')) {
+          pkgMgrType = 'apk';
+        }
       }
 
       // Fetch WireGuard peer information for WireGuard interfaces
@@ -696,16 +980,12 @@ class AppState extends ChangeNotifier {
           );
 
           if (allWireGuardData != null) {
-            // The new endpoint returns data for all interfaces
-            // We need to extract data for each WireGuard interface
             for (final interface in interfaceDump['interface']) {
               if (interface is Map<String, dynamic>) {
                 final ifname = interface['interface'] as String?;
                 final proto = interface['proto'] as String?;
                 if (proto == 'wireguard' && ifname != null) {
-                  // Look for this interface in the WireGuard data
                   final interfaceData = allWireGuardData[ifname];
-
                   if (interfaceData != null) {
                     wireguardData[ifname] = interfaceData;
                   }
@@ -738,14 +1018,12 @@ class AppState extends ChangeNotifier {
       }
 
       // Update throughput data using the service
-        // Check if we should track specific interface
-        final prefs = _dashboardPreferences;
-        String? specificInterface;
-        if (!prefs.showAllThroughput &&
-            prefs.primaryThroughputInterface != null) {
-          // Map interface name to actual device name
-          specificInterface = _getDeviceNameForInterface(prefs.primaryThroughputInterface!);
-        }
+      final prefs = _dashboardPreferences;
+      String? specificInterface;
+      if (!prefs.showAllThroughput &&
+          prefs.primaryThroughputInterface != null) {
+        specificInterface = _getDeviceNameForInterface(prefs.primaryThroughputInterface!);
+      }
 
       _throughputService?.updateThroughput(
         networkData,
@@ -753,15 +1031,102 @@ class AppState extends ChangeNotifier {
         specificInterface: specificInterface,
       );
 
+      // Fetch wireless stations (associated client devices) across active wireless interfaces
+      final wirelessStationsMap = <String, dynamic>{};
+      final wirelessDevs = wirelessData ?? (uciWirelessConfig is Map<String, dynamic> ? uciWirelessConfig : null);
+      final ifnamesToQuery = <String>{};
+
+      if (wirelessDevs is Map<String, dynamic>) {
+        wirelessDevs.forEach((k, v) {
+          if (v is Map<String, dynamic>) {
+            final ifaces = v['interfaces'];
+            if (ifaces is List) {
+              for (final ifc in ifaces) {
+                if (ifc is Map<String, dynamic>) {
+                  final name = ifc['ifname']?.toString() ?? ifc['section']?.toString();
+                  if (name != null && name.isNotEmpty) ifnamesToQuery.add(name);
+                }
+              }
+            } else if (v['ifname'] != null) {
+              ifnamesToQuery.add(v['ifname'].toString());
+            }
+          }
+        });
+      }
+
+      // Also dynamically query live iwinfo devices directly from router RPC
+      try {
+        final devRes = await callOptionalRpc(
+          object: 'iwinfo',
+          method: 'devices',
+        );
+        final devData = getOptionalData(devRes, 'iwinfo.devices');
+        if (devData is List) {
+          for (final item in devData) {
+            if (item != null && item.toString().isNotEmpty) {
+              ifnamesToQuery.add(item.toString());
+            }
+          }
+        }
+      } catch (_) {}
+
+      // Also extract any wireless device names from interface dump
+      if (interfaceDump is Map<String, dynamic> && interfaceDump['interface'] is List) {
+        for (final ifc in interfaceDump['interface']) {
+          if (ifc is Map<String, dynamic>) {
+            final dev = ifc['device']?.toString() ?? ifc['l3_device']?.toString();
+            if (dev != null &&
+                (dev.contains('wlan') ||
+                    dev.contains('phy') ||
+                    dev.contains('wifi') ||
+                    dev.contains('ath') ||
+                    dev.contains('ra'))) {
+              ifnamesToQuery.add(dev);
+            }
+          }
+        }
+      }
+
+      final assocResults = await Future.wait(
+        ifnamesToQuery.map((ifname) async {
+          try {
+            final res = await callOptionalRpc(
+              object: 'iwinfo',
+              method: 'assoclist',
+              params: {'device': ifname},
+            );
+            return MapEntry(ifname, getOptionalData(res, 'iwinfo.assoclist.$ifname'));
+          } catch (_) {
+            return MapEntry(ifname, null);
+          }
+        }),
+      );
+
+      for (final entry in assocResults) {
+        if (entry.value != null) {
+          wirelessStationsMap[entry.key] = entry.value;
+        }
+      }
+
       _dashboardData = {
         'boardInfo': boardInfoData,
         'sysInfo': sysInfoData,
         'networkDevices': networkData,
         'interfaceDump': interfaceDump,
         'wireless': wirelessData ?? <String, dynamic>{},
-        'dhcpLeases': dhcpLeases,
+        'wirelessStations': wirelessStationsMap,
+        'dhcpLeases': dhcpLeasesRaw,
         'wan': _extractWanData(interfaceDump),
         'uciWirelessConfig': uciWirelessConfig,
+        'uciDhcpConfig': uciDhcpConfig,
+        'uciFirewallConfig': uciFirewallConfig,
+        'packageManager': pkgMgrType,
+        'installedPackages': installedPackagesData,
+        'availablePackages': availablePackagesData,
+        'cronJobs': cronRaw,
+        'services': servicesData,
+        'initScripts': initScriptsData,
+        'mountPoints': mountPointsData,
         'wireguard': wireguardData,
         '_lastUpdated':
             DateTime.now().millisecondsSinceEpoch, // Force UI updates
@@ -788,9 +1153,6 @@ class AppState extends ChangeNotifier {
       } else {
         _dashboardError = 'Failed to fetch dashboard data: $e';
       }
-      // Log error with stack trace for debugging
-      // print('Dashboard fetch error: $e\n$stack');
-      // Clear dashboard data when there's an error so we don't show stale data
       _dashboardData = null;
     } finally {
       _isDashboardLoading = false;
@@ -798,33 +1160,240 @@ class AppState extends ChangeNotifier {
     }
   }
 
+
+
+  /// Manage software packages on OpenWrt (OPKG / APK)
+  Future<bool> managePackage({
+    required String packageName,
+    required String action, // 'install', 'remove', 'update', 'upgrade'
+  }) async {
+    final ip = _routerService?.selectedRouter?.ipAddress;
+    if (ip == null || _authService?.sysauth == null) return false;
+    final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
+
+    // Determine package manager dynamically
+    final pkgMgr = _dashboardData?['packageManager']?.toString() ?? 'opkg';
+    final isApk = pkgMgr == 'apk';
+
+    final cmd = isApk ? 'apk' : 'opkg';
+    List<String> args = [];
+
+    if (action == 'install') {
+      args = isApk ? ['add', packageName] : ['install', packageName];
+    } else if (action == 'remove') {
+      args = isApk ? ['del', packageName] : ['remove', packageName];
+    } else if (action == 'update') {
+      args = ['update'];
+    } else if (action == 'upgrade') {
+      args = ['upgrade'];
+    }
+
+    try {
+      final res = await _apiService!.call(
+        ip,
+        _authService!.sysauth!,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {'command': cmd, 'args': args},
+      );
+
+      // Fallback to luci-rpc for standard OPKG if file.exec is unavailable
+      if (res == null && !isApk) {
+        if (action == 'install') {
+          await _apiService!.call(
+            ip,
+            _authService!.sysauth!,
+            useHttps,
+            object: 'luci-rpc',
+            method: 'installPackage',
+            params: {'package': packageName},
+          );
+        } else if (action == 'remove') {
+          await _apiService!.call(
+            ip,
+            _authService!.sysauth!,
+            useHttps,
+            object: 'luci-rpc',
+            method: 'removePackage',
+            params: {'package': packageName},
+          );
+        }
+      }
+
+      await fetchDashboardData();
+      return true;
+    } catch (e) {
+      Logger.error('Failed package action $action for $packageName: $e');
+      return false;
+    }
+  }
+
+  /// Check and fetch upgradable packages on demand
+  Future<List<OpenWrtPackage>> fetchUpgradablePackages() async {
+    if (_reviewerModeEnabled) {
+      return [
+        OpenWrtPackage(
+          name: 'luci-app-firewall',
+          version: 'git-23.332 ➔ git-24.010',
+          description: 'Firewall management interface upgrade',
+          isInstalled: true,
+          managerType: PackageManagerType.opkg,
+        ),
+        OpenWrtPackage(
+          name: 'dnsmasq',
+          version: '2.89-1 ➔ 2.90-1',
+          description: 'DHCP and DNS server security update',
+          isInstalled: true,
+          managerType: PackageManagerType.opkg,
+        ),
+      ];
+    }
+
+    try {
+      final pkgMgr = _dashboardData?['packageManager']?.toString() ?? 'opkg';
+      final isApk = pkgMgr == 'apk';
+
+      // Update package lists first
+      await executeRouterCommandOutput(isApk ? 'apk' : 'opkg', ['update']);
+
+      // Query upgradable packages
+      final output = isApk
+          ? await executeRouterCommandOutput('apk', ['list', '--upgradable'])
+          : await executeRouterCommandOutput('opkg', ['list-upgradable']);
+
+      if (output == null || output.trim().isEmpty) return [];
+
+      final upgradable = <OpenWrtPackage>[];
+      final type = isApk ? PackageManagerType.apk : PackageManagerType.opkg;
+
+      for (final line in output.split('\n')) {
+        final trimmed = line.trim();
+        if (trimmed.isEmpty || trimmed.startsWith('WARNING') || trimmed.startsWith('#')) continue;
+
+        if (trimmed.contains(' - ')) {
+          final parts = trimmed.split(' - ');
+          final name = parts[0].trim();
+          final oldVer = parts.length > 1 ? parts[1].trim() : '';
+          final newVer = parts.length > 2 ? parts[2].trim() : '';
+          upgradable.add(OpenWrtPackage(
+            name: name,
+            version: oldVer.isNotEmpty && newVer.isNotEmpty ? '$oldVer ➔ $newVer' : (newVer.isNotEmpty ? newVer : oldVer),
+            description: 'Upgradable package ($name)',
+            isInstalled: true,
+            managerType: type,
+          ));
+        } else {
+          final parts = trimmed.split(RegExp(r'\s+'));
+          if (parts.isNotEmpty) {
+            final name = parts[0].trim();
+            upgradable.add(OpenWrtPackage(
+              name: name,
+              version: parts.length > 1 ? parts[1] : 'update available',
+              description: 'Upgradable package ($name)',
+              isInstalled: true,
+              managerType: type,
+            ));
+          }
+        }
+      }
+      return upgradable;
+    } catch (e) {
+      Logger.error('Failed to fetch upgradable packages: $e');
+      return [];
+    }
+  }
+
+  /// Execute generic router shell command via file.exec RPC
+  Future<bool> executeRouterCommand(String command, List<String> args) async {
+    final ip = _routerService?.selectedRouter?.ipAddress;
+    if (ip == null || _authService?.sysauth == null) return false;
+    final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
+
+    try {
+      final res = await _apiService!.call(
+        ip,
+        _authService!.sysauth!,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {'command': command, 'args': args},
+      );
+      if (res != null) return true;
+    } catch (_) {}
+    return false;
+  }
+
+  /// Execute generic router shell command via file.exec or file.read RPC and return output String
+  Future<String?> executeRouterCommandOutput(String command, List<String> args) async {
+    final ip = _routerService?.selectedRouter?.ipAddress;
+    if (ip == null || _authService?.sysauth == null) return null;
+    final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
+
+    try {
+      final res = await _apiService!.call(
+        ip,
+        _authService!.sysauth!,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {'command': command, 'args': args},
+      );
+      if (res is List && res.length > 1 && res[0] == 0) {
+        final data = res[1] as Map<String, dynamic>?;
+        return data?['stdout']?.toString() ?? data?['data']?.toString();
+      }
+      if (res is Map<String, dynamic>) {
+        return res['stdout']?.toString() ?? res['data']?.toString();
+      }
+    } catch (_) {}
+
+    if (command == 'cat' && args.isNotEmpty) {
+      try {
+        final readRes = await _apiService!.call(
+          ip,
+          _authService!.sysauth!,
+          useHttps,
+          object: 'file',
+          method: 'read',
+          params: {'path': args.first},
+        );
+        if (readRes is List && readRes.length > 1 && readRes[0] == 0) {
+          final data = readRes[1] as Map<String, dynamic>?;
+          return data?['data']?.toString() ?? data?['stdout']?.toString();
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
   Map<String, dynamic> _processDhcpLeases(Map<String, dynamic> rawDhcpData) {
-    final stdout = rawDhcpData['stdout'] as String? ?? '';
+    final rawStr = rawDhcpData['data']?.toString() ?? rawDhcpData['stdout']?.toString() ?? '';
     final leases = <Map<String, dynamic>>[];
 
-    for (final line in stdout.split('\n')) {
-      if (line.trim().isEmpty) continue;
+    for (final line in rawStr.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty || trimmed.startsWith('#')) continue;
 
-      final parts = line.trim().split(' ');
-      if (parts.length >= 5) {
-        // Format: timestamp mac_address ip_address hostname client_id
+      final parts = trimmed.split(RegExp(r'\s+'));
+      if (parts.length >= 4) {
         final timestamp = int.tryParse(parts[0]) ?? 0;
         final macAddress = parts[1];
         final ipAddress = parts[2];
-        final hostname = parts[3];
+        final hostname = parts[3] == '*' ? 'Unknown' : parts[3];
 
         leases.add({
           'expires': timestamp,
           'macaddr': macAddress,
           'ipaddr': ipAddress,
           'hostname': hostname,
-          'activetime': 0, // Default for mock data
+          'activetime': 0,
           'leasetime': timestamp,
         });
       }
     }
 
-    return {'dhcp_leases': leases};
+    return {'dhcp_leases': leases, 'leases': leases};
   }
 
   Map<String, dynamic>? _extractWanData(Map<String, dynamic>? interfaceDump) {
@@ -1309,6 +1878,24 @@ class AppState extends ChangeNotifier {
       stationsMap.forEach((_, stations) {
         macs.addAll(stations.map((m) => m.toLowerCase()));
       });
+
+      // Also include configured wireless maclist entries from dashboard data
+      final wirelessConfig = _dashboardData?['uciWirelessConfig'] ?? _dashboardData?['wireless'];
+      if (wirelessConfig is Map<String, dynamic>) {
+        wirelessConfig.forEach((k, v) {
+          if (v is Map<String, dynamic>) {
+            final maclist = v['maclist'] ?? v['config']?['maclist'];
+            if (maclist is List) {
+              for (final item in maclist) {
+                if (item != null && item.toString().isNotEmpty) {
+                  macs.add(item.toString().toLowerCase());
+                }
+              }
+            }
+          }
+        });
+      }
+
       return macs;
     }
   }
@@ -1326,59 +1913,23 @@ class AppState extends ChangeNotifier {
   /// as wireless if their MAC appears in any router's associated stations list.
   Future<List<Client>> fetchAggregatedClients() async {
     try {
-      // Build a union of wireless MACs across all routers
-      final wirelessMacs = await fetchAllAssociatedWirelessMacsAggregated();
-      final normalizedWireless = wirelessMacs
-          .map((m) => m.toUpperCase().replaceAll('-', ':'))
-          .toSet();
-
-      // Aggregate leases across routers
-      final leases = await fetchAggregatedDhcpLeases();
-
-      // Convert to Client models with connection type
-      final clients = <String, Client>{}; // key by normalized MAC
-      for (final lease in leases) {
-        final client = Client.fromLease(lease);
-        final macNorm = client.macAddress.toUpperCase().replaceAll('-', ':');
-        final isWireless = normalizedWireless.contains(macNorm);
-        // If confirmed wireless by assoclist, mark wireless; otherwise keep heuristic
-        final enriched = isWireless
-            ? client.copyWith(connectionType: ConnectionType.wireless)
-            : client;
-        // Prefer entries that have more info (hostname length as heuristic)
-        if (!clients.containsKey(macNorm) ||
-            (enriched.hostname.isNotEmpty &&
-                enriched.hostname.length >
-                    (clients[macNorm]?.hostname.length ?? 0))) {
-          clients[macNorm] = enriched;
-        }
-      }
-
-      // Add wireless stations not in DHCP leases (AP-mode fallback)
-      for (final mac in normalizedWireless) {
-        if (!clients.containsKey(mac)) {
-          clients[mac] = Client.fromWirelessStation(mac);
-        }
-      }
-
-      // Sort: wireless > wired > unknown, then by hostname
-      final list = clients.values.toList();
-      list.sort((a, b) {
-        int typeOrder(ConnectionType t) {
-          switch (t) {
-            case ConnectionType.wireless:
-              return 0;
-            case ConnectionType.wired:
-              return 1;
-            default:
-              return 2;
+      final clientsMap = <String, Client>{};
+      final routers = _routerService?.routers ?? [];
+      for (final router in routers) {
+        final routerClients = await _fetchClientsForRouter(router);
+        for (final c in routerClients) {
+          final macNorm = c.macAddress.toUpperCase().replaceAll('-', ':');
+          if (!clientsMap.containsKey(macNorm) || (c.isConnected && !clientsMap[macNorm]!.isConnected)) {
+            clientsMap[macNorm] = c;
           }
         }
-
-        final cmpType =
-            typeOrder(a.connectionType).compareTo(typeOrder(b.connectionType));
-        if (cmpType != 0) return cmpType;
-        return a.hostname.toLowerCase().compareTo(b.hostname.toLowerCase());
+      }
+      final list = clientsMap.values.toList();
+      list.sort((a, b) {
+        if (a.isConnected != b.isConnected) {
+          return a.isConnected ? -1 : 1;
+        }
+        return a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
       });
       return list;
     } catch (e, stack) {
@@ -1451,18 +2002,71 @@ class AppState extends ChangeNotifier {
       if (_routerService?.selectedRouter == null || _authService?.sysauth == null) {
         return [];
       }
-      final router = _routerService!.selectedRouter!;
+      return await _fetchClientsForRouter(_routerService!.selectedRouter!);
+    } catch (e, stack) {
+      Logger.exception('Failed to fetch clients for selected router', e, stack);
+      return [];
+    }
+  }
 
-      // Get wireless MACs for this router
+  Future<List<Client>> _fetchClientsForRouter(model.Router router) async {
+    try {
+      String normMac(String mac) => mac
+          .trim()
+          .toUpperCase()
+          .replaceAll('-', ':')
+          .split(':')
+          .map((b) => b.length == 1 ? '0$b' : b)
+          .join(':');
+
+      // 1. Fetch live associated wireless stations (strict check for Wi-Fi tags)
       final stationsMap = await _apiService!.fetchAllAssociatedWirelessMacsWithContext(
         ipAddress: router.ipAddress,
         sysauth: _authService!.sysauth!,
         useHttps: router.useHttps,
       );
+      final macToSsidMap = <String, String>{};
       final wireless = <String>{};
-      stationsMap.forEach((_, s) => wireless.addAll(s.map((m) => m.toLowerCase())));
+      stationsMap.forEach((ifnameOrSsid, s) {
+        for (final m in s) {
+          final n = normMac(m);
+          wireless.add(n);
+          macToSsidMap[n] = ifnameOrSsid;
+        }
+      });
 
-      // Get DHCP leases for this router
+      // Fallback: Shell station dump if station map is empty
+      if (wireless.isEmpty) {
+        final iwDevOut = await executeRouterCommandOutput('iw', ['dev']);
+        final ifaces = <String>[];
+        if (iwDevOut != null && iwDevOut.isNotEmpty) {
+          for (final line in iwDevOut.split('\n')) {
+            final trimmed = line.trim();
+            if (trimmed.startsWith('Interface ')) {
+              ifaces.add(trimmed.substring(10).trim());
+            }
+          }
+        }
+        if (ifaces.isEmpty) {
+          ifaces.addAll(['wlan0', 'wlan1', 'phy0-ap0', 'phy1-ap0', 'phy2-ap0', 'ra0']);
+        }
+        for (final iface in ifaces) {
+          final iwDump = await executeRouterCommandOutput('iw', ['dev', iface, 'station', 'dump']) ??
+              await executeRouterCommandOutput('iwinfo', [iface, 'assoclist']);
+          if (iwDump != null && iwDump.isNotEmpty) {
+            final macRegex = RegExp(r'([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})');
+            for (final match in macRegex.allMatches(iwDump)) {
+              final m = match.group(0);
+              if (m != null) {
+                wireless.add(normMac(m));
+              }
+            }
+          }
+        }
+      }
+      final normalizedWireless = wireless.map(normMac).toSet();
+
+      // 2. Fetch getDHCPLeases from luci-rpc (returns dhcp_leases & dhcp6_leases)
       final callRes = await _apiService!.call(
         router.ipAddress,
         _authService!.sysauth!,
@@ -1471,58 +2075,303 @@ class AppState extends ChangeNotifier {
         method: 'getDHCPLeases',
         params: {},
       );
-      final leases = <Map<String, dynamic>>[];
+      final dhcp4Leases = <Map<String, dynamic>>[];
+      final dhcp6Leases = <Map<String, dynamic>>[];
       if (callRes is List && callRes.length > 1 && callRes[0] == 0) {
         final data = callRes[1] as Map<String, dynamic>;
-        leases.addAll(
-          (data['dhcp_leases'] as List<dynamic>? ?? [])
-              .cast<Map<String, dynamic>>(),
-        );
-      }
-
-      // Normalize wireless MACs for consistent lookup
-      final normalizedWireless = wireless
-          .map((m) => m.toUpperCase().replaceAll('-', ':'))
-          .toSet();
-
-      final clientMap = <String, Client>{};
-      for (final l in leases) {
-        final c = Client.fromLease(l);
-        final macNorm = c.macAddress.toUpperCase().replaceAll('-', ':');
-        final isWireless = normalizedWireless.contains(macNorm);
-        clientMap[macNorm] = isWireless
-            ? c.copyWith(connectionType: ConnectionType.wireless)
-            : c;
-      }
-
-      // Add wireless stations not in DHCP leases (AP-mode fallback)
-      for (final mac in normalizedWireless) {
-        if (!clientMap.containsKey(mac)) {
-          clientMap[mac] = Client.fromWirelessStation(mac);
+        if (data['dhcp_leases'] is List) {
+          dhcp4Leases.addAll((data['dhcp_leases'] as List).cast<Map<String, dynamic>>());
+        }
+        if (data['dhcp6_leases'] is List) {
+          dhcp6Leases.addAll((data['dhcp6_leases'] as List).cast<Map<String, dynamic>>());
         }
       }
 
-      final clients = clientMap.values.toList();
+      // If DHCP leases are empty, attempt direct file read fallback (/tmp/dhcp.leases or /var/dhcp.leases)
+      if (dhcp4Leases.isEmpty) {
+        final rawLeaseStr = await executeRouterCommandOutput('cat', ['/tmp/dhcp.leases']) ??
+            await executeRouterCommandOutput('cat', ['/var/dhcp.leases']) ??
+            await executeRouterCommandOutput('cat', ['/tmp/dnsmasq.leases']);
+        if (rawLeaseStr != null && rawLeaseStr.isNotEmpty) {
+          final processed = _processDhcpLeases({'data': rawLeaseStr});
+          if (processed['dhcp_leases'] is List) {
+            dhcp4Leases.addAll((processed['dhcp_leases'] as List).cast<Map<String, dynamic>>());
+          }
+        }
+      }
 
-      // Sort similar to aggregated
-      clients.sort((a, b) {
-        int typeOrder(ConnectionType t) {
-          switch (t) {
-            case ConnectionType.wireless:
-              return 0;
-            case ConnectionType.wired:
-              return 1;
-            default:
-              return 2;
+      // 3. Fetch active ARP table (/proc/net/arp) to detect active non-wireless devices
+      final arpClients = <Map<String, dynamic>>[];
+      try {
+        final arpStr = await executeRouterCommandOutput('cat', ['/proc/net/arp']);
+        if (arpStr != null && arpStr.isNotEmpty) {
+          for (final line in arpStr.split('\n')) {
+            final trimmed = line.trim();
+            if (trimmed.isEmpty || trimmed.startsWith('IP address') || trimmed.startsWith('IP')) continue;
+            final parts = trimmed.split(RegExp(r'\s+'));
+            if (parts.length >= 4) {
+              final ip = parts[0];
+              final flags = parts[2];
+              final mac = parts[3];
+              final dev = parts.length >= 6 ? parts[5] : '';
+              if (mac != '00:00:00:00:00:00' && mac.contains(':') && flags != '0x0') {
+                arpClients.add({
+                  'ipaddr': ip,
+                  'macaddr': normMac(mac),
+                  'device': dev,
+                });
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      // 4. Fetch Host Hints dictionary (UCI static leases + luci-rpc hostHints)
+      final hostHints = await _apiService!.fetchHostHintsWithContext(
+        ipAddress: router.ipAddress,
+        sysauth: _authService!.sysauth!,
+        useHttps: router.useHttps,
+      );
+
+      // Extract router's own IPs and MAC addresses for self-filtering
+      final routerIps = <String>{router.ipAddress, '127.0.0.1', '0.0.0.0'};
+      final routerMacs = <String>{};
+
+      // Fetch network device status from router to extract all router interface MACs
+      try {
+        final devRes = await _apiService!.call(
+          router.ipAddress,
+          _authService!.sysauth!,
+          router.useHttps,
+          object: 'network.device',
+          method: 'status',
+          params: {},
+        );
+        if (devRes is List && devRes.length > 1 && devRes[0] == 0 && devRes[1] is Map) {
+          final devs = devRes[1] as Map<String, dynamic>;
+          devs.forEach((devName, devData) {
+            if (devData is Map && devData['macaddr'] != null) {
+              final m = normMac(devData['macaddr'].toString());
+              if (m.isNotEmpty && m != '00:00:00:00:00:00') {
+                routerMacs.add(m);
+              }
+            }
+          });
+        }
+      } catch (_) {}
+
+      hostHints.forEach((mac, info) {
+        final m = normMac(mac);
+        final ipaddrs = info['ipaddrs'] as List?;
+        if (ipaddrs != null && ipaddrs.contains(router.ipAddress)) {
+          routerMacs.add(m);
+          for (final ip in ipaddrs) {
+            routerIps.add(ip.toString());
+          }
+        }
+      });
+
+      final clientMap = <String, Client>{};
+
+      // A. Process IPv4 DHCP leases
+      for (final l in dhcp4Leases) {
+        final c = Client.fromLease(l);
+        final macN = normMac(c.macAddress);
+        if (macN.isEmpty || macN == 'N/A' || macN == '00:00:00:00:00:00') continue;
+
+        var hostname = c.hostname;
+        if ((hostname == 'Unknown' || hostname.isEmpty) && hostHints.containsKey(macN)) {
+          final hintName = hostHints[macN]?['name']?.toString();
+          if (hintName != null && hintName.isNotEmpty && hintName != '*') {
+            hostname = hintName;
           }
         }
 
-        final cmpType =
-            typeOrder(a.connectionType).compareTo(typeOrder(b.connectionType));
-        if (cmpType != 0) return cmpType;
-        return a.hostname.toLowerCase().compareTo(b.hostname.toLowerCase());
+        final staticName = hostHints[macN]?['staticLeaseName']?.toString();
+        final isWireless = normalizedWireless.contains(macN);
+        final foundSsid = macToSsidMap[macN];
+
+        final hintV6 = hostHints[macN]?['ip6addrs'] as List?;
+        final v6List = (hintV6 != null && hintV6.isNotEmpty)
+            ? hintV6.map((e) => e.toString()).toList()
+            : c.ipv6Addresses;
+
+        clientMap[macN] = c.copyWith(
+          hostname: hostname,
+          connectionType: isWireless ? ConnectionType.wireless : ConnectionType.wired,
+          ssid: foundSsid,
+          staticLeaseName: staticName,
+          ipv6Addresses: v6List,
+        );
+      }
+
+      // B. Process IPv6 DHCP leases & consolidate under existing client or new entry
+      for (final l in dhcp6Leases) {
+        final macRaw = l['macaddr']?.toString() ?? l['mac']?.toString() ?? '';
+        final macN = macRaw.isNotEmpty ? normMac(macRaw) : '';
+        final hostname = l['hostname']?.toString();
+
+        List<String> v6Addrs = [];
+        if (l['ip6addrs'] is List) {
+          v6Addrs = (l['ip6addrs'] as List).map((e) => e.toString()).toList();
+        } else if (l['ip6addr'] != null) {
+          v6Addrs = [l['ip6addr'].toString()];
+        }
+
+        if (macN.isNotEmpty && clientMap.containsKey(macN)) {
+          final existing = clientMap[macN]!;
+          final mergedV6 = <String>{...?(existing.ipv6Addresses), ...v6Addrs}.toList();
+          clientMap[macN] = existing.copyWith(ipv6Addresses: mergedV6);
+        } else {
+          String? matchedMac;
+          if (macN.isNotEmpty) {
+            matchedMac = macN;
+          } else {
+            hostHints.forEach((hMac, info) {
+              if (matchedMac != null) return;
+              final hName = info['name']?.toString();
+              if (hostname != null && hostname.isNotEmpty && hName != null &&
+                  (hName == hostname || hName == '$hostname.lan')) {
+                matchedMac = normMac(hMac);
+              }
+            });
+          }
+
+          if (matchedMac != null && matchedMac!.isNotEmpty) {
+            if (clientMap.containsKey(matchedMac)) {
+              final existing = clientMap[matchedMac]!;
+              final mergedV6 = <String>{...?(existing.ipv6Addresses), ...v6Addrs}.toList();
+              clientMap[matchedMac!] = existing.copyWith(ipv6Addresses: mergedV6);
+            } else {
+              final isWireless = normalizedWireless.contains(matchedMac!);
+              final staticName = hostHints[matchedMac]?['staticLeaseName']?.toString();
+              clientMap[matchedMac!] = Client(
+                ipAddress: 'N/A',
+                macAddress: matchedMac!,
+                hostname: (hostname != null && hostname.isNotEmpty) ? hostname : matchedMac!,
+                connectionType: isWireless ? ConnectionType.wireless : ConnectionType.wired,
+                ssid: macToSsidMap[matchedMac],
+                staticLeaseName: staticName,
+                ipv6Addresses: v6Addrs,
+              );
+            }
+          }
+        }
+      }
+
+      // C. Merge Static Leases configured on router that have no active dynamic lease yet
+      hostHints.forEach((mac, info) {
+        final macN = normMac(mac);
+        if (!clientMap.containsKey(macN)) {
+          final hintName = info['name']?.toString();
+          final staticName = info['staticLeaseName']?.toString();
+          final ipaddrs = info['ipaddrs'] as List?;
+          final ip = (ipaddrs != null && ipaddrs.isNotEmpty) ? ipaddrs.first.toString() : 'N/A';
+          final name = (hintName != null && hintName.isNotEmpty && hintName != '*') ? hintName : macN;
+          final isWireless = normalizedWireless.contains(macN);
+          final hintV6 = info['ip6addrs'] as List?;
+          final v6List = (hintV6 != null && hintV6.isNotEmpty)
+              ? hintV6.map((e) => e.toString()).toList()
+              : null;
+
+          clientMap[macN] = Client(
+            ipAddress: ip,
+            macAddress: macN,
+            hostname: name,
+            connectionType: isWireless ? ConnectionType.wireless : ConnectionType.wired,
+            ssid: macToSsidMap[macN],
+            staticLeaseName: staticName,
+            ipv6Addresses: v6List,
+          );
+        }
       });
-      return clients;
+
+      // D. Final pass: Compute active connection status, populate IP fallback, strict Wi-Fi tag assignment & self-filtering
+      final processedClients = <Client>[];
+      final sysHostname = (router.lastKnownHostname ?? '').trim().toLowerCase();
+
+      for (final c in clientMap.values) {
+        final macN = normMac(c.macAddress);
+
+        // Filter out router's own IP / MAC interfaces / hostname
+        if (routerMacs.contains(macN) || routerIps.contains(c.ipAddress)) {
+          continue;
+        }
+        if (sysHostname.isNotEmpty) {
+          final nameLower = c.displayName.trim().toLowerCase();
+          if (nameLower == sysHostname || nameLower == '$sysHostname.lan') {
+            continue;
+          }
+        }
+
+        // Populate IPv4 address from hostHints or ARP if currently 'N/A' or empty
+        var resolvedIp = c.ipAddress;
+        if ((resolvedIp == 'N/A' || resolvedIp.isEmpty) && hostHints.containsKey(macN)) {
+          final hintIps = hostHints[macN]?['ipaddrs'] as List?;
+          if (hintIps != null && hintIps.isNotEmpty) {
+            resolvedIp = hintIps.first.toString();
+          }
+          if ((resolvedIp == 'N/A' || resolvedIp.isEmpty) && hostHints[macN]?['staticLeaseIp'] != null) {
+            resolvedIp = hostHints[macN]!['staticLeaseIp'].toString();
+          }
+        }
+        if (resolvedIp == 'N/A' || resolvedIp.isEmpty) {
+          final arpMatch = arpClients.firstWhere(
+            (a) => normMac(a['macaddr'] as String) == macN,
+            orElse: () => <String, dynamic>{},
+          );
+          if (arpMatch.containsKey('ipaddr')) {
+            resolvedIp = arpMatch['ipaddr']?.toString() ?? 'N/A';
+          }
+        }
+
+        final isWirelessActive = normalizedWireless.contains(macN);
+        final isArpActive = arpClients.any((a) {
+          final aMac = normMac(a['macaddr'] as String);
+          final dev = (a['device'] as String? ?? '').toLowerCase();
+          final isWlanDev = dev.startsWith('wlan') || dev.startsWith('phy') || dev.startsWith('ra') || dev.startsWith('wifi') || dev.startsWith('ath');
+          return aMac == macN && !isWlanDev;
+        });
+
+        // Connected status: Must be actively associated on Wi-Fi radio OR responding in ARP
+        final isConnected = isWirelessActive || isArpActive;
+
+        // Filter out nameless entries with no IPv4, only link-local (fe80::) IPv6, and disconnected
+        final hasValidIp = resolvedIp != 'N/A' && resolvedIp.isNotEmpty;
+        final hasGlobalV6 = c.ipv6Addresses != null &&
+            c.ipv6Addresses!.any((addr) => !addr.toLowerCase().startsWith('fe80:'));
+        final hasName = (c.staticLeaseName != null && c.staticLeaseName!.isNotEmpty) ||
+            (c.hostname != 'Unknown' && c.hostname.isNotEmpty && c.hostname != macN);
+
+        if (!hasValidIp && !hasGlobalV6 && !hasName && !isConnected) {
+          continue;
+        }
+
+        // Strictly assign ConnectionType.wireless ONLY if connected through a wireless radio
+        final finalConnType = isWirelessActive ? ConnectionType.wireless : ConnectionType.wired;
+
+        final isLeaseExpired = c.leaseTime != null && c.leaseTime! < 0;
+        final isStaticLease = hostHints[macN]?['isStaticLease'] == true ||
+            (c.staticLeaseName != null && c.staticLeaseName!.isNotEmpty);
+
+        if (isConnected || !isLeaseExpired || isStaticLease) {
+          processedClients.add(c.copyWith(
+            ipAddress: resolvedIp,
+            isConnected: isConnected,
+            connectionType: finalConnType,
+          ));
+        }
+      }
+
+      // Sort: Connected clients first, then alphabetically by display name
+      processedClients.sort((a, b) {
+        if (a.isConnected != b.isConnected) {
+          return a.isConnected ? -1 : 1;
+        }
+        return a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
+      });
+
+      return processedClients;
     } catch (e, stack) {
       Logger.exception('Failed to fetch clients for selected router', e, stack);
       return [];

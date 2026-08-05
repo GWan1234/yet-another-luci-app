@@ -58,6 +58,12 @@ abstract class IApiService {
     required bool useHttps,
     BuildContext? context,
   });
+  Future<Map<String, Map<String, dynamic>>> fetchHostHintsWithContext({
+    required String ipAddress,
+    required String sysauth,
+    required bool useHttps,
+    BuildContext? context,
+  });
   Future<dynamic> uciSet(
     String ipAddress,
     String sysauth,

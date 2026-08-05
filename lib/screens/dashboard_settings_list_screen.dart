@@ -5,6 +5,8 @@ import 'package:luci_mobile/widgets/luci_app_bar.dart';
 import 'package:luci_mobile/design/luci_design_system.dart';
 import 'package:luci_mobile/screens/router_dashboard_settings_screen.dart';
 
+import 'package:luci_mobile/widgets/theme_router_logo.dart';
+
 class DashboardSettingsListScreen extends ConsumerWidget {
   const DashboardSettingsListScreen({super.key});
 
@@ -58,17 +60,9 @@ class DashboardSettingsListScreen extends ConsumerWidget {
                       horizontal: 16,
                       vertical: 8,
                     ),
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.router,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        size: 22,
-                      ),
+                    leading: const ThemeRouterLogo(
+                      width: 32,
+                      height: 32,
                     ),
                     title: Text(
                       title,

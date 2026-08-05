@@ -1,6 +1,6 @@
-Take full control of your OpenWrt router with LuCI Mobile. Our app offers a modern, intuitive interface to securely manage your home network from anywhere.
+Take full control of your OpenWrt router with Yet Another LuCI by Tuhin Garai. Our app offers a modern, intuitive interface to securely manage your home network from anywhere.
 
-Designed for both power users and network enthusiasts, LuCI Mobile simplifies router management without sacrificing functionality.
+Designed for both power users and network enthusiasts, Yet Another LuCI simplifies router management without sacrificing functionality.
 
 <b>Key Features:</b>
 
@@ -22,11 +22,12 @@ This app requires an OpenWrt router with the LuCI web interface enabled. For rem
 
 <b>Support & Source Code:</b>
 
-LuCI Mobile is an open-source project. For support, to report issues, or to view the source code, please visit our GitHub repository:
+Yet Another LuCI is an open-source project by Tuhin Garai (nightcodex7). For support, to report issues, or to view the source code, please visit our GitHub repository:
 
-https://github.com/cogwheel0/luci-mobile
+https://github.com/nightcodex7/yet-another-luci-app
 
-Email: cogwheel@cogwheel.app
+Author: Tuhin Garai (nightcodex7)
+Email: tuhingarai123@gmail.com
 
 -----
 

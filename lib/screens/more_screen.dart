@@ -13,6 +13,8 @@ import 'package:luci_mobile/config/app_config.dart';
 import 'package:luci_mobile/screens/manage_routers_screen.dart';
 import 'package:luci_mobile/utils/http_client_manager.dart';
 import 'package:luci_mobile/state/app_state.dart';
+import 'package:luci_mobile/modules/core/luci_module_registry.dart';
+import 'package:luci_mobile/widgets/theme_router_logo.dart';
 
 class _MoreScreenSection extends StatelessWidget {
   final List<Widget> tiles;
@@ -227,20 +229,22 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
           return AlertDialog(
             title: Row(
               children: [
-                const Icon(Icons.router, size: 32),
+                const ThemeRouterLogo(width: 32, height: 32, showShadow: true),
                 const SizedBox(width: 12),
-                const Text('LuCI Mobile'),
+                const Text('Yet Another LuCI'),
               ],
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Version ${info.version}'),
-                const SizedBox(height: 16),
-                const Text('A mobile client for OpenWrt routers.'),
-                const SizedBox(height: 16),
-                const Text('Open source and free to use.'),
+                Text('Version ${info.version}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                const Text('A modern, high-performance OpenWrt router management mobile application.'),
+                const SizedBox(height: 12),
+                const Text('Author: Tuhin Garai (nightcodex7)', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+                const Text('Open source & free for the OpenWrt community.'),
                 const SizedBox(height: 16),
                 InkWell(
                   onTap: () async {
@@ -324,6 +328,25 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                   ],
                 );
               },
+            ),
+            const LuciSectionHeader('Management Modules'),
+            _MoreScreenSection(
+              tiles: LuciModuleRegistry.instance.enabledModules.where((m) => !m.showInBottomNav).map((module) {
+                return _buildMoreTile(
+                  context,
+                  icon: module.icon,
+                  iconColor: Theme.of(context).colorScheme.primary,
+                  title: module.name,
+                  subtitle: module.description,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => module.buildScreen(context),
+                      ),
+                    );
+                  },
+                );
+              }).toList(),
             ),
             const LuciSectionHeader('Application'),
             _MoreScreenSection(

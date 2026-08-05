@@ -4,6 +4,7 @@ import 'package:luci_mobile/main.dart';
 import 'package:luci_mobile/models/router.dart' as model;
 import 'package:luci_mobile/widgets/luci_app_bar.dart';
 import 'package:luci_mobile/utils/url_parser.dart';
+import 'package:luci_mobile/widgets/theme_router_logo.dart';
 
 class ManageRoutersScreen extends ConsumerStatefulWidget {
   const ManageRoutersScreen({super.key});
@@ -671,20 +672,9 @@ class _UnifiedRouterCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           child: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withValues(alpha: 0.13),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.router,
-                  color: isSelected
-                      ? colorScheme.primary
-                      : colorScheme.onSurface,
-                  size: 22,
-                  semanticLabel: 'Router icon',
-                ),
+              const ThemeRouterLogo(
+                width: 34,
+                height: 34,
               ),
               const SizedBox(width: 16),
               Expanded(

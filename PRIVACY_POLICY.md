@@ -1,9 +1,9 @@
 # Privacy Policy
 
-**LuCI Mobile**  
-Last updated: July 7, 2025
+**Yet Another LuCI** (by Tuhin Garai)  
+Last updated: August 4, 2026
 
-LuCI Mobile ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how our mobile application ("App") collects, uses, and safeguards your information when you use the App to manage your OpenWrt/LuCI routers.
+Yet Another LuCI ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how our mobile application ("App") collects, uses, and safeguards your information when you use the App to manage your OpenWrt/LuCI routers.
 
 ## 1. Information We Collect
 
@@ -49,4 +49,4 @@ LuCI Mobile ("we", "our", or "us") is committed to protecting your privacy. This
 ## 7. Contact Us
 
 If you have any questions or concerns about this Privacy Policy, please contact us at:  
-[github.com/cogwheel0/luci-mobile/issues] 
+[github.com/nightcodex7/yet-another-luci-app/issues] 

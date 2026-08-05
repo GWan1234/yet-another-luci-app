@@ -7,7 +7,6 @@ import 'package:luci_mobile/widgets/luci_app_bar.dart';
 import 'package:luci_mobile/design/luci_design_system.dart';
 import 'package:luci_mobile/widgets/luci_loading_states.dart';
 import 'package:luci_mobile/widgets/luci_refresh_components.dart';
-import 'package:luci_mobile/widgets/luci_animation_system.dart';
 
 class ClientsScreen extends ConsumerStatefulWidget {
   const ClientsScreen({super.key});
@@ -19,7 +18,7 @@ class ClientsScreen extends ConsumerStatefulWidget {
 class _ClientsScreenState extends ConsumerState<ClientsScreen>
     with SingleTickerProviderStateMixin {
   String _searchQuery = '';
-  final Set<int> _expandedClientIndices = {};
+  final Set<String> _expandedClientMacs = {};
   late AnimationController _controller;
   late TextEditingController _searchController;
   bool _aggregateAllRouters = true;
@@ -144,16 +143,18 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                     }
 
                     final clients = aggregatedClients;
-
                     final filteredClients = clients.where((client) {
                       final query = _searchQuery.toLowerCase();
-                      return client.hostname.toLowerCase().contains(query) ||
+                      return client.displayName.toLowerCase().contains(query) ||
+                          client.hostname.toLowerCase().contains(query) ||
                           client.ipAddress.toLowerCase().contains(query) ||
                           client.macAddress.toLowerCase().contains(query) ||
                           (client.vendor != null &&
                               client.vendor!.toLowerCase().contains(query)) ||
                           (client.dnsName != null &&
-                              client.dnsName!.toLowerCase().contains(query));
+                              client.dnsName!.toLowerCase().contains(query)) ||
+                          (client.ssid != null &&
+                              client.ssid!.toLowerCase().contains(query));
                     }).toList();
 
                     return Column(
@@ -198,43 +199,6 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                             ),
                           ),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16.0,
-                            vertical: 4.0,
-                          ),
-                          child: SegmentedButton<bool>(
-                            segments: const [
-                              ButtonSegment<bool>(
-                                value: true,
-                                label: Text('All'),
-                                icon: Icon(Icons.apartment),
-                              ),
-                              ButtonSegment<bool>(
-                                value: false,
-                                label: Text('Selected'),
-                                icon: Icon(Icons.router),
-                              ),
-                            ],
-                            selected: {_aggregateAllRouters},
-                            showSelectedIcon: false,
-                            style: SegmentedButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                            ),
-                            onSelectionChanged: (s) {
-                              setState(() {
-                                _aggregateAllRouters = s.first;
-                                _computeClientsFuture();
-                              });
-                              // Persist selection
-                              ref
-                                  .read(appStateProvider)
-                                  .setClientsAggregateAllRouters(
-                                      _aggregateAllRouters);
-                            },
-                          ),
-                        ),
                         Expanded(
                           child: filteredClients.isEmpty
                               ? LuciEmptyState(
@@ -253,35 +217,30 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                                   itemCount: filteredClients.length,
                                   itemBuilder: (context, index) {
                                     final client = filteredClients[index];
-                                    final isExpanded = _expandedClientIndices
-                                        .contains(index);
+                                    final isExpanded = _expandedClientMacs
+                                        .contains(client.macAddress);
 
-                                    return LuciSlideTransition(
-                                      direction: LuciSlideDirection.up,
-                                      delay: Duration(milliseconds: index * 50),
-                                      distance: 30,
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16.0,
-                                          vertical: 8.0,
-                                        ),
-                                        child: _UnifiedClientCard(
-                                          client: client,
-                                          isExpanded: isExpanded,
-                                          onTap: () {
-                                            setState(() {
-                                              if (isExpanded) {
-                                                _expandedClientIndices.remove(
-                                                  index,
-                                                );
-                                              } else {
-                                                _expandedClientIndices.add(
-                                                  index,
-                                                );
-                                              }
-                                            });
-                                          },
-                                        ),
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16.0,
+                                        vertical: 8.0,
+                                      ),
+                                      child: _UnifiedClientCard(
+                                        client: client,
+                                        isExpanded: isExpanded,
+                                        onTap: () {
+                                          setState(() {
+                                            if (isExpanded) {
+                                              _expandedClientMacs.remove(
+                                                client.macAddress,
+                                              );
+                                            } else {
+                                              _expandedClientMacs.add(
+                                                client.macAddress,
+                                              );
+                                            }
+                                          });
+                                        },
                                       ),
                                     );
                                   },
@@ -356,198 +315,202 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Card(
-      elevation: widget.isExpanded ? 6 : 2,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18.0),
-        side: BorderSide(
-          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.10),
-          width: 1,
+    return Opacity(
+      opacity: widget.client.isConnected ? 1.0 : 0.55,
+      child: Card(
+        elevation: widget.isExpanded ? 6 : 2,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18.0),
+          side: BorderSide(
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.10),
+            width: 1,
+          ),
         ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: AnimatedScale(
-        scale: widget.isExpanded ? 1.02 : 1.0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOutBack,
-        child: Column(
-          children: [
-            InkWell(
-              onTap: widget.onTap,
-              borderRadius: BorderRadius.circular(18.0),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 8.0,
-                ),
-                child: Row(
-                  children: [
-                    Stack(
-                      alignment: Alignment.topRight,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8.0),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer.withValues(
-                              alpha: 0.13,
-                            ),
-                            shape: BoxShape.circle,
-                          ),
-                          child: AnimatedScale(
-                            scale: widget.isExpanded ? 1.1 : 1.0,
-                            duration: const Duration(milliseconds: 500),
-                            curve: Curves.elasticOut,
-                            child: Icon(
-                              Icons.person_outline,
-                              color: colorScheme.primary,
-                              size: 22,
-                              semanticLabel: 'Client icon',
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          child: Tooltip(
-                            message:
-                                widget.client.connectionType ==
-                                    ConnectionType.unknown
-                                ? 'Unknown connection type'
-                                : 'Client is online',
-                            child: Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                color:
-                                    widget.client.connectionType ==
-                                            ConnectionType.wireless ||
-                                        widget.client.connectionType ==
-                                            ConnectionType.wired
-                                    ? Colors.green
-                                    : Colors.amber,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: colorScheme.surface,
-                                  width: 1.5,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+        clipBehavior: Clip.antiAlias,
+        child: AnimatedScale(
+          scale: widget.isExpanded ? 1.02 : 1.0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutBack,
+          child: Column(
+            children: [
+              InkWell(
+                onTap: widget.onTap,
+                borderRadius: BorderRadius.circular(18.0),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 8.0,
+                  ),
+                  child: Row(
+                    children: [
+                      Stack(
+                        alignment: Alignment.topRight,
                         children: [
-                          Text(
-                            widget.client.hostname,
-                            style: LuciTextStyles.cardTitle(context),
-                            semanticsLabel:
-                                'Client hostname: ${widget.client.hostname}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: LuciSpacing.xs),
                           Container(
-                            margin: const EdgeInsets.only(right: 32),
-                            child: Divider(
-                              color: colorScheme.surfaceContainerHighest
-                                  .withValues(alpha: 0.10),
-                              thickness: 1,
-                              height: 8,
+                            padding: const EdgeInsets.all(8.0),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primaryContainer.withValues(
+                                alpha: widget.client.isConnected ? 0.13 : 0.05,
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                            child: AnimatedScale(
+                              scale: widget.isExpanded ? 1.1 : 1.0,
+                              duration: const Duration(milliseconds: 500),
+                              curve: Curves.elasticOut,
+                              child: Icon(
+                                Icons.person_outline,
+                                color: widget.client.isConnected
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurfaceVariant,
+                                size: 22,
+                                semanticLabel: 'Client icon',
+                              ),
                             ),
                           ),
-                          Text(
-                            _buildMinimalClientSubtitle(widget.client),
-                            style: LuciTextStyles.cardSubtitle(context),
-                            semanticsLabel:
-                                'Client details: ${_buildMinimalClientSubtitle(widget.client)}',
-                          ),
-                          if (widget.client.vendor != null &&
-                              widget.client.vendor!.isNotEmpty)
-                            Text(
-                              widget.client.vendor!,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurface.withValues(
-                                  alpha: 0.7,
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: Tooltip(
+                              message: widget.client.isConnected
+                                  ? 'Client is online'
+                                  : 'Client is offline (Lease active)',
+                              child: Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: widget.client.isConnected
+                                      ? Colors.green
+                                      : Colors.grey.shade400,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: colorScheme.surface,
+                                    width: 1.5,
+                                  ),
                                 ),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              semanticsLabel: 'Vendor: ${widget.client.vendor}',
                             ),
+                          ),
                         ],
                       ),
-                    ),
-                    _buildConnectionTypeChip(
-                      context,
-                      widget.client.connectionType,
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(
-                      widget.isExpanded ? Icons.expand_less : Icons.expand_more,
-                      color: colorScheme.onSurfaceVariant,
-                      size: 26,
-                      semanticLabel: widget.isExpanded
-                          ? 'Collapse details'
-                          : 'Expand details',
-                    ),
-                  ],
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.client.displayName,
+                              style: LuciTextStyles.cardTitle(context),
+                              semanticsLabel:
+                                  'Client name: ${widget.client.displayName}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: LuciSpacing.xs),
+                            Container(
+                              margin: const EdgeInsets.only(right: 32),
+                              child: Divider(
+                                color: colorScheme.surfaceContainerHighest
+                                    .withValues(alpha: 0.10),
+                                thickness: 1,
+                                height: 8,
+                              ),
+                            ),
+                            Text(
+                              _buildMinimalClientSubtitle(widget.client),
+                              style: LuciTextStyles.cardSubtitle(context),
+                              semanticsLabel:
+                                  'Client details: ${_buildMinimalClientSubtitle(widget.client)}',
+                            ),
+                            if (widget.client.vendor != null &&
+                                widget.client.vendor!.isNotEmpty)
+                              Text(
+                                widget.client.vendor!,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurface.withValues(
+                                    alpha: 0.7,
+                                  ),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                semanticsLabel: 'Vendor: ${widget.client.vendor}',
+                              ),
+                          ],
+                        ),
+                      ),
+                      _buildConnectionTypeChip(
+                        context,
+                        widget.client,
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        widget.isExpanded ? Icons.expand_less : Icons.expand_more,
+                        color: colorScheme.onSurfaceVariant,
+                        size: 26,
+                        semanticLabel: widget.isExpanded
+                            ? 'Collapse details'
+                            : 'Expand details',
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            if (widget.isExpanded)
-              Column(
-                children: [
-                  const Divider(height: 1, indent: 16, endIndent: 16),
-                  _buildClientDetails(context, widget.client),
-                ],
-              ),
-          ],
+              if (widget.isExpanded)
+                Column(
+                  children: [
+                    const Divider(height: 1, indent: 16, endIndent: 16),
+                    _buildClientDetails(context, widget.client),
+                  ],
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildConnectionTypeChip(BuildContext context, ConnectionType type) {
+  Widget _buildConnectionTypeChip(BuildContext context, Client client) {
+    if (!client.isConnected || client.connectionType != ConnectionType.wireless) {
+      return const SizedBox.shrink();
+    }
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    String label;
-    IconData icon;
-    Color bgColor;
-    Color fgColor;
+    final bgColor = colorScheme.primaryContainer;
+    final fgColor = colorScheme.onPrimaryContainer;
 
-    switch (type) {
-      case ConnectionType.wireless:
-        label = 'Wi-Fi';
-        icon = Icons.wifi;
-        bgColor = colorScheme.primaryContainer;
-        fgColor = colorScheme.onPrimaryContainer;
-        break;
-      case ConnectionType.wired:
-        label = 'Wired';
-        icon = Icons.settings_ethernet;
-        bgColor = colorScheme.secondaryContainer;
-        fgColor = colorScheme.onSecondaryContainer;
-        break;
-      default:
-        label = 'Unknown';
-        icon = Icons.devices_other_outlined;
-        bgColor = colorScheme.surfaceContainerHighest;
-        fgColor = colorScheme.onSurfaceVariant;
-        break;
-    }
-
-    return Chip(
-      label: Text(label),
-      avatar: Icon(icon, size: 16, color: fgColor),
-      backgroundColor: bgColor,
-      labelStyle: theme.textTheme.labelSmall?.copyWith(color: fgColor),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Chip(
+          label: const Text('Wi-Fi'),
+          avatar: Icon(Icons.wifi, size: 16, color: fgColor),
+          backgroundColor: bgColor,
+          labelStyle: theme.textTheme.labelSmall?.copyWith(color: fgColor),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        if (client.ssid != null && client.ssid!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: Colors.blue.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'SSID: ${client.ssid}',
+                style: const TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -645,6 +608,12 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
               'Vendor',
               client.vendor!,
               semanticsLabel: 'Vendor: ${client.vendor}',
+            ),
+          if (client.ssid != null && client.ssid!.isNotEmpty)
+            detailRow(
+              'Connected Wireless SSID',
+              client.ssid!,
+              semanticsLabel: 'SSID: ${client.ssid}',
             ),
           if (client.dnsName != null && client.dnsName!.isNotEmpty)
             detailRow(

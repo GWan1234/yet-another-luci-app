@@ -175,6 +175,48 @@ class RealApiService implements IApiService {
           }
         }
       }
+
+      // Fallback: Try ubus JSON-RPC session.login (for modern OpenWrt 24.10/25.12+)
+      try {
+        final ubusUrl = _buildUrl(ipAddress, useHttps, '/ubus');
+        final rpcPayload = {
+          'jsonrpc': '2.0',
+          'id': 1,
+          'method': 'call',
+          'params': [
+            '00000000000000000000000000000000',
+            'session',
+            'login',
+            {'username': username, 'password': password}
+          ],
+        };
+        final ubusResponse = await client.post(
+          ubusUrl.toString(),
+          data: jsonEncode(rpcPayload),
+          options: Options(
+            headers: {'Content-Type': 'application/json'},
+            validateStatus: (code) => code != null && code < 500,
+          ),
+        );
+        if (ubusResponse.statusCode == 200) {
+          final decoded = ubusResponse.data is String
+              ? jsonDecode(ubusResponse.data as String)
+              : ubusResponse.data;
+          if (decoded is Map &&
+              decoded['result'] is List &&
+              (decoded['result'] as List).length > 1) {
+            final resData = decoded['result'][1];
+            if (resData is Map && resData['ubus_rpc_session'] != null) {
+              final sessionToken = resData['ubus_rpc_session'].toString();
+              Logger.info('Successfully authenticated via ubus JSON-RPC session.login');
+              return sessionToken;
+            }
+          }
+        }
+      } catch (ubusErr) {
+        Logger.info('ubus JSON-RPC login attempt fallback error: $ubusErr');
+      }
+
       return null;
     } on DioException catch (e, stack) {
       Logger.exception('Login failed', e, stack);
@@ -296,9 +338,7 @@ class RealApiService implements IApiService {
     Map<String, dynamic>? params,
     BuildContext? context,
   }) async {
-    final url = _buildUrl(ipAddress, useHttps, '/cgi-bin/luci/admin/ubus');
     final client = _createHttpClient(useHttps, ipAddress, context: context);
-
     final rpcPayload = {
       'jsonrpc': '2.0',
       'id': 1,
@@ -306,38 +346,52 @@ class RealApiService implements IApiService {
       'params': [sysauth, object, method, params ?? {}],
     };
 
-    try {
-      final response = await client.post(
-        url.toString(),
-        data: jsonEncode(rpcPayload),
-        options: Options(
-          headers: {'Content-Type': 'application/json'},
-        ),
-      );
+    final endpoints = ['/ubus', '/cgi-bin/luci/admin/ubus'];
 
-      if (response.statusCode == 200) {
-        final decoded = response.data is String
-            ? jsonDecode(response.data as String)
-            : response.data;
-        if (decoded['error'] != null) {
-          throw Exception('RPC error: ${decoded['error']['message']}');
-        }
-        // Return in LuCI RPC format: [status, data]
-        final result = decoded['result'];
-        if (result is List && result.isNotEmpty) {
-          // Result is already in [status, data] format
-          return result;
+    for (int i = 0; i < endpoints.length; i++) {
+      final endpointPath = endpoints[i];
+      final url = _buildUrl(ipAddress, useHttps, endpointPath);
+
+      try {
+        final response = await client.post(
+          url.toString(),
+          data: jsonEncode(rpcPayload),
+          options: Options(
+            headers: {'Content-Type': 'application/json'},
+            validateStatus: (status) => status != null && status < 500,
+          ),
+        );
+
+        if (response.statusCode == 200) {
+          final decoded = response.data is String
+              ? jsonDecode(response.data as String)
+              : response.data;
+          if (decoded['error'] != null) {
+            throw Exception('RPC error: ${decoded['error']['message']}');
+          }
+          // Return in LuCI RPC format: [status, data]
+          final result = decoded['result'];
+          if (result is List && result.isNotEmpty) {
+            return result;
+          } else {
+            return [0, result];
+          }
+        } else if (response.statusCode == 404 && i < endpoints.length - 1) {
+          // Fallback to next endpoint
+          continue;
         } else {
-          // Wrap single result in format: [0, data]
-          return [0, result];
+          throw Exception('Failed to call RPC: HTTP ${response.statusCode}');
         }
-      } else {
-        throw Exception('Failed to call RPC: HTTP ${response.statusCode}');
+      } on DioException catch (e, stack) {
+        if (i < endpoints.length - 1) {
+          continue;
+        }
+        Logger.exception('API call failed', e, stack);
+        rethrow;
       }
-    } on DioException catch (e, stack) {
-      Logger.exception('API call failed', e, stack);
-      rethrow;
     }
+
+    throw Exception('Failed to reach RPC endpoint');
   }
 
   @override
@@ -401,8 +455,11 @@ class RealApiService implements IApiService {
     required bool useHttps,
     BuildContext? context,
   }) async {
+    final result = <String, Set<String>>{};
+    final discoveredIfaces = <String, String>{}; // ifname -> ssid/label
+
     try {
-      // First, get wireless device information to find all wireless interfaces
+      // 1. Try getWirelessDevices via luci-rpc
       final wirelessResult = await callWithContext(
         ipAddress,
         sysauth,
@@ -412,51 +469,114 @@ class RealApiService implements IApiService {
         context: context,
       );
 
-      if (wirelessResult is List &&
-          wirelessResult.length > 1 &&
-          wirelessResult[0] == 0) {
+      if (wirelessResult is List && wirelessResult.length > 1 && wirelessResult[0] == 0) {
         final wirelessData = wirelessResult[1] as Map<String, dynamic>?;
-        if (wirelessData == null) return {};
+        if (wirelessData != null) {
+          for (final entry in wirelessData.entries) {
+            final radioData = entry.value as Map<String, dynamic>?;
+            if (radioData == null || radioData['interfaces'] == null) continue;
 
-        final result = <String, Set<String>>{};
+            final rawIfaces = radioData['interfaces'];
+            final interfaces = rawIfaces is List ? rawIfaces : (rawIfaces is Map ? rawIfaces.values.toList() : null);
+            if (interfaces == null) continue;
 
-        // For each wireless radio, get the associated stations
-        for (final entry in wirelessData.entries) {
-          final radioData = entry.value as Map<String, dynamic>?;
-          if (radioData == null || radioData['interfaces'] == null) continue;
-
-          final interfaces = radioData['interfaces'] as List?;
-          if (interfaces == null) continue;
-
-          for (final iface in interfaces) {
-            if (iface is Map<String, dynamic>) {
-              final ifname = iface['ifname'] as String?;
-              if (ifname != null) {
-                // Fetch associated stations for this interface
-                final stations = await fetchAssociatedStationsWithContext(
-                  ipAddress: ipAddress,
-                  sysauth: sysauth,
-                  useHttps: useHttps,
-                  interface: ifname,
-                  context: context?.mounted == true ? context : null,
-                );
-                if (stations.isNotEmpty) {
-                  result[ifname] = stations.toSet();
+            for (final iface in interfaces) {
+              if (iface is Map<String, dynamic>) {
+                final ifname = iface['ifname']?.toString();
+                final ssid = iface['config']?['ssid']?.toString() ??
+                    iface['iwinfo']?['ssid']?.toString() ??
+                    iface['ssid']?.toString() ??
+                    ifname;
+                if (ifname != null && ifname.isNotEmpty) {
+                  discoveredIfaces[ifname] = ssid ?? ifname;
                 }
               }
             }
           }
         }
-        return result;
       }
-      return {};
-    } catch (e, stack) {
-      Logger.exception('Failed to fetch all associated stations', e, stack);
-      return {};
+    } catch (_) {}
+
+    // 2. Query UCI wireless configuration directly for VAP interface names & maclists
+    try {
+      final uciRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'get',
+        params: {'config': 'wireless'},
+        context: context?.mounted == true ? context : null,
+      );
+      if (uciRes is List && uciRes.length > 1 && uciRes[0] == 0) {
+        final values = (uciRes[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>?;
+        if (values != null) {
+          for (final section in values.values) {
+            if (section is Map<String, dynamic> && section['.type'] == 'wifi-iface') {
+              final ifname = section['ifname']?.toString();
+              final ssid = section['ssid']?.toString() ?? ifname;
+              if (ifname != null && ifname.isNotEmpty && ssid != null) {
+                discoveredIfaces[ifname] = ssid;
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 3. Command/ubus fallback to find interface names if none found
+    if (discoveredIfaces.isEmpty) {
+      try {
+        final resIwDev = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'file',
+          method: 'exec',
+          params: {'command': 'iw', 'args': ['dev']},
+          context: context?.mounted == true ? context : null,
+        );
+        if (resIwDev is List && resIwDev.length > 1 && resIwDev[0] == 0) {
+          final data = resIwDev[1] as Map<String, dynamic>?;
+          final stdout = data?['stdout']?.toString() ?? '';
+          String? currentIface;
+          for (final line in stdout.split('\n')) {
+            final trimmed = line.trim();
+            if (trimmed.startsWith('Interface ')) {
+              currentIface = trimmed.substring(10).trim();
+              discoveredIfaces[currentIface] = currentIface;
+            } else if (trimmed.startsWith('ssid ') && currentIface != null) {
+              final ssid = trimmed.substring(5).trim();
+              discoveredIfaces[currentIface] = ssid;
+            }
+          }
+        }
+      } catch (_) {}
     }
+
+    // 3. For every discovered interface, fetch associated stations
+    for (final entry in discoveredIfaces.entries) {
+      final ifname = entry.key;
+      final label = entry.value;
+
+      final stations = await fetchAssociatedStationsWithContext(
+        ipAddress: ipAddress,
+        sysauth: sysauth,
+        useHttps: useHttps,
+        interface: ifname,
+        context: context?.mounted == true ? context : null,
+      );
+
+      if (stations.isNotEmpty) {
+        result[label] = (result[label] ?? {})..addAll(stations);
+      }
+    }
+
+    return result;
   }
 
   /// Fetches associated stations (wireless clients) for a given wireless interface (e.g., wlan0)
+  /// Fetches associated stations (wireless clients) for a given wireless interface (e.g., phy0-ap0, wlan0)
   @override
   Future<List<String>> fetchAssociatedStationsWithContext({
     required String ipAddress,
@@ -465,35 +585,235 @@ class RealApiService implements IApiService {
     required String interface,
     BuildContext? context,
   }) async {
+    final stations = <String>{};
+
     try {
-      final result = await callWithContext(
+      // 1. Try iwinfo assoclist
+      final resultIw = await callWithContext(
         ipAddress,
         sysauth,
         useHttps,
         object: 'iwinfo',
         method: 'assoclist',
         params: {'device': interface},
-        context: context,
+        context: context?.mounted == true ? context : null,
       );
-      // Handle LuCI RPC format: [status, data]
-      if (result is List && result.length > 1 && result[0] == 0) {
-        final data = result[1];
+      if (resultIw is List && resultIw.length > 1 && resultIw[0] == 0) {
+        final data = resultIw[1];
         if (data is Map && data['results'] is List) {
-          final resultsList = data['results'] as List;
-          return resultsList
-              .map(
-                (entry) => (entry as Map<String, dynamic>)['mac']?.toString(),
-              )
-              .where((mac) => mac != null)
-              .cast<String>()
-              .toList();
+          for (final entry in (data['results'] as List)) {
+            final mac = (entry as Map<String, dynamic>)['mac']?.toString();
+            if (mac != null && mac.isNotEmpty) {
+              stations.add(mac.toUpperCase().replaceAll('-', ':'));
+            }
+          }
         }
       }
-      return [];
-    } catch (e, stack) {
-      Logger.exception('Failed to fetch associated stations', e, stack);
-      return [];
+    } catch (_) {}
+
+    try {
+      // 2. Try hostapd.<interface> get_clients
+      final resultHostapd = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'hostapd.$interface',
+        method: 'get_clients',
+        params: {},
+        context: context?.mounted == true ? context : null,
+      );
+      if (resultHostapd is List && resultHostapd.length > 1 && resultHostapd[0] == 0) {
+        final data = resultHostapd[1];
+        if (data is Map && data['clients'] is Map) {
+          final clientsMap = data['clients'] as Map<String, dynamic>;
+          for (final mac in clientsMap.keys) {
+            stations.add(mac.toUpperCase().replaceAll('-', ':'));
+          }
+        }
+      }
+    } catch (_) {}
+
+    if (stations.isEmpty) {
+      try {
+        // 3. Command execution fallback (iwinfo <iface> assoclist or iw dev <iface> station dump)
+        final resExec1 = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'file',
+          method: 'exec',
+          params: {'command': 'iwinfo', 'args': [interface, 'assoclist']},
+          context: context?.mounted == true ? context : null,
+        );
+        if (resExec1 is List && resExec1.length > 1 && resExec1[0] == 0) {
+          final data = resExec1[1] as Map<String, dynamic>?;
+          final stdout = data?['stdout']?.toString() ?? '';
+          final macRegex = RegExp(r'([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})');
+          for (final m in macRegex.allMatches(stdout)) {
+            final macStr = m.group(0);
+            if (macStr != null) stations.add(macStr.toUpperCase().replaceAll('-', ':'));
+          }
+        }
+
+        if (stations.isEmpty) {
+          final resExec2 = await callWithContext(
+            ipAddress,
+            sysauth,
+            useHttps,
+            object: 'file',
+            method: 'exec',
+            params: {'command': 'iw', 'args': ['dev', interface, 'station', 'dump']},
+            context: context?.mounted == true ? context : null,
+          );
+          if (resExec2 is List && resExec2.length > 1 && resExec2[0] == 0) {
+            final data = resExec2[1] as Map<String, dynamic>?;
+            final stdout = data?['stdout']?.toString() ?? '';
+            final macRegex = RegExp(r'([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})');
+            for (final m in macRegex.allMatches(stdout)) {
+              final macStr = m.group(0);
+              if (macStr != null) stations.add(macStr.toUpperCase().replaceAll('-', ':'));
+            }
+          }
+        }
+      } catch (_) {}
     }
+
+    return stations.toList();
+  }
+
+  /// Fetches Host Hints dictionary from luci-rpc and UCI dhcp static host leases
+  @override
+  Future<Map<String, Map<String, dynamic>>> fetchHostHintsWithContext({
+    required String ipAddress,
+    required String sysauth,
+    required bool useHttps,
+    BuildContext? context,
+  }) async {
+    final hints = <String, Map<String, dynamic>>{};
+
+    // 1. Fetch static DHCP host leases directly from UCI (dhcp)
+    try {
+      final uciRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'get',
+        params: {'config': 'dhcp', 'type': 'host'},
+        context: context?.mounted == true ? context : null,
+      );
+      if (uciRes is List && uciRes.length > 1 && uciRes[0] == 0) {
+        final rawData = uciRes[1];
+        Map<String, dynamic>? values;
+        if (rawData is Map<String, dynamic>) {
+          if (rawData['values'] is Map<String, dynamic>) {
+            values = rawData['values'] as Map<String, dynamic>;
+          } else {
+            values = rawData;
+          }
+        }
+        if (values != null) {
+          values.forEach((_, sec) {
+            if (sec is Map<String, dynamic>) {
+              final rawName = sec['name']?.toString() ??
+                  sec['hostname']?.toString() ??
+                  sec['comment']?.toString() ??
+                  sec['description']?.toString();
+              final rawMac = sec['mac'];
+              if (rawName != null && rawName.isNotEmpty && rawMac != null) {
+                final macList = <String>[];
+                if (rawMac is List) {
+                  macList.addAll(rawMac.map((e) => e.toString()));
+                } else if (rawMac is String) {
+                  macList.addAll(rawMac.split(RegExp(r'\s+')));
+                }
+                for (final mac in macList) {
+                  final normMac = mac
+                      .toUpperCase()
+                      .replaceAll('-', ':')
+                      .split(':')
+                      .map((b) => b.length == 1 ? '0$b' : b)
+                      .join(':');
+                  if (normMac.isNotEmpty) {
+                    hints[normMac] = {
+                      'name': rawName,
+                      'staticLeaseName': rawName,
+                      'ipaddrs': sec['ip'] != null ? [sec['ip'].toString()] : [],
+                      'staticLeaseIp': sec['ip']?.toString(),
+                      'isStaticLease': true,
+                    };
+                  }
+                }
+              }
+            }
+          });
+        }
+      }
+    } catch (_) {}
+
+    // 2. Fetch getHostHints from luci-rpc (merges /etc/hosts, ethers, and active leases)
+    try {
+      final res = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'luci-rpc',
+        method: 'getHostHints',
+        params: {},
+        context: context?.mounted == true ? context : null,
+      );
+      if (res is List && res.length > 1 && res[0] == 0) {
+        final data = res[1];
+        if (data is Map<String, dynamic>) {
+          data.forEach((mac, info) {
+            if (info is Map<String, dynamic>) {
+              final normMac = mac
+                  .trim()
+                  .toUpperCase()
+                  .replaceAll('-', ':')
+                  .split(':')
+                  .map((b) => b.length == 1 ? '0$b' : b)
+                  .join(':');
+              var name = info['name']?.toString();
+              if (name != null && name.isNotEmpty && name != '*') {
+                if (name.endsWith('.lan')) {
+                  name = name.substring(0, name.length - 4);
+                } else if (name.endsWith('.local')) {
+                  name = name.substring(0, name.length - 6);
+                }
+              }
+              final existing = hints[normMac];
+              final validName = (name != null && name.isNotEmpty && name != '*') ? name : null;
+              final newIps = info['ipaddrs'] as List?;
+              final newV6Ips = info['ip6addrs'] as List?;
+              if (existing == null) {
+                hints[normMac] = {
+                  'name': name ?? '',
+                  'staticLeaseName': validName,
+                  'ipaddrs': newIps ?? [],
+                  'ip6addrs': newV6Ips ?? [],
+                };
+              } else {
+                // Keep static lease name if set, otherwise update missing fields
+                if (existing['name'] == null || existing['name'].toString().isEmpty) {
+                  existing['name'] = name ?? '';
+                }
+                if (existing['staticLeaseName'] == null && validName != null) {
+                  existing['staticLeaseName'] = validName;
+                }
+                if (newIps != null && newIps.isNotEmpty) {
+                  existing['ipaddrs'] = newIps;
+                }
+                if (newV6Ips != null && newV6Ips.isNotEmpty) {
+                  existing['ip6addrs'] = newV6Ips;
+                }
+              }
+            }
+          });
+        }
+      }
+    } catch (_) {}
+    return hints;
   }
 
   @override
@@ -561,9 +881,9 @@ class RealApiService implements IApiService {
         final peers = <String, dynamic>{};
 
         // The structure might have peers in different formats
-        if (value['peers'] is List) {
-          final peersList = value['peers'] as List;
-          for (final peer in peersList) {
+        final rawPeers = value['peers'];
+        if (rawPeers is List) {
+          for (final peer in rawPeers) {
             if (peer is Map<String, dynamic>) {
               final publicKey = peer['public_key'] as String?;
               if (publicKey != null) {
@@ -575,20 +895,23 @@ class RealApiService implements IApiService {
                         peer['latest_handshake']?.toString() ?? '0',
                       ) ??
                       0,
+                  'rx_bytes': peer['rx_bytes'] ?? 0,
+                  'tx_bytes': peer['tx_bytes'] ?? 0,
+                  'allowed_ips': peer['allowed_ips'] ?? [],
                 };
               }
             }
           }
-        } else if (value['peers'] is Map<String, dynamic>) {
-          final peersMap = value['peers'] as Map<String, dynamic>;
-          peersMap.forEach((peerKey, peerData) {
-            if (peerData is Map<String, dynamic>) {
-              peers[peerKey] = {
-                'public_key': peerKey,
-                'endpoint': peerData['endpoint'] ?? 'N/A',
+        } else if (rawPeers is Map) {
+          rawPeers.forEach((k, peer) {
+            if (peer is Map<String, dynamic>) {
+              final publicKey = peer['public_key'] as String? ?? k.toString();
+              peers[publicKey] = {
+                'public_key': publicKey,
+                'endpoint': peer['endpoint'] ?? 'N/A',
                 'last_handshake':
                     int.tryParse(
-                      peerData['latest_handshake']?.toString() ?? '0',
+                      peer['latest_handshake']?.toString() ?? '0',
                     ) ??
                     0,
               };

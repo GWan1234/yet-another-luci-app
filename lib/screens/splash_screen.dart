@@ -1,8 +1,8 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:luci_mobile/services/secure_storage_service.dart';
 import 'package:luci_mobile/config/app_config.dart';
+import 'package:luci_mobile/widgets/theme_router_logo.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -43,7 +43,7 @@ class _SplashScreenState extends State<SplashScreen>
       // Navigate directly to main screen in reviewer mode
       unawaited(Navigator.of(context).pushReplacementNamed('/'));
     } else if (mounted) {
-      // Normal flow - go to login screen
+      // Direct flow - go straight to login screen
       unawaited(Navigator.of(context).pushReplacementNamed('/login'));
     }
   }
@@ -79,30 +79,39 @@ class _SplashScreenState extends State<SplashScreen>
             children: [
               ScaleTransition(
                 scale: _logoScale,
-                child: Icon(
-                  Icons.router,
-                  size: 100,
-                  color: colorScheme.onSurface,
+                child: const ThemeRouterLogo(
+                  width: 140,
+                  height: 140,
+                  showShadow: true,
                 ),
               ),
               const SizedBox(height: 32),
               Text(
-                'LuCI Mobile',
+                'Yet Another LuCI',
                 style: theme.textTheme.headlineLarge?.copyWith(
-                  color: colorScheme.onPrimaryContainer,
+                  color: colorScheme.onSurface,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.2,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                'OpenWrt Router Control',
+                'OpenWrt Router Management System',
                 style: theme.textTheme.titleMedium?.copyWith(
-                  color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
-                  fontWeight: FontWeight.w500,
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+              Text(
+                'By Tuhin Garai (nightcodex7)',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 36),
               const CircularProgressIndicator(),
             ],
           ),

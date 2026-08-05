@@ -100,7 +100,7 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
   void didUpdateWidget(InterfacesScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // Handle parameter changes (important for iOS navigation)
+    // Handle parameter changes
     if (widget.scrollToInterface != oldWidget.scrollToInterface) {
       _targetInterface = widget.scrollToInterface;
       if (_targetInterface != null) {
@@ -136,8 +136,8 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
 
         if (dashboardData != null) {
           // Check wired interfaces first
-          final wiredInterfaces =
-              dashboardData['interfaceDump']?['interface'] as List<dynamic>?;
+          final rawWired = dashboardData['interfaceDump']?['interface'];
+          final wiredInterfaces = rawWired is List ? rawWired : (rawWired is Map ? rawWired.values.toList() : null);
           if (wiredInterfaces != null) {
             for (int i = 0; i < wiredInterfaces.length; i++) {
               final iface = wiredInterfaces[i] as Map<String, dynamic>;
@@ -157,7 +157,8 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
           if (wirelessData != null) {
             final normalizedTarget = _normalizeInterfaceKey(interfaceName);
             wirelessData.forEach((radioName, radioData) {
-              final interfaces = radioData['interfaces'] as List<dynamic>?;
+              final rawIfaces = radioData['interfaces'];
+              final interfaces = rawIfaces is List ? rawIfaces : (rawIfaces is Map ? rawIfaces.values.toList() : null);
               if (interfaces != null) {
                 for (var i = 0; i < interfaces.length; i++) {
                   final interface = interfaces[i];
@@ -516,7 +517,8 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
     final runtimeInterfaces = <String>{};
     if (wirelessData != null) {
       wirelessData.forEach((radioName, radioData) {
-        final interfaces = radioData['interfaces'] as List<dynamic>?;
+        final rawIfaces = radioData['interfaces'];
+        final interfaces = rawIfaces is List ? rawIfaces : (rawIfaces is Map ? rawIfaces.values.toList() : null);
         if (interfaces != null) {
           for (final iface in interfaces) {
             final config = iface['config'] ?? {};

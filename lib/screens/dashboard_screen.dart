@@ -6,6 +6,9 @@ import 'package:luci_mobile/main.dart';
 import 'package:luci_mobile/widgets/luci_app_bar.dart';
 import 'package:luci_mobile/widgets/luci_animation_system.dart';
 import 'package:luci_mobile/models/router.dart' as model;
+import 'package:luci_mobile/modules/core/luci_module_registry.dart';
+import 'package:luci_mobile/modules/wireless_management/models/wireless_info.dart';
+import 'package:luci_mobile/widgets/theme_router_logo.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -15,74 +18,18 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  final ScrollController _wirelessScrollController = ScrollController();
-  bool _showWirelessLeftArrow = false;
-  bool _showWirelessRightArrow = false;
-
   final ScrollController _wanScrollController = ScrollController();
-  bool _showWanLeftArrow = false;
-  bool _showWanRightArrow = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(appStateProvider).fetchDashboardData();
-      // Initialize arrows after layout
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _updateWirelessArrows();
-        _updateWanArrows();
-      });
-    });
-    _wirelessScrollController.addListener(_updateWirelessArrows);
-    _wanScrollController.addListener(_updateWanArrows);
-  }
-
-  @override
-  void didUpdateWidget(covariant DashboardScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _updateWirelessArrows();
-      _updateWanArrows();
-    });
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _updateWirelessArrows();
-      _updateWanArrows();
-    });
-  }
-
-  void _updateWirelessArrows() {
-    if (!_wirelessScrollController.hasClients) return;
-    final max = _wirelessScrollController.position.maxScrollExtent;
-    final min = _wirelessScrollController.position.minScrollExtent;
-    final offset = _wirelessScrollController.offset;
-    setState(() {
-      _showWirelessLeftArrow = offset > min + 2;
-      _showWirelessRightArrow = offset < max - 2;
-    });
-  }
-
-  void _updateWanArrows() {
-    if (!_wanScrollController.hasClients) return;
-    final max = _wanScrollController.position.maxScrollExtent;
-    final min = _wanScrollController.position.minScrollExtent;
-    final offset = _wanScrollController.offset;
-    setState(() {
-      _showWanLeftArrow = offset > min + 2;
-      _showWanRightArrow = offset < max - 2;
     });
   }
 
   @override
   void dispose() {
-    _wirelessScrollController.removeListener(_updateWirelessArrows);
-    _wirelessScrollController.dispose();
-    _wanScrollController.removeListener(_updateWanArrows);
     _wanScrollController.dispose();
     super.dispose();
   }
@@ -386,57 +333,134 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   );
                 },
                 child: hasValidData && !isSwitchingRouter
-                    ? LineChart(
-                        key: ValueKey('chart_${appState.selectedRouter?.id}'),
-                        LineChartData(
-                          gridData: FlGridData(show: false),
-                          titlesData: FlTitlesData(show: false),
-                          borderData: FlBorderData(show: false),
-                          lineTouchData: LineTouchData(
-                            touchTooltipData: LineTouchTooltipData(
-                              fitInsideVertically: true,
-                              getTooltipColor: (LineBarSpot spot) => Theme.of(
-                                context,
-                              ).colorScheme.surface.withValues(alpha: 0.9),
-                              tooltipBorderRadius: BorderRadius.circular(8),
-                              tooltipPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'RX: ${_formatSpeed(appState.currentRxRate)}',
+                                  style: const TextStyle(
+                                    color: Colors.green,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
-                              getTooltipItems:
-                                  (List<LineBarSpot> touchedSpots) {
-                                    return touchedSpots.map((barSpot) {
-                                      final flSpot = barSpot;
-                                      final Color color =
-                                          flSpot.bar.gradient?.colors.first ??
-                                          flSpot.bar.color ??
-                                          Colors.white;
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'TX: ${_formatSpeed(appState.currentTxRate)}',
+                                  style: const TextStyle(
+                                    color: Colors.blue,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Expanded(
+                            child: LineChart(
+                              key: ValueKey('chart_${appState.selectedRouter?.id}'),
+                              LineChartData(
+                                gridData: FlGridData(
+                                  show: true,
+                                  drawVerticalLine: false,
+                                  getDrawingHorizontalLine: (val) => FlLine(
+                                    color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.2),
+                                    strokeWidth: 1,
+                                  ),
+                                ),
+                                titlesData: FlTitlesData(
+                                  show: true,
+                                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                  bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                  leftTitles: AxisTitles(
+                                    sideTitles: SideTitles(
+                                      showTitles: true,
+                                      reservedSize: 42,
+                                      getTitlesWidget: (value, meta) {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(right: 4.0),
+                                          child: Text(
+                                            _formatSpeed(value),
+                                            style: TextStyle(
+                                              fontSize: 9,
+                                              color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            textAlign: TextAlign.right,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                                borderData: FlBorderData(show: false),
+                                lineTouchData: LineTouchData(
+                                  touchTooltipData: LineTouchTooltipData(
+                                    fitInsideVertically: true,
+                                    getTooltipColor: (LineBarSpot spot) => Theme.of(
+                                      context,
+                                    ).colorScheme.surface.withValues(alpha: 0.9),
+                                    tooltipBorderRadius: BorderRadius.circular(8),
+                                    tooltipPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    getTooltipItems:
+                                        (List<LineBarSpot> touchedSpots) {
+                                          return touchedSpots.map((barSpot) {
+                                            final flSpot = barSpot;
+                                            final isRx = barSpot.barIndex == 0;
+                                            final Color color =
+                                                flSpot.bar.gradient?.colors.first ??
+                                                flSpot.bar.color ??
+                                                Colors.white;
 
-                                      return LineTooltipItem(
-                                        _formatSpeed(flSpot.y),
-                                        TextStyle(
-                                          color: color,
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                        textAlign: TextAlign.left,
-                                      );
-                                    }).toList();
-                                  },
+                                            return LineTooltipItem(
+                                              '${isRx ? "RX" : "TX"}: ${_formatSpeed(flSpot.y)}',
+                                              TextStyle(
+                                                color: color,
+                                                fontWeight: FontWeight.w900,
+                                              ),
+                                              textAlign: TextAlign.left,
+                                            );
+                                          }).toList();
+                                        },
+                                  ),
+                                ),
+                                lineBarsData: [
+                                  _buildLineChartBarData(rxHistory, [
+                                    Colors.green.shade700,
+                                    Colors.green.shade400,
+                                  ]),
+                                  _buildLineChartBarData(txHistory, [
+                                    Colors.blue.shade700,
+                                    Colors.blue.shade400,
+                                  ]),
+                                ],
+                              ),
+                              duration: const Duration(milliseconds: 800),
+                              curve: Curves.easeInOut,
                             ),
                           ),
-                          lineBarsData: [
-                            _buildLineChartBarData(rxHistory, [
-                              Colors.green.shade700,
-                              Colors.green.shade400,
-                            ]),
-                            _buildLineChartBarData(txHistory, [
-                              Colors.blue.shade700,
-                              Colors.blue.shade400,
-                            ]),
-                          ],
-                        ),
-                        duration: const Duration(milliseconds: 800),
-                        curve: Curves.easeInOut,
+                        ],
                       )
                     : Center(
                         key: ValueKey('loading_${appState.selectedRouter?.id}'),
@@ -654,7 +678,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final uptime = sysInfo?['uptime'] as int?;
     final uptimeValue = uptime != null ? _formatUptime(uptime) : 'N/A';
 
-    final cpuLoad = sysInfo?['load'] as List<dynamic>?;
+    final rawCpuLoad = sysInfo?['load'];
+    final cpuLoad = rawCpuLoad is List ? rawCpuLoad : (rawCpuLoad is Map ? rawCpuLoad.values.toList() : null);
     final cpuLoadValue = cpuLoad != null ? _formatCpuLoad(cpuLoad) : 'N/A';
 
     final totalMem = sysInfo?['memory']?['total'] as int? ?? 0;
@@ -700,333 +725,315 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildWirelessInfoCardContent(
-    BuildContext context, {
-    required String ssid,
-    required bool isEnabled,
-    required int? signal,
-    required String channel,
-  }) {
-    final textTheme = Theme.of(context).textTheme;
-    final primaryColor = Theme.of(context).colorScheme.primary;
+  Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 14.0, bottom: 6.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: theme.colorScheme.primary),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.wifi,
-              color: isEnabled
-                  ? primaryColor
-                  : Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.5),
-              size: 20,
+  void _showWirelessClientsBottomSheet(
+    BuildContext context,
+    String ssid,
+    String radioName,
+    String bandLabel,
+    String channel,
+    List<WirelessStation> stations,
+    AppState appState,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        final leasesRaw = appState.dashboardData?['dhcpLeases'];
+        final leases = <String, Map<String, dynamic>>{};
+        if (leasesRaw is Map<String, dynamic>) {
+          final dhcpList = leasesRaw['dhcp_leases'] ?? leasesRaw['leases'];
+          if (dhcpList is List) {
+            for (final lease in dhcpList) {
+              if (lease is Map<String, dynamic>) {
+                final mac = lease['macaddr']?.toString().toUpperCase() ?? lease['mac']?.toString().toUpperCase();
+                if (mac != null) {
+                  leases[mac] = lease;
+                }
+              }
+            }
+          }
+        }
+
+        return SafeArea(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.75,
             ),
-            const SizedBox(width: 8),
-            Text(
-              ssid,
-              style: textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.max,
-          children: [
-            if (signal != null)
-              Flexible(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.network_cell,
-                      size: 16,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        '$signal dBm',
-                        style: textTheme.bodySmall,
-                        overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Row(
+                  children: [
+                    Icon(Icons.wifi_tethering, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            ssid,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            '$radioName • $bandLabel • Channel $channel',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Chip(
+                      label: Text('${stations.length} connected'),
+                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                      labelStyle: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
                       ),
                     ),
                   ],
                 ),
-              ),
-            if (signal != null) const SizedBox(width: 8),
-            Flexible(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.settings_input_antenna,
-                    size: 16,
-                    color: Colors.grey.shade600,
-                  ),
-                  const SizedBox(width: 4),
+                const Divider(height: 24),
+                if (stations.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24.0),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Icon(Icons.devices_other, size: 40, color: Colors.grey.shade500),
+                          const SizedBox(height: 8),
+                          Text(
+                            'No clients currently associated with $radioName ($ssid).',
+                            style: TextStyle(color: Colors.grey.shade600),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
                   Flexible(
-                    child: Text(
-                      'Ch: $channel',
-                      style: textTheme.bodySmall,
-                      overflow: TextOverflow.ellipsis,
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: stations.length,
+                      separatorBuilder: (context, index) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final st = stations[index];
+                        final normMac = st.macAddress.toUpperCase();
+                        final lease = leases[normMac];
+                        final hostname = lease?['hostname']?.toString() ?? lease?['name']?.toString() ?? 'Wireless Client';
+                        final ip = lease?['ipaddr']?.toString() ?? lease?['ip']?.toString() ?? 'DHCP Unassigned';
+
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                            child: Icon(Icons.devices, color: Theme.of(context).colorScheme.primary, size: 20),
+                          ),
+                          title: Text(
+                            hostname,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          subtitle: Text(
+                            'IP: $ip\nMAC: ${st.macAddress}',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                st.formattedSignal,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: st.signalDbm != null && st.signalDbm! > -65 ? Colors.green : Colors.orange,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Text(
+                                st.signalQualityLabel,
+                                style: const TextStyle(fontSize: 10, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                   ),
-                ],
-              ),
+              ],
             ),
-          ],
-        ),
-      ],
+          ),
+        );
+      },
     );
   }
 
   Widget _buildWirelessNetworksCard(AppState appState) {
-    final prefs = appState.dashboardPreferences;
-    final wirelessRadios =
-        appState.dashboardData?['wireless'] as Map<String, dynamic>?;
-    final uciWirelessConfig = appState.dashboardData?['uciWirelessConfig'];
+    final overview = WirelessOverview.fromDashboardData(
+      appState.dashboardData,
+      isReviewerMode: appState.reviewerModeEnabled,
+    );
 
-    // Track which interfaces we've already added from runtime data
-    final addedInterfaces = <String>{};
-
-    List<Widget> networkCardWidgets = [];
-
-    // First, add interfaces from runtime wireless data
-    if (wirelessRadios != null) {
-      wirelessRadios.forEach((radioName, radioData) {
-        final interfaces = radioData['interfaces'] as List<dynamic>?;
-        if (interfaces != null) {
-          for (var interface in interfaces) {
-            final config = interface['config'] ?? {};
-            final iwinfo = interface['iwinfo'] ?? {};
-            final ssid = iwinfo['ssid'] ?? config['ssid'] ?? 'N/A';
-            if (ssid == 'N/A') continue;
-
-            final deviceName = config['device'] ?? radioName;
-            final interfaceId = '$ssid ($deviceName)';
-            final uciName = interface['section'] as String?;
-
-            if (uciName != null) {
-              addedInterfaces.add(uciName);
-            }
-
-            // If preferences are not empty, check if this interface should be shown
-            // Empty preferences means show all interfaces by default
-            if (prefs.enabledWirelessInterfaces.isNotEmpty &&
-                !prefs.enabledWirelessInterfaces.contains(interfaceId)) {
-              continue; // Skip this interface
-            }
-
-            final isEnabled = !(config['disabled'] as bool? ?? false);
-            final channel = (iwinfo['channel'] ?? config['channel'] ?? 'N/A')
-                .toString();
-            final signal = iwinfo['signal'] as int?;
-
-            networkCardWidgets.add(
-              Card(
-                margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(18),
-                  onLongPress: () {
-                    // Navigate to interfaces tab with the specific interface name
-                    final appState = ref.read(appStateProvider);
-                    appState.requestTab(2, interfaceToScroll: deviceName);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: _buildWirelessInfoCardContent(
-                      context,
-                      ssid: ssid,
-                      isEnabled: isEnabled,
-                      signal: signal,
-                      channel: channel,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }
-        }
-      });
-    }
-
-    // Now add disabled interfaces from UCI config that aren't in runtime data
-    if (uciWirelessConfig != null) {
-      final uciValues = uciWirelessConfig['values'] as Map?;
-      if (uciValues != null) {
-        final uciRadios = <String, Map>{};
-        final uciInterfaces = <String, Map>{};
-
-        // Categorize UCI entries
-        uciValues.forEach((key, value) {
-          final typedValue = value as Map?;
-          if (typedValue?['.type'] == 'wifi-device') {
-            uciRadios[key] = typedValue!;
-          } else if (typedValue?['.type'] == 'wifi-iface') {
-            uciInterfaces[key] = typedValue!;
-          }
-        });
-
-        // Add interfaces that aren't in runtime data
-        uciInterfaces.forEach((uciName, config) {
-          if (!addedInterfaces.contains(uciName)) {
-            final ssid = config['ssid'] ?? 'Unnamed';
-            final device = config['device'] ?? '';
-            final interfaceId = '$ssid ($device)';
-
-            // Check if this interface should be shown based on preferences
-            if (prefs.enabledWirelessInterfaces.isNotEmpty &&
-                !prefs.enabledWirelessInterfaces.contains(interfaceId)) {
-              return; // Skip this interface
-            }
-
-            final isRadioEnabled = uciRadios[device]?['disabled'] != '1';
-            final isIfaceEnabled = config['disabled'] != '1';
-            final isEnabled = isRadioEnabled && isIfaceEnabled;
-
-            networkCardWidgets.add(
-              Card(
-                margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(18),
-                  onLongPress: () {
-                    // Navigate to interfaces tab with the specific interface name
-                    final appState = ref.read(appStateProvider);
-                    appState.requestTab(2, interfaceToScroll: device);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: _buildWirelessInfoCardContent(
-                      context,
-                      ssid: ssid,
-                      isEnabled: isEnabled,
-                      signal: null, // No signal for disabled interfaces
-                      channel: config['channel']?.toString() ?? 'N/A',
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }
-        });
-      }
-    }
-
-    if (networkCardWidgets.isEmpty) {
+    if (overview.radios.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    List<Widget> rowChildren = [];
-    final isScrollable = networkCardWidgets.length > 2;
-    for (int i = 0; i < networkCardWidgets.length; i++) {
-      if (isScrollable) {
-        rowChildren.add(SizedBox(width: 180, child: networkCardWidgets[i]));
-      } else {
-        rowChildren.add(Expanded(child: networkCardWidgets[i]));
-      }
-      if (i < networkCardWidgets.length - 1) {
-        rowChildren.add(SizedBox(width: isScrollable ? 4 : 8));
+    final cardWidgets = <Widget>[];
+
+    for (final radio in overview.radios) {
+      for (final iface in radio.interfaces) {
+        final ssid = iface.ssid;
+        final isEnabled = iface.isEnabled;
+
+        cardWidgets.add(
+          Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                _showWirelessClientsBottomSheet(
+                  context,
+                  ssid,
+                  radio.name,
+                  radio.bandLabel,
+                  iface.channel,
+                  iface.stations,
+                  appState,
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: isEnabled ? Colors.blue.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.15),
+                      child: Icon(Icons.wifi, color: isEnabled ? Colors.blue : Colors.grey),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                ssid,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isEnabled ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  isEnabled ? 'ENABLED' : 'DISABLED',
+                                  style: TextStyle(
+                                    color: isEnabled ? Colors.green.shade800 : Colors.red.shade800,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Radio: ${radio.name} (${radio.bandLabel}) • Ch ${iface.channel} • ${iface.encryption}',
+                            style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.devices, size: 12, color: Theme.of(context).colorScheme.onPrimaryContainer),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${iface.stations.length} clients',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Tap for clients',
+                          style: TextStyle(fontSize: 9, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
       }
     }
 
-    if (isScrollable) {
-      return Stack(
-        children: [
-          SizedBox(
-            height: 110, // or whatever height fits the card
-            child: ListView(
-              controller: _wirelessScrollController,
-              scrollDirection: Axis.horizontal,
-              children: rowChildren,
-            ),
-          ),
-          if (_showWirelessRightArrow)
-            Positioned(
-              right: 0,
-              top: 0,
-              bottom: 0,
-              child: IgnorePointer(
-                child: Container(
-                  width: 28,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [
-                        Colors.transparent,
-                        Theme.of(context).colorScheme.surface,
-                      ],
-                    ),
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 18,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.45),
-                  ),
-                ),
-              ),
-            ),
-          if (_showWirelessLeftArrow)
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              child: IgnorePointer(
-                child: Container(
-                  width: 28,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerRight,
-                      end: Alignment.centerLeft,
-                      colors: [
-                        Colors.transparent,
-                        Theme.of(context).colorScheme.surface,
-                      ],
-                    ),
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    size: 18,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.45),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      );
-    } else {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: rowChildren,
-      );
-    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: cardWidgets,
+    );
   }
 
   IconData _getInterfaceIcon(String name, String proto) {
@@ -1081,9 +1088,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildInterfaceStatusCards(AppState appState) {
     final prefs = appState.dashboardPreferences;
-    final interfaces =
-        appState.dashboardData?['interfaceDump']?['interface']
-            as List<dynamic>?;
+    final rawDump = appState.dashboardData?['interfaceDump']?['interface'];
+    final interfaces = rawDump is List ? rawDump : (rawDump is Map ? rawDump.values.toList() : null);
     if (interfaces == null || interfaces.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -1097,10 +1103,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
       // If preferences are empty, show all interfaces by default
       if (prefs.enabledWiredInterfaces.isEmpty) {
-        return true; // Show all interfaces when no specific preferences
+        return true;
       }
 
-      // Otherwise, check if this interface is in the enabled list
       return prefs.enabledWiredInterfaces.contains(name);
     }).toList();
 
@@ -1113,86 +1118,168 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       final interface = item as Map<String, dynamic>;
       final name = interface['interface'] as String? ?? 'N/A';
       final isUp = interface['up'] as bool? ?? false;
-      final proto = interface['proto'] as String? ?? '';
+      final proto = (interface['proto'] as String? ?? '').toUpperCase();
+      final l3Dev = interface['l3_device']?.toString() ?? interface['device']?.toString() ?? '';
+
+      String ipText = 'No IPv4';
+      if (interface['ipv4-address'] is List && (interface['ipv4-address'] as List).isNotEmpty) {
+        final first = (interface['ipv4-address'] as List).first;
+        if (first is Map) {
+          final addr = first['address']?.toString() ?? '';
+          final mask = first['mask']?.toString() ?? '';
+          if (addr.isNotEmpty) {
+            ipText = mask.isNotEmpty ? '$addr/$mask' : addr;
+          }
+        }
+      } else if (interface['ipv6-address'] is List && (interface['ipv6-address'] as List).isNotEmpty) {
+        final first = (interface['ipv6-address'] as List).first;
+        if (first is Map) {
+          final addr = first['address']?.toString() ?? '';
+          if (addr.isNotEmpty) {
+            ipText = addr;
+          }
+        }
+      }
 
       interfaceCardWidgets.add(
         Card(
-          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
           elevation: 2,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: isUp
+                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)
+                  : Colors.red.withValues(alpha: 0.3),
+              width: 1,
+            ),
           ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
+            onTap: () {
+              final appState = ref.read(appStateProvider);
+              appState.requestTab(2, interfaceToScroll: name);
+            },
             onLongPress: () {
-              // Navigate to interfaces tab with the specific interface name
               final appState = ref.read(appStateProvider);
               appState.requestTab(2, interfaceToScroll: name);
             },
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: 12.0,
-                horizontal: 12.0,
-              ),
+              padding: const EdgeInsets.all(12.0),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(
-                    _getInterfaceIcon(name, proto),
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 20,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    name.toUpperCase(),
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isUp
-                          ? Colors.green.withValues(alpha: 0.15)
-                          : Colors.red.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: SizedBox(
-                      width: 63,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              isUp ? Icons.check_circle : Icons.cancel,
-                              size: 11,
-                              color: isUp
-                                  ? Colors.green.shade800
-                                  : Colors.red.shade800,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
                             ),
-                            const SizedBox(width: 1),
+                            child: Icon(
+                              _getInterfaceIcon(name, proto),
+                              color: Theme.of(context).colorScheme.primary,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            name.toUpperCase(),
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isUp
+                              ? Colors.green.withValues(alpha: 0.18)
+                              : Colors.red.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isUp ? Colors.green.shade600 : Colors.red.shade600,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
                             Text(
                               isUp ? 'UP' : 'DOWN',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: isUp
-                                    ? Colors.green.shade900
-                                    : Colors.red.shade900,
+                                color: isUp ? Colors.green.shade800 : Colors.red.shade800,
                                 fontSize: 10,
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.lan_outlined,
+                        size: 14,
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          ipText,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'monospace',
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (proto.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            proto,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      if (l3Dev.isNotEmpty)
+                        Text(
+                          'Dev: $l3Dev',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            fontSize: 11,
+                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),
@@ -1202,112 +1289,23 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       );
     }
 
-    List<Widget> rowChildren = [];
-    final isScrollable = interfaceCardWidgets.length >= 5;
-    for (int i = 0; i < interfaceCardWidgets.length; i++) {
-      rowChildren.add(Expanded(child: interfaceCardWidgets[i]));
-      if (i < interfaceCardWidgets.length - 1) {
-        rowChildren.add(const SizedBox(width: 6));
-      }
-    }
-
-    if (isScrollable) {
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          // 4 cards visible, 3 gaps between them
-          final totalSpacing = 6.0 * 3;
-          final width = constraints.maxWidth;
-          final calculatedCardWidth = (width - totalSpacing) / 4;
-          final localRowChildren = <Widget>[];
-          for (int i = 0; i < interfaceCardWidgets.length; i++) {
-            localRowChildren.add(
-              SizedBox(
-                width: calculatedCardWidth,
-                child: interfaceCardWidgets[i],
-              ),
-            );
-            if (i < interfaceCardWidgets.length - 1) {
-              localRowChildren.add(const SizedBox(width: 6));
-            }
-          }
-          return Stack(
-            children: [
-              SizedBox(
-                height: 110,
-                child: ListView(
-                  controller: _wanScrollController,
-                  scrollDirection: Axis.horizontal,
-                  children: localRowChildren,
-                ),
-              ),
-              if (_showWanRightArrow)
-                Positioned(
-                  right: 0,
-                  top: 0,
-                  bottom: 0,
-                  child: IgnorePointer(
-                    child: Container(
-                      width: 28,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                          colors: [
-                            Colors.transparent,
-                            Theme.of(context).colorScheme.surface,
-                          ],
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        Icons.arrow_forward_ios_rounded,
-                        size: 18,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.45),
-                      ),
-                    ),
-                  ),
-                ),
-              if (_showWanLeftArrow)
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  child: IgnorePointer(
-                    child: Container(
-                      width: 28,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.centerRight,
-                          end: Alignment.centerLeft,
-                          colors: [
-                            Colors.transparent,
-                            Theme.of(context).colorScheme.surface,
-                          ],
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        size: 18,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.45),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+    final cardWidth = 220.0;
+    return SizedBox(
+      height: 130,
+      child: ListView.separated(
+        controller: _wanScrollController,
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        itemCount: interfaceCardWidgets.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          return SizedBox(
+            width: cardWidth,
+            child: interfaceCardWidgets[index],
           );
         },
-      );
-    } else {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: rowChildren,
-      );
-    }
+      ),
+    );
   }
 
   @override
@@ -1424,15 +1422,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                         routerTitle = r.ipAddress;
                                       }
                                       return ListTile(
-                                        leading: Icon(
-                                          Icons.router,
-                                          color: isSelected
-                                              ? Theme.of(
-                                                  context,
-                                                ).colorScheme.primary
-                                              : Theme.of(
-                                                  context,
-                                                ).colorScheme.onSurfaceVariant,
+                                        leading: const ThemeRouterLogo(
+                                          width: 26,
+                                          height: 26,
                                         ),
                                         title: Tooltip(
                                           message: isStale
@@ -1603,7 +1595,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               const SizedBox(height: 12),
               _buildInterfaceStatusCards(appState),
               const SizedBox(height: 12),
-              // Extra padding to ensure scroll behavior for RefreshIndicator
+              ..._buildModuleDashboardWidgets(context),
               const SizedBox(height: 100),
             ];
 
@@ -1618,44 +1610,64 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
             );
           } else {
-            // Portrait mode: Fill available height exactly without scrolling
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                return RefreshIndicator(
-                  onRefresh: () => appState.fetchDashboardData(),
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: SizedBox(
-                      height: constraints.maxHeight,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 16),
-                            _buildDeviceInfoCard(appState),
-                            const SizedBox(height: 12),
-                            Expanded(
-                              child: _buildRealtimeThroughputCard(appState),
-                            ),
-                            const SizedBox(height: 12),
-                            _buildSystemVitalsCard(appState),
-                            const SizedBox(height: 12),
-                            _buildWirelessNetworksCard(appState),
-                            const SizedBox(height: 12),
-                            _buildInterfaceStatusCards(appState),
-                            const SizedBox(height: 12),
-                          ],
-                        ),
-                      ),
+            // Portrait mode: SingleChildScrollView with all dynamic module widgets
+            return RefreshIndicator(
+              onRefresh: () => appState.fetchDashboardData(),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 12),
+                    _buildDeviceInfoCard(appState),
+                    _buildSectionHeader(context, 'Real-time Network Traffic', Icons.swap_vert),
+                    SizedBox(
+                      height: 220,
+                      child: _buildRealtimeThroughputCard(appState),
                     ),
-                  ),
-                );
-              },
+                    _buildSectionHeader(context, 'System Vitals', Icons.monitor_heart),
+                    _buildSystemVitalsCard(appState),
+                    _buildSectionHeader(context, 'Wireless Radios & SSIDs', Icons.wifi),
+                    _buildWirelessNetworksCard(appState),
+                    _buildSectionHeader(context, 'Network Interfaces', Icons.lan),
+                    _buildInterfaceStatusCards(appState),
+                    _buildSectionHeader(context, 'System Modules & Storage', Icons.storage),
+                    ..._buildModuleDashboardWidgets(context),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
             );
           }
         },
       ),
     );
+  }
+
+  List<Widget> _buildModuleDashboardWidgets(BuildContext context) {
+    final widgets = <Widget>[];
+    final modules = LuciModuleRegistry.instance.enabledModules;
+    for (final module in modules) {
+      if (module.showInBottomNav) continue; // Skip core tab bar screens
+      final widget = module.buildDashboardWidget(context);
+      if (widget != null) {
+        widgets.add(
+          InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => module.buildScreen(context),
+                ),
+              );
+            },
+            child: widget,
+          ),
+        );
+        widgets.add(const SizedBox(height: 10));
+      }
+    }
+    return widgets;
   }
 }

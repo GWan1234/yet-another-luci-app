@@ -34,7 +34,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   void didUpdateWidget(MainScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // Handle parameter changes (important for iOS navigation)
+    // Handle parameter changes
     if (widget.interfaceToScroll != oldWidget.interfaceToScroll) {
       _currentInterfaceToScroll = widget.interfaceToScroll;
     }

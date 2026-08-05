@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher_string.dart';
 import 'package:luci_mobile/config/app_config.dart';
 import 'package:luci_mobile/services/secure_storage_service.dart';
 import 'package:luci_mobile/utils/url_parser.dart';
+import 'package:luci_mobile/widgets/theme_router_logo.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -270,8 +271,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             children: [
                               Column(
                                 children: [
+                                  const ThemeRouterLogo(
+                                    width: 100,
+                                    height: 100,
+                                    showShadow: true,
+                                  ),
+                                  const SizedBox(height: 16),
                                   Text(
-                                    'LuCI Mobile',
+                                    'Yet Another LuCI',
                                     style: textTheme.headlineLarge?.copyWith(
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -641,6 +648,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                                         ],
                                                       ),
                                               ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(
+                                                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.security_rounded,
+                                                  size: 20,
+                                                  color: colorScheme.primary,
+                                                ),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Text(
+                                                    '🔒 Local Network Access Notice: This app communicates exclusively with your local OpenWrt router over LAN/Wi-Fi. No analytics, personal data, or credentials are sent to cloud servers.',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: colorScheme.onSurfaceVariant,
+                                                      height: 1.3,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ],
