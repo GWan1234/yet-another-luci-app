@@ -1,159 +1,196 @@
 # Yet Another LuCI app
 
 <div align="center">
-  <h3>Created & Maintained by Tuhin Garai (@nightcodex7)</h3>
-  <br>
+  <img src="assets/images/app_logo_transparent.png" width="120" alt="App Logo" />
+  <h2>Modern OpenWrt & LuCI Router Manager for Mobile</h2>
+  <p>Maintained by <b>Tuhin Garai (@nightcodex7)</b></p>
 
-  <!-- Google Play Store link (Pending release)
-  <a href="https://play.google.com/store/apps/details?id=com.nightcode.luci">
-    <img src="store-badges/google.webp" alt="Get it on Google Play" style="height:56px;"/>
-  </a>
-  -->
+  [![Flutter](https://img.shields.io/badge/Flutter-3.32.5+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
+  [![Dart](https://img.shields.io/badge/Dart-3.8+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
+  [![License](https://img.shields.io/badge/License-GPL--3.0-blue.svg?style=for-the-badge)](LICENSE)
+  [![Build Status](https://img.shields.io/badge/Build-Passing-teal.svg?style=for-the-badge)]()
+  [![OpenWrt](https://img.shields.io/badge/OpenWrt-21.02--24.10+-1589F0?style=for-the-badge&logo=openwrt&logoColor=white)](https://openwrt.org)
 
-  ![GitHub all downloads](https://img.shields.io/github/downloads/nightcodex7/yet-another-luci-app/total?style=flat-square&label=Downloads&logo=github&color=0A84FF)
+  <br><br>
 
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/flutter_01.png" width="300"/>
+  <h3>Dashboard Preview (Light & Dark Theme)</h3>
+  <p>
+    <img src="assets/screenshots/3_dashboard-light.jpeg" width="340" alt="Dashboard Light Mode" />
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    <img src="assets/screenshots/4_dashboard-dark.jpeg" width="340" alt="Dashboard Dark Mode" />
+  </p>
 </div>
 
 <br>
 
-**Yet Another LuCI app** is a modern, high-performance Flutter application developed by **Tuhin Garai** (forked from [cogwheel0/luci-mobile](https://github.com/cogwheel0/luci-mobile)) for managing, monitoring, and diagnosing OpenWrt/LuCI routers on mobile devices.
+**Yet Another LuCI app** is a modern, high-performance Flutter mobile application for managing, monitoring, and diagnosing OpenWrt routers. Built with Material 3 design principles, custom micro-animations, and full LuCI RPC integration, it brings desktop-class router control directly to your mobile phone.
 
 ---
 
-## Currently Implemented Features
+## 🌟 Key Features
 
-- **Multiple Router Management & Fast Switching:**
-  - Add, edit, remove, and switch seamlessly between unlimited OpenWrt routers with isolated secure credential storage.
+### 📡 Multi-Router Management & Secure Vault
+- **Multi-Device Support:** Switch between unlimited OpenWrt routers with isolated secure credentials.
+- **HTTPS & Custom Ports:** Connect via HTTP/HTTPS with support for self-signed SSL certificates.
 
-- **Dashboard Vitals & Real-Time Metrics:**
-  - Live CPU, RAM, and Storage Vitals with animated gauge widgets.
-  - Real-time Network Throughput Chart (Rx/Tx Mbps/Kbps) with live scaling.
-  - Detailed Network Interfaces Status Cards displaying IP addresses, device names, protocols (DHCP/Static/PPPoE), and UP/DOWN state.
-  - Dynamic Wireless Radios Cards (2.4GHz / 5GHz / 6GHz, channels, transmit power, and connected clients count).
+### 📊 Real-Time Dashboard & Network Vitals
+- **Dual Themes:** Clean, seamless switching between Light and Dark themes.
+- **Animated Vitals Gauges:** Live CPU load, RAM memory usage, Swap, and Storage capacity.
+- **Real-Time Throughput Graph:** Smooth live chart displaying network transfer rates (Rx/Tx Kbps/Mbps) with configurable polling intervals.
+- **Interface Overview Cards:** Live UP/DOWN statuses, assigned IPv4/IPv6 addresses, MACs, and protocols (DHCP, Static, PPPoE, WWAN).
 
-- **Client Device Management:**
-  - Segmented filtering for **All**, **Wireless**, and **Wired** connected devices.
-  - Displays hostnames, MAC addresses, IPv4/IPv6, MAC vendor OUI, connected SSID names, and DHCP lease expiration.
-  - Active ARP table neighbor lookup to reliably detect static IP wired clients.
-  - Custom MAC Entry interface for Wi-Fi access control.
+### 📱 Connected Client Management
+- **Unified Connected List:** Synchronous aggregation of active DHCP leases, ARP neighbor entries, and wireless stations.
+- **Device Identification:** Displays hostname (prioritizing static leases and DHCP), IP, MAC address, vendor OUI, connected SSID, and radio band badges.
+- **Wi-Fi Access Control:** Quick MAC entry tool for access management.
 
-- **Wireless Radios & SSID Control:**
-  - Radio frequency & channel diagnostics across multiple wireless cards (`radio0`, `radio1`, etc.).
-  - Connected Clients modal popup per SSID showing exact devices linked to each radio band.
+### 📶 Wireless Radios & Station Diagnostics
+- **Radio Band Management:** Multi-radio card diagnostic for 2.4GHz, 5GHz, and 6GHz bands.
+- **Precise Frequency Info:** Displays operational frequency up to 3 decimal places (e.g. 2.423 GHz), channel, transmit power, and active stations.
+- **Station List Modal:** View exact connected client hostnames and signal levels linked per SSID.
 
-- **OPKG & APK Package Manager:**
-  - Automatic system package manager engine detection (OPKG for standard releases, APK for OpenWrt 24.10+ / SNAPSHOT).
-  - Search repository packages, install, remove, and update feeds (`opkg update` / `apk update`).
-  - Discovered LuCI Apps validator checking installed vs available modules.
+### 📦 OPKG & APK Dual Package Manager
+- **Smart Engine Detection:** Automatic engine switching between standard `opkg` and OpenWrt 24.10+ `apk` package managers.
+- **Package Search & Feed Updates:** Search available repositories, update package lists, install, and remove modules.
+- **LuCI App Finder:** Dedicated view for discovering and managing installed vs. available LuCI extensions (`luci-app-*`).
 
-- **System Backup, Restore & Flash Operations:**
-  - Generate configuration backup archives (`sysupgrade -b /tmp/backup.tar.gz`).
-  - Factory reset router configuration (`firstboot -y && reboot`).
-  - Save/Dump `mtdblock` partition images directly from `/proc/mtd`.
-  - Sysupgrade firmware flasher with options to keep or reset settings.
-  - Preserved backup files list viewer (`sysupgrade -l`) and configuration file editor (`/etc/sysupgrade.conf`).
-
-- **Storage Monitoring & Disk Space:**
-  - Disk usage analysis across all mounted filesystems (`/`, `/overlay`, `/tmp`, external USB storage).
-  - Accurate free/used space calculation in KB/MB/GB.
-
-- **User Setup Cron Jobs:**
-  - View, create, edit, and delete scheduled system cron entries (`/etc/crontabs/root`).
-
-- **System Services Diagnostics:**
-  - Active status tracking for `procd` daemons and init scripts (Running, Stopped, Enabled, Disabled).
-  - Remote control actions: Start, Stop, Restart, Enable, and Disable services.
-
-- **Onboarding & Permission Transparency:**
-  - Guided onboarding flow explaining necessary permissions for router communication and storage handling.
+### ⚙️ System Diagnostics & Control
+- **Services Management:** View active `procd` daemons and init scripts with live status tracking (Running, Stopped, Enabled, Disabled). Start, stop, restart, enable, or disable services remotely.
+- **Cron Job Scheduler:** View custom or system scheduled tasks (`/etc/crontabs/root`).
+- **Disk & Filesystems Monitor:** Storage usage breakdown for root `/`, overlay `/overlay`, temporary `/tmp`, and attached USB storage.
+- **Preserved Backup File Viewer:** Inspect files preserved during sysupgrade operations (`sysupgrade -l`).
+- **MTD Partition Dumper:** Save binary `mtdblock` partition images directly from `/proc/mtd`.
+- **Factory Reset Trigger:** Remotely initiate system reset (`firstboot -y`) and router reboot.
 
 ---
 
-## Screenshots
+## 📸 Screenshots Showcase
 
-| Login | Dashboard | Clients | Interfaces |
-|-------|-----------|---------|------------|
-| <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/flutter_02.png" width="200"/> | <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/flutter_01.png" width="200"/> | <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/flutter_03.png" width="200"/> | <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/flutter_05.png" width="200"/> |
+<div align="center">
+  <p><b>Explore full resolution screenshots of Yet Another LuCI app features:</b></p>
+</div>
+
+| Login Screen | Dashboard (Light) | Dashboard (Dark) | Connected Clients |
+|:---:|:---:|:---:|:---:|
+| <img src="assets/screenshots/2_login_page.jpeg" width="180"/> | <img src="assets/screenshots/3_dashboard-light.jpeg" width="180"/> | <img src="assets/screenshots/4_dashboard-dark.jpeg" width="180"/> | <img src="assets/screenshots/7_clients.jpeg" width="180"/> |
+
+| Network Interfaces | Wireless Management | Real-Time Metrics | Services Diagnostics |
+|:---:|:---:|:---:|:---:|
+| <img src="assets/screenshots/8_interfaces.jpeg" width="180"/> | <img src="assets/screenshots/11_wirelessmanagement.jpeg" width="180"/> | <img src="assets/screenshots/12_real_time_metrics.jpeg" width="180"/> | <img src="assets/screenshots/15_service.jpeg" width="180"/> |
+
+| Package Manager | Storage Monitoring | DHCP & DNS Leases | Multi-Router Manager |
+|:---:|:---:|:---:|:---:|
+| <img src="assets/screenshots/16_package_manager.jpeg" width="180"/> | <img src="assets/screenshots/10_storagemon.jpeg" width="180"/> | <img src="assets/screenshots/13_dhcp_dns.jpeg" width="180"/> | <img src="assets/screenshots/18_multi_router.jpeg" width="180"/> |
+
+<br>
+
+<div align="center">
+  <a href="https://github.com/nightcodex7/yet-another-luci-app/tree/main/assets/screenshots">
+    <img src="https://img.shields.io/badge/📂%20View%20All%20Screenshots%20in%20Repository-0A84FF?style=for-the-badge&logo=github&logoColor=white" alt="View All Screenshots on GitHub"/>
+  </a>
+  <br>
+  <p><i>Click the badge above or navigate to <a href="assets/screenshots/">assets/screenshots/</a> to view the complete collection of screenshots on GitHub.</i></p>
+</div>
 
 ---
 
-## Installation
+## 📁 Repository Structure
 
-<!-- Google Play installation method (Currently not implemented yet)
-Get it on **Google Play** once released, or build from source:
--->
+```
+yet-another-luci-app/
+├── android/                   # Android native platform code & signing configs
+├── assets/                    # Static app assets
+│   ├── icons/                 # App launcher icons
+│   ├── images/                # Brand graphics & logos
+│   ├── mock/                  # Mock diagnostic data for review modes
+│   └── screenshots/           # Full app feature screenshots & theme previews
+├── fastlane/                  # Google Play Store release metadata & screenshots
+├── lib/                       # Main Flutter codebase
+│   ├── config/                # Design tokens, themes, app routes, and constants
+│   ├── models/                # Strongly-typed data models (Client, Interface, Router, etc.)
+│   ├── modules/               # Feature modules (Package Manager, System Backup, Services, Cron, Storage)
+│   ├── screens/               # Core screens (Dashboard, Clients, Interfaces, Login, Settings)
+│   ├── services/              # API communication layer, JSON-RPC client, secure storage
+│   ├── state/                 # State management engine (Riverpod AppState)
+│   ├── widgets/               # Reusable UI widgets, animated gauges, throughput charts
+│   └── main.dart              # Application entry point
+├── scripts/                   # Auxiliary maintenance scripts
+├── store-badges/              # Google Play Store promotional badges
+├── pubspec.yaml               # Flutter package specification & dependencies
+├── PRIVACY_POLICY.md          # Full privacy policy disclosure
+├── CONTRIBUTING.md            # Guidelines for open-source contributors
+└── README.md                  # Project documentation
+```
 
-Build directly from source:
+---
+
+## 🛠️ Building & Running
+
+### Prerequisites
+
+- **Flutter SDK:** 3.32.5+
+- **Dart SDK:** 3.8+
+- **JDK:** OpenJDK 17 or higher
+- **Android Studio / Android SDK:** API level 36
+
+### Quick Local Run
 
 ```bash
+# 1. Clone repository
 git clone https://github.com/nightcodex7/yet-another-luci-app.git
 cd yet-another-luci-app
+
+# 2. Install dependencies
 flutter pub get
+
+# 3. Analyze code quality
+flutter analyze
+
+# 4. Run application in dev mode
 flutter run
 ```
 
-- Requires Flutter 3.32.5+ and Dart 3.8+
-- Build Android APK: `export JAVA_HOME=/path/to/jdk17 && flutter build apk`
-
 ---
 
-## Project Structure
+## 🔐 Router Requirements & Security
 
-```
-lib/
-├── config/                 # App configuration & design system
-├── models/                 # Data models (client, interface, router)
-├── modules/                # Specialized modules (package manager, flash ops, storage, cron, services)
-├── screens/                # UI screens (dashboard, clients, interfaces, login, settings)
-├── services/               # Business logic (RPC API, secure storage)
-├── state/                  # State management (app_state.dart)
-├── widgets/                # Reusable UI components
-└── main.dart               # App entry point
+To enable full communication between **Yet Another LuCI app** and your OpenWrt router, ensure the following RPC modules are installed on your router:
+
+```bash
+opkg update
+opkg install luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status
+/etc/init.d/rpcd restart
 ```
 
----
+### Security Highlights
 
-## Development & Contribution
-
-- Run in dev mode: `flutter run`
-- Build for release: `flutter build apk --release`
-- Analyze code: `flutter analyze`
-
-**Contributions welcome!** Please fork, branch, and submit a pull request.
+- **Zero Analytics:** No tracking telemetry, no cloud relays, zero data collection.
+- **Local Vault:** Router IP addresses, credentials, and tokens remain isolated on your local device.
+- **SSL Support:** Supports HTTPS RPC endpoints and self-signed SSL certificate bypass options.
 
 ---
 
-## Security & Privacy
+## 🤝 Contributing
 
-- All credentials are stored securely on-device using Android KeyStore / Flutter Secure Storage.
-- HTTPS and self-signed certificate support.
-- Zero analytics or data tracking.
+Contributions, bug reports, and feature suggestions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting pull requests.
 
----
-
-## Troubleshooting
-
-- **Connection Failed:** Check router IP, LuCI web interface, firewall rules, and try HTTP/HTTPS.
-- **Authentication Failed:** Verify username/password and admin privileges.
-- **No Data Displayed:** Ensure the router has LuCI RPC support installed: `opkg update && opkg install luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status`, restart `rpcd` (or reboot), then verify with `ubus list luci-rpc`.
+1. Fork the project.
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`).
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`).
+4. Push to the branch (`git push origin feature/AmazingFeature`).
+5. Open a Pull Request.
 
 ---
 
-## License
+## 📜 License & Credits
 
-GPL v3.0. See [LICENSE](LICENSE).
+Distributed under the **GNU General Public License v3.0**. See [`LICENSE`](LICENSE) for details.
 
----
+### Acknowledgments
 
-## Acknowledgments & Credits
-
-- **[cogwheel0/luci-mobile](https://github.com/cogwheel0/luci-mobile)** — This project is forked from `cogwheel0/luci-mobile`. Special thanks and credits to [cogwheel0](https://github.com/cogwheel0) for building the initial foundation and application architecture.
-- **OpenWrt Community** — For creating OpenWrt, LuCI, and `luci-rpc` / `rpcd` APIs.
-- **Flutter & Dart Team** — For the cross-platform application framework.
-- **[OpenWrtManager](https://github.com/hagaygo/OpenWrtManager)** — Additional inspiration for router diagnostic features.
+- **[cogwheel0/luci-mobile](https://github.com/cogwheel0/luci-mobile)** — Special thanks to [cogwheel0](https://github.com/cogwheel0) for building the initial foundation of `luci-mobile`.
+- **OpenWrt Project** — Thanks to the OpenWrt developers and community for creating OpenWrt and `rpcd` / `luci-rpc` interfaces.
+- **Flutter Framework** — Built with Flutter and Riverpod for high-performance reactive UI rendering.
 
 ---
-
-**Note:** This app requires an OpenWrt router with LuCI web interface enabled. Make sure your router is properly configured before use.ke sure your router is properly configured before use.
-
+*Maintained with ❤️ by [Tuhin Garai (@nightcodex7)](https://github.com/nightcodex7)*
