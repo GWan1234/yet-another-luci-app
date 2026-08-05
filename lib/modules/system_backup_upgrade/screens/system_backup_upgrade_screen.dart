@@ -1,6 +1,12 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../../main.dart';
+import '../../../state/app_state.dart';
 
 class SystemBackupUpgradeScreen extends ConsumerStatefulWidget {
   const SystemBackupUpgradeScreen({super.key});
@@ -9,10 +15,8 @@ class SystemBackupUpgradeScreen extends ConsumerStatefulWidget {
   ConsumerState<SystemBackupUpgradeScreen> createState() => _SystemBackupUpgradeScreenState();
 }
 
-class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  bool _keepSettings = true;
+class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeScreen> {
+  final bool _keepSettings = true;
   bool _isProcessing = false;
   String? _statusMessage;
 
@@ -20,23 +24,10 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
   List<Map<String, String>> _mtdList = [];
   String? _selectedMtdDevice;
 
-  // Sysupgrade conf state
-  final TextEditingController _sysupgradeConfController = TextEditingController();
-  bool _isLoadingConf = false;
-
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _loadMtdBlocks();
-    _loadSysupgradeConf();
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    _sysupgradeConfController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadMtdBlocks() async {
@@ -78,46 +69,6 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
     });
   }
 
-  Future<void> _loadSysupgradeConf() async {
-    setState(() => _isLoadingConf = true);
-    final appState = ref.read(appStateProvider);
-    final content = await appState.executeRouterCommandOutput('cat', ['/etc/sysupgrade.conf']);
-    setState(() {
-      _isLoadingConf = false;
-      if (content != null) {
-        _sysupgradeConfController.text = content.trim();
-      } else {
-        _sysupgradeConfController.text = '# /etc/sysupgrade.conf\n# Add custom files/directories to preserve during sysupgrade\n/etc/shadow\n/etc/passwd\n';
-      }
-    });
-  }
-
-  Future<void> _saveSysupgradeConf() async {
-    setState(() {
-      _isProcessing = true;
-      _statusMessage = 'Saving /etc/sysupgrade.conf...';
-    });
-
-    final content = _sysupgradeConfController.text;
-    final appState = ref.read(appStateProvider);
-    // Write configuration file
-    final success = await appState.executeRouterCommand('sh', ['-c', 'echo "$content" > /etc/sysupgrade.conf']);
-
-    setState(() => _isProcessing = false);
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          success
-              ? 'Successfully updated /etc/sysupgrade.conf'
-              : 'Failed to write /etc/sysupgrade.conf',
-        ),
-        backgroundColor: success ? Colors.teal : Colors.red,
-      ),
-    );
-  }
-
   Future<void> _showCurrentBackupFileList() async {
     setState(() {
       _isProcessing = true;
@@ -125,7 +76,16 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
     });
 
     final appState = ref.read(appStateProvider);
-    final fileList = await appState.executeRouterCommandOutput('sysupgrade', ['-l']);
+    String? fileList = await appState.executeRouterCommandOutput('sh', ['-c', 'sysupgrade -l']);
+    if (fileList == null || fileList.trim().isEmpty) {
+      fileList = await appState.executeRouterCommandOutput('sysupgrade', ['-l']);
+    }
+    if (fileList == null || fileList.trim().isEmpty) {
+      fileList = await appState.executeRouterCommandOutput('/sbin/sysupgrade', ['-l']);
+    }
+    if (fileList == null || fileList.trim().isEmpty) {
+      fileList = await appState.executeRouterCommandOutput('cat', ['/etc/sysupgrade.conf']);
+    }
 
     setState(() => _isProcessing = false);
 
@@ -151,7 +111,7 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                 children: [
                   const Text(
                     'Preserved Backup File List (sysupgrade -l)',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
@@ -164,8 +124,8 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                 child: SingleChildScrollView(
                   controller: scrollController,
                   child: SelectableText(
-                    fileList != null && fileList.isNotEmpty
-                        ? fileList
+                    fileList != null && fileList.trim().isNotEmpty
+                        ? fileList.trim()
                         : 'No file list returned from router.',
                     style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
                   ),
@@ -178,28 +138,221 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
     );
   }
 
+  Future<Uint8List?> _readRouterFileAsBytes(AppState appState, String filePath) async {
+    // Check file size
+    final sizeStr = await appState.executeRouterCommandOutput('sh', ['-c', 'wc -c "$filePath"']);
+    int? totalSize;
+    if (sizeStr != null && sizeStr.trim().isNotEmpty) {
+      final parts = sizeStr.trim().split(RegExp(r'\s+'));
+      if (parts.isNotEmpty) {
+        totalSize = int.tryParse(parts.first);
+      }
+    }
+
+    const chunkSize = 32768; // 32 KB chunk
+    final List<int> accumulatedBytes = [];
+
+    if (totalSize != null && totalSize > 0) {
+      int offset = 0;
+      int chunkIndex = 0;
+      while (offset < totalSize) {
+        final chunkB64 = await appState.executeRouterCommandOutput(
+          'sh',
+          ['-c', 'dd if="$filePath" bs=$chunkSize skip=$chunkIndex count=1 2>/dev/null | base64'],
+        );
+
+        if (chunkB64 != null && chunkB64.trim().isNotEmpty) {
+          final cleanB64 = chunkB64.replaceAll('\n', '').replaceAll('\r', '').replaceAll(' ', '').trim();
+          try {
+            final decoded = base64Decode(cleanB64);
+            if (decoded.isNotEmpty) {
+              accumulatedBytes.addAll(decoded);
+            } else {
+              break;
+            }
+          } catch (_) {
+            break;
+          }
+        } else {
+          break;
+        }
+        offset += chunkSize;
+        chunkIndex++;
+      }
+
+      if (accumulatedBytes.isNotEmpty) {
+        return Uint8List.fromList(accumulatedBytes);
+      }
+    }
+
+    // Fallback 1: single base64 call
+    String? b64Str = await appState.executeRouterCommandOutput('sh', ['-c', 'base64 "$filePath"']);
+    if (b64Str == null || b64Str.trim().isEmpty) {
+      b64Str = await appState.executeRouterCommandOutput('base64', [filePath]);
+    }
+
+    if (b64Str != null && b64Str.trim().isNotEmpty) {
+      try {
+        final cleanB64 = b64Str.replaceAll('\n', '').replaceAll('\r', '').replaceAll(' ', '').trim();
+        return base64Decode(cleanB64);
+      } catch (_) {}
+    }
+
+    // Fallback 2: hexdump
+    final hexStr = await appState.executeRouterCommandOutput('sh', ['-c', 'hexdump -v -e \'1/1 "%02x"\' "$filePath"']);
+    if (hexStr != null && hexStr.trim().isNotEmpty) {
+      final cleanHex = hexStr.replaceAll('\n', '').replaceAll('\r', '').replaceAll(' ', '').trim();
+      final List<int> byteList = [];
+      for (var i = 0; i < cleanHex.length; i += 2) {
+        if (i + 2 <= cleanHex.length) {
+          byteList.add(int.parse(cleanHex.substring(i, i + 2), radix: 16));
+        }
+      }
+      if (byteList.isNotEmpty) {
+        return Uint8List.fromList(byteList);
+      }
+    }
+
+    return null;
+  }
+
+  // ignore: unused_element
   Future<void> _handleGenerateBackup() async {
     setState(() {
       _isProcessing = true;
-      _statusMessage = 'Generating configuration backup...';
+      _statusMessage = 'Generating configuration backup on router...';
     });
 
     final appState = ref.read(appStateProvider);
-    final success = await appState.executeRouterCommand('sysupgrade', ['-b', '/tmp/backup.tar.gz']);
+    try {
+      bool genSuccess = await appState.executeRouterCommand('sh', ['-c', 'sysupgrade -b /tmp/backup.tar.gz']);
+      if (!genSuccess) {
+        genSuccess = await appState.executeRouterCommand('sysupgrade', ['-b', '/tmp/backup.tar.gz']);
+      }
+      if (!genSuccess) {
+        genSuccess = await appState.executeRouterCommand('sh', ['-c', 'tar -czf /tmp/backup.tar.gz -C / etc/config etc/passwd etc/shadow etc/dropbear etc/uhttpd etc/dnsmasq.conf /etc/sysupgrade.conf']);
+      }
 
-    setState(() => _isProcessing = false);
+      setState(() {
+        _statusMessage = 'Downloading backup archive...';
+      });
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          success
-              ? 'Backup archive created on router at /tmp/backup.tar.gz'
-              : 'Failed to generate configuration backup.',
+      final bytes = await _readRouterFileAsBytes(appState, '/tmp/backup.tar.gz');
+      if (bytes == null || bytes.isEmpty) {
+        throw Exception('Failed to read generated backup file from router.');
+      }
+
+      String? savePath;
+      try {
+        savePath = await FilePicker.saveFile(
+          dialogTitle: 'Save Backup Archive',
+          fileName: 'backup-${DateTime.now().millisecondsSinceEpoch ~/ 1000}.tar.gz',
+          type: FileType.any,
+          bytes: bytes,
+        );
+      } catch (_) {
+        final dir = await getApplicationDocumentsDirectory();
+        final file = File('${dir.path}/backup-${DateTime.now().millisecondsSinceEpoch ~/ 1000}.tar.gz');
+        await file.writeAsBytes(bytes);
+        savePath = file.path;
+      }
+
+      if (savePath != null && savePath.isNotEmpty) {
+        final saveFile = File(savePath);
+        if (!await saveFile.exists()) {
+          await saveFile.writeAsBytes(bytes);
+        }
+      }
+
+      setState(() => _isProcessing = false);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(savePath != null ? 'Backup archive downloaded to: $savePath' : 'Backup downloaded successfully.'),
+          backgroundColor: Colors.teal,
+          duration: const Duration(seconds: 5),
         ),
-        backgroundColor: success ? Colors.teal : Colors.red,
-      ),
-    );
+      );
+    } catch (e) {
+      setState(() => _isProcessing = false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleUploadArchive() async {
+    try {
+      final pickerResult = await FilePicker.pickFiles(
+        type: FileType.any,
+        allowMultiple: false,
+        withData: true,
+      );
+
+      if (pickerResult == null || pickerResult.files.isEmpty) {
+        return;
+      }
+
+      final pickedFile = pickerResult.files.first;
+      Uint8List? fileBytes = pickedFile.bytes;
+      if (fileBytes == null && pickedFile.path != null) {
+        fileBytes = await File(pickedFile.path!).readAsBytes();
+      }
+
+      if (fileBytes == null || fileBytes.isEmpty) {
+        throw Exception('Could not read chosen archive file.');
+      }
+
+      setState(() {
+        _isProcessing = true;
+        _statusMessage = 'Uploading archive to router...';
+      });
+
+      final appState = ref.read(appStateProvider);
+      final b64Str = base64Encode(fileBytes);
+
+      // Write b64 content to /tmp/uploaded_backup.tar.gz in chunks
+      const chunkSize = 30000;
+      await appState.executeRouterCommand('sh', ['-c', 'rm -f /tmp/uploaded_backup.tar.gz.b64 /tmp/uploaded_backup.tar.gz']);
+      for (var i = 0; i < b64Str.length; i += chunkSize) {
+        final end = (i + chunkSize < b64Str.length) ? i + chunkSize : b64Str.length;
+        final chunk = b64Str.substring(i, end);
+        await appState.executeRouterCommand('sh', ['-c', 'echo -n "$chunk" >> /tmp/uploaded_backup.tar.gz.b64']);
+      }
+
+      await appState.executeRouterCommand('sh', ['-c', 'base64 -d /tmp/uploaded_backup.tar.gz.b64 > /tmp/uploaded_backup.tar.gz && rm -f /tmp/uploaded_backup.tar.gz.b64']);
+
+      setState(() {
+        _statusMessage = 'Restoring backup configuration...';
+      });
+
+      final restoreSuccess = await appState.executeRouterCommand('sysupgrade', ['-r', '/tmp/uploaded_backup.tar.gz']);
+      final fallbackSuccess = !restoreSuccess ? await appState.executeRouterCommand('tar', ['-xzf', '/tmp/uploaded_backup.tar.gz', '-C', '/']) : true;
+
+      setState(() => _isProcessing = false);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text((restoreSuccess || fallbackSuccess) ? 'Configuration restored successfully from archive.' : 'Failed to restore backup configuration.'),
+          backgroundColor: (restoreSuccess || fallbackSuccess) ? Colors.teal : Colors.red,
+        ),
+      );
+    } catch (e) {
+      setState(() => _isProcessing = false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to upload archive: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _handleFactoryReset() async {
@@ -265,27 +418,54 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
 
     setState(() {
       _isProcessing = true;
-      _statusMessage = 'Saving mtdblock ($dev) to /tmp/$filename.bin...';
+      _statusMessage = 'Saving mtdblock ($dev)...';
     });
 
     final appState = ref.read(appStateProvider);
-    final success = await appState.executeRouterCommand('dd', ['if=$dev', 'of=/tmp/$filename.bin']);
+    try {
+      final success = await appState.executeRouterCommand('dd', ['if=$dev', 'of=/tmp/$filename.bin']);
+      if (!success) throw Exception('Failed to create mtdblock dump on router');
 
-    setState(() => _isProcessing = false);
+      final bytes = await _readRouterFileAsBytes(appState, '/tmp/$filename.bin');
+      if (bytes == null || bytes.isEmpty) throw Exception('Failed to read mtdblock dump from router');
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          success
-              ? 'Saved mtdblock $dev to /tmp/$filename.bin'
-              : 'Failed to dump mtdblock $dev',
+      String? savePath;
+      try {
+        savePath = await FilePicker.saveFile(
+          dialogTitle: 'Save mtdblock file',
+          fileName: '$filename.bin',
+          type: FileType.any,
+          bytes: bytes,
+        );
+      } catch (_) {
+        final dir = await getApplicationDocumentsDirectory();
+        final file = File('${dir.path}/$filename.bin');
+        await file.writeAsBytes(bytes);
+        savePath = file.path;
+      }
+
+      setState(() => _isProcessing = false);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(savePath != null ? 'Saved $filename.bin to $savePath' : 'Saved $filename.bin'),
+          backgroundColor: Colors.teal,
         ),
-        backgroundColor: success ? Colors.teal : Colors.red,
-      ),
-    );
+      );
+    } catch (e) {
+      setState(() => _isProcessing = false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save mtdblock: ${e.toString().replaceAll('Exception: ', '')}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
+  // ignore: unused_element
   Future<void> _handlePerformSysupgrade() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -351,24 +531,11 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Flash operations'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Actions'),
-            Tab(text: 'Configuration'),
-          ],
-        ),
+        title: const Text('Backup / Flash Firmware'),
       ),
       body: Stack(
         children: [
-          TabBarView(
-            controller: _tabController,
-            children: [
-              _buildActionsTab(context),
-              _buildConfigurationTab(context),
-            ],
-          ),
+          _buildActionsView(context),
           if (_isProcessing)
             Container(
               color: Colors.black45,
@@ -396,7 +563,7 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
     );
   }
 
-  Widget _buildActionsTab(BuildContext context) {
+  Widget _buildActionsView(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16.0),
       children: [
@@ -405,15 +572,33 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
           title: 'Backup',
           icon: Icons.archive_outlined,
           iconColor: Colors.teal,
-          description: 'Click "Generate archive" to download a tar archive of the current configuration files.',
-          actionWidget: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.teal,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: _isProcessing ? null : _handleGenerateBackup,
-            child: const Text('Generate archive'),
+          description: 'Click "View preserved backup file list" to view files that will be saved during configuration updates.',
+          actionWidget: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey.shade400,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: null,
+                icon: const Icon(Icons.download),
+                label: const Text('Generate & Download archive (Future Improvement)'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.teal,
+                  side: const BorderSide(color: Colors.teal),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: _isProcessing ? null : _showCurrentBackupFileList,
+                icon: const Icon(Icons.list_alt),
+                label: const Text('View preserved backup file list'),
+              ),
+            ],
           ),
         ),
 
@@ -425,7 +610,7 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
           icon: Icons.restore_outlined,
           iconColor: Colors.red,
           description:
-              'To restore configuration files, you can upload a previously generated backup archive here. To reset the firmware to its initial state, click "Perform reset" (only possible with squashfs images).',
+              'To restore configuration files, upload a previously generated backup archive file. To reset firmware to its default initial state, click "Perform reset".',
           actionWidget: Row(
             children: [
               Expanded(
@@ -441,18 +626,15 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: ElevatedButton(
+                child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.teal,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Archive upload tool selected. Choose backup tar archive file.')),
-                    );
-                  },
-                  child: const Text('Upload archive...'),
+                  onPressed: _isProcessing ? null : _handleUploadArchive,
+                  icon: const Icon(Icons.upload_file),
+                  label: const Text('Upload archive...'),
                 ),
               ),
             ],
@@ -506,14 +688,15 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
           title: 'Flash new firmware image',
           icon: Icons.system_update_alt,
           iconColor: Colors.blue,
-          description: 'Upload a sysupgrade-compatible image here to replace the running firmware.',
+          isFutureImprovement: true,
+          description: 'Upload a sysupgrade-compatible image here to replace the running firmware. (Currently disabled - coming in a future update)',
           actionWidget: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CheckboxListTile(
-                title: const Text('Keep settings and current configuration', style: TextStyle(fontSize: 13)),
+                title: const Text('Keep settings and current configuration', style: TextStyle(fontSize: 13, color: Colors.grey)),
                 value: _keepSettings,
-                onChanged: (val) => setState(() => _keepSettings = val ?? true),
+                onChanged: null,
                 contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
               ),
@@ -522,83 +705,15 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
+                    backgroundColor: Colors.grey.shade400,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  onPressed: _isProcessing ? null : _handlePerformSysupgrade,
-                  child: const Text('Flash image...'),
+                  onPressed: null,
+                  child: const Text('Flash image (Future Improvement)'),
                 ),
               ),
             ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildConfigurationTab(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16.0),
-      children: [
-        Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Sysupgrade Configuration Files (/etc/sysupgrade.conf)',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'This is a list of shell glob patterns for matching files and directories to include during sysupgrade. Modified files in /etc/config/ and certain other configurations are automatically preserved.',
-                  style: TextStyle(fontSize: 13, color: Colors.grey),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: _isProcessing ? null : _showCurrentBackupFileList,
-                  icon: const Icon(Icons.list_alt),
-                  label: const Text('Show current backup file list'),
-                ),
-                const SizedBox(height: 16),
-                if (_isLoadingConf)
-                  const Center(child: CircularProgressIndicator())
-                else
-                  TextField(
-                    controller: _sysupgradeConfController,
-                    maxLines: 12,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      hintText: '# Add custom files or folders line by line',
-                    ),
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-                  ),
-                const SizedBox(height: 16),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: _isProcessing ? null : _saveSysupgradeConf,
-                    icon: const Icon(Icons.save),
-                    label: const Text('Save'),
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ],
@@ -611,6 +726,7 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
     required Color iconColor,
     required String description,
     required Widget actionWidget,
+    bool isFutureImprovement = false,
   }) {
     return Card(
       elevation: 2,
@@ -624,10 +740,29 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
               children: [
                 Icon(icon, color: iconColor, size: 22),
                 const SizedBox(width: 10),
-                Text(
-                  title,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
                 ),
+                if (isFutureImprovement)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade400, width: 0.8),
+                    ),
+                    child: Text(
+                      'Future Improvement',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange.shade800,
+                      ),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 8),

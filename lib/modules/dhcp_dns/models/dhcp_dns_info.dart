@@ -13,17 +13,33 @@ class DhcpLease {
   });
 
   factory DhcpLease.fromJson(Map<String, dynamic> json) {
+    int parseSec(dynamic val) {
+      if (val == null) return 0;
+      if (val is num) return val.toInt();
+      if (val is String) return int.tryParse(val) ?? 0;
+      return 0;
+    }
+
+    final expRaw = json['expires'];
+    final ltRaw = json['leasetime'];
+    final expiry = expRaw != null && expRaw is! bool
+        ? parseSec(expRaw)
+        : (ltRaw != null && ltRaw is! bool ? parseSec(ltRaw) : 0);
+
     return DhcpLease(
       hostname: json['hostname']?.toString() ?? json['name']?.toString() ?? 'Anonymous Device',
       ipAddress: json['ipaddr']?.toString() ?? json['ip']?.toString() ?? 'N/A',
       macAddress: (json['macaddr']?.toString() ?? json['mac']?.toString() ?? 'N/A').toUpperCase(),
-      expirySeconds: (json['expires'] as num?)?.toInt() ?? (json['leasetime'] as num?)?.toInt() ?? 0,
+      expirySeconds: expiry,
     );
   }
 
   String get formattedExpiry {
-    if (expirySeconds <= 0) return 'Expired';
-    final duration = Duration(seconds: expirySeconds);
+    if (expirySeconds <= 0) return 'Unlimited';
+    final nowSeconds = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final remaining = expirySeconds > nowSeconds ? expirySeconds - nowSeconds : expirySeconds;
+    if (remaining <= 0) return 'Unlimited';
+    final duration = Duration(seconds: remaining);
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
     if (hours > 0) return '${hours}h ${minutes}m remaining';
@@ -124,34 +140,63 @@ class DhcpDnsOverview {
     if (data != null) {
       // Parse DHCP leases from RPC dashboard data
       final rawLeases = data['dhcpLeases'];
-      if (rawLeases is List) {
-        for (final item in rawLeases) {
+
+      void addLeasesFromList(List<dynamic> list) {
+        for (final item in list) {
           if (item is Map<String, dynamic>) {
             leaseList.add(DhcpLease.fromJson(item));
           }
         }
+      }
+
+      if (rawLeases is List) {
+        addLeasesFromList(rawLeases);
       } else if (rawLeases is Map) {
-        rawLeases.forEach((_, item) {
-          if (item is Map<String, dynamic>) {
-            leaseList.add(DhcpLease.fromJson(item));
+        rawLeases.forEach((key, val) {
+          if (val is List) {
+            addLeasesFromList(val);
+          } else if (val is Map<String, dynamic>) {
+            leaseList.add(DhcpLease.fromJson(val));
           }
         });
       }
 
       // Parse UCI DHCP config for dnsmasq and static host mappings
-      final uciDhcp = data['uciDhcpConfig'] as Map<String, dynamic>?;
+      final rawUciDhcp = data['uciDhcpConfig'];
+      Map<String, dynamic>? uciDhcp;
+      if (rawUciDhcp is Map<String, dynamic>) {
+        uciDhcp = rawUciDhcp;
+      } else if (rawUciDhcp is Map) {
+        uciDhcp = rawUciDhcp.cast<String, dynamic>();
+      }
+
       if (uciDhcp != null) {
-        final values = uciDhcp['values'] as Map<String, dynamic>? ?? uciDhcp;
-        values.forEach((key, val) {
-          if (val is Map<String, dynamic>) {
-            final type = val['.type']?.toString();
-            if (type == 'dnsmasq') {
-              dnsmasqRaw = val;
-            } else if (type == 'host') {
-              staticList.add(DhcpStaticMapping.fromJson(val));
+        final rawValues = uciDhcp['values'] ?? uciDhcp;
+        if (rawValues is Map) {
+          rawValues.forEach((key, val) {
+            if (val is Map) {
+              final valMap = Map<String, dynamic>.from(val);
+              final type = valMap['.type']?.toString();
+              if (type == 'dnsmasq') {
+                dnsmasqRaw = valMap;
+              } else if (type == 'host') {
+                staticList.add(DhcpStaticMapping.fromJson(valMap));
+              }
+            }
+          });
+        } else if (rawValues is List) {
+          for (final val in rawValues) {
+            if (val is Map) {
+              final valMap = Map<String, dynamic>.from(val);
+              final type = valMap['.type']?.toString();
+              if (type == 'dnsmasq') {
+                dnsmasqRaw = valMap;
+              } else if (type == 'host') {
+                staticList.add(DhcpStaticMapping.fromJson(valMap));
+              }
             }
           }
-        });
+        }
       }
     }
 

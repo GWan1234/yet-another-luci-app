@@ -12,9 +12,14 @@ class ChartingScreen extends ConsumerWidget {
     final metricsData = ref.watch(metricsChartEngineProvider);
     final engine = ref.read(metricsChartEngineProvider.notifier);
 
-    // Sync latest appState metrics into chart engine
     final appState = ref.watch(appStateProvider);
     final sysInfo = appState.dashboardData?['sysInfo'] as Map<String, dynamic>?;
+
+    if (metricsData.pollingIntervalSeconds != appState.throughputIntervalSeconds) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        engine.updatePollingInterval(appState.throughputIntervalSeconds);
+      });
+    }
 
     final rawLoad = sysInfo?['load'];
     final cpuLoadList = rawLoad is List ? rawLoad : (rawLoad is Map ? rawLoad.values.toList() : null);
@@ -139,7 +144,9 @@ class ChartingScreen extends ConsumerWidget {
               divisions: 9,
               label: '${currentInterval}s',
               onChanged: (val) {
-                engine.updatePollingInterval(val.toInt());
+                final interval = val.toInt();
+                engine.updatePollingInterval(interval);
+                ref.read(appStateProvider).setThroughputInterval(interval);
               },
             ),
           ],

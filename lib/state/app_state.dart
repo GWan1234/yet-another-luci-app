@@ -42,6 +42,8 @@ class AppState extends ChangeNotifier {
   String? _dashboardError;
 
   Timer? _throughputTimer;
+  int _throughputIntervalSeconds = 2;
+  int get throughputIntervalSeconds => _throughputIntervalSeconds;
   Timer? _pollingTimer;
   int _pollAttempts = 0;
   static const int _maxPollAttempts =
@@ -1310,6 +1312,8 @@ class AppState extends ChangeNotifier {
     if (ip == null || _authService?.sysauth == null) return false;
     final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
 
+    final cmdStr = command == 'sh' && args.length >= 2 && args[0] == '-c' ? args[1] : ([command, ...args]).join(' ');
+
     try {
       final res = await _apiService!.call(
         ip,
@@ -1319,9 +1323,73 @@ class AppState extends ChangeNotifier {
         method: 'exec',
         params: {'command': command, 'args': args},
       );
-      if (res != null) return true;
+      if (_isSuccessResponse(res)) return true;
     } catch (_) {}
+
+    if (command != '/bin/sh' && command != 'sh') {
+      try {
+        final res = await _apiService!.call(
+          ip,
+          _authService!.sysauth!,
+          useHttps,
+          object: 'file',
+          method: 'exec',
+          params: {'command': '/bin/sh', 'args': ['-c', cmdStr]},
+        );
+        if (_isSuccessResponse(res)) return true;
+      } catch (_) {}
+
+      try {
+        final res = await _apiService!.call(
+          ip,
+          _authService!.sysauth!,
+          useHttps,
+          object: 'file',
+          method: 'exec',
+          params: {'command': 'sh', 'args': ['-c', cmdStr]},
+        );
+        if (_isSuccessResponse(res)) return true;
+      } catch (_) {}
+    }
+
     return false;
+  }
+
+  bool _isSuccessResponse(dynamic res) {
+    if (res == null) return false;
+    if (res is List && res.isNotEmpty) {
+      if (res[0] == 0) return true;
+      if (res.length > 1 && res[1] is Map) {
+        final map = res[1] as Map;
+        return map['code'] == 0 || map.containsKey('stdout') || map.containsKey('data');
+      }
+    } else if (res is Map) {
+      return res['code'] == 0 || res.containsKey('stdout') || res.containsKey('data');
+    }
+    return false;
+  }
+
+  String? _extractStdout(dynamic res) {
+    if (res == null) return null;
+    if (res is String) return res;
+
+    if (res is List) {
+      if (res.isEmpty) return null;
+      for (final item in res) {
+        if (item is Map) {
+          final out = item['stdout'] ?? item['data'] ?? item['out'];
+          if (out != null) return out.toString();
+        } else if (item is String && item.isNotEmpty && item != '0') {
+          return item;
+        }
+      }
+    } else if (res is Map) {
+      final out = res['stdout'] ?? res['data'] ?? res['out'];
+      if (out != null) return out.toString();
+      final result = res['result'];
+      if (result != null) return _extractStdout(result);
+    }
+    return null;
   }
 
   /// Execute generic router shell command via file.exec or file.read RPC and return output String
@@ -1330,6 +1398,9 @@ class AppState extends ChangeNotifier {
     if (ip == null || _authService?.sysauth == null) return null;
     final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
 
+    final cmdStr = command == 'sh' && args.length >= 2 && args[0] == '-c' ? args[1] : ([command, ...args]).join(' ');
+
+    // 1. Direct exec
     try {
       final res = await _apiService!.call(
         ip,
@@ -1339,16 +1410,41 @@ class AppState extends ChangeNotifier {
         method: 'exec',
         params: {'command': command, 'args': args},
       );
-      if (res is List && res.length > 1 && res[0] == 0) {
-        final data = res[1] as Map<String, dynamic>?;
-        return data?['stdout']?.toString() ?? data?['data']?.toString();
-      }
-      if (res is Map<String, dynamic>) {
-        return res['stdout']?.toString() ?? res['data']?.toString();
-      }
+      final out = _extractStdout(res);
+      if (out != null && out.trim().isNotEmpty) return out;
     } catch (_) {}
 
-    if (command == 'cat' && args.isNotEmpty) {
+    // 2. Shell exec fallbacks
+    if (command != '/bin/sh' && command != 'sh') {
+      try {
+        final res = await _apiService!.call(
+          ip,
+          _authService!.sysauth!,
+          useHttps,
+          object: 'file',
+          method: 'exec',
+          params: {'command': '/bin/sh', 'args': ['-c', cmdStr]},
+        );
+        final out = _extractStdout(res);
+        if (out != null && out.trim().isNotEmpty) return out;
+      } catch (_) {}
+
+      try {
+        final res = await _apiService!.call(
+          ip,
+          _authService!.sysauth!,
+          useHttps,
+          object: 'file',
+          method: 'exec',
+          params: {'command': 'sh', 'args': ['-c', cmdStr]},
+        );
+        final out = _extractStdout(res);
+        if (out != null && out.trim().isNotEmpty) return out;
+      } catch (_) {}
+    }
+
+    // 3. File read fallback
+    if ((command == 'cat' || command == 'base64') && args.isNotEmpty) {
       try {
         final readRes = await _apiService!.call(
           ip,
@@ -1356,14 +1452,13 @@ class AppState extends ChangeNotifier {
           useHttps,
           object: 'file',
           method: 'read',
-          params: {'path': args.first},
+          params: {'path': args.last},
         );
-        if (readRes is List && readRes.length > 1 && readRes[0] == 0) {
-          final data = readRes[1] as Map<String, dynamic>?;
-          return data?['data']?.toString() ?? data?['stdout']?.toString();
-        }
+        final out = _extractStdout(readRes);
+        if (out != null && out.trim().isNotEmpty) return out;
       } catch (_) {}
     }
+
     return null;
   }
 
@@ -1445,13 +1540,22 @@ class AppState extends ChangeNotifier {
     return interfaceName;
   }
 
+  void setThroughputInterval(int seconds) {
+    final clamped = seconds.clamp(1, 10);
+    if (_throughputIntervalSeconds != clamped) {
+      _throughputIntervalSeconds = clamped;
+      _startThroughputTimer();
+      notifyListeners();
+    }
+  }
+
   void _startThroughputTimer() {
     _throughputTimer?.cancel();
     // Don't start timer if we're rebooting
     if (_isRebooting) {
       return;
     }
-    _throughputTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+    _throughputTimer = Timer.periodic(Duration(seconds: _throughputIntervalSeconds), (timer) {
       _updateThroughputOnly();
     });
   }

@@ -159,10 +159,13 @@ class WirelessRadio {
     Map<String, dynamic>? assocData,
   ) {
     final up = json['up'] as bool? ?? true;
-    final ch = (json['channel'] ?? 'Auto').toString();
-    final freq = (json['frequency'] as num?)?.toInt();
+    final ch = (json['channel'] ?? json['config']?['channel'] ?? 'Auto').toString();
+    int? freq = (json['frequency'] as num?)?.toInt();
+    if (freq == null && json['config'] != null) {
+      freq = (json['config']['frequency'] as num?)?.toInt();
+    }
     final txp = (json['txpower'] as num?)?.toInt();
-    final ctry = json['country']?.toString() ?? 'Global';
+    final ctry = json['country']?.toString() ?? json['config']?['country']?.toString() ?? 'Global';
 
     final ifaceList = <WirelessInterface>[];
     final ifacesRaw = json['interfaces'];
@@ -171,14 +174,41 @@ class WirelessRadio {
       for (final item in ifacesRaw) {
         if (item is Map<String, dynamic>) {
           ifaceList.add(WirelessInterface.fromJson(item, assocData));
+          if ((freq == null || freq == 0) && item['iwinfo'] != null) {
+            final iwFreq = (item['iwinfo']['frequency'] as num?)?.toInt();
+            if (iwFreq != null && iwFreq > 0) freq = iwFreq;
+          }
         }
       }
     } else if (ifacesRaw is Map) {
       ifacesRaw.forEach((_, item) {
         if (item is Map<String, dynamic>) {
           ifaceList.add(WirelessInterface.fromJson(item, assocData));
+          if ((freq == null || freq == 0) && item['iwinfo'] != null) {
+            final iwFreq = (item['iwinfo']['frequency'] as num?)?.toInt();
+            if (iwFreq != null && iwFreq > 0) freq = iwFreq;
+          }
         }
       });
+    }
+
+    // Fallback frequency calculation from channel if missing
+    if (freq == null || freq == 0) {
+      var chNum = int.tryParse(ch) ?? 0;
+      if (chNum == 0) {
+        for (final ifc in ifaceList) {
+          final parsed = int.tryParse(ifc.channel);
+          if (parsed != null && parsed > 0) {
+            chNum = parsed;
+            break;
+          }
+        }
+      }
+      if (chNum >= 1 && chNum <= 14) {
+        freq = chNum == 14 ? 2484 : 2407 + (chNum * 5);
+      } else if (chNum >= 36 && chNum <= 177) {
+        freq = 5000 + (chNum * 5);
+      }
     }
 
     return WirelessRadio(
@@ -190,6 +220,14 @@ class WirelessRadio {
       country: ctry,
       interfaces: ifaceList,
     );
+  }
+
+  String get formattedFrequency {
+    if (frequency != null && frequency! > 0) {
+      final ghz = frequency! / 1000.0;
+      return '${ghz.toStringAsFixed(3)} GHz';
+    }
+    return 'N/A';
   }
 
   String get bandLabel {

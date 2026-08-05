@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
+import 'package:luci_mobile/state/app_state.dart';
+import 'package:luci_mobile/modules/dhcp_dns/models/dhcp_dns_info.dart';
 import '../models/wireless_info.dart';
 
 class WirelessManagementScreen extends ConsumerWidget {
@@ -31,7 +33,7 @@ class WirelessManagementScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             _buildSectionHeader(context, 'Connected Wireless Stations', Icons.devices_other_outlined),
             const SizedBox(height: 8),
-            _buildStationsList(context, overview),
+            _buildStationsList(context, overview, appState),
             const SizedBox(height: 32),
           ],
         ),
@@ -105,50 +107,35 @@ class WirelessManagementScreen extends ConsumerWidget {
             ),
             const Divider(height: 24),
             _buildDetailRow('TX Power', '${radio.txPowerDbm ?? 20} dBm'),
-            _buildDetailRow('Frequency', radio.frequency != null ? '${radio.frequency} MHz' : 'N/A'),
+            _buildDetailRow('Frequency', radio.formattedFrequency),
             _buildDetailRow('Country Code', radio.country),
             const SizedBox(height: 12),
-            const Text('Associated SSIDs & Security', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            ...radio.interfaces.map((iface) => _buildInterfaceItem(context, iface)),
+            if (radio.interfaces.isNotEmpty) ...[
+              const Text('Interfaces / SSIDs', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 6),
+              ...radio.interfaces.map((iface) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('${iface.ssid} (${iface.mode})', style: const TextStyle(fontSize: 13)),
+                    Text('${iface.stations.length} clients', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  ],
+                ),
+              )),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInterfaceItem(BuildContext context, WirelessInterface iface) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('SSID: ${iface.ssid}', style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text('Mode: ${iface.mode}', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 12)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Security: ${iface.encryption}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              Text('Clients: ${iface.stations.length}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ],
-      ),
+  Widget _buildStationsList(BuildContext context, WirelessOverview overview, AppState appState) {
+    final dhcpOverview = DhcpDnsOverview.fromDashboardData(
+      appState.dashboardData,
+      isReviewerMode: appState.reviewerModeEnabled,
     );
-  }
 
-  Widget _buildStationsList(BuildContext context, WirelessOverview overview) {
     final allStations = <Map<String, dynamic>>[];
     for (final radio in overview.radios) {
       for (final iface in radio.interfaces) {
@@ -166,9 +153,28 @@ class WirelessManagementScreen extends ConsumerWidget {
       return const Card(
         child: Padding(
           padding: EdgeInsets.all(16.0),
-          child: Text('No wireless client stations connected.'),
+          child: Center(
+            child: Text('No wireless stations connected.'),
+          ),
         ),
       );
+    }
+
+    String normMac(String m) => m.toUpperCase().replaceAll('-', ':').split(':').map((b) => b.length == 1 ? '0$b' : b).join(':');
+
+    String? resolveHostname(String macStr) {
+      final macNorm = normMac(macStr);
+      for (final st in dhcpOverview.staticMappings) {
+        if (normMac(st.macAddress) == macNorm && st.hostname.isNotEmpty && st.hostname != 'Unnamed Host') {
+          return st.hostname;
+        }
+      }
+      for (final l in dhcpOverview.activeLeases) {
+        if (normMac(l.macAddress) == macNorm && l.hostname.isNotEmpty && l.hostname != 'Anonymous Device') {
+          return l.hostname;
+        }
+      }
+      return null;
     }
 
     return Column(
@@ -176,6 +182,11 @@ class WirelessManagementScreen extends ConsumerWidget {
         final st = item['station'] as WirelessStation;
         final ssid = item['ssid'] as String;
         final band = item['band'] as String;
+
+        final hostname = resolveHostname(st.macAddress);
+        final hasName = hostname != null && hostname.isNotEmpty && normMac(hostname) != normMac(st.macAddress);
+        final titleText = hasName ? hostname : st.macAddress;
+        final subtitleText = hasName ? 'MAC: ${st.macAddress} • SSID: $ssid ($band)' : 'SSID: $ssid ($band)';
 
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
@@ -186,8 +197,8 @@ class WirelessManagementScreen extends ConsumerWidget {
               Icons.wifi_tethering,
               color: _getSignalColor(st.signalDbm),
             ),
-            title: Text(st.macAddress, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('SSID: $ssid ($band)'),
+            title: Text(titleText, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text(subtitleText),
             trailing: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,

@@ -661,20 +661,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                               ),
                                             ),
                                             child: Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
                                                 Icon(
-                                                  Icons.security_rounded,
+                                                  Icons.info_outline,
                                                   size: 20,
                                                   color: colorScheme.primary,
                                                 ),
                                                 const SizedBox(width: 10),
                                                 Expanded(
-                                                  child: Text(
-                                                    '🔒 Local Network Access Notice: This app communicates exclusively with your local OpenWrt router over LAN/Wi-Fi. No analytics, personal data, or credentials are sent to cloud servers.',
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      color: colorScheme.onSurfaceVariant,
-                                                      height: 1.3,
+                                                  child: Text.rich(
+                                                    TextSpan(
+                                                      children: [
+                                                        TextSpan(
+                                                          text: 'Note: ',
+                                                          style: TextStyle(
+                                                            fontWeight: FontWeight.bold,
+                                                            fontSize: 11,
+                                                            color: colorScheme.onSurfaceVariant,
+                                                          ),
+                                                        ),
+                                                        TextSpan(
+                                                          text: 'This app communicates exclusively with your local OpenWrt router over LAN/Wi-Fi. No analytics, personal data, or credentials are sent to cloud servers.',
+                                                          style: TextStyle(
+                                                            fontSize: 11,
+                                                            color: colorScheme.onSurfaceVariant,
+                                                            height: 1.3,
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
                                                   ),
                                                 ),

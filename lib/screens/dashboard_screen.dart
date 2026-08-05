@@ -675,16 +675,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget _buildSystemVitalsCard(AppState appState) {
     final sysInfo = appState.dashboardData?['sysInfo'] as Map<String, dynamic>?;
 
-    final uptime = sysInfo?['uptime'] as int?;
+    final uptime = (sysInfo?['uptime'] is num)
+        ? (sysInfo!['uptime'] as num).toInt()
+        : (sysInfo?['uptime'] is String ? int.tryParse(sysInfo!['uptime']) : null);
     final uptimeValue = uptime != null ? _formatUptime(uptime) : 'N/A';
 
     final rawCpuLoad = sysInfo?['load'];
     final cpuLoad = rawCpuLoad is List ? rawCpuLoad : (rawCpuLoad is Map ? rawCpuLoad.values.toList() : null);
     final cpuLoadValue = cpuLoad != null ? _formatCpuLoad(cpuLoad) : 'N/A';
 
-    final totalMem = sysInfo?['memory']?['total'] as int? ?? 0;
-    final freeMem = sysInfo?['memory']?['free'] as int? ?? 0;
-    final bufferedMem = sysInfo?['memory']?['buffered'] as int? ?? 0;
+    final totalMem = (sysInfo?['memory']?['total'] is num)
+        ? (sysInfo!['memory']['total'] as num).toInt()
+        : (sysInfo?['memory']?['total'] is String ? int.tryParse(sysInfo!['memory']['total']) ?? 0 : 0);
+    final freeMem = (sysInfo?['memory']?['free'] is num)
+        ? (sysInfo!['memory']['free'] as num).toInt()
+        : (sysInfo?['memory']?['free'] is String ? int.tryParse(sysInfo!['memory']['free']) ?? 0 : 0);
+    final bufferedMem = (sysInfo?['memory']?['buffered'] is num)
+        ? (sysInfo!['memory']['buffered'] as num).toInt()
+        : (sysInfo?['memory']?['buffered'] is String ? int.tryParse(sysInfo!['memory']['buffered']) ?? 0 : 0);
     final usedMem = totalMem - freeMem - bufferedMem;
     final memoryValue = totalMem > 0
         ? '${(usedMem / totalMem * 100).toStringAsFixed(0)}%'
