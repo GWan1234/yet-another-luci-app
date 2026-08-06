@@ -61,9 +61,11 @@ jobs:
         run: flutter pub get
 
       - name: Setup Keystore
-        if: ${{ secrets.COMMUNITY_KEYSTORE_BASE64 != '' }}
+        env:
+          COMMUNITY_KEYSTORE_BASE64: ${{ secrets.COMMUNITY_KEYSTORE_BASE64 }}
+        if: env.COMMUNITY_KEYSTORE_BASE64 != ''
         run: |
-          echo "${{ secrets.COMMUNITY_KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.jks
+          echo "$COMMUNITY_KEYSTORE_BASE64" | base64 --decode > android/app/release.jks
 
       - name: Build Community Release APK
         env:
