@@ -152,21 +152,15 @@ jobs:
       - name: Generate Dual Changelogs
         id: changelog
         run: |
-          PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -v "${{ github.ref_name }}" | head -n 1)
-          if [ -z "$PREVIOUS_TAG" ]; then
-            PREVIOUS_TAG=$(git rev-list --max-parents=0 HEAD)
-          fi
-
-          echo "Generating community release notes excluding monetization commits..."
-          echo "## What's Changed in Community Build (${{ github.ref_name }})" > release_notes_community.md
+          echo "## What's New in Yet Another LuCI App (${{ github.ref_name }})" > release_notes_community.md
           echo "" >> release_notes_community.md
-          git log --pretty=format:"- %s (%h)" "$PREVIOUS_TAG..${{ github.ref_name }}" | \
-            grep -vE -i "monetization|paywall|admob|bannerad|play billing|in_app_purchase|subscription|\bads\b|entitlement" >> release_notes_community.md || true
-
-          echo "Generating full Play Store release notes..."
-          echo "## What's Changed in Play Store Build (${{ github.ref_name }})" > release_notes_playstore.md
-          echo "" >> release_notes_playstore.md
-          git log --pretty=format:"- %s (%h)" "$PREVIOUS_TAG..${{ github.ref_name }}" >> release_notes_playstore.md
+          echo "### Highlights" >> release_notes_community.md
+          echo "- **Open-Core & Apache 2.0**: Fully free and open-source under Apache License 2.0." >> release_notes_community.md
+          echo "- **Unlimited Routers & No Ads**: Community build flavor includes unlimited router management with zero ads and zero paywall limits." >> release_notes_community.md
+          echo "- **Smart Topology Engine**: Support for DSA and Swconfig OpenWrt network architecture models." >> release_notes_community.md
+          echo "- **Dual Package Engine**: OPKG and APK (OpenWrt 24.10+) package manager compatibility." >> release_notes_community.md
+          echo "- **Firewall 3 & 4 Support**: Unified rules interface supporting iptables (fw3) and nftables (fw4)." >> release_notes_community.md
+          echo "- **WPA3-SAE Security Badges**: Precise wireless security classification (WPA3-SAE, WPA2/WPA3 Mixed, WPA2-PSK)." >> release_notes_community.md
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1

@@ -75,6 +75,15 @@ jobs:
           KEY_PASSWORD: ${{ secrets.COMMUNITY_KEY_PASSWORD }}
         run: flutter build appbundle --release --flavor playstore --dart-define=FLAVOR=playstore
 
+      - name: Generate Play Store Release Notes
+        run: |
+          echo "What's New:" > release_notes_playstore.txt
+          echo "- OpenWrt router management with support for legacy OPKG and modern APK packages." >> release_notes_playstore.txt
+          echo "- Hardware network topology view for DSA and Swconfig router models." >> release_notes_playstore.txt
+          echo "- Firewall 3 and Firewall 4 rules manager." >> release_notes_playstore.txt
+          echo "- WPA3-SAE wireless security badge classification." >> release_notes_playstore.txt
+          echo "- General performance and stability improvements." >> release_notes_playstore.txt
+
       - name: Upload Play Store AAB Artifact
         uses: actions/upload-artifact@v4
         with:
