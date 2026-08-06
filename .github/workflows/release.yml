@@ -69,7 +69,7 @@ jobs:
 
       - name: Build Community Release APK
         env:
-          KEYSTORE_PATH: app/release.jks
+          KEYSTORE_PATH: release.jks
           KEYSTORE_PASSWORD: ${{ secrets.COMMUNITY_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.COMMUNITY_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.COMMUNITY_KEY_PASSWORD }}
@@ -105,7 +105,19 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      - name: Setup Keystore
+        env:
+          COMMUNITY_KEYSTORE_BASE64: ${{ secrets.COMMUNITY_KEYSTORE_BASE64 }}
+        if: env.COMMUNITY_KEYSTORE_BASE64 != ''
+        run: |
+          echo "$COMMUNITY_KEYSTORE_BASE64" | base64 --decode > android/app/release.jks
+
       - name: Build Play Store Release AAB
+        env:
+          KEYSTORE_PATH: release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.COMMUNITY_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.COMMUNITY_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.COMMUNITY_KEY_PASSWORD }}
         run: flutter build appbundle --release --flavor playstore --dart-define=FLAVOR=playstore
 
       - name: Upload Play Store AAB Artifact

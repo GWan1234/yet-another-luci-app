@@ -70,7 +70,7 @@ jobs:
 
       - name: Build Play Store Release AAB
         env:
-          KEYSTORE_PATH: app/release.jks
+          KEYSTORE_PATH: release.jks
           KEYSTORE_PASSWORD: ${{ secrets.COMMUNITY_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.COMMUNITY_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.COMMUNITY_KEY_PASSWORD }}
