@@ -9,12 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2026-08-06
 
-### Added
-- Multi-router management with real-time capability detection (ubus / UCI / exec fallback).
-- DSA & Swconfig network bridge/VLAN topology rendering.
-- Package Manager support for both OPKG (`opkg`) and APK (`apk`) package engines on OpenWrt 24.10+.
-- Dual-parser Firewall & Security management supporting `firewall3` (iptables) and `firewall4` (nftables).
-- Wireless security badge classification (WPA3-SAE, WPA2/WPA3 Mixed, Legacy PSK).
-- Automatic frequency precision and channel formatting for 2.4GHz / 5GHz / 6GHz radios.
-- In-app RPCD ACL remediation dialogs and explicit setup guidance.
-- Dual-build architecture: Apache 2.0 Community Edition (unlimited, 100% ad-free) and Play Store Edition.
+We are excited to announce the official **v1.0.0 Community Release**! Built completely free and open-source under the Apache License 2.0, this release delivers a powerful, privacy-first mobile management interface for OpenWrt routers without any ads, telemetry, or feature paywalls.
+
+### 🌟 Key Features & Highlights
+- **Zero Ads & 100% Free**: Pure FOSS build compiled with zero ad SDKs or tracking dependencies.
+- **Smart Network Topology**: Automatic detection and visual mapping for both **DSA** and **Swconfig** OpenWrt architecture models.
+- **Dual Package Manager Compatibility**: Seamless software management supporting both **OPKG** (OpenWrt 23.05 and earlier) and **APK** (OpenWrt 24.10+).
+- **Firewall & Security Control**: Unified management interface for both **iptables (fw3)** and **nftables (fw4)** rules, port forwards, and custom rulesets.
+- **Wi-Fi & Client Management**: Real-time connected client lists, signal strength meters, WPA3-SAE security status badges, and interface toggles.
+- **Manual Update Checker**: Integrated check-for-update utility querying official GitHub release channels on demand in Settings.
+- **In-App RPCD ACL Remediation**: Guided diagnostic dialogs to identify and resolve missing OpenWrt ubus RPC permissions.
