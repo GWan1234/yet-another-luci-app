@@ -149,10 +149,18 @@ jobs:
           name: playstore-aab
           path: release-artifacts/
 
+      - name: Extract App Version
+        id: version
+        run: |
+          RAW_VER=$(grep '^version:' pubspec.yaml | head -n 1 | awk '{print $2}' | cut -d'+' -f1)
+          TAG_VER="v${RAW_VER}"
+          echo "TAG_VER=${TAG_VER}" >> $GITHUB_ENV
+          echo "tag_ver=${TAG_VER}" >> $GITHUB_OUTPUT
+
       - name: Generate Dual Changelogs
         id: changelog
         run: |
-          echo "## What's New in Yet Another LuCI App (${{ github.ref_name }})" > release_notes_community.md
+          echo "## What's New in Yet Another LuCI App (${{ env.TAG_VER }})" > release_notes_community.md
           echo "" >> release_notes_community.md
           echo "### Highlights" >> release_notes_community.md
           echo "- **Open-Core & Apache 2.0**: Fully free and open-source under Apache License 2.0." >> release_notes_community.md
@@ -167,5 +175,6 @@ jobs:
         with:
           artifacts: "release-artifacts/*"
           bodyFile: "release_notes_community.md"
-          tag: ${{ github.ref_name }}
+          tag: ${{ env.TAG_VER }}
+          name: ${{ env.TAG_VER }}
           token: ${{ secrets.GITHUB_TOKEN }}
