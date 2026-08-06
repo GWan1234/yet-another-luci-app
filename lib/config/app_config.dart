@@ -37,6 +37,9 @@ class AppConfig {
   /// Strictly `false` for community builds to ensure zero ad/billing SDK activity.
   static bool get isMonetizationEnabled => flavor == AppFlavor.playstore;
 
+  /// Whether the current build is the FOSS community flavor.
+  static bool get isCommunityFlavor => flavor == AppFlavor.community;
+
   /// Human-readable build channel description.
   static String get flavorName => flavor == AppFlavor.playstore ? 'Play Store' : 'Community';
 }

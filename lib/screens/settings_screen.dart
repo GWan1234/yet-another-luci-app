@@ -9,6 +9,7 @@ import 'package:luci_mobile/screens/paywall_screen.dart';
 import 'package:luci_mobile/widgets/banner_ad_widget.dart';
 import 'package:luci_mobile/widgets/luci_app_bar.dart';
 import 'package:luci_mobile/screens/dashboard_settings_list_screen.dart';
+import 'package:luci_mobile/services/update_checker_service.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -248,6 +249,52 @@ class SettingsScreen extends ConsumerWidget {
                               builder: (context) => const PaywallScreen(),
                             ),
                           );
+                        },
+                      ),
+                    ),
+                  ],
+                  if (AppConfig.isCommunityFlavor) ...[
+                    const Divider(height: 32),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      child: Text(
+                        'App Updates',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.system_update_rounded,
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            size: 24,
+                          ),
+                        ),
+                        title: const Text(
+                          'Check for Updates',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: const Text('Check for new releases on GitHub'),
+                        trailing: Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        onTap: () {
+                          UpdateCheckerService.checkForUpdates(context);
                         },
                       ),
                     ),

@@ -15,6 +15,7 @@ import 'package:luci_mobile/utils/http_client_manager.dart';
 import 'package:luci_mobile/state/app_state.dart';
 import 'package:luci_mobile/modules/core/luci_module_registry.dart';
 import 'package:luci_mobile/widgets/theme_router_logo.dart';
+import 'package:luci_mobile/services/update_checker_service.dart';
 
 class _MoreScreenSection extends StatelessWidget {
   final List<Widget> tiles;
@@ -285,6 +286,15 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
               ],
             ),
             actions: [
+              if (AppConfig.isCommunityFlavor)
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    UpdateCheckerService.checkForUpdates(context);
+                  },
+                  icon: const Icon(Icons.system_update, size: 16),
+                  label: const Text('Check for Updates'),
+                ),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: const Text('Close'),
@@ -351,20 +361,30 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
             const LuciSectionHeader('Application'),
             _MoreScreenSection(
               tiles: [
-                _buildMoreTile(
-                  context,
-                  icon: Icons.router,
-                  iconColor: Theme.of(context).colorScheme.primary,
-                  title: 'Manage Routers',
-                  subtitle: 'Edit or remove saved routers',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const ManageRoutersScreen(),
-                      ),
-                    );
-                  },
-                ),
+                if (!AppConfig.isCommunityFlavor)
+                  _buildMoreTile(
+                    context,
+                    icon: Icons.router,
+                    iconColor: Theme.of(context).colorScheme.primary,
+                    title: 'Manage Routers',
+                    subtitle: 'Edit or remove saved routers',
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const ManageRoutersScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                if (AppConfig.isCommunityFlavor)
+                  _buildMoreTile(
+                    context,
+                    icon: Icons.system_update_outlined,
+                    iconColor: Theme.of(context).colorScheme.primary,
+                    title: 'Check for Updates',
+                    subtitle: 'Check for new releases on GitHub',
+                    onTap: () => UpdateCheckerService.checkForUpdates(context),
+                  ),
                 _buildMoreTile(
                   context,
                   icon: Icons.settings_outlined,
