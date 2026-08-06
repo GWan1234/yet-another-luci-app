@@ -1,4 +1,4 @@
-name: Release Pipeline
+name: Community Release (GitHub Releases)
 
 on:
   push:
@@ -36,14 +36,17 @@ jobs:
       - name: Run Unit Tests
         run: flutter test
 
-  build-community:
-    name: Build Community APK (Apache 2.0)
+  build-and-release-community:
+    name: Build & Publish Community APK
     needs: quality-gate
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set Up Java
         uses: actions/setup-java@v4
@@ -73,92 +76,22 @@ jobs:
           KEY_PASSWORD: ${{ secrets.COMMUNITY_KEY_PASSWORD }}
         run: flutter build apk --release --flavor community --dart-define=FLAVOR=community
 
-      - name: Upload Community APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: community-apk
-          path: build/app/outputs/flutter-apk/app-community-release.apk
-
-  build-playstore:
-    name: Build Play Store AAB
-    needs: quality-gate
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Set Up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '21'
-
-      - name: Set Up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.35.2'
-          channel: 'stable'
-
-      - name: Install Dependencies
-        run: flutter pub get
-
-      - name: Build Play Store Release AAB
-        run: flutter build appbundle --release --flavor playstore --dart-define=FLAVOR=playstore
-
-      - name: Upload Play Store AAB Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: playstore-aab
-          path: build/app/outputs/bundle/playstoreRelease/app-playstore-release.aab
-
-  publish-release:
-    name: Publish GitHub Release
-    needs: [build-community, build-playstore]
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download Community APK Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: community-apk
-          path: release-artifacts/
-
-      - name: Download Play Store AAB Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: playstore-aab
-          path: release-artifacts/
-
-      - name: Generate Dual Changelogs
-        id: changelog
+      - name: Generate Community Release Notes
         run: |
           PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -v "${{ github.ref_name }}" | head -n 1)
           if [ -z "$PREVIOUS_TAG" ]; then
             PREVIOUS_TAG=$(git rev-list --max-parents=0 HEAD)
           fi
 
-          echo "Generating community release notes excluding monetization commits..."
           echo "## What's Changed in Community Build (${{ github.ref_name }})" > release_notes_community.md
           echo "" >> release_notes_community.md
           git log --pretty=format:"- %s (%h)" "$PREVIOUS_TAG..${{ github.ref_name }}" | \
             grep -vE -i "monetization|paywall|admob|bannerad|play billing|in_app_purchase|subscription|\bads\b|entitlement" >> release_notes_community.md || true
 
-          echo "Generating full Play Store release notes..."
-          echo "## What's Changed in Play Store Build (${{ github.ref_name }})" > release_notes_playstore.md
-          echo "" >> release_notes_playstore.md
-          git log --pretty=format:"- %s (%h)" "$PREVIOUS_TAG..${{ github.ref_name }}" >> release_notes_playstore.md
-
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "release-artifacts/*"
+          artifacts: "build/app/outputs/flutter-apk/app-community-release.apk"
           bodyFile: "release_notes_community.md"
           tag: ${{ github.ref_name }}
           token: ${{ secrets.GITHUB_TOKEN }}
