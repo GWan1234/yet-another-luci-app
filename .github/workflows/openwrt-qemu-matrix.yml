@@ -1,0 +1,95 @@
+name: OpenWrt QEMU Matrix Test
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' # Weekly on Sunday at midnight
+  workflow_dispatch:
+
+jobs:
+  qemu-matrix:
+    name: OpenWrt ${{ matrix.openwrt_version }} Test
+    runs-on: ubuntu-latest
+    continue-on-error: true # Informational / non-blocking check status
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - openwrt_version: "19.07.10"
+            image_url: "https://archive.openwrt.org/releases/19.07.10/targets/x86/64/openwrt-19.07.10-x86-64-combined-squashfs.img.gz"
+            pkg_engine: "opkg"
+            fw_backend: "fw3"
+            net_model: "swconfig"
+            port: 8081
+          - openwrt_version: "21.02.7"
+            image_url: "https://downloads.openwrt.org/releases/21.02.7/targets/x86/64/openwrt-21.02.7-x86-64-generic-squashfs-combined.img.gz"
+            pkg_engine: "opkg"
+            fw_backend: "fw3"
+            net_model: "dsa"
+            port: 8082
+          - openwrt_version: "22.03.7"
+            image_url: "https://downloads.openwrt.org/releases/22.03.7/targets/x86/64/openwrt-22.03.7-x86-64-generic-squashfs-combined.img.gz"
+            pkg_engine: "opkg"
+            fw_backend: "fw4"
+            net_model: "dsa"
+            port: 8083
+          - openwrt_version: "23.05.5"
+            image_url: "https://downloads.openwrt.org/releases/23.05.5/targets/x86/64/openwrt-23.05.5-x86-64-generic-squashfs-combined.img.gz"
+            pkg_engine: "opkg"
+            fw_backend: "fw4"
+            net_model: "dsa"
+            port: 8084
+          - openwrt_version: "24.10.0"
+            image_url: "https://downloads.openwrt.org/releases/24.10.0/targets/x86/64/openwrt-24.10.0-x86-64-generic-squashfs-combined.img.gz"
+            pkg_engine: "apk"
+            fw_backend: "fw4"
+            net_model: "dsa"
+            port: 8085
+          - openwrt_version: "snapshot"
+            image_url: "https://downloads.openwrt.org/snapshots/targets/x86/64/openwrt-x86-64-generic-squashfs-combined.img.gz"
+            pkg_engine: "apk"
+            fw_backend: "fw4"
+            net_model: "dsa"
+            port: 8086
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set Up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set Up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.2'
+          channel: 'stable'
+          cache: true
+
+      - name: Install QEMU & Network Utilities
+        run: |
+          sudo apt-get update
+          sudo apt-get install -q -y qemu-system-x86 bc curl
+
+      - name: Boot OpenWrt QEMU Instance (${{ matrix.openwrt_version }})
+        run: |
+          chmod +x scripts/ci/boot_openwrt_qemu.sh
+          ./scripts/ci/boot_openwrt_qemu.sh "${{ matrix.openwrt_version }}" "${{ matrix.image_url }}" "${{ matrix.port }}"
+
+      - name: Run QEMU Integration Matrix Test
+        env:
+          OPENWRT_TARGET_VERSION: ${{ matrix.openwrt_version }}
+          OPENWRT_TARGET_PORT: ${{ matrix.port }}
+          EXPECTED_PKG_ENGINE: ${{ matrix.pkg_engine }}
+          EXPECTED_FW_BACKEND: ${{ matrix.fw_backend }}
+          EXPECTED_NET_MODEL: ${{ matrix.net_model }}
+        run: flutter test test/integration/openwrt_qemu_matrix_test.dart
+
+      - name: Failure Reporting Diagnostic
+        if: failure()
+        run: |
+          echo "::error::OpenWrt Matrix Failure on version ${{ matrix.openwrt_version }}"
+          echo "=== QEMU Output Log for ${{ matrix.openwrt_version }} ==="
+          cat "/tmp/openwrt_qemu_${{ matrix.openwrt_version }}/qemu.log" || true
