@@ -1,3 +1,163 @@
+import 'package:flutter/material.dart';
+
+/// PMF (Protected Management Frames / IEEE 802.11w) state.
+enum PmfState {
+  disabled, // 0
+  optional, // 1
+  required; // 2
+
+  String get displayName {
+    switch (this) {
+      case PmfState.disabled:
+        return 'PMF Disabled';
+      case PmfState.optional:
+        return 'PMF Optional';
+      case PmfState.required:
+        return 'PMF Required';
+    }
+  }
+
+  static PmfState parse(dynamic rawVal) {
+    if (rawVal == null) return PmfState.disabled;
+    final str = rawVal.toString().trim();
+    if (str == '2' || str.toLowerCase() == 'required') return PmfState.required;
+    if (str == '1' || str.toLowerCase() == 'optional') return PmfState.optional;
+    return PmfState.disabled;
+  }
+}
+
+/// Structured Wi-Fi Security Mode classification.
+enum WifiSecurityMode {
+  saeOnly,   // WPA3-SAE Only (PMF mandatory)
+  saeMixed,  // WPA2/WPA3 Transitional Mode
+  wpa2Psk,   // WPA2-PSK
+  wpaPsk,    // WPA-PSK (Legacy)
+  wep,       // WEP (Legacy)
+  open,      // Open (No encryption)
+  enterprise,// WPA-Enterprise / EAP
+  unknown;   // Fallback for unclassified encryption
+
+  String get displayName {
+    switch (this) {
+      case WifiSecurityMode.saeOnly:
+        return 'WPA3-SAE (SAE-Only)';
+      case WifiSecurityMode.saeMixed:
+        return 'WPA2/WPA3 Mixed';
+      case WifiSecurityMode.wpa2Psk:
+        return 'WPA2-PSK';
+      case WifiSecurityMode.wpaPsk:
+        return 'WPA-PSK';
+      case WifiSecurityMode.wep:
+        return 'WEP';
+      case WifiSecurityMode.open:
+        return 'Open (None)';
+      case WifiSecurityMode.enterprise:
+        return 'WPA-Enterprise';
+      case WifiSecurityMode.unknown:
+        return 'Custom/Unknown';
+    }
+  }
+
+  String get shortBadgeLabel {
+    switch (this) {
+      case WifiSecurityMode.saeOnly:
+        return 'WPA3-SAE';
+      case WifiSecurityMode.saeMixed:
+        return 'WPA2/WPA3';
+      case WifiSecurityMode.wpa2Psk:
+        return 'WPA2-PSK';
+      case WifiSecurityMode.wpaPsk:
+        return 'WPA-PSK';
+      case WifiSecurityMode.wep:
+        return 'WEP';
+      case WifiSecurityMode.open:
+        return 'OPEN';
+      case WifiSecurityMode.enterprise:
+        return 'WPA-EAP';
+      case WifiSecurityMode.unknown:
+        return 'UNKNOWN';
+    }
+  }
+
+  Color get badgeColor {
+    switch (this) {
+      case WifiSecurityMode.saeOnly:
+        return Colors.deepPurple;
+      case WifiSecurityMode.saeMixed:
+        return Colors.indigo;
+      case WifiSecurityMode.wpa2Psk:
+        return Colors.green;
+      case WifiSecurityMode.wpaPsk:
+        return Colors.orange;
+      case WifiSecurityMode.wep:
+        return Colors.red;
+      case WifiSecurityMode.open:
+        return Colors.amber.shade800;
+      case WifiSecurityMode.enterprise:
+        return Colors.teal;
+      case WifiSecurityMode.unknown:
+        return Colors.grey;
+    }
+  }
+
+  static WifiSecurityMode parse({
+    Map<String, dynamic>? iwinfoEnc,
+    String? rawConfigEnc,
+  }) {
+    final configEnc = (rawConfigEnc ?? '').toLowerCase().trim();
+    final description = (iwinfoEnc?['description']?.toString() ?? '').toUpperCase();
+    final enabled = iwinfoEnc?['enabled'] as bool? ?? true;
+
+    final authSuitesRaw = iwinfoEnc?['auth_suites'];
+    final authSuites = <String>[];
+    if (authSuitesRaw is List) {
+      authSuites.addAll(authSuitesRaw.map((e) => e.toString().toUpperCase()));
+    }
+
+    if (configEnc == 'none' || (!enabled && description.isEmpty && configEnc.isEmpty)) {
+      return WifiSecurityMode.open;
+    }
+
+    final hasSaeSuite = authSuites.contains('SAE') || description.contains('SAE') || configEnc.contains('sae');
+    final hasPsk2Suite = authSuites.contains('PSK') || description.contains('WPA2') || configEnc.contains('psk2');
+    final hasPsk1Suite = configEnc == 'psk' || (description.contains('WPA') && !description.contains('WPA2'));
+
+    // 1. SAE Only vs SAE Mixed
+    if (hasSaeSuite) {
+      if (configEnc == 'sae' || (!hasPsk2Suite && !description.contains('WPA2') && !description.contains('PSK'))) {
+        return WifiSecurityMode.saeOnly;
+      }
+      return WifiSecurityMode.saeMixed;
+    }
+
+    // 2. WPA Enterprise
+    if (description.contains('802.1X') || description.contains('EAP') || (configEnc.startsWith('wpa') && !configEnc.contains('psk'))) {
+      return WifiSecurityMode.enterprise;
+    }
+
+    // 3. WPA2-PSK
+    if (hasPsk2Suite) {
+      return WifiSecurityMode.wpa2Psk;
+    }
+
+    // 4. WPA-PSK Legacy
+    if (hasPsk1Suite || configEnc.contains('psk')) {
+      return WifiSecurityMode.wpaPsk;
+    }
+
+    // 5. WEP
+    if (configEnc.contains('wep') || description.contains('WEP') || (iwinfoEnc?['wep'] == true)) {
+      return WifiSecurityMode.wep;
+    }
+
+    if (description.isNotEmpty) {
+      return WifiSecurityMode.unknown;
+    }
+
+    return WifiSecurityMode.wpa2Psk;
+  }
+}
+
 /// Represents a connected wireless station (client device).
 class WirelessStation {
   final String macAddress;
@@ -46,6 +206,8 @@ class WirelessInterface {
   final String ssid;
   final String mode; // AP, Client, Mesh, Ad-Hoc
   final String encryption;
+  final WifiSecurityMode securityMode;
+  final PmfState pmfState;
   final String channel;
   final bool isEnabled;
   final List<WirelessStation> stations;
@@ -55,6 +217,8 @@ class WirelessInterface {
     required this.ssid,
     required this.mode,
     required this.encryption,
+    required this.securityMode,
+    required this.pmfState,
     required this.channel,
     required this.isEnabled,
     required this.stations,
@@ -75,6 +239,19 @@ class WirelessInterface {
         'WPA2-PSK';
     final chStr = (iwinfo['channel'] ?? config['channel'] ?? 'Auto').toString();
     final enabled = !(config['disabled'] as bool? ?? false);
+
+    final iwEncMap = iwinfo['encryption'] is Map<String, dynamic>
+        ? iwinfo['encryption'] as Map<String, dynamic>
+        : null;
+    final rawConfigEnc = config['encryption']?.toString();
+
+    final secMode = WifiSecurityMode.parse(
+      iwinfoEnc: iwEncMap,
+      rawConfigEnc: rawConfigEnc,
+    );
+
+    final rawPmf = config['ieee80211w'] ?? iwinfo['ieee80211w'];
+    final pmf = PmfState.parse(rawPmf);
 
     final stationList = <WirelessStation>[];
     if (assocData != null) {
@@ -126,6 +303,8 @@ class WirelessInterface {
       ssid: ssidStr,
       mode: modeStr,
       encryption: encStr,
+      securityMode: secMode,
+      pmfState: pmf,
       channel: chStr,
       isEnabled: enabled,
       stations: stationList,
@@ -138,7 +317,7 @@ class WirelessRadio {
   final String name;
   final bool isUp;
   final String channel;
-  final int? frequency;
+  final int? frequency; // frequency in MHz
   final int? txPowerDbm;
   final String country;
   final List<WirelessInterface> interfaces;
@@ -192,46 +371,29 @@ class WirelessRadio {
       });
     }
 
-    // Fallback frequency calculation from channel if missing
-    if (freq == null || freq == 0) {
-      var chNum = int.tryParse(ch) ?? 0;
-      if (chNum == 0) {
-        for (final ifc in ifaceList) {
-          final parsed = int.tryParse(ifc.channel);
-          if (parsed != null && parsed > 0) {
-            chNum = parsed;
-            break;
-          }
-        }
-      }
-      if (chNum >= 1 && chNum <= 14) {
-        freq = chNum == 14 ? 2484 : 2407 + (chNum * 5);
-      } else if (chNum >= 36 && chNum <= 177) {
-        freq = 5000 + (chNum * 5);
-      }
-    }
-
     return WirelessRadio(
       name: radioName,
       isUp: up,
       channel: ch,
-      frequency: freq,
+      frequency: (freq != null && freq! > 0) ? freq : null,
       txPowerDbm: txp,
       country: ctry,
       interfaces: ifaceList,
     );
   }
 
-  String get formattedFrequency {
+  /// Formatted frequency display string (e.g. "2.437 GHz").
+  /// Returns null if frequency data is absent/unreported on older radios/firmware.
+  String? get formattedFrequency {
     if (frequency != null && frequency! > 0) {
       final ghz = frequency! / 1000.0;
       return '${ghz.toStringAsFixed(3)} GHz';
     }
-    return 'N/A';
+    return null;
   }
 
   String get bandLabel {
-    if (frequency != null) {
+    if (frequency != null && frequency! > 0) {
       if (frequency! >= 5925) return '6 GHz';
       if (frequency! >= 4900) return '5 GHz';
       if (frequency! >= 2400) return '2.4 GHz';
@@ -288,6 +450,8 @@ class WirelessOverview {
               ssid: 'OpenWrt-2.4G',
               mode: 'AP',
               encryption: 'WPA2-PSK (CCMP)',
+              securityMode: WifiSecurityMode.wpa2Psk,
+              pmfState: PmfState.disabled,
               channel: '6',
               isEnabled: true,
               stations: [
@@ -309,7 +473,9 @@ class WirelessOverview {
               ifName: 'wlan1',
               ssid: 'OpenWrt-5G',
               mode: 'AP',
-              encryption: 'WPA3-SAE / WPA2-PSK',
+              encryption: 'WPA3-SAE (Mandatory PMF)',
+              securityMode: WifiSecurityMode.saeOnly,
+              pmfState: PmfState.required,
               channel: '36',
               isEnabled: true,
               stations: [

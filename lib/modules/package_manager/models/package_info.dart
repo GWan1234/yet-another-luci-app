@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:luci_mobile/models/router_capabilities.dart';
 
-/// Package manager type running on OpenWrt (OPKG vs APK).
-enum PackageManagerType {
-  opkg,
-  apk,
-}
+/// Unify package manager enum across application
+typedef PackageManagerType = PackageManagerEngine;
 
 /// Unified software package model supporting OPKG (.ipk) and Alpine Package Keeper (.apk) formats.
 class OpenWrtPackage {
@@ -492,4 +490,59 @@ class PackageManagerOverview {
   int get upgradableCount => installedPackages.where((p) => p.hasUpdate).length;
 
   String get managerTitle => 'OPKG/APK Package Manager';
+}
+
+/// Package feed/repository definition supporting OPKG and APK feed parsing.
+class OpenWrtPackageRepository {
+  final String name;
+  final String url;
+  final bool isEnabled;
+  final PackageManagerEngine engine;
+
+  const OpenWrtPackageRepository({
+    required this.name,
+    required this.url,
+    this.isEnabled = true,
+    required this.engine,
+  });
+
+  /// Parse OPKG config line: e.g. "src/gz openwrt_core https://downloads.openwrt.org/..."
+  static OpenWrtPackageRepository? parseOpkgLine(String line) {
+    final trimmed = line.trim();
+    if (trimmed.isEmpty || trimmed.startsWith('#')) return null;
+    final parts = trimmed.split(RegExp(r'\s+'));
+    if (parts.length >= 3 && (parts[0].startsWith('src') || parts[0] == 'dest')) {
+      return OpenWrtPackageRepository(
+        name: parts[1],
+        url: parts[2],
+        engine: PackageManagerEngine.opkg,
+      );
+    }
+    return null;
+  }
+
+  /// Parse APK repositories line: e.g. "https://downloads.openwrt.org/snapshots/packages/x86_64/base"
+  static OpenWrtPackageRepository? parseApkLine(String line) {
+    final trimmed = line.trim();
+    if (trimmed.isEmpty || trimmed.startsWith('#')) return null;
+    String name = 'repository';
+    String url = trimmed;
+    if (trimmed.startsWith('@')) {
+      final parts = trimmed.split(RegExp(r'\s+'));
+      if (parts.length >= 2) {
+        name = parts[0].substring(1);
+        url = parts[1];
+      }
+    } else {
+      final uri = Uri.tryParse(trimmed);
+      if (uri != null && uri.pathSegments.isNotEmpty) {
+        name = uri.pathSegments.lastWhere((s) => s.isNotEmpty, orElse: () => 'repo');
+      }
+    }
+    return OpenWrtPackageRepository(
+      name: name,
+      url: url,
+      engine: PackageManagerEngine.apk,
+    );
+  }
 }

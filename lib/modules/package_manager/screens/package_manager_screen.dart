@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
+import 'package:luci_mobile/models/router_capabilities.dart';
+import 'package:luci_mobile/models/rpc_result.dart';
+import 'package:luci_mobile/widgets/rpc_result_dialog.dart';
 import '../models/package_info.dart';
 
 class PackageManagerScreen extends ConsumerStatefulWidget {
@@ -33,26 +36,34 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
     super.dispose();
   }
 
+  void _handleRpcResult<T>(RpcResult<T> result, String actionLabel) {
+    RpcResultUiHelper.handleRpcResult(context, result, actionLabel);
+  }
+
   Future<void> _checkUpgrades() async {
     setState(() {
       _isCheckingUpgrades = true;
     });
     try {
-      final list = await ref.read(appStateProvider).fetchUpgradablePackages();
+      final result = await ref.read(appStateProvider).fetchUpgradablePackagesResult();
       if (mounted) {
         setState(() {
-          _upgradablePackages = list;
+          _upgradablePackages = result.data ?? [];
           _isCheckingUpgrades = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              list.isEmpty
-                  ? 'All installed packages are up to date.'
-                  : 'Found ${list.length} upgradable package(s).',
+        if (!result.isSuccess) {
+          _handleRpcResult(result, 'Check Package Upgrades');
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _upgradablePackages!.isEmpty
+                    ? 'All installed packages are up to date.'
+                    : 'Found ${_upgradablePackages!.length} upgradable package(s).',
+              ),
             ),
-          ),
-        );
+          );
+        }
       }
     } catch (_) {
       if (mounted) {
@@ -71,7 +82,7 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Upgrading all packages... This may take a while.')),
     );
-    final success = await ref.read(appStateProvider).managePackage(
+    final result = await ref.read(appStateProvider).managePackageResult(
           packageName: '',
           action: 'upgrade',
         );
@@ -79,22 +90,58 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
       setState(() {
         _isUpgradingAll = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            success
-                ? 'System package upgrade completed successfully.'
-                : 'Failed to complete system package upgrade.',
-          ),
-        ),
-      );
-      await _checkUpgrades();
+      _handleRpcResult(result, 'System Package Upgrade');
+      if (result.isSuccess) {
+        await _checkUpgrades();
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final appState = ref.watch(appStateProvider);
+    final caps = appState.capabilities;
+
+    // Step 2: Handle the "neither engine" case explicitly
+    if (caps != null && caps.packageEngine == PackageManagerEngine.none) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Package Manager')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.extension_off_rounded, size: 64, color: Colors.grey.shade400),
+                const SizedBox(height: 16),
+                Text(
+                  'Package Manager Not Detected',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'This router image does not have an active OPKG or APK package manager installed, or capability probing failed to detect one.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Re-probing router capabilities...')),
+                    );
+                    await ref.read(appStateProvider).redetectCapabilities();
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Re-detect Router Capabilities'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final overview = PackageManagerOverview.fromDashboardData(
       appState.dashboardData,
       isReviewerMode: appState.reviewerModeEnabled,
@@ -364,19 +411,14 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('${isUpgradable ? "Upgrading" : (isInstalled ? "Removing" : "Installing")} ${pkg.name}...')),
             );
-            final success = await ref.read(appStateProvider).managePackage(
+            final result = await ref.read(appStateProvider).managePackageResult(
                   packageName: pkg.name,
                   action: action,
                 );
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    success
-                        ? 'Successfully ${isUpgradable ? "upgraded" : (isInstalled ? "removed" : "installed")} ${pkg.name}'
-                        : 'Failed to $action ${pkg.name}',
-                  ),
-                ),
+              _handleRpcResult(
+                result,
+                '${isUpgradable ? "Upgrade" : (isInstalled ? "Removal" : "Installation")} of ${pkg.name}',
               );
             }
           },

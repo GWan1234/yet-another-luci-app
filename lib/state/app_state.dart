@@ -19,6 +19,11 @@ import 'package:luci_mobile/config/app_config.dart';
 import 'package:luci_mobile/utils/http_client_manager.dart';
 import 'package:luci_mobile/utils/logger.dart';
 import 'package:luci_mobile/modules/package_manager/models/package_info.dart';
+import 'package:luci_mobile/models/router_capabilities.dart';
+import 'package:luci_mobile/models/rpc_result.dart';
+import 'package:luci_mobile/models/network_topology.dart';
+import 'package:luci_mobile/modules/firewall_security/models/firewall_info.dart';
+import 'package:luci_mobile/modules/wireless_management/models/wireless_info.dart';
 
 class AppState extends ChangeNotifier {
   static AppState? _instance;
@@ -29,6 +34,10 @@ class AppState extends ChangeNotifier {
   RouterService? _routerService;
   ThroughputService? _throughputService;
   final HttpClientManager _httpClientManager = HttpClientManager();
+
+  // Router Capabilities State
+  RouterCapabilities? _capabilities;
+  RouterCapabilities? get capabilities => _capabilities;
 
   // Reviewer mode state
   bool _reviewerModeEnabled = false;
@@ -446,6 +455,222 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Action to re-detect capabilities for the active router
+  Future<void> redetectCapabilities() async {
+    await probeRouterCapabilities(forceRefresh: true);
+  }
+
+  /// Probe and cache actual ubus objects, methods, package manager engine, firewall backend, and network model.
+  Future<RouterCapabilities> probeRouterCapabilities({bool forceRefresh = false}) async {
+    if (_reviewerModeEnabled) {
+      _capabilities = RouterCapabilities.mock();
+      notifyListeners();
+      return _capabilities!;
+    }
+
+    if (_routerService?.selectedRouter == null || _authService?.sysauth == null) {
+      _capabilities = RouterCapabilities.conservative('unknown');
+      return _capabilities!;
+    }
+
+    final routerId = _routerService!.selectedRouter!.id;
+    final cacheKey = 'router_capabilities_$routerId';
+
+    if (!forceRefresh) {
+      try {
+        final cachedJsonStr = await _secureStorageService.readValue(cacheKey);
+        if (cachedJsonStr != null && cachedJsonStr.isNotEmpty) {
+          final Map<String, dynamic> cachedMap = jsonDecode(cachedJsonStr);
+          final cachedCaps = RouterCapabilities.fromJson(cachedMap);
+          if (!cachedCaps.probeFailed && DateTime.now().difference(cachedCaps.probedAt).inHours < 24) {
+            _capabilities = cachedCaps;
+            Logger.info('Loaded router capabilities from cache for $routerId');
+            notifyListeners();
+            return _capabilities!;
+          }
+        }
+      } catch (e) {
+        Logger.warning('Failed to load cached router capabilities: $e');
+      }
+    }
+
+    final ip = _routerService!.selectedRouter!.ipAddress;
+    final sysauth = _authService!.sysauth!;
+    final useHttps = _routerService!.selectedRouter!.useHttps;
+
+    final ubusObjects = <String>{};
+    final ubusMethods = <String, List<String>>{};
+    PackageManagerEngine pkgEngine = PackageManagerEngine.opkg;
+    FirewallBackend fwBackend = FirewallBackend.fw4;
+    NetworkModel netModel = NetworkModel.dsa;
+    String releaseVer = '';
+    String board = '';
+    bool probeFailed = false;
+    String? probeError;
+
+    try {
+      // 1. Probe available ubus objects and methods
+      try {
+        final listRes = await _apiService!.call(
+          ip,
+          sysauth,
+          useHttps,
+          object: 'rpc',
+          method: 'list',
+        );
+        if (listRes is Map<String, dynamic>) {
+          listRes.forEach((obj, methods) {
+            ubusObjects.add(obj);
+            if (methods is List) {
+              ubusMethods[obj] = methods.cast<String>();
+            } else if (methods is Map) {
+              ubusMethods[obj] = methods.keys.cast<String>().toList();
+            }
+          });
+        }
+      } catch (e) {
+        Logger.warning('ubus list probe failed: $e');
+      }
+
+      // 2. Probe Package Manager engine: check /etc/apk vs /etc/opkg or ubus objects
+      try {
+        if (ubusObjects.contains('apk')) {
+          pkgEngine = PackageManagerEngine.apk;
+        } else if (ubusObjects.contains('opkg')) {
+          pkgEngine = PackageManagerEngine.opkg;
+        } else {
+          final apkStat = await _apiService!.call(
+            ip,
+            sysauth,
+            useHttps,
+            object: 'file',
+            method: 'stat',
+            params: {'path': '/etc/apk'},
+          );
+          if (apkStat is List && apkStat.length > 1 && apkStat[0] == 0) {
+            pkgEngine = PackageManagerEngine.apk;
+          } else {
+            final opkgStat = await _apiService!.call(
+              ip,
+              sysauth,
+              useHttps,
+              object: 'file',
+              method: 'stat',
+              params: {'path': '/etc/opkg'},
+            );
+            if (opkgStat is List && opkgStat.length > 1 && opkgStat[0] == 0) {
+              pkgEngine = PackageManagerEngine.opkg;
+            }
+          }
+        }
+      } catch (e) {
+        Logger.warning('Package engine probe failed: $e');
+      }
+
+      // 3. Probe Firewall backend (fw3 vs fw4)
+      try {
+        if (ubusObjects.contains('fw4')) {
+          fwBackend = FirewallBackend.fw4;
+        } else if (ubusObjects.contains('fw3')) {
+          fwBackend = FirewallBackend.fw3;
+        } else {
+          final uciFw = await _apiService!.call(
+            ip,
+            sysauth,
+            useHttps,
+            object: 'uci',
+            method: 'get',
+            params: {'config': 'firewall'},
+          );
+          if (uciFw is List && uciFw.length > 1 && uciFw[0] == 0) {
+            final values = uciFw[1] as Map<String, dynamic>?;
+            if (values != null && values.toString().contains('nftables')) {
+              fwBackend = FirewallBackend.fw4;
+            } else {
+              fwBackend = FirewallBackend.fw3;
+            }
+          }
+        }
+      } catch (e) {
+        Logger.warning('Firewall backend probe failed: $e');
+      }
+
+      // 4. Probe Network model (DSA vs swconfig)
+      try {
+        final uciNet = await _apiService!.call(
+          ip,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'get',
+          params: {'config': 'network'},
+        );
+        if (uciNet is List && uciNet.length > 1 && uciNet[0] == 0) {
+          final values = uciNet[1] as Map<String, dynamic>?;
+          if (values != null) {
+            final strVal = values.toString();
+            if (strVal.contains('switch_vlan') || strVal.contains('swconfig')) {
+              netModel = NetworkModel.swconfig;
+            } else {
+              netModel = NetworkModel.dsa;
+            }
+          }
+        }
+      } catch (e) {
+        Logger.warning('Network model probe failed: $e');
+      }
+
+      // 5. System board / release info
+      try {
+        final boardRes = await _apiService!.call(
+          ip,
+          sysauth,
+          useHttps,
+          object: 'system',
+          method: 'board',
+        );
+        if (boardRes is List && boardRes.length > 1 && boardRes[0] == 0) {
+          final bData = boardRes[1] as Map<String, dynamic>?;
+          board = bData?['model']?.toString() ?? bData?['hostname']?.toString() ?? '';
+          final release = bData?['release'] as Map<String, dynamic>?;
+          releaseVer = release?['version']?.toString() ?? '';
+        }
+      } catch (e) {
+        Logger.warning('Board probe failed: $e');
+      }
+    } catch (e) {
+      probeFailed = true;
+      probeError = e.toString();
+      Logger.error('Router capability probe error: $e');
+    }
+
+    _capabilities = RouterCapabilities(
+      routerId: routerId,
+      ubusObjects: ubusObjects,
+      ubusMethods: ubusMethods,
+      packageEngine: pkgEngine,
+      firewallBackend: fwBackend,
+      networkModel: netModel,
+      releaseVersion: releaseVer,
+      boardName: board,
+      probedAt: DateTime.now(),
+      probeFailed: probeFailed,
+      lastProbeError: probeError,
+    );
+
+    try {
+      await _secureStorageService.writeValue(
+        cacheKey,
+        jsonEncode(_capabilities!.toJson()),
+      );
+    } catch (e) {
+      Logger.warning('Failed to write capability cache: $e');
+    }
+
+    notifyListeners();
+    return _capabilities!;
+  }
+
   Future<void> fetchDashboardData() async {
     if (_reviewerModeEnabled) {
       // For reviewer mode, return mock data immediately
@@ -466,6 +691,7 @@ class AppState extends ChangeNotifier {
           _apiService!.callSimple('wireless', 'devices', {}),
           _apiService!.callSimple('luci-rpc', 'getDHCPLeases', {}),
           _apiService!.callSimple('uci', 'get', {'config': 'wireless'}),
+          _apiService!.callSimple('uci', 'get', {'config': 'network'}),
         ]);
 
         final interfaceDump = results[3][1] as Map<String, dynamic>;
@@ -480,6 +706,7 @@ class AppState extends ChangeNotifier {
           'wireless': results[4][1],
           'dhcpLeases': processedDhcpData,
           'uciWirelessConfig': results[6][1],
+          'uciNetworkConfig': results[7][1],
           'wan': _extractWanData(interfaceDump),
           'wireguard': <String, dynamic>{}, // Empty for reviewer mode
           '_lastUpdated':
@@ -534,14 +761,15 @@ class AppState extends ChangeNotifier {
       return;
     }
 
-    // If already loading, don't start another request (but this shouldn't prevent pull-to-refresh)
-    // We'll let the new request proceed and the loading state will be handled properly
-    final ip = _routerService!.selectedRouter!.ipAddress;
-    final useHttps = _routerService!.selectedRouter!.useHttps;
-
     _isDashboardLoading = true;
     _dashboardError = null;
     notifyListeners();
+
+    // Perform capability probing before batch RPC calls
+    await probeRouterCapabilities();
+
+    final ip = _routerService!.selectedRouter!.ipAddress;
+    final useHttps = _routerService!.selectedRouter!.useHttps;
 
     try {
       // Perform all API calls in parallel
@@ -616,113 +844,13 @@ class AppState extends ChangeNotifier {
       );
 
       Future<dynamic> fetchPackagesData() async {
-        try {
-          // 1. Try command execution opkg list-installed
-          final resOpkgExec = await callOptionalRpc(
-            object: 'file',
-            method: 'exec',
-            params: {'command': 'opkg', 'args': ['list-installed']},
-          );
-          final dataOpkgExec = getOptionalData(resOpkgExec, 'file.exec.opkg');
-          if (dataOpkgExec is Map && dataOpkgExec['stdout'] != null && (dataOpkgExec['stdout'] as String).trim().isNotEmpty) {
-            return dataOpkgExec['stdout'];
-          }
-
-          // 2. Try command execution apk info / apk list --installed
-          final resApkExec1 = await callOptionalRpc(
-            object: 'file',
-            method: 'exec',
-            params: {'command': 'apk', 'args': ['info']},
-          );
-          final dataApkExec1 = getOptionalData(resApkExec1, 'file.exec.apk1');
-          if (dataApkExec1 is Map && dataApkExec1['stdout'] != null && (dataApkExec1['stdout'] as String).trim().isNotEmpty) {
-            return dataApkExec1['stdout'];
-          }
-
-          final resApkExec2 = await callOptionalRpc(
-            object: 'file',
-            method: 'exec',
-            params: {'command': 'apk', 'args': ['list', '--installed']},
-          );
-          final dataApkExec2 = getOptionalData(resApkExec2, 'file.exec.apk2');
-          if (dataApkExec2 is Map && dataApkExec2['stdout'] != null && (dataApkExec2['stdout'] as String).trim().isNotEmpty) {
-            return dataApkExec2['stdout'];
-          }
-
-          // 3. Try reading status file /usr/lib/opkg/status or /var/lib/opkg/status
-          final resOpkgStatus1 = await callOptionalRpc(
-            object: 'file',
-            method: 'read',
-            params: {'path': '/usr/lib/opkg/status'},
-          );
-          final dataOpkg1 = getOptionalData(resOpkgStatus1, 'file.read.opkg1');
-          if (dataOpkg1 is Map && dataOpkg1['data'] != null && (dataOpkg1['data'] as String).trim().isNotEmpty) {
-            return dataOpkg1['data'];
-          }
-
-          final resOpkgStatus2 = await callOptionalRpc(
-            object: 'file',
-            method: 'read',
-            params: {'path': '/var/lib/opkg/status'},
-          );
-          final dataOpkg2 = getOptionalData(resOpkgStatus2, 'file.read.opkg2');
-          if (dataOpkg2 is Map && dataOpkg2['data'] != null && (dataOpkg2['data'] as String).trim().isNotEmpty) {
-            return dataOpkg2['data'];
-          }
-
-          // 4. Try reading APK DB /lib/apk/db/installed
-          final resApkDb = await callOptionalRpc(
-            object: 'file',
-            method: 'read',
-            params: {'path': '/lib/apk/db/installed'},
-          );
-          final dataApk = getOptionalData(resApkDb, 'file.read.apk');
-          if (dataApk is Map && dataApk['data'] != null && (dataApk['data'] as String).trim().isNotEmpty) {
-            return dataApk['data'];
-          }
-
-          // 5. Try luci-rpc listPackages as fallback if it returns actual package entries
-          final res1 = await callOptionalRpc(
-            object: 'luci-rpc',
-            method: 'listPackages',
-            params: {},
-          );
-          final data1 = getOptionalData(res1, 'luci-rpc.listPackages');
-          if (data1 != null) {
-            if (data1 is Map && (data1.containsKey('packages') || data1.containsKey('result') || data1.length > 2)) {
-              return data1;
-            }
-            if (data1 is List && data1.isNotEmpty) {
-              return data1;
-            }
-          }
-        } catch (_) {}
-        return null;
+        final res = await fetchPackagesDataResult();
+        return res.data;
       }
 
       Future<dynamic> fetchAvailablePackagesData() async {
-        try {
-          final res1 = await callOptionalRpc(
-            object: 'file',
-            method: 'exec',
-            params: {'command': 'opkg', 'args': ['list']},
-          );
-          final data1 = getOptionalData(res1, 'file.exec.opkg_avail');
-          if (data1 is Map && data1['stdout'] != null && (data1['stdout'] as String).trim().isNotEmpty) {
-            return data1['stdout'];
-          }
-
-          final res2 = await callOptionalRpc(
-            object: 'file',
-            method: 'exec',
-            params: {'command': 'apk', 'args': ['list']},
-          );
-          final data2 = getOptionalData(res2, 'file.exec.apk_avail');
-          if (data2 is Map && data2['stdout'] != null && (data2['stdout'] as String).trim().isNotEmpty) {
-            return data2['stdout'];
-          }
-        } catch (_) {}
-        return null;
+        final res = await fetchAvailablePackagesDataResult();
+        return res.data;
       }
 
       Future<dynamic> fetchCronData() async {
@@ -947,16 +1075,8 @@ class AppState extends ChangeNotifier {
 
       dynamic mountPointsData = mountPointsRaw;
 
-      // Determine Package Manager type (opkg vs apk)
-      String pkgMgrType = 'opkg';
-      if (boardInfoData is Map<String, dynamic>) {
-        final release = boardInfoData['release'] as Map<String, dynamic>?;
-        final version = release?['version']?.toString().toLowerCase() ?? '';
-        final target = release?['target']?.toString().toLowerCase() ?? '';
-        if (version.contains('24.') || version.contains('25.') || version.contains('apk') || target.contains('apk')) {
-          pkgMgrType = 'apk';
-        }
-      }
+      // Determine Package Manager engine from probed RouterCapabilities
+      final pkgMgrType = _capabilities?.packageEngine.name ?? 'opkg';
 
       // Fetch WireGuard peer information for WireGuard interfaces
       final wireguardData = <String, dynamic>{};
@@ -1164,19 +1284,263 @@ class AppState extends ChangeNotifier {
 
 
 
-  /// Manage software packages on OpenWrt (OPKG / APK)
-  Future<bool> managePackage({
+  /// Capability-aware fetch for installed packages returning RpcResult
+  Future<RpcResult<dynamic>> fetchPackagesDataResult() async {
+    final ip = _routerService?.selectedRouter?.ipAddress;
+    if (ip == null || _authService?.sysauth == null) {
+      return RpcResult.networkError('No active router session');
+    }
+    final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
+
+    final engine = _capabilities?.packageEngine ?? PackageManagerEngine.opkg;
+    if (engine == PackageManagerEngine.none) {
+      return RpcResult.methodNotFound('No package manager detected on router');
+    }
+
+    final isApk = engine == PackageManagerEngine.apk;
+    final cmd = isApk ? 'apk' : 'opkg';
+    final args = isApk ? ['info'] : ['list-installed'];
+
+    try {
+      final rawRpc = await _apiService!.call(
+        ip,
+        _authService!.sysauth!,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {'command': cmd, 'args': args},
+      );
+
+      final execResult = RpcResult.classifyExecResult<dynamic>(rawRpc, (data) {
+        if (data is Map && data['stdout'] != null && (data['stdout'] as String).trim().isNotEmpty) {
+          return data['stdout'];
+        }
+        return null;
+      });
+
+      if (execResult.isSuccess && execResult.data != null) {
+        return execResult;
+      }
+
+      if (execResult.status == RpcCallStatus.methodNotFound) {
+        Logger.warning('Installed package query returned methodNotFound. Triggering background capability re-probe.');
+        unawaited(redetectCapabilities());
+      }
+
+      // Try status file read fallback if file.exec failed / unpermitted
+      final statusPath = isApk ? '/lib/apk/db/installed' : '/usr/lib/opkg/status';
+      final rawRead = await _apiService!.call(
+        ip,
+        _authService!.sysauth!,
+        useHttps,
+        object: 'file',
+        method: 'read',
+        params: {'path': statusPath},
+      );
+
+      if (rawRead != null) {
+        final readResult = RpcResult.fromUbusResponse<dynamic>(rawRead, (data) {
+          if (data is Map && data['data'] != null && (data['data'] as String).trim().isNotEmpty) {
+            return data['data'];
+          }
+          return null;
+        });
+
+        if (readResult.isSuccess && readResult.data != null) {
+          return readResult;
+        }
+      }
+
+      return execResult;
+    } catch (e) {
+      return RpcResult.networkError('Network error fetching installed packages: $e');
+    }
+  }
+
+  /// Capability-aware fetch for available packages returning RpcResult
+  Future<RpcResult<dynamic>> fetchAvailablePackagesDataResult() async {
+    final ip = _routerService?.selectedRouter?.ipAddress;
+    if (ip == null || _authService?.sysauth == null) {
+      return RpcResult.networkError('No active router session');
+    }
+    final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
+
+    final engine = _capabilities?.packageEngine ?? PackageManagerEngine.opkg;
+    if (engine == PackageManagerEngine.none) {
+      return RpcResult.methodNotFound('No package manager detected on router');
+    }
+
+    final isApk = engine == PackageManagerEngine.apk;
+    final cmd = isApk ? 'apk' : 'opkg';
+
+    try {
+      final rawRpc = await _apiService!.call(
+        ip,
+        _authService!.sysauth!,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {'command': cmd, 'args': ['list']},
+      );
+
+      final execResult = RpcResult.classifyExecResult<dynamic>(rawRpc, (data) {
+        if (data is Map && data['stdout'] != null && (data['stdout'] as String).trim().isNotEmpty) {
+          return data['stdout'];
+        }
+        return null;
+      });
+
+      if (execResult.status == RpcCallStatus.methodNotFound) {
+        unawaited(redetectCapabilities());
+      }
+
+      return execResult;
+    } catch (e) {
+      return RpcResult.networkError('Network error fetching available packages: $e');
+    }
+  }
+
+  /// Capability-aware fetch for network switch / VLAN topology returning `RpcResult<NetworkTopology>`
+  Future<RpcResult<NetworkTopology>> fetchNetworkTopologyResult() async {
+    final ip = _routerService?.selectedRouter?.ipAddress;
+    if (ip == null || _authService?.sysauth == null) {
+      return RpcResult.networkError('No active router session');
+    }
+    final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
+
+    final model = _capabilities?.networkModel ?? NetworkModel.unknown;
+    if (model == NetworkModel.unknown) {
+      return RpcResult.methodNotFound('Network model is unknown or in conservative fallback mode');
+    }
+
+    try {
+      final rawRpc = await _apiService!.call(
+        ip,
+        _authService!.sysauth!,
+        useHttps,
+        object: 'uci',
+        method: 'get',
+        params: {'config': 'network'},
+      );
+
+      final rpcRes = RpcResult.fromUbusResponse<NetworkTopology>(rawRpc, (data) {
+        if (data is Map) {
+          final map = Map<String, dynamic>.from(data);
+          if (model == NetworkModel.dsa) {
+            return DsaTopologyParser.parse(map, null);
+          } else {
+            return SwconfigTopologyParser.parse(map, null);
+          }
+        }
+        return NetworkTopology.unavailable(model, 'Invalid network config payload format');
+      });
+
+      if (rpcRes.status == RpcCallStatus.methodNotFound) {
+        Logger.warning('Network topology fetch returned methodNotFound. Triggering background capability re-probe.');
+        unawaited(redetectCapabilities());
+      }
+
+      return rpcRes;
+    } catch (e) {
+      return RpcResult.networkError('Network error fetching switch topology: $e');
+    }
+  }
+
+  /// Capability-aware fetch for firewall configuration returning `RpcResult<FirewallOverview>`
+  Future<RpcResult<FirewallOverview>> fetchFirewallOverviewResult() async {
+    final ip = _routerService?.selectedRouter?.ipAddress;
+    if (ip == null || _authService?.sysauth == null) {
+      return RpcResult.networkError('No active router session');
+    }
+    final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
+    final backend = _capabilities?.firewallBackend ?? FirewallBackend.fw4;
+
+    try {
+      final rawRpc = await _apiService!.call(
+        ip,
+        _authService!.sysauth!,
+        useHttps,
+        object: 'uci',
+        method: 'get',
+        params: {'config': 'firewall'},
+      );
+
+      final rpcRes = RpcResult.fromUbusResponse<FirewallOverview>(rawRpc, (data) {
+        if (data is Map) {
+          final map = Map<String, dynamic>.from(data);
+          return FirewallOverview.fromUciData(
+            map,
+            backend: backend,
+            isReviewerMode: reviewerModeEnabled,
+          );
+        }
+        return FirewallOverview.unavailable(backend, 'Invalid firewall config payload format');
+      });
+
+      if (rpcRes.status == RpcCallStatus.methodNotFound) {
+        Logger.warning('Firewall config fetch returned methodNotFound. Triggering background capability re-probe.');
+        unawaited(redetectCapabilities());
+      }
+
+      return rpcRes;
+    } catch (e) {
+      return RpcResult.networkError('Network error fetching firewall overview: $e');
+    }
+  }
+
+  /// Capability-aware fetch for wireless configuration returning `RpcResult<WirelessOverview>`
+  Future<RpcResult<WirelessOverview>> fetchWirelessOverviewResult() async {
+    final ip = _routerService?.selectedRouter?.ipAddress;
+    if (ip == null || _authService?.sysauth == null) {
+      return RpcResult.networkError('No active router session');
+    }
+    final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
+
+    try {
+      final rawRpc = await _apiService!.call(
+        ip,
+        _authService!.sysauth!,
+        useHttps,
+        object: 'luci-rpc',
+        method: 'getWirelessDevices',
+        params: {},
+      );
+
+      final rpcRes = RpcResult.fromUbusResponse<WirelessOverview>(rawRpc, (data) {
+        return WirelessOverview.fromDashboardData(
+          {'wireless': data},
+          isReviewerMode: reviewerModeEnabled,
+        );
+      });
+
+      if (rpcRes.status == RpcCallStatus.methodNotFound) {
+        Logger.warning('Wireless devices fetch returned methodNotFound. Triggering background capability re-probe.');
+        unawaited(redetectCapabilities());
+      }
+
+      return rpcRes;
+    } catch (e) {
+      return RpcResult.networkError('Network error fetching wireless overview: $e');
+    }
+  }
+
+  /// Manage software packages on OpenWrt (OPKG / APK) returning classified RpcResult
+  Future<RpcResult<String>> managePackageResult({
     required String packageName,
     required String action, // 'install', 'remove', 'update', 'upgrade'
   }) async {
     final ip = _routerService?.selectedRouter?.ipAddress;
-    if (ip == null || _authService?.sysauth == null) return false;
+    if (ip == null || _authService?.sysauth == null) {
+      return RpcResult.networkError('No active router session');
+    }
     final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
 
-    // Determine package manager dynamically
-    final pkgMgr = _dashboardData?['packageManager']?.toString() ?? 'opkg';
-    final isApk = pkgMgr == 'apk';
+    final engine = _capabilities?.packageEngine ?? PackageManagerEngine.opkg;
+    if (engine == PackageManagerEngine.none) {
+      return RpcResult.methodNotFound('No package manager detected on this router');
+    }
 
+    final isApk = engine == PackageManagerEngine.apk;
     final cmd = isApk ? 'apk' : 'opkg';
     List<String> args = [];
 
@@ -1191,7 +1555,7 @@ class AppState extends ChangeNotifier {
     }
 
     try {
-      final res = await _apiService!.call(
+      final rawRpc = await _apiService!.call(
         ip,
         _authService!.sysauth!,
         useHttps,
@@ -1200,110 +1564,149 @@ class AppState extends ChangeNotifier {
         params: {'command': cmd, 'args': args},
       );
 
-      // Fallback to luci-rpc for standard OPKG if file.exec is unavailable
-      if (res == null && !isApk) {
-        if (action == 'install') {
-          await _apiService!.call(
-            ip,
-            _authService!.sysauth!,
-            useHttps,
-            object: 'luci-rpc',
-            method: 'installPackage',
-            params: {'package': packageName},
-          );
-        } else if (action == 'remove') {
-          await _apiService!.call(
-            ip,
-            _authService!.sysauth!,
-            useHttps,
-            object: 'luci-rpc',
-            method: 'removePackage',
-            params: {'package': packageName},
-          );
+      final result = RpcResult.classifyExecResult<String>(rawRpc, (data) {
+        if (data is Map && data['stdout'] != null) {
+          return data['stdout'].toString();
         }
+        return 'Action completed successfully';
+      });
+
+      // Trigger background re-probe on capability mismatch
+      if (result.status == RpcCallStatus.methodNotFound) {
+        Logger.warning('Package action returned methodNotFound. Triggering background capability re-probe.');
+        unawaited(redetectCapabilities());
       }
 
-      await fetchDashboardData();
-      return true;
+      if (result.isSuccess) {
+        await fetchDashboardData();
+      }
+
+      return result;
     } catch (e) {
       Logger.error('Failed package action $action for $packageName: $e');
-      return false;
+      return RpcResult.networkError('Network error executing package action: $e');
     }
   }
 
-  /// Check and fetch upgradable packages on demand
-  Future<List<OpenWrtPackage>> fetchUpgradablePackages() async {
+  /// Backward compatible wrapper for managePackage
+  Future<bool> managePackage({
+    required String packageName,
+    required String action,
+  }) async {
+    final res = await managePackageResult(packageName: packageName, action: action);
+    return res.isSuccess;
+  }
+
+  /// Check and fetch upgradable packages returning classified RpcResult
+  Future<RpcResult<List<OpenWrtPackage>>> fetchUpgradablePackagesResult() async {
     if (_reviewerModeEnabled) {
-      return [
+      return RpcResult.success([
         OpenWrtPackage(
           name: 'luci-app-firewall',
           version: 'git-23.332 ➔ git-24.010',
           description: 'Firewall management interface upgrade',
           isInstalled: true,
-          managerType: PackageManagerType.opkg,
+          managerType: PackageManagerEngine.opkg,
         ),
         OpenWrtPackage(
           name: 'dnsmasq',
           version: '2.89-1 ➔ 2.90-1',
           description: 'DHCP and DNS server security update',
           isInstalled: true,
-          managerType: PackageManagerType.opkg,
+          managerType: PackageManagerEngine.opkg,
         ),
-      ];
+      ]);
     }
+
+    final engine = _capabilities?.packageEngine ?? PackageManagerEngine.opkg;
+    if (engine == PackageManagerEngine.none) {
+      return RpcResult.methodNotFound('No package manager detected on this router');
+    }
+
+    final isApk = engine == PackageManagerEngine.apk;
+    final cmd = isApk ? 'apk' : 'opkg';
+    final updateArgs = ['update'];
+    final listArgs = isApk ? ['list', '--upgradable'] : ['list-upgradable'];
+
+    final ip = _routerService?.selectedRouter?.ipAddress;
+    if (ip == null || _authService?.sysauth == null) {
+      return RpcResult.networkError('No active router session');
+    }
+    final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
 
     try {
-      final pkgMgr = _dashboardData?['packageManager']?.toString() ?? 'opkg';
-      final isApk = pkgMgr == 'apk';
+      await _apiService!.call(
+        ip,
+        _authService!.sysauth!,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {'command': cmd, 'args': updateArgs},
+      );
 
-      // Update package lists first
-      await executeRouterCommandOutput(isApk ? 'apk' : 'opkg', ['update']);
+      final rawRpc = await _apiService!.call(
+        ip,
+        _authService!.sysauth!,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {'command': cmd, 'args': listArgs},
+      );
 
-      // Query upgradable packages
-      final output = isApk
-          ? await executeRouterCommandOutput('apk', ['list', '--upgradable'])
-          : await executeRouterCommandOutput('opkg', ['list-upgradable']);
+      final result = RpcResult.classifyExecResult<List<OpenWrtPackage>>(rawRpc, (data) {
+        final output = data is Map ? (data['stdout']?.toString() ?? '') : '';
+        if (output.trim().isEmpty) return <OpenWrtPackage>[];
 
-      if (output == null || output.trim().isEmpty) return [];
+        final upgradable = <OpenWrtPackage>[];
+        for (final line in output.split('\n')) {
+          final trimmed = line.trim();
+          if (trimmed.isEmpty || trimmed.startsWith('WARNING') || trimmed.startsWith('#')) continue;
 
-      final upgradable = <OpenWrtPackage>[];
-      final type = isApk ? PackageManagerType.apk : PackageManagerType.opkg;
-
-      for (final line in output.split('\n')) {
-        final trimmed = line.trim();
-        if (trimmed.isEmpty || trimmed.startsWith('WARNING') || trimmed.startsWith('#')) continue;
-
-        if (trimmed.contains(' - ')) {
-          final parts = trimmed.split(' - ');
-          final name = parts[0].trim();
-          final oldVer = parts.length > 1 ? parts[1].trim() : '';
-          final newVer = parts.length > 2 ? parts[2].trim() : '';
-          upgradable.add(OpenWrtPackage(
-            name: name,
-            version: oldVer.isNotEmpty && newVer.isNotEmpty ? '$oldVer ➔ $newVer' : (newVer.isNotEmpty ? newVer : oldVer),
-            description: 'Upgradable package ($name)',
-            isInstalled: true,
-            managerType: type,
-          ));
-        } else {
-          final parts = trimmed.split(RegExp(r'\s+'));
-          if (parts.isNotEmpty) {
+          if (trimmed.contains(' - ')) {
+            final parts = trimmed.split(' - ');
             final name = parts[0].trim();
+            final oldVer = parts.length > 1 ? parts[1].trim() : '';
+            final newVer = parts.length > 2 ? parts[2].trim() : '';
             upgradable.add(OpenWrtPackage(
               name: name,
-              version: parts.length > 1 ? parts[1] : 'update available',
+              version: oldVer.isNotEmpty && newVer.isNotEmpty ? '$oldVer ➔ $newVer' : (newVer.isNotEmpty ? newVer : oldVer),
               description: 'Upgradable package ($name)',
               isInstalled: true,
-              managerType: type,
+              managerType: engine,
             ));
+          } else {
+            final parts = trimmed.split(RegExp(r'\s+'));
+            if (parts.isNotEmpty) {
+              final name = parts[0].trim();
+              upgradable.add(OpenWrtPackage(
+                name: name,
+                version: parts.length > 1 ? parts[1] : 'update available',
+                description: 'Upgradable package ($name)',
+                isInstalled: true,
+                managerType: engine,
+              ));
+            }
           }
         }
+        return upgradable;
+      });
+
+      if (result.status == RpcCallStatus.methodNotFound) {
+        Logger.warning('Upgradable query returned methodNotFound. Triggering background capability re-probe.');
+        unawaited(redetectCapabilities());
       }
-      return upgradable;
+
+      return result;
     } catch (e) {
       Logger.error('Failed to fetch upgradable packages: $e');
-      return [];
+      return RpcResult.networkError('Network error checking package upgrades: $e');
     }
+  }
+
+  /// Backward compatible wrapper for fetchUpgradablePackages
+  Future<List<OpenWrtPackage>> fetchUpgradablePackages() async {
+    final res = await fetchUpgradablePackagesResult();
+    return res.data ?? [];
   }
 
   /// Execute generic router shell command via file.exec RPC

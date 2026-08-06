@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
+import 'package:luci_mobile/models/router_capabilities.dart';
 import '../models/firewall_info.dart';
 
 class FirewallSecurityScreen extends ConsumerWidget {
@@ -9,43 +10,83 @@ class FirewallSecurityScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appState = ref.watch(appStateProvider);
+    final capabilities = appState.capabilities;
+    final backend = capabilities?.firewallBackend ?? FirewallBackend.fw4;
     final uciFirewall = appState.dashboardData?['uciFirewallConfig'];
+
     final overview = FirewallOverview.fromUciData(
       uciFirewall,
+      backend: backend,
       isReviewerMode: appState.reviewerModeEnabled,
     );
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Firewall & Security'),
+        title: Text('Firewall & Security (${backend == FirewallBackend.fw4 ? "fw4 / nftables" : "fw3 / iptables"})'),
       ),
       body: RefreshIndicator(
         onRefresh: () async {
           await appState.fetchDashboardData();
         },
-        child: ListView(
-          padding: const EdgeInsets.all(16.0),
+        child: !overview.isAvailable
+            ? _buildUnavailableView(context, ref, overview)
+            : ListView(
+                padding: const EdgeInsets.all(16.0),
+                children: [
+                  _buildSectionHeader(context, 'Global Default Policies', Icons.shield_outlined),
+                  const SizedBox(height: 8),
+                  _buildDefaultPoliciesCard(context, overview.defaultPolicy),
+                  const SizedBox(height: 16),
+                  _buildSectionHeader(context, 'Firewall Zones Overview', Icons.layers_outlined),
+                  const SizedBox(height: 8),
+                  ...overview.zones.map((zone) => _buildZoneCard(context, zone)),
+                  const SizedBox(height: 16),
+                  _buildSectionHeader(context, 'Inter-Zone Forwarding Rules', Icons.alt_route_outlined),
+                  const SizedBox(height: 8),
+                  _buildForwardingsCard(context, overview.forwardings),
+                  const SizedBox(height: 16),
+                  _buildSectionHeader(context, 'Port Forwarding (Redirects)', Icons.import_export_outlined),
+                  const SizedBox(height: 8),
+                  _buildPortForwardingsList(context, overview.portForwards),
+                  const SizedBox(height: 16),
+                  _buildSectionHeader(context, 'Custom Security Rules', Icons.rule_outlined),
+                  const SizedBox(height: 8),
+                  _buildCustomRulesList(context, overview.customRules),
+                  const SizedBox(height: 32),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _buildUnavailableView(BuildContext context, WidgetRef ref, FirewallOverview overview) {
+    final theme = Theme.of(context);
+    final appState = ref.watch(appStateProvider);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _buildSectionHeader(context, 'Global Default Policies', Icons.shield_outlined),
+            Icon(Icons.shield_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(height: 12),
+            Text(
+              'Firewall Configuration Unavailable',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
-            _buildDefaultPoliciesCard(context, overview.defaultPolicy),
+            Text(
+              overview.errorMessage ?? 'The firewall configuration could not be loaded or parsed.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
             const SizedBox(height: 16),
-            _buildSectionHeader(context, 'Firewall Zones Overview', Icons.layers_outlined),
-            const SizedBox(height: 8),
-            ...overview.zones.map((zone) => _buildZoneCard(context, zone)),
-            const SizedBox(height: 16),
-            _buildSectionHeader(context, 'Inter-Zone Forwarding Rules', Icons.alt_route_outlined),
-            const SizedBox(height: 8),
-            _buildForwardingsCard(context, overview.forwardings),
-            const SizedBox(height: 16),
-            _buildSectionHeader(context, 'Port Forwarding (Redirects)', Icons.import_export_outlined),
-            const SizedBox(height: 8),
-            _buildPortForwardingsList(context, overview.portForwards),
-            const SizedBox(height: 16),
-            _buildSectionHeader(context, 'Custom Security Rules', Icons.rule_outlined),
-            const SizedBox(height: 8),
-            _buildCustomRulesList(context, overview.customRules),
-            const SizedBox(height: 32),
+            ElevatedButton.icon(
+              onPressed: () => appState.redetectCapabilities(),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('Re-probe Capabilities'),
+            ),
           ],
         ),
       ),
@@ -209,12 +250,16 @@ class FirewallSecurityScreen extends ConsumerWidget {
   Widget _buildCustomRulesList(BuildContext context, List<FirewallCustomRule> rules) {
     if (rules.isEmpty) {
       return const Card(
-        child: Padding(padding: EdgeInsets.all(16.0), child: Text('No custom security rules defined.')),
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text('No custom security rules defined (default zone policies active).'),
+        ),
       );
     }
 
     return Column(
       children: rules.map((r) {
+        final policyColor = _getPolicyColor(r.target);
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
           elevation: 1,
@@ -229,12 +274,28 @@ class FirewallSecurityScreen extends ConsumerWidget {
             trailing: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: _getPolicyColor(r.target).withValues(alpha: 0.15),
+                color: policyColor.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(6),
+                border: r.isUnrecognizedTarget
+                    ? Border.all(color: Colors.amber.shade700, width: 1)
+                    : null,
               ),
-              child: Text(
-                r.target,
-                style: TextStyle(color: _getPolicyColor(r.target), fontWeight: FontWeight.bold, fontSize: 11),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (r.isUnrecognizedTarget) ...[
+                    Icon(Icons.warning_amber_rounded, size: 12, color: Colors.amber.shade700),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(
+                    r.target,
+                    style: TextStyle(
+                      color: r.isUnrecognizedTarget ? Colors.amber.shade800 : policyColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

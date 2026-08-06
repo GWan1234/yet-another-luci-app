@@ -9,10 +9,14 @@ import 'package:luci_mobile/screens/settings_screen.dart';
 import 'package:luci_mobile/screens/splash_screen.dart';
 import 'package:luci_mobile/screens/onboarding_screen.dart';
 
+import 'package:luci_mobile/models/router_capabilities.dart';
 import 'package:luci_mobile/modules/built_in_modules.dart';
 
-void main() {
+import 'package:luci_mobile/services/ad_consent_service.dart';
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AdConsentService.initializeConsentAndAds();
   registerBuiltInModules();
   runApp(ProviderScope(child: const LuCIApp()));
 }
@@ -20,6 +24,10 @@ void main() {
 final appStateProvider = ChangeNotifierProvider<AppState>(
   (ref) => AppState.instance,
 );
+
+final routerCapabilitiesProvider = Provider<RouterCapabilities?>((ref) {
+  return ref.watch(appStateProvider).capabilities;
+});
 
 class LuCIApp extends ConsumerWidget {
   const LuCIApp({super.key});

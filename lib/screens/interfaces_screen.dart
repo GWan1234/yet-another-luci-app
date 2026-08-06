@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
 import 'package:flutter/services.dart';
 import 'package:luci_mobile/models/interface.dart';
+import 'package:luci_mobile/models/router_capabilities.dart';
+import 'package:luci_mobile/models/network_topology.dart';
+import 'package:luci_mobile/widgets/network_topology_card.dart';
 import 'dart:math';
 import 'package:luci_mobile/widgets/luci_app_bar.dart';
 import 'package:luci_mobile/design/luci_design_system.dart';
@@ -410,6 +413,8 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
                     slivers: [
                       SliverToBoxAdapter(child: LuciSectionHeader('Wired')),
                       _buildWiredInterfacesList(),
+                      SliverToBoxAdapter(child: LuciSectionHeader('Switch Topology & VLANs')),
+                      SliverToBoxAdapter(child: _buildTopologySection()),
                       SliverToBoxAdapter(child: LuciSectionHeader('Wireless')),
                       _buildWirelessInterfacesList(),
                       SliverToBoxAdapter(
@@ -426,6 +431,37 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTopologySection() {
+    final appState = ref.watch(appStateProvider);
+    final capabilities = appState.capabilities;
+    final model = capabilities?.networkModel ?? NetworkModel.unknown;
+
+    if (model == NetworkModel.unknown) {
+      return NetworkTopologyCard(
+        topology: NetworkTopology.unavailable(NetworkModel.unknown, 'Conservative fallback active — network model could not be verified automatically.'),
+        onRetry: () => appState.redetectCapabilities(),
+      );
+    }
+
+    final uciNetwork = appState.dashboardData?['uciNetworkConfig'];
+    Map<String, dynamic> uciMap = {};
+    if (uciNetwork is Map) {
+      uciMap = Map<String, dynamic>.from(uciNetwork);
+    }
+
+    NetworkTopology topology;
+    if (model == NetworkModel.dsa) {
+      topology = DsaTopologyParser.parse(uciMap, appState.dashboardData?['networkDevices'] as Map<String, dynamic>?);
+    } else {
+      topology = SwconfigTopologyParser.parse(uciMap, appState.dashboardData?['networkDevices'] as Map<String, dynamic>?);
+    }
+
+    return NetworkTopologyCard(
+      topology: topology,
+      onRetry: () => appState.redetectCapabilities(),
     );
   }
 
@@ -650,8 +686,31 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
   }
 
   Widget _buildWiredDetails(BuildContext context, NetworkInterface interface) {
+    final parsedProto = WanProtocol.parse(interface.protocol);
     return Column(
       children: [
+        if (parsedProto == WanProtocol.unknown)
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade900.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.amber.shade700.withValues(alpha: 0.5)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.amber.shade700, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Unrecognized proto (${interface.protocol}) — showing raw fields',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
         _buildDetailRow(context, 'Device', interface.device),
         _buildDetailRow(context, 'Uptime', interface.formattedUptime),
         if (interface.ipAddress != null)

@@ -59,6 +59,7 @@ class WirelessManagementScreen extends ConsumerWidget {
 
   Widget _buildRadioCard(BuildContext context, WirelessRadio radio) {
     final theme = Theme.of(context);
+    final freqStr = radio.formattedFrequency ?? 'Channel ${radio.channel} (Freq Unreported)';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -107,18 +108,63 @@ class WirelessManagementScreen extends ConsumerWidget {
             ),
             const Divider(height: 24),
             _buildDetailRow('TX Power', '${radio.txPowerDbm ?? 20} dBm'),
-            _buildDetailRow('Frequency', radio.formattedFrequency),
+            _buildDetailRow('Frequency', freqStr),
             _buildDetailRow('Country Code', radio.country),
             const SizedBox(height: 12),
             if (radio.interfaces.isNotEmpty) ...[
               const Text('Interfaces / SSIDs', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 6),
               ...radio.interfaces.map((iface) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                padding: const EdgeInsets.symmetric(vertical: 6.0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('${iface.ssid} (${iface.mode})', style: const TextStyle(fontSize: 13)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${iface.ssid} (${iface.mode})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: iface.securityMode.badgeColor.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  iface.securityMode.shortBadgeLabel,
+                                  style: TextStyle(
+                                    color: iface.securityMode.badgeColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ),
+                              if (iface.pmfState != PmfState.disabled) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: (iface.pmfState == PmfState.required ? Colors.purple : Colors.blue).withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    iface.pmfState.displayName,
+                                    style: TextStyle(
+                                      color: iface.pmfState == PmfState.required ? Colors.purple : Colors.blue,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                     Text('${iface.stations.length} clients', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                   ],
                 ),

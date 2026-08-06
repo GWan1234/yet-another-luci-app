@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
 import 'package:luci_mobile/models/router.dart' as model;
+import 'package:luci_mobile/providers/entitlement_provider.dart';
+import 'package:luci_mobile/screens/paywall_screen.dart';
 import 'package:luci_mobile/widgets/luci_app_bar.dart';
 import 'package:luci_mobile/utils/url_parser.dart';
 import 'package:luci_mobile/widgets/theme_router_logo.dart';
@@ -195,6 +197,16 @@ class _ManageRoutersScreenState extends ConsumerState<ManageRoutersScreen> {
                                 elevation: 2,
                               ),
                               onPressed: () async {
+                                final entitlement = ref.read(entitlementProvider);
+                                if (!entitlement.canAddRouter(routers.length)) {
+                                  await Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) => const PaywallScreen(),
+                                    ),
+                                  );
+                                  return;
+                                }
+
                                 final ipController = TextEditingController();
                                 final userController = TextEditingController(
                                   text: 'root',

@@ -7,7 +7,7 @@
 
   [![Flutter](https://img.shields.io/badge/Flutter-3.32.5+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
   [![Dart](https://img.shields.io/badge/Dart-3.8+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
-  [![License](https://img.shields.io/badge/License-GPL--3.0-blue.svg?style=for-the-badge)](LICENSE)
+  [![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg?style=for-the-badge)](LICENSE)
   [![Build Status](https://img.shields.io/badge/Build-Passing-teal.svg?style=for-the-badge)]()
   [![OpenWrt](https://img.shields.io/badge/OpenWrt-21.02--24.10+-1589F0?style=for-the-badge&logo=openwrt&logoColor=white)](https://openwrt.org)
 
@@ -190,7 +190,7 @@ Contributions, bug reports, and feature suggestions are welcome! Please read [CO
 
 ## 📜 License & Credits
 
-Distributed under the **GNU General Public License v3.0**. See [`LICENSE`](LICENSE) for details.
+Distributed under the **Apache License 2.0**. See [`LICENSE`](LICENSE) and [`LICENSE_CHANGE.md`](LICENSE_CHANGE.md) for details.
 
 ### Acknowledgments
 

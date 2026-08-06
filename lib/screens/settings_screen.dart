@@ -3,6 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
+import 'package:luci_mobile/config/app_config.dart';
+import 'package:luci_mobile/providers/entitlement_provider.dart';
+import 'package:luci_mobile/screens/paywall_screen.dart';
+import 'package:luci_mobile/widgets/banner_ad_widget.dart';
 import 'package:luci_mobile/widgets/luci_app_bar.dart';
 import 'package:luci_mobile/screens/dashboard_settings_list_screen.dart';
 
@@ -137,6 +141,117 @@ class SettingsScreen extends ConsumerWidget {
                       },
                     ),
                   ),
+                  const Divider(height: 32),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    child: Text(
+                      'Router Diagnostics & Surface',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.secondaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.radar_rounded,
+                          color: Theme.of(context).colorScheme.onSecondaryContainer,
+                          size: 24,
+                        ),
+                      ),
+                      title: const Text(
+                        'Re-detect Router Capabilities',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        appState.capabilities != null
+                            ? 'Engine: ${appState.capabilities!.packageEngine.name.toUpperCase()} • Firewall: ${appState.capabilities!.firewallBackend.name.toUpperCase()} • Network: ${appState.capabilities!.networkModel.name.toUpperCase()}'
+                            : 'Probe active router ubus objects & features',
+                      ),
+                      trailing: Icon(
+                        Icons.refresh_rounded,
+                        size: 20,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      onTap: () async {
+                        await appState.redetectCapabilities();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Router capabilities re-detected & cached successfully!'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                  if (AppConfig.isMonetizationEnabled) ...[
+                    const Divider(height: 32),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      child: Text(
+                        'Subscription',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.tertiaryContainer,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.workspace_premium_rounded,
+                            color: Theme.of(context).colorScheme.onTertiaryContainer,
+                            size: 24,
+                          ),
+                        ),
+                        title: const Text(
+                          'Manage Subscription',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Consumer(
+                          builder: (context, ref, _) {
+                            final entitlement = ref.watch(entitlementProvider);
+                            return Text('Current Tier: ${entitlement.tier.displayName}');
+                          },
+                        ),
+                        trailing: Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const PaywallScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                   if (appState.reviewerModeEnabled) ...[
                     const Divider(height: 32),
                     Padding(
@@ -177,6 +292,8 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                     ),
                   ],
+                  const SizedBox(height: 16),
+                  const BannerAdWidget(),
                 ],
               );
             },

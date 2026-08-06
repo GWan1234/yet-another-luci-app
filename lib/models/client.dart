@@ -42,6 +42,17 @@ class Client {
       return ConnectionType.wireless;
     }
 
+    final hostname = (lease['hostname'] ?? lease['name'] ?? '').toString().toLowerCase();
+    final vendor = (lease['vendor'] ?? '').toString().toLowerCase();
+    if (hostname.contains('iphone') ||
+        hostname.contains('ipad') ||
+        hostname.contains('galaxy') ||
+        hostname.contains('android') ||
+        vendor.contains('apple') ||
+        vendor.contains('samsung')) {
+      return ConnectionType.wireless;
+    }
+
     final ifname = (lease['ifname'] ?? lease['device'] ?? '').toString().toLowerCase();
     if (ifname.startsWith('wlan') ||
         ifname.startsWith('phy') ||

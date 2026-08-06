@@ -31,4 +31,4 @@ Email: tuhingarai123@gmail.com
 
 -----
 
-<b>Disclaimer:</b> This is an independent, third-party application licensed under the GNU General Public License v3.0 (GPLv3) and is not officially affiliated with the OpenWrt project.
+<b>Disclaimer:</b> This is an independent, third-party application licensed under the Apache License 2.0 and is not officially affiliated with the OpenWrt project.

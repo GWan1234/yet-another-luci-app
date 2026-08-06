@@ -16,8 +16,8 @@ plugins {
 
 android {
     namespace = "com.nightcode.luci"
-    compileSdk = 36
-    ndkVersion = "27.0.12077973"
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -39,20 +39,40 @@ android {
         versionName = flutter.versionName
     }
 
+    flavorDimensions += "default"
+
+    productFlavors {
+        create("community") {
+            dimension = "default"
+            applicationIdSuffix = ".community"
+            resValue("string", "app_name", "LuCI Mobile")
+        }
+        create("playstore") {
+            dimension = "default"
+            resValue("string", "app_name", "LuCI Mobile")
+        }
+    }
+
     signingConfigs {
-        if (keystorePropertiesFile.exists()) {
+        val storeFilePath = (keystoreProperties["storeFile"] as? String) ?: System.getenv("KEYSTORE_PATH")
+        val storePass = (keystoreProperties["storePassword"] as? String) ?: System.getenv("KEYSTORE_PASSWORD")
+        val alias = (keystoreProperties["keyAlias"] as? String) ?: System.getenv("KEY_ALIAS")
+        val keyPass = (keystoreProperties["keyPassword"] as? String) ?: System.getenv("KEY_PASSWORD")
+
+        if (storeFilePath != null && storePass != null && alias != null && keyPass != null) {
             create("release") {
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = file(storeFilePath)
+                storePassword = storePass
+                keyAlias = alias
+                keyPassword = keyPass
             }
         }
     }
 
     buildTypes {
         getByName("release") {
-            if (keystorePropertiesFile.exists()) {
+            val hasReleaseSigning = signingConfigs.findByName("release") != null
+            if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
             isMinifyEnabled = true

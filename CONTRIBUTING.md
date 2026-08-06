@@ -274,6 +274,53 @@ flutter test --coverage
 - Document error codes
 - Keep API documentation current
 
+## 🛡️ Capability-Detection Architecture & Feature Gating
+
+To ensure seamless support across various OpenWrt releases (from OpenWrt 19.07 up through 24.10+ and SNAPSHOT builds), **Yet Another LuCI App** employs a dynamic capability-detection probing layer.
+
+### Key Guidelines for Contributors:
+
+1. **Avoid Version-String Branching**:
+   - Never write code that gates features based on string matching against `system.board.release.version` (e.g. `if (version.contains('24.'))`).
+   - Use `RouterCapabilities` (`ref.watch(routerCapabilitiesProvider)` or `appState.capabilities`) instead.
+
+2. **Accessing Capabilities**:
+   - Check `capabilities.packageEngine` (`PackageManagerEngine.opkg` vs `.apk`) for software management logic.
+   - Check `capabilities.firewallBackend` (`FirewallBackend.fw3` vs `.fw4`) for firewall structures.
+   - Check `capabilities.networkModel` (`NetworkModel.dsa` vs `.swconfig`) for switch configuration topology.
+   - Check `capabilities.hasObject('ubus_object')` and `capabilities.hasMethod('object', 'method')`.
+
+3. **Conservative Fallback & Caching**:
+   - Capabilities are probed once at login/connection time via `rpc.list` and file stat checks (`/etc/apk` vs `/etc/opkg`).
+   - Capabilities are cached per-router in encrypted storage (`flutter_secure_storage`).
+   - Users can manually re-trigger detection via **Settings ➔ Re-detect Router Capabilities**.
+   - If probing fails or times out, the app defaults to conservative/legacy mode (`RouterCapabilities.conservative`) rather than failing or throwing unhandled exceptions.
+
+4. **Reference Implementation — Package Manager Module**:
+   - The Package Manager module (`lib/modules/package_manager/`) serves as the canonical reference implementation for consuming `RouterCapabilities` and `RpcResult<T>`.
+   - Engine type reads exclusively from `capabilities.packageEngine` (`PackageManagerEngine.opkg`, `.apk`, or `.none`).
+   - Shell RPC calls use `RpcResult.classifyExecResult` to evaluate transport status and underlying command exit code / stderr (127 → `methodNotFound`, 126 → `permissionDenied`, non-zero exit code → `failed` with raw stderr attached).
+   - If an RPC returns `methodNotFound` against a capability profile, a background capability re-probe is triggered automatically to heal stale caches.
+
+5. **Reference Implementation — Network Interfaces Module (DSA vs swconfig)**:
+   - The Interfaces module (`lib/screens/interfaces_screen.dart`, `lib/models/network_topology.dart`) serves as the canonical reference for capability-gated dual-parser architectures.
+   - **Genuinely Separate Parsers**: Never use a single merged schema with optional fields across incompatible OpenWrt models. `DsaTopologyParser` processes `bridge-vlan` UCI sections, while `SwconfigTopologyParser` processes legacy `switch_vlan` sections.
+   - Parser selection is gated strictly by `capabilities.networkModel`. If `NetworkModel.unknown`, neither parser runs and the UI displays an explicit "topology unavailable" state.
+   - **Distinct Empty States**: The UI cleanly differentiates between "Topology Unavailable" (capability model unverified or probe failed) and "Flat Network (0 Configured VLANs)" (legitimate single bridge/flat network).
+   - **Shared Error Infrastructure**: Uses `RpcResultUiHelper` (`lib/widgets/rpc_result_dialog.dart`) for standard RPCD ACL remediation dialogs and error alerts across modules.
+   - **WAN Protocol Coverage**: Uses `WanProtocol` enum (`dhcp`, `static`, `pppoe`, `dhcpv6`, `dslite`, `map`, `6in4`, `6to4`, `qmi`, `ncm`, `wireguard`). Unrecognized protocols render a generic fallback card displaying raw fields rather than collapsing or failing.
+
+6. **Reference Implementation — Firewall Security Module (fw3/iptables vs fw4/nftables)**:
+   - The Firewall module (`lib/modules/firewall_security/`) serves as the third canonical reference implementation for capability-gated dual-parser architectures.
+   - **Gated Parsers**: `Fw3FirewallParser` processes iptables-era schemas (`defaults`, `zone`, `forwarding`, `redirect`, `rule`), while `Fw4FirewallParser` processes nftables-era schemas (adds `ipset`/`nftset`, `flow_offloading`, and nftables targets `NOTRACK`, `HELPER`).
+   - **Strict Payload Guards**: Enforces that empty or unpopulated payloads (`{}`) evaluate to "Firewall Configuration Unavailable", whereas valid payloads with 0 custom rules evaluate to "No Custom Rules Configured (Default zone policies active)".
+   - **Unrecognized Target Fallback**: If a rule references an unrecognized target or custom nftables set, it is rendered with a fallback badge rather than being silently dropped or crashing.
+
+7. **RPCD ACL Architecture Decision**:
+   - **No Companion RPCD ACL `.json` File**: The project deliberately does not ship a separate companion RPCD ACL configuration `.json` file in the repository.
+   - **Reasoning**: In-app ACL remediation dialogs built across modules (`RpcResultUiHelper` in `lib/widgets/rpc_result_dialog.dart`) surface exact remediation commands (`opkg install luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status`) directly at the point of RPC failure. This provides immediate, actionable guidance without forcing users to discover and install a separately versioned ACL file.
+   - **Single Source of Truth**: All RPCD ACL dialogs reference `RpcResultUiHelper.kRpcdAclRemediationCommand`, keeping error remediation guidance unified with `README.md`.
+
 ## Review Process
 
 ### Code Review Guidelines

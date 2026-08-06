@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
+import 'package:luci_mobile/models/router_capabilities.dart';
 import '../models/firewall_info.dart';
 
 class FirewallSecurityCard extends ConsumerWidget {
@@ -9,8 +10,13 @@ class FirewallSecurityCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appState = ref.watch(appStateProvider);
+    final backend = appState.capabilities?.firewallBackend ?? FirewallBackend.fw4;
     final uciFirewall = appState.dashboardData?['uciFirewallConfig'];
-    final overview = FirewallOverview.fromUciData(uciFirewall);
+    final overview = FirewallOverview.fromUciData(
+      uciFirewall,
+      backend: backend,
+      isReviewerMode: appState.reviewerModeEnabled,
+    );
 
     final defPolicy = overview.defaultPolicy;
 

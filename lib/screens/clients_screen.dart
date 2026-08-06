@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/models/client.dart';
 import 'package:luci_mobile/main.dart';
 import 'package:luci_mobile/widgets/luci_app_bar.dart';
+import 'package:luci_mobile/widgets/banner_ad_widget.dart';
 import 'package:luci_mobile/design/luci_design_system.dart';
 import 'package:luci_mobile/widgets/luci_loading_states.dart';
 import 'package:luci_mobile/widgets/luci_refresh_components.dart';
@@ -246,6 +247,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                                   },
                                 ),
                         ),
+                        const BannerAdWidget(),
                       ],
                     );
                   },

@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:luci_mobile/services/interfaces/api_service_interface.dart';
 import 'package:luci_mobile/config/app_config.dart';
+import 'package:luci_mobile/models/router_capabilities.dart';
 
 class MockApiService implements IApiService {
   static final Random _random = Random();
+  static PackageManagerEngine mockPackageEngine = PackageManagerEngine.opkg;
+  static NetworkModel mockNetworkModel = NetworkModel.dsa;
   static int _baseUptime = 86400; // Base uptime of 1 day
   static int _baseRxBytes = 1234567890;
   static int _baseTxBytes = 987654321;
@@ -47,6 +50,18 @@ class MockApiService implements IApiService {
     final endpointKey = '$object.$method';
 
     try {
+      if (object == 'uci' && method == 'get' && params?['config'] == 'network') {
+        final netFile = mockNetworkModel == NetworkModel.swconfig
+            ? 'uci_network_swconfig.json'
+            : 'uci_network_dsa.json';
+        try {
+          final jsonString = await rootBundle.loadString(
+            '${AppConfig.mockDataPath}$netFile',
+          );
+          return [0, jsonDecode(jsonString)];
+        } catch (_) {}
+      }
+
       // Return appropriate mock data based on object and method
       final mockDataFile = _getMockDataFile(object, method);
 
@@ -96,6 +111,42 @@ class MockApiService implements IApiService {
     final endpointKey = '$object.$method';
 
     try {
+      if (object == 'file' && method == 'stat') {
+        final path = params['path']?.toString() ?? '';
+        if (path == '/etc/apk') {
+          if (mockPackageEngine == PackageManagerEngine.apk) {
+            return [0, {'type': 'directory', 'path': '/etc/apk'}];
+          } else {
+            return [1, {'error': 'No such file or directory'}];
+          }
+        }
+        if (path == '/etc/opkg') {
+          if (mockPackageEngine == PackageManagerEngine.opkg) {
+            return [0, {'type': 'directory', 'path': '/etc/opkg'}];
+          } else {
+            return [1, {'error': 'No such file or directory'}];
+          }
+        }
+      }
+
+      if (object == 'file' && method == 'exec') {
+        final cmd = params['command']?.toString() ?? '';
+        if (cmd == 'opkg') {
+          if (mockPackageEngine == PackageManagerEngine.opkg) {
+            return [0, {'code': 0, 'stdout': 'luci-base - git-23.330\nwireguard-tools - 1.0.20210914-1\n', 'stderr': ''}];
+          } else {
+            return [0, {'code': 127, 'stdout': '', 'stderr': 'opkg: not found'}];
+          }
+        }
+        if (cmd == 'apk') {
+          if (mockPackageEngine == PackageManagerEngine.apk) {
+            return [0, {'code': 0, 'stdout': 'luci-base-git-23.330\nwireguard-tools-1.0.20210914-1\n', 'stderr': ''}];
+          } else {
+            return [0, {'code': 127, 'stdout': '', 'stderr': 'apk: not found'}];
+          }
+        }
+      }
+
       // Return appropriate mock data based on object and method
       final mockDataFile = _getMockDataFile(object, method);
 
@@ -266,6 +317,25 @@ class MockApiService implements IApiService {
   dynamic _getDefaultMockData(String object, String method) {
     // Return default mock data based on object and method
     switch ('$object.$method') {
+      case 'rpc.list':
+        final objs = <String, List<String>>{
+          'system': ['info', 'board', 'reboot'],
+          'luci-rpc': ['getInitList', 'getWirelessDevices', 'getDHCPLeases'],
+          'network.interface': ['dump'],
+          'wireless.devices': ['get'],
+          'file': ['read', 'stat', 'exec'],
+          'service': ['list'],
+          'rc': ['list'],
+          'uci': ['get', 'set', 'commit'],
+          'fw4': ['get'],
+        };
+        if (mockPackageEngine == PackageManagerEngine.opkg) {
+          objs['opkg'] = ['list', 'install', 'remove'];
+        } else if (mockPackageEngine == PackageManagerEngine.apk) {
+          objs['apk'] = ['list', 'add', 'del'];
+        }
+        return [0, objs];
+
       case 'system.board':
         return [
           0,
