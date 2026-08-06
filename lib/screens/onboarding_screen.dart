@@ -14,7 +14,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<OnboardingPageData> _pages = const [
     OnboardingPageData(
-      title: 'Welcome to Yet Another LuCI',
+      title: 'Welcome to Yet Another LuCI App',
       subtitle: 'Modern OpenWrt Router Management',
       description:
           'Monitor real-time network throughput, system vitals, connected devices, and interface diagnostics effortlessly.',

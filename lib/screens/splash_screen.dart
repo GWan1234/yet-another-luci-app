@@ -87,7 +87,7 @@ class _SplashScreenState extends State<SplashScreen>
               ),
               const SizedBox(height: 32),
               Text(
-                'Yet Another LuCI',
+                'Yet Another LuCI App',
                 style: theme.textTheme.headlineLarge?.copyWith(
                   color: colorScheme.onSurface,
                   fontWeight: FontWeight.bold,

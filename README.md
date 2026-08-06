@@ -1,4 +1,4 @@
-# Yet Another LuCI app
+# Yet Another LuCI App
 
 <div align="center">
   <img src="assets/images/app_logo_transparent.png" width="120" alt="App Logo" />
@@ -23,38 +23,44 @@
 
 <br>
 
-**Yet Another LuCI app** is a modern, high-performance Flutter mobile application for managing, monitoring, and diagnosing OpenWrt routers. Built with Material 3 design principles, custom micro-animations, and full LuCI RPC integration, it brings desktop-class router control directly to your mobile phone.
+**Yet Another LuCI App** is a modern, high-performance Flutter mobile application for managing, monitoring, and diagnosing OpenWrt routers. Built with Material 3 design principles, custom micro-animations, and full LuCI RPC integration, it brings desktop-class router control directly to your mobile phone.
 
 ---
 
 ## 🌟 Key Features
 
 ### 📡 Multi-Router Management & Secure Vault
+
 - **Multi-Device Support:** Switch between unlimited OpenWrt routers with isolated secure credentials.
 - **HTTPS & Custom Ports:** Connect via HTTP/HTTPS with support for self-signed SSL certificates.
 
 ### 📊 Real-Time Dashboard & Network Vitals
+
 - **Dual Themes:** Clean, seamless switching between Light and Dark themes.
 - **Animated Vitals Gauges:** Live CPU load, RAM memory usage, Swap, and Storage capacity.
 - **Real-Time Throughput Graph:** Smooth live chart displaying network transfer rates (Rx/Tx Kbps/Mbps) with configurable polling intervals.
 - **Interface Overview Cards:** Live UP/DOWN statuses, assigned IPv4/IPv6 addresses, MACs, and protocols (DHCP, Static, PPPoE, WWAN).
 
 ### 📱 Connected Client Management
+
 - **Unified Connected List:** Synchronous aggregation of active DHCP leases, ARP neighbor entries, and wireless stations.
 - **Device Identification:** Displays hostname (prioritizing static leases and DHCP), IP, MAC address, vendor OUI, connected SSID, and radio band badges.
 - **Wi-Fi Access Control:** Quick MAC entry tool for access management.
 
 ### 📶 Wireless Radios & Station Diagnostics
+
 - **Radio Band Management:** Multi-radio card diagnostic for 2.4GHz, 5GHz, and 6GHz bands.
 - **Precise Frequency Info:** Displays operational frequency up to 3 decimal places (e.g. 2.423 GHz), channel, transmit power, and active stations.
 - **Station List Modal:** View exact connected client hostnames and signal levels linked per SSID.
 
 ### 📦 OPKG & APK Dual Package Manager
+
 - **Smart Engine Detection:** Automatic engine switching between standard `opkg` and OpenWrt 24.10+ `apk` package managers.
 - **Package Search & Feed Updates:** Search available repositories, update package lists, install, and remove modules.
 - **LuCI App Finder:** Dedicated view for discovering and managing installed vs. available LuCI extensions (`luci-app-*`).
 
 ### ⚙️ System Diagnostics & Control
+
 - **Services Management:** View active `procd` daemons and init scripts with live status tracking (Running, Stopped, Enabled, Disabled). Start, stop, restart, enable, or disable services remotely.
 - **Cron Job Scheduler:** View custom or system scheduled tasks (`/etc/crontabs/root`).
 - **Disk & Filesystems Monitor:** Storage usage breakdown for root `/`, overlay `/overlay`, temporary `/tmp`, and attached USB storage.
@@ -67,7 +73,7 @@
 ## 📸 Screenshots Showcase
 
 <div align="center">
-  <p><b>Explore full resolution screenshots of Yet Another LuCI app features:</b></p>
+  <p><b>Explore full resolution screenshots of Yet Another LuCI App features:</b></p>
 </div>
 
 | Login Screen | Dashboard (Light) | Dashboard (Dark) | Connected Clients |
@@ -154,7 +160,7 @@ flutter run
 
 ## 🔐 Router Requirements & Security
 
-To enable full communication between **Yet Another LuCI app** and your OpenWrt router, ensure the following RPC modules are installed on your router:
+To enable full communication between **Yet Another LuCI App** and your OpenWrt router, ensure the following RPC modules are installed on your router:
 
 ```bash
 opkg update

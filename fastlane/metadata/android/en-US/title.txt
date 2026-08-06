@@ -1,1 +1,1 @@
-Yet Another LuCI
+Yet Another LuCI App

@@ -231,7 +231,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
               children: [
                 const ThemeRouterLogo(width: 32, height: 32, showShadow: true),
                 const SizedBox(width: 12),
-                const Text('Yet Another LuCI'),
+                const Text('Yet Another LuCI App'),
               ],
             ),
             content: Column(

@@ -1,9 +1,9 @@
 # Privacy Policy
 
-**Yet Another LuCI** (by Tuhin Garai)  
+**Yet Another LuCI App** (by Tuhin Garai)  
 Last updated: August 4, 2026
 
-Yet Another LuCI ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how our mobile application ("App") collects, uses, and safeguards your information when you use the App to manage your OpenWrt/LuCI routers.
+Yet Another LuCI App ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how our mobile application ("App") collects, uses, and safeguards your information when you use the App to manage your OpenWrt/LuCI routers.
 
 ## 1. Information We Collect
 

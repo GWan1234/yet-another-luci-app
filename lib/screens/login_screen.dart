@@ -278,7 +278,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
-                                    'Yet Another LuCI',
+                                    'Yet Another LuCI App',
                                     style: textTheme.headlineLarge?.copyWith(
                                       fontWeight: FontWeight.bold,
                                     ),

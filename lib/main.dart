@@ -33,7 +33,7 @@ class LuCIApp extends ConsumerWidget {
     const cyanSecondary = Color(0xFF06B6D4);
 
     return MaterialApp(
-      title: 'Yet Another LuCI',
+      title: 'Yet Another LuCI App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
