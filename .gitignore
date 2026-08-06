@@ -135,6 +135,11 @@ GoogleService-Info.plist
 # Generated files
 **/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
 
+# Internal Planning & Architecture Documents
+ARCHITECTURE_EDITIONS.md
+.private/
+docs/internal/
+
 # Exceptions to above rules
 !**/ios/**/default.mode1v3
 !**/ios/**/default.mode2v3
