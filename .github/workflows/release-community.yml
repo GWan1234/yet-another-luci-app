@@ -1,10 +1,10 @@
 name: Community Release (GitHub Releases)
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   quality-gate:
@@ -39,7 +39,6 @@ jobs:
   build-and-release-community:
     name: Build & Publish Community APK
     needs: quality-gate
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
