@@ -4,16 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:luci_mobile/config/app_config.dart';
+import 'package:luci_mobile/config/ad_config.dart';
 import 'package:luci_mobile/providers/entitlement_provider.dart';
 
 /// Fixed-height banner ad widget gated on entitlement state.
 /// Reserves container height upfront to prevent layout shift.
 class BannerAdWidget extends ConsumerStatefulWidget {
-  /// Test Ad Unit IDs provided by Google AdMob for development.
-  /// Replace with your production Ad Unit IDs from AdMob console before release.
-  static const String testAndroidBannerId = 'ca-app-pub-3940256099942544/6300978111';
-  static const String testIosBannerId = 'ca-app-pub-3940256099942544/2934735716';
-
   const BannerAdWidget({super.key});
 
   @override
@@ -24,11 +20,7 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> {
   BannerAd? _bannerAd;
   bool _isAdLoaded = false;
 
-  String get _adUnitId {
-    if (kIsWeb) return BannerAdWidget.testAndroidBannerId;
-    if (Platform.isIOS) return BannerAdWidget.testIosBannerId;
-    return BannerAdWidget.testAndroidBannerId;
-  }
+  String get _adUnitId => AdConfig.bannerAdUnitId;
 
   @override
   void initState() {
