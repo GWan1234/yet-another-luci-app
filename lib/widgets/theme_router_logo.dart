@@ -19,9 +19,8 @@ class ThemeRouterLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    
-    Widget imageWidget = ClipRRect(
+
+    return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: Image.asset(
         'assets/images/app_logo.png',
@@ -37,23 +36,5 @@ class ThemeRouterLogo extends StatelessWidget {
         },
       ),
     );
-
-    if (showShadow) {
-      return Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: (isDark ? Colors.cyan : Colors.blue).withValues(alpha: 0.35),
-              blurRadius: 24,
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        child: imageWidget,
-      );
-    }
-
-    return imageWidget;
   }
 }

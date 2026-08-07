@@ -139,6 +139,7 @@ GoogleService-Info.plist
 ARCHITECTURE_EDITIONS.md
 .private/
 docs/internal/
+android/build/
 
 # Exceptions to above rules
 !**/ios/**/default.mode1v3

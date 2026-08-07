@@ -34,11 +34,11 @@ body:
     id: installation-method
     attributes:
       label: How you installed it
-      description: "How did you install Luci Mobile?"
+      description: "How did you install Yet Another LuCI App?"
       options:
-        - App Store
+        # - App Store
         - Google Play
-        - IzzyOnDroid
+        # - IzzyOnDroid
         - GitHub Releases
         - Built from source
         - Other

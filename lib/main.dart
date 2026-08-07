@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:luci_mobile/state/app_state.dart';
-import 'package:luci_mobile/screens/login_screen.dart';
+import 'package:luci_mobile/screens/login_screen.dart';                                 
 import 'package:luci_mobile/screens/main_screen.dart';
 import 'package:luci_mobile/screens/settings_screen.dart';
 import 'package:luci_mobile/screens/splash_screen.dart';
@@ -12,13 +12,41 @@ import 'package:luci_mobile/screens/onboarding_screen.dart';
 import 'package:luci_mobile/models/router_capabilities.dart';
 import 'package:luci_mobile/modules/built_in_modules.dart';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:luci_mobile/services/ad_consent_service.dart';
+import 'package:luci_mobile/config/app_config.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart' hide AppState;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await AdConsentService.initializeConsentAndAds();
+
+  if (AppConfig.isMonetizationEnabled) {
+    try {
+      await MobileAds.instance.initialize();
+
+      if (kDebugMode) {
+        await MobileAds.instance.updateRequestConfiguration(
+          RequestConfiguration(
+            testDeviceIds: const [
+              
+            ],
+          ),
+        );
+      }
+
+      await AdConsentService.initializeConsentAndAds();
+    } catch (e) {
+      debugPrint('MobileAds initialization skipped or failed: $e');
+    }
+  }
+
   registerBuiltInModules();
-  runApp(ProviderScope(child: const LuCIApp()));
+  runApp(
+    const ProviderScope(
+      child: LuCIApp(),
+    ),
+  );
 }
 
 final appStateProvider = ChangeNotifierProvider<AppState>(

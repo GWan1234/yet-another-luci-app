@@ -82,7 +82,6 @@ class _SplashScreenState extends State<SplashScreen>
                 child: const ThemeRouterLogo(
                   width: 140,
                   height: 140,
-                  showShadow: true,
                 ),
               ),
               const SizedBox(height: 32),

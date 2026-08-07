@@ -7,11 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.0] - 2026-08-06
-
-We are excited to announce the official **v1.0.0 Community Release**! Built completely free and open-source under the Apache License 2.0, this release delivers a powerful, privacy-first mobile management interface for OpenWrt routers without any ads, telemetry, or feature paywalls.
-
 ### 🌟 Key Features & Highlights
+
 - **Zero Ads & 100% Free**: Pure FOSS build compiled with zero ad SDKs or tracking dependencies.
 - **Smart Network Topology**: Automatic detection and visual mapping for both **DSA** and **Swconfig** OpenWrt architecture models.
 - **Dual Package Manager Compatibility**: Seamless software management supporting both **OPKG** (OpenWrt 23.05 and earlier) and **APK** (OpenWrt 24.10+).

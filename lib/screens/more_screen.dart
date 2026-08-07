@@ -308,9 +308,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
             const LuciSectionHeader('Device Management'),
             Builder(
               builder: (context) {
-                final isRebooting = ref.watch(
-                  appStateProvider.select((state) => state.isRebooting),
-                );
+                final isRebooting = ref.watch(appStateProvider).isRebooting;
                 return _MoreScreenSection(
                   tiles: [
                     _buildMoreTile(
