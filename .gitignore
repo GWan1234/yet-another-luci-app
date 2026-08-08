@@ -152,6 +152,7 @@ analysis_options.yaml
 .metadata
 .flutter-plugins-dependencies
 scripts/
+test/
 lib/widgets/banner_ad_widget.dart
 lib/widgets/luci_refresh_components.dart
 lib/main.dart
