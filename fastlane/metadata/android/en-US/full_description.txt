@@ -27,7 +27,7 @@ Yet Another LuCI App is an open-source project by Tuhin Garai (nightcodex7). For
 https://github.com/nightcodex7/yet-another-luci-app
 
 Author: Tuhin Garai (nightcodex7)
-Email: tuhingarai123@gmail.com
+Email: tuhingarai.dev+support@gmail.com
 
 -----
 

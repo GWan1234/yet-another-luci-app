@@ -143,6 +143,35 @@ android/build/
 lib/config/ad_config.dart
 android/app/src/playstore/AndroidManifest.xml
 
+# Custom Untracked Internal Files & Modules
+pubspec.yaml
+pubspec.lock
+LICENSE_CHANGE.md
+devtools_options.yaml
+analysis_options.yaml
+.metadata
+.flutter-plugins-dependencies
+scripts/
+lib/widgets/banner_ad_widget.dart
+lib/widgets/luci_refresh_components.dart
+lib/main.dart
+lib/widgets/theme_router_logo.dart
+lib/utils/logger.dart
+lib/utils/url_parser.dart
+lib/utils/http_client_manager.dart
+lib/state/app_state.dart
+lib/services/update_checker_service.dart
+lib/services/service_factory.dart
+lib/services/auth_service.dart
+lib/services/ad_consent_service.dart
+lib/screens/paywall_screen.dart
+lib/screens/clients_screen.dart
+lib/providers/entitlement_provider.dart
+lib/config/
+android/app/src/playstore/
+android/app/src/main/
+android/app/src/debug/
+
 # Exceptions to above rules
 !**/ios/**/default.mode1v3
 !**/ios/**/default.mode2v3
