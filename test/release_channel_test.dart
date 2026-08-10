@@ -1,45 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-
-/// Tests for release channel detection (GitHub issue #44).
-///
-/// Root cause: The _deriveReleaseChannel function only checks a subset of
-/// release fields, and the 'rc' check is too broad (matches "source", etc.).
-
-// Copy of the production function for testing — will be updated with fixes
-String deriveReleaseChannel(Map<String, dynamic>? release) {
-  if (release == null || release.isEmpty) {
-    return 'stable';
-  }
-
-  final buffer = StringBuffer();
-  // Check ALL release fields, not just a hardcoded subset
-  for (final value in release.values) {
-    if (value == null) continue;
-    buffer
-      ..write(' ')
-      ..write(value.toString().toLowerCase());
-  }
-
-  final combined = buffer.toString();
-
-  if (combined.contains('snapshot')) {
-    return 'snapshot';
-  }
-  if (combined.contains('beta')) {
-    return 'beta';
-  }
-  // Use word boundary matching for 'rc' to avoid false positives
-  if (RegExp(r'[\b\-_.]rc[\d\b\-_.]').hasMatch(combined) ||
-      combined.contains('-rc') ||
-      combined.endsWith('rc')) {
-    return 'rc';
-  }
-  if (combined.contains('testing')) {
-    return 'testing';
-  }
-
-  return 'stable';
-}
+import 'package:luci_mobile/utils/release_utils.dart';
 
 void main() {
   group('Release channel detection', () {

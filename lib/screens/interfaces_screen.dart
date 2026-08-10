@@ -716,7 +716,11 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
         if (interface.ipAddress != null)
           _buildDetailRow(
             context,
-            'IP Address',
+            _isPublicIp(interface.ipAddress!)
+                ? 'Public IP Address'
+                : (interface.name.toLowerCase().contains('wan')
+                    ? 'IP Address (WAN)'
+                    : 'IP Address'),
             interface.ipAddress!,
             onTap: () =>
                 _copyToClipboard(context, interface.ipAddress!, 'IP Address'),
@@ -726,7 +730,7 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
           ...interface.ipv6Addresses!.map(
             (ipv6) => _buildDetailRow(
               context,
-              'IPv6 Address',
+              _isPublicIp(ipv6) ? 'Public IPv6 Address' : 'IPv6 Address',
               ipv6,
               onTap: () => _copyToClipboard(context, ipv6, 'IPv6 Address'),
             ),
@@ -1014,6 +1018,41 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  bool _isPublicIp(String ipText) {
+    if (ipText.isEmpty || ipText == 'No IPv4' || ipText == 'No IPv6' || ipText == 'N/A') {
+      return false;
+    }
+    final raw = ipText.split('/')[0].trim();
+    if (raw.contains('.')) {
+      final parts = raw.split('.');
+      if (parts.length != 4) return false;
+      final octet1 = int.tryParse(parts[0]);
+      final octet2 = int.tryParse(parts[1]);
+      if (octet1 == null || octet2 == null) return false;
+      if (octet1 == 10) return false;
+      if (octet1 == 172 && octet2 >= 16 && octet2 <= 31) return false;
+      if (octet1 == 192 && octet2 == 168) return false;
+      if (octet1 == 127) return false;
+      if (octet1 == 169 && octet2 == 254) return false;
+      return true;
+    } else if (raw.contains(':')) {
+      final lower = raw.toLowerCase();
+      if (lower == '::1') return false;
+      if (lower.startsWith('fe80:') ||
+          lower.startsWith('fe8') ||
+          lower.startsWith('fe9') ||
+          lower.startsWith('fea') ||
+          lower.startsWith('feb')) {
+        return false;
+      }
+      if (lower.startsWith('fc') || lower.startsWith('fd')) {
+        return false;
+      }
+      return true;
+    }
+    return false;
   }
 
   Widget _buildStatsRow(BuildContext context, Map<String, dynamic> stats) {

@@ -243,27 +243,106 @@ class WirelessManagementScreen extends ConsumerWidget {
           elevation: 1,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           child: ListTile(
-            leading: Icon(
-              Icons.wifi_tethering,
-              color: _getSignalColor(st.signalDbm),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            leading: CircleAvatar(
+              backgroundColor: _getSignalColor(st.signalDbm).withValues(alpha: 0.12),
+              child: Icon(
+                Icons.wifi,
+                color: _getSignalColor(st.signalDbm),
+                size: 20,
+              ),
             ),
-            title: Text(titleText, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text(subtitleText),
+            title: Text(
+              titleText,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              subtitleText,
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
             trailing: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(st.formattedSignal, style: TextStyle(fontWeight: FontWeight.bold, color: _getSignalColor(st.signalDbm))),
                 Text(
-                  st.rxRate != null && st.txRate != null ? 'Rx: ${st.rxRate} / Tx: ${st.txRate} M' : st.signalQualityLabel,
-                  style: const TextStyle(fontSize: 11),
+                  st.formattedSignal,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: _getSignalColor(st.signalDbm),
+                    fontSize: 12,
+                  ),
                 ),
+                if (st.rxRate != null)
+                  Text(
+                    'Rx: ${_formatBandwidthRate(st.rxRate)}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                if (st.txRate != null)
+                  Text(
+                    'Tx: ${_formatBandwidthRate(st.txRate)}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                if (st.rxRate == null && st.txRate == null)
+                  Text(
+                    st.signalQualityLabel,
+                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  ),
               ],
             ),
           ),
         );
       }).toList(),
     );
+  }
+
+  String _formatBandwidthRate(num? rawRate) {
+    if (rawRate == null) return 'N/A';
+    double rate = rawRate.toDouble();
+    if (rate <= 0) return '0 Mbps';
+
+    // Normalize raw rate to Mbps based on standard OpenWrt payload scales:
+    // 1. bps (>= 10,000,000)
+    // 2. Kbps (>= 10,000 or integer >= 1,000)
+    // 3. Mbps (< 10,000 with decimals or direct Mbps)
+    double rateMbps;
+    if (rate >= 10000000) {
+      rateMbps = rate / 1000000;
+    } else if (rate >= 10000 || (rate >= 1000 && rate % 1 == 0)) {
+      rateMbps = rate / 1000;
+    } else {
+      rateMbps = rate;
+    }
+
+    if (rateMbps >= 1000) {
+      final gbps = rateMbps / 1000;
+      return '${gbps % 1 == 0 ? gbps.toInt() : gbps.toStringAsFixed(1)} Gbps';
+    } else if (rateMbps >= 1) {
+      return '${rateMbps % 1 == 0 ? rateMbps.toInt() : rateMbps.toStringAsFixed(1)} Mbps';
+    } else if (rateMbps > 0) {
+      final kbps = (rateMbps * 1000).round();
+      if (kbps >= 1) {
+        return '$kbps Kbps';
+      } else {
+        final bytes = (rateMbps * 1000000 / 8).round();
+        return '$bytes Bytes';
+      }
+    }
+    return '0 Mbps';
   }
 
   Color _getSignalColor(int? signal) {

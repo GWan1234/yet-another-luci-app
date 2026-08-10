@@ -15,9 +15,9 @@
 
   <h3>Dashboard Preview (Light & Dark Theme)</h3>
   <p>
-    <img src="assets/screenshots/3_dashboard-light.jpeg" width="340" alt="Dashboard Light Mode" />
+    <img src="assets/screenshots/1_dashboard-light.jpeg" width="340" alt="Dashboard Light Mode" />
     &nbsp;&nbsp;&nbsp;&nbsp;
-    <img src="assets/screenshots/4_dashboard-dark.jpeg" width="340" alt="Dashboard Dark Mode" />
+    <img src="assets/screenshots/2_dashboard-dark.jpeg" width="340" alt="Dashboard Dark Mode" />
   </p>
 </div>
 
@@ -37,21 +37,22 @@
 ### 📊 Real-Time Dashboard & Network Vitals
 
 - **Dual Themes:** Clean, seamless switching between Light and Dark themes.
-- **Animated Vitals Gauges:** Live CPU load, RAM memory usage, Swap, and Storage capacity.
+- **Animated Vitals Gauges:** Live CPU load, RAM memory usage, Swap, and root `/` filesystem capacity.
 - **Real-Time Throughput Graph:** Smooth live chart displaying network transfer rates (Rx/Tx Kbps/Mbps) with configurable polling intervals.
-- **Interface Overview Cards:** Live UP/DOWN statuses, assigned IPv4/IPv6 addresses, MACs, and protocols (DHCP, Static, PPPoE, WWAN).
+- **Interface Overview Cards:** Live UP/DOWN statuses, assigned IPv4/IPv6 addresses, MACs, protocols, and public IP badges on WAN interfaces with direct tab navigation.
 
 ### 📱 Connected Client Management
 
 - **Unified Connected List:** Synchronous aggregation of active DHCP leases, ARP neighbor entries, and wireless stations.
 - **Device Identification:** Displays hostname (prioritizing static leases and DHCP), IP, MAC address, vendor OUI, connected SSID, and radio band badges.
+- **Expandable IPv6 Management:** Clean IPv6 address deduplication with toggleable expand/collapse lists for clients with multiple private (ULA) or link-local IPv6 addresses.
 - **Wi-Fi Access Control:** Quick MAC entry tool for access management.
 
 ### 📶 Wireless Radios & Station Diagnostics
 
 - **Radio Band Management:** Multi-radio card diagnostic for 2.4GHz, 5GHz, and 6GHz bands.
 - **Precise Frequency Info:** Displays operational frequency up to 3 decimal places (e.g. 2.423 GHz), channel, transmit power, and active stations.
-- **Station List Modal:** View exact connected client hostnames and signal levels linked per SSID.
+- **Station Throughput & Diagnostics:** View exact connected client hostnames, signal quality, and live Rx/Tx bandwidth rates adaptively formatted in `Gbps`, `Mbps`, `Kbps`, or `B/s`.
 
 ### 📦 OPKG & APK Dual Package Manager
 
@@ -76,17 +77,29 @@
   <p><b>Explore full resolution screenshots of Yet Another LuCI App features:</b></p>
 </div>
 
-| Login Screen | Dashboard (Light) | Dashboard (Dark) | Connected Clients |
+| Login Screen | Dashboard (Light) | Dashboard (Dark) | Dashboard Vitals |
 |:---:|:---:|:---:|:---:|
-| <img src="assets/screenshots/2_login_page.jpeg" width="180"/> | <img src="assets/screenshots/3_dashboard-light.jpeg" width="180"/> | <img src="assets/screenshots/4_dashboard-dark.jpeg" width="180"/> | <img src="assets/screenshots/7_clients.jpeg" width="180"/> |
+| <img src="assets/screenshots/3_login_page.jpeg" width="180"/> | <img src="assets/screenshots/1_dashboard-light.jpeg" width="180"/> | <img src="assets/screenshots/2_dashboard-dark.jpeg" width="180"/> | <img src="assets/screenshots/4_dashboard-2.jpeg" width="180"/> |
 
-| Network Interfaces | Wireless Management | Real-Time Metrics | Services Diagnostics |
+| Interface Vitals | Connected Clients | Network Interfaces | Interface Details |
 |:---:|:---:|:---:|:---:|
-| <img src="assets/screenshots/8_interfaces.jpeg" width="180"/> | <img src="assets/screenshots/11_wirelessmanagement.jpeg" width="180"/> | <img src="assets/screenshots/12_real_time_metrics.jpeg" width="180"/> | <img src="assets/screenshots/15_service.jpeg" width="180"/> |
+| <img src="assets/screenshots/5_dashboard-3.jpeg" width="180"/> | <img src="assets/screenshots/6_clients.jpeg" width="180"/> | <img src="assets/screenshots/7_interfaces.jpeg" width="180"/> | <img src="assets/screenshots/8_interfaces-1.jpeg" width="180"/> |
 
-| Package Manager | Storage Monitoring | DHCP & DNS Leases | Multi-Router Manager |
+| Wireless Management | System Services | Storage & Overlay | Network Topology |
 |:---:|:---:|:---:|:---:|
-| <img src="assets/screenshots/16_package_manager.jpeg" width="180"/> | <img src="assets/screenshots/10_storagemon.jpeg" width="180"/> | <img src="assets/screenshots/13_dhcp_dns.jpeg" width="180"/> | <img src="assets/screenshots/18_multi_router.jpeg" width="180"/> |
+| <img src="assets/screenshots/9_wireless.jpeg" width="180"/> | <img src="assets/screenshots/10_system.jpeg" width="180"/> | <img src="assets/screenshots/11_storage.jpeg" width="180"/> | <img src="assets/screenshots/12_network.jpeg" width="180"/> |
+
+| Network Routes | Real-Time Metrics | DHCP Leases | DNS Configuration |
+|:---:|:---:|:---:|:---:|
+| <img src="assets/screenshots/13_network-1.jpeg" width="180"/> | <img src="assets/screenshots/14_realtime_charts.jpeg" width="180"/> | <img src="assets/screenshots/15_dhcp_dns.jpeg" width="180"/> | <img src="assets/screenshots/16_dhcp_dns-1.jpeg" width="180"/> |
+
+| Firewall Rules | Port Forwards | Package Manager | App Settings |
+|:---:|:---:|:---:|:---:|
+| <img src="assets/screenshots/17_firewall.jpeg" width="180"/> | <img src="assets/screenshots/18_firewall-1.jpeg" width="180"/> | <img src="assets/screenshots/19_packagemanager.jpeg" width="180"/> | <img src="assets/screenshots/20-settings-community.jpeg" width="180"/> |
+
+| More Tools | Community Options | About & GitHub | |
+|:---:|:---:|:---:|:---:|
+| <img src="assets/screenshots/21-more.jpeg" width="180"/> | <img src="assets/screenshots/22-more-community.jpeg" width="180"/> | <img src="assets/screenshots/23-about.jpeg" width="180"/> | |
 
 <br>
 

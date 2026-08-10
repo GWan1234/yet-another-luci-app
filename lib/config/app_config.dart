@@ -55,17 +55,16 @@ class AppConfig {
   }
 
   /// Whether the ads SDK should be compiled, initialized, and rendered.
-  /// Requires BOTH playstore flavor AND explicit `ENABLE_ADS=true` dart-define.
-  static bool get isAdsEnabled => flavor == AppFlavor.playstore && _enableAdsFlag;
+  /// Explicitly disabled across all builds (Play Store & Community).
+  static bool get isAdsEnabled => false;
 
   /// Whether voluntary Support the Developer feature is enabled in UI.
-  /// Defaults to false in all release builds unless explicitly enabled via `ENABLE_SUPPORT_DEV=true`.
-  static bool get isSupportDevEnabled => _enableSupportDevFlag;
+  /// Explicitly disabled until feature is explicitly requested.
+  static bool get isSupportDevEnabled => false;
 
   /// Whether monetization features (Play Billing, Paywalls, Router Gating) are enabled.
-  /// Strictly `false` for community builds to ensure zero billing SDK activity.
-  /// Note: Ads are separately gated by [isAdsEnabled].
-  static bool get isMonetizationEnabled => flavor == AppFlavor.playstore;
+  /// Explicitly disabled across all builds.
+  static bool get isMonetizationEnabled => false;
 
   /// Whether the current build is the FOSS community flavor.
   static bool get isCommunityFlavor => flavor == AppFlavor.community;

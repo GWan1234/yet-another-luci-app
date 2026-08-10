@@ -201,6 +201,9 @@ class StorageOverview {
   MountPointItem? get rootFs {
     if (mountPoints.isEmpty) return null;
     for (final m in mountPoints) {
+      if (m.mountPath == '/') return m;
+    }
+    for (final m in mountPoints) {
       if (m.mountPath == '/rom' || m.device == '/dev/root') return m;
     }
     for (final m in mountPoints) {

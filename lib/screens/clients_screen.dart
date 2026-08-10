@@ -288,6 +288,7 @@ class _UnifiedClientCard extends StatefulWidget {
 class _UnifiedClientCardState extends State<_UnifiedClientCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  bool _showAllIpv6 = false;
 
   @override
   void initState() {
@@ -649,12 +650,27 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
     // Build classified IPv6 rows, sorted: public → private → link-local
     List<Widget> ipv6Rows = [];
     if (client.ipv6Addresses != null && client.ipv6Addresses!.isNotEmpty) {
-      final classified = client.ipv6Addresses!.map((ipv6) {
+      // Deduplicate IPv6 list
+      final uniqueV6 = <String>{};
+      final deduplicatedV6 = <String>[];
+      for (final addr in client.ipv6Addresses!) {
+        final norm = addr.trim().toLowerCase();
+        if (norm.isNotEmpty && uniqueV6.add(norm)) {
+          deduplicatedV6.add(addr.trim());
+        }
+      }
+
+      final classified = deduplicatedV6.map((ipv6) {
         final label = _classifyIPv6(ipv6);
         return (label: label, address: ipv6);
       }).toList();
       classified.sort((a, b) => _ipv6SortPriority(a.label).compareTo(_ipv6SortPriority(b.label)));
-      ipv6Rows = classified.map(
+
+      final displayEntries = (classified.length > 1 && !_showAllIpv6)
+          ? classified.take(1).toList()
+          : classified;
+
+      ipv6Rows = displayEntries.map(
         (entry) => detailRow(
           entry.label,
           entry.address,
@@ -662,6 +678,47 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
           semanticsLabel: '${entry.label}: ${entry.address}',
         ),
       ).toList();
+
+      if (classified.length > 1) {
+        final remainingCount = classified.length - 1;
+        ipv6Rows.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+            child: InkWell(
+              onTap: () {
+                setState(() {
+                  _showAllIpv6 = !_showAllIpv6;
+                });
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _showAllIpv6
+                          ? 'Collapse IPv6 addresses'
+                          : 'Show $remainingCount more IPv6 address${remainingCount > 1 ? 'es' : ''}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      _showAllIpv6 ? Icons.expand_less : Icons.expand_more,
+                      size: 16,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }
     }
 
     return Container(

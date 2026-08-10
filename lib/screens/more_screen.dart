@@ -276,7 +276,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                           'GitHub Repository',
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.primary,
-                            decoration: TextDecoration.underline,
+                            decoration: TextDecoration.none,
                           ),
                         ),
                       ),

@@ -321,6 +321,10 @@ To ensure seamless support across various OpenWrt releases (from OpenWrt 19.07 u
    - **Reasoning**: In-app ACL remediation dialogs built across modules (`RpcResultUiHelper` in `lib/widgets/rpc_result_dialog.dart`) surface exact remediation commands (`opkg install luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status`) directly at the point of RPC failure. This provides immediate, actionable guidance without forcing users to discover and install a separately versioned ACL file.
    - **Single Source of Truth**: All RPCD ACL dialogs reference `RpcResultUiHelper.kRpcdAclRemediationCommand`, keeping error remediation guidance unified with `README.md`.
 
+8. **UI & Metric Formatting Best Practices**:
+   - **Adaptive Unit Formatting**: Always format transfer rates, memory sizes, or disk capacities into human-readable adaptive units (`Gbps`, `Mbps`, `Kbps`, `B/s`, `GB`, `MB`, `KB`, `Bytes`) based on magnitude rather than displaying raw numbers with static suffixes.
+   - **Collapsible Detail Lists**: When displaying multiple network IP addresses (such as IPv6 ULA or Link-Local addresses), deduplicate entries and implement interactive expand/collapse toggles to maintain clean, non-overwhelming card UI layouts.
+
 ## Review Process
 
 ### Code Review Guidelines

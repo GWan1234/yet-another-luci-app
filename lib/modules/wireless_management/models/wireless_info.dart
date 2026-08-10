@@ -177,8 +177,12 @@ class WirelessStation {
   });
 
   factory WirelessStation.fromJson(String mac, Map<String, dynamic> json) {
-    final rx = json['rx_rate'] as num? ?? (json['rx'] is Map ? (json['rx']['rate'] as num?) : null);
-    final tx = json['tx_rate'] as num? ?? (json['tx'] is Map ? (json['tx']['rate'] as num?) : null);
+    final rx = json['rx_rate'] as num? ??
+        json['rx_bitrate'] as num? ??
+        (json['rx'] is Map ? (json['rx']['rate'] as num? ?? json['rx']['bitrate'] as num?) : null);
+    final tx = json['tx_rate'] as num? ??
+        json['tx_bitrate'] as num? ??
+        (json['tx'] is Map ? (json['tx']['rate'] as num? ?? json['tx']['bitrate'] as num?) : null);
     return WirelessStation(
       macAddress: mac,
       signalDbm: (json['signal'] as num?)?.toInt() ?? (json['signal_dbm'] as num?)?.toInt(),

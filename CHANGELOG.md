@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.0.4] - 2026-08-10
+
+### Added
+- **Client IPv6 Address Expand/Collapse & Deduplication**:
+  - Automatically deduplicated client IPv6 address lists and added an interactive `Show X more IPv6 address(es)` / `Collapse IPv6 addresses` toggle for device cards with multiple ULA or link-local IPv6 addresses.
+- **Adaptive Wireless Throughput Rate Formatting**:
+  - Formatted wireless station Rx/Tx rates dynamically in human-readable units (`Gbps`, `Mbps`, `Kbps`, or `B/s`) based on connection throughput.
+- **WAN & Public IP Card Identification**:
+  - Expanded interface cards on the Interfaces tab now explicitly identify WAN/ISP interfaces and label public IP addresses (`Public IP Address`, `Public IPv6 Address`).
+
+### Fixed
+- **Storage & Overlay Root Metric Calculation**:
+  - Fixed storage calculation on Dashboard and Storage Monitoring cards to accurately fetch and report root `/` filesystem capacity rather than locking onto the read-only `/rom` SquashFS image (`0 MB / 16 MB`).
+- **Dashboard Interface Card Navigation**:
+  - Corrected interface card tap and long-press actions on the Dashboard to open the **Interfaces** tab (`InterfacesScreen`) and auto-expand the targeted interface card.
+- **About Dialog Link Styling**:
+  - Removed underline text decoration from the GitHub repository link in the About popup dialog.
+
+---
+
 ## [0.0.3] - 2026-08-10
 
 > [!NOTE]  
@@ -33,11 +53,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Migrated hardcoded chart line gradients and speed indicators in `DashboardScreen` and `InterfacesScreen` to design system color tokens.
 - **Application ID Normalization**:
   - Standardized the Community build package name to `com.nightcode.luci`.
+- **Adaptive Wireless Throughput Units**:
+  - Formatted wireless station Rx/Tx rates dynamically in human-readable units (`Gbps`, `Mbps`, `Kbps`, or `B/s`) based on connection speed magnitude.
+- **Client IPv6 List Expand/Collapse & Deduplication**:
+  - Deduplicated IPv6 addresses on client cards and added an interactive expand/collapse toggle for devices with multiple private (ULA) or link-local IPv6 addresses.
+- **WAN & Public IP Card Identification**:
+  - Expanded interface cards on the Interfaces tab now explicitly identify and label WAN/ISP interfaces and public IP addresses (`Public IP Address`, `Public IPv6 Address`).
 
 ### Fixed
+- **Storage & Overlay Root Metric Parsing**:
+  - Corrected storage calculation on Dashboard and Storage Monitoring cards to fetch root `/` filesystem usage rather than defaulting to the read-only `/rom` SquashFS image (`0 MB / 16 MB`).
+- **Dashboard Interface Card Navigation**:
+  - Fixed interface status card tap action on the Dashboard to navigate directly to the **Interfaces** tab (`tab 1`) and auto-expand the selected interface card (resolving redirection to Clients tab).
 - **Login Keyboard & Focus Stability**:
   - Fixed soft keyboard flickering and focus drops on login form entry by isolating state scope and attaching dedicated `FocusNode` instances.
 - **Auto-Reconnect Engine**:
   - Added silent exponential backoff auto-reconnection logic when ubus RPC sessions expire or network transitions occur.
 - **Clients List Rendering & Debouncing**:
   - Applied 200ms query debouncing and list key stabilization to eliminate UI micro-jitter on longer client device lists.
+- **About Dialog Underline Styling**:
+  - Removed underline text decoration from GitHub repository link in the About dialog.

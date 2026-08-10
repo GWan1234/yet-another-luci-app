@@ -88,6 +88,7 @@ class AppState extends ChangeNotifier {
   model.Router? get selectedRouter => _routerService?.selectedRouter;
 
   VoidCallback? onRouterBackOnline;
+  DateTime? _lastNeighborProbeTime;
 
   // Add requestedTab for programmatic tab switching
   int? requestedTab;
@@ -2645,45 +2646,78 @@ class AppState extends ChangeNotifier {
         }
       }
 
+      // Helper to parse `ip neigh show` output into structured maps
+      List<Map<String, dynamic>> parseIpNeighOutput(String raw) {
+        final list = <Map<String, dynamic>>[];
+        for (final line in raw.split('\n')) {
+          final trimmed = line.trim();
+          if (trimmed.isEmpty) continue;
+          final parts = trimmed.split(RegExp(r'\s+'));
+          if (parts.length < 4) continue;
+          final ip = parts[0];
+          final dev = parts.length > 2 ? parts[2] : '';
+          String? mac;
+          String nudState = parts.last.toUpperCase();
+          final llIdx = parts.indexOf('lladdr');
+          if (llIdx >= 0 && llIdx + 1 < parts.length) {
+            mac = parts[llIdx + 1];
+          }
+          if (mac == null || !mac.contains(':')) continue;
+          if (mac == '00:00:00:00:00:00') continue;
+          list.add({
+            'ipaddr': ip,
+            'macaddr': normMac(mac),
+            'device': dev,
+            'nud_state': nudState,
+          });
+        }
+        return list;
+      }
+
       // 3. Fetch neighbor table via `ip neigh show` for NUD-state-aware wired client detection.
-      // Unlike /proc/net/arp (which can't distinguish REACHABLE from STALE), ip neigh
-      // explicitly reports NUD states: REACHABLE, STALE, DELAY, PROBE, FAILED, INCOMPLETE.
       final neighClients = <Map<String, dynamic>>[];
       bool usedIpNeigh = false;
       try {
         final neighStr = await executeRouterCommandOutput('ip', ['neigh', 'show']);
         if (neighStr != null && neighStr.trim().isNotEmpty) {
           usedIpNeigh = true;
-          for (final line in neighStr.split('\n')) {
-            final trimmed = line.trim();
-            if (trimmed.isEmpty) continue;
-            // Format: <IP> dev <DEV> lladdr <MAC> <NUD_STATE>
-            // or:     <IP> dev <DEV> <NUD_STATE>  (no lladdr when FAILED/INCOMPLETE)
-            final parts = trimmed.split(RegExp(r'\s+'));
-            if (parts.length < 4) continue;
-            final ip = parts[0];
-            final dev = parts.length > 2 ? parts[2] : '';
-            String? mac;
-            String nudState = parts.last.toUpperCase();
-            final llIdx = parts.indexOf('lladdr');
-            if (llIdx >= 0 && llIdx + 1 < parts.length) {
-              mac = parts[llIdx + 1];
-            }
-            if (mac == null || !mac.contains(':')) continue;
-            if (mac == '00:00:00:00:00:00') continue;
-            neighClients.add({
-              'ipaddr': ip,
-              'macaddr': normMac(mac),
-              'device': dev,
-              'nud_state': nudState,
-            });
-          }
+          neighClients.addAll(parseIpNeighOutput(neighStr));
         }
       } catch (_) {}
 
+      // Active Probing for Absent/Incomplete Wired Clients:
+      // Idle wired devices (e.g. set-top boxes, idle laptops) may have NO entry in `ip neigh show`.
+      // Extract known leased IPv4 addresses (non-wireless) that are missing from `neighClients` or marked INCOMPLETE/FAILED.
+      // Throttle sweeps to run at most once per 30s per device, capped at max 10 IPs per probe execution.
+      if (usedIpNeigh) {
+        try {
+          final probeIps = selectNeighborProbeTargets(
+            dhcp4Leases,
+            normalizedWireless,
+            neighClients,
+            routerIp: router.ipAddress,
+            maxBatch: kNeighborProbeMaxBatch,
+          );
+
+          final now = DateTime.now();
+          final shouldProbe = _lastNeighborProbeTime == null ||
+              now.difference(_lastNeighborProbeTime!) >= kNeighborProbeInterval;
+
+          if (shouldProbe && probeIps.isNotEmpty) {
+            final cmd = 'for ip in ${probeIps.join(' ')}; do ping -c 1 -W 1 \$ip >/dev/null 2>&1 & done; wait; ip neigh show';
+            final probedNeighStr = await executeRouterCommandOutput('sh', ['-c', cmd]);
+            if (probedNeighStr != null && probedNeighStr.trim().isNotEmpty) {
+              neighClients.clear();
+              neighClients.addAll(parseIpNeighOutput(probedNeighStr));
+            }
+            _lastNeighborProbeTime = now;
+          }
+        } catch (e) {
+          Logger.warning('Active neighbor probing failed: $e');
+        }
+      }
+
       // Fallback: /proc/net/arp for firmware without iproute2 (pre-18.06).
-      // KNOWN LIMITATION: Cannot distinguish REACHABLE from STALE — all non-incomplete
-      // entries show as flags=0x2. Clients may appear "active" for minutes after disconnect.
       if (!usedIpNeigh || neighClients.isEmpty) {
         try {
           final arpStr = await executeRouterCommandOutput('cat', ['/proc/net/arp']);
@@ -3126,3 +3160,56 @@ class AppState extends ChangeNotifier {
     }
   }
 }
+
+/// Minimum interval between active NUD ping sweeps to prevent router CPU load.
+const Duration kNeighborProbeInterval = Duration(seconds: 30);
+
+/// Maximum number of target IP addresses probed per NUD ping sweep batch.
+const int kNeighborProbeMaxBatch = 10;
+
+/// Pure function to extract non-wireless wired client IPs from DHCP leases that are currently
+/// absent from `ip neigh show` or marked INCOMPLETE/FAILED, capped at `maxBatch`.
+List<String> selectNeighborProbeTargets(
+  List<Map<String, dynamic>> dhcp4Leases,
+  Set<String> normalizedWireless,
+  List<Map<String, dynamic>> neighClients, {
+  String routerIp = '',
+  int maxBatch = kNeighborProbeMaxBatch,
+}) {
+  String normMac(String mac) => mac
+      .trim()
+      .toUpperCase()
+      .replaceAll('-', ':')
+      .split(':')
+      .map((b) => b.length == 1 ? '0$b' : b)
+      .join(':');
+
+  final normWireless = normalizedWireless.map(normMac).toSet();
+
+  final candidateIps = <String>{};
+  for (final l in dhcp4Leases) {
+    final macRaw = l['macaddr']?.toString() ?? l['mac']?.toString() ?? '';
+    final ipRaw = l['ipaddr']?.toString() ?? l['ip']?.toString() ?? '';
+    final macN = normMac(macRaw);
+    if (macN.isNotEmpty &&
+        !normWireless.contains(macN) &&
+        ipRaw.isNotEmpty &&
+        ipRaw != 'N/A' &&
+        ipRaw != routerIp) {
+      candidateIps.add(ipRaw);
+    }
+  }
+
+  final missingWiredIps = candidateIps.where((ip) {
+    final Map<String, dynamic>? entry = neighClients.cast<Map<String, dynamic>?>().firstWhere(
+      (n) => n?['ipaddr'] == ip,
+      orElse: () => null,
+    );
+    if (entry == null) return true;
+    final nud = (entry['nud_state']?.toString() ?? '').toUpperCase();
+    return nud == 'INCOMPLETE' || nud == 'FAILED';
+  }).toList();
+
+  return missingWiredIps.take(maxBatch).toList();
+}
+

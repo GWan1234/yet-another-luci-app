@@ -44,7 +44,7 @@ void main() {
       final dhcpLeases = <Map<String, dynamic>>[];
       final wirelessMacs = {'AA:BB:CC:11:22:33', 'AA:BB:CC:44:55:66'};
 
-      final clients = _buildMergedClientList(dhcpLeases, wirelessMacs);
+      final clients = Client.buildMergedClientList(dhcpLeases, wirelessMacs);
 
       expect(clients, hasLength(2));
       expect(clients.every((c) => c.connectionType == ConnectionType.wireless), isTrue);
@@ -64,7 +64,7 @@ void main() {
       ];
       final wirelessMacs = {'AA:BB:CC:11:22:33'};
 
-      final clients = _buildMergedClientList(dhcpLeases, wirelessMacs);
+      final clients = Client.buildMergedClientList(dhcpLeases, wirelessMacs);
 
       expect(clients, hasLength(1));
       expect(clients.first.hostname, 'iPhone-John');
@@ -88,7 +88,7 @@ void main() {
       // One MAC overlaps with DHCP, one is wireless-only
       final wirelessMacs = {'AA:BB:CC:11:22:33', 'AA:BB:CC:99:88:77'};
 
-      final clients = _buildMergedClientList(dhcpLeases, wirelessMacs);
+      final clients = Client.buildMergedClientList(dhcpLeases, wirelessMacs);
 
       // 2 from DHCP + 1 wireless-only = 3
       expect(clients, hasLength(3));
@@ -104,57 +104,8 @@ void main() {
     });
 
     test('empty DHCP and empty wireless returns no clients', () {
-      final clients = _buildMergedClientList([], {});
+      final clients = Client.buildMergedClientList([], {});
       expect(clients, isEmpty);
     });
   });
-}
-
-/// Simulates the merged client list logic that will be in app_state.dart.
-/// This is the pattern we're implementing: DHCP leases + wireless fallback.
-List<Client> _buildMergedClientList(
-  List<Map<String, dynamic>> dhcpLeases,
-  Set<String> wirelessMacs,
-) {
-  final normalizedWireless =
-      wirelessMacs.map((m) => m.toUpperCase().replaceAll('-', ':')).toSet();
-
-  // Build clients from DHCP leases (existing behavior)
-  final clients = <String, Client>{};
-  for (final lease in dhcpLeases) {
-    final client = Client.fromLease(lease);
-    final macNorm = client.macAddress.toUpperCase().replaceAll('-', ':');
-    final isWireless = normalizedWireless.contains(macNorm);
-    clients[macNorm] = client.copyWith(
-      connectionType: isWireless ? ConnectionType.wireless : ConnectionType.wired,
-    );
-  }
-
-  // Add wireless-only clients not in DHCP (the fix for AP mode)
-  for (final mac in normalizedWireless) {
-    if (!clients.containsKey(mac)) {
-      clients[mac] = Client.fromWirelessStation(mac);
-    }
-  }
-
-  // Sort: wireless > wired > unknown, then by hostname
-  final list = clients.values.toList();
-  list.sort((a, b) {
-    int typeOrder(ConnectionType t) {
-      switch (t) {
-        case ConnectionType.wireless:
-          return 0;
-        case ConnectionType.wired:
-          return 1;
-        default:
-          return 2;
-      }
-    }
-
-    final cmpType =
-        typeOrder(a.connectionType).compareTo(typeOrder(b.connectionType));
-    if (cmpType != 0) return cmpType;
-    return a.hostname.toLowerCase().compareTo(b.hostname.toLowerCase());
-  });
-  return list;
 }

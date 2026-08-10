@@ -294,4 +294,54 @@ class Client {
       staticLeaseName: staticLeaseName ?? this.staticLeaseName,
     );
   }
+
+  /// Merges DHCP leases and active wireless station MACs into a sorted list of Clients.
+  static List<Client> buildMergedClientList(
+    List<Map<String, dynamic>> dhcpLeases,
+    Set<String> wirelessMacs,
+  ) {
+    String norm(String m) => m
+        .toUpperCase()
+        .replaceAll('-', ':')
+        .split(':')
+        .map((b) => b.length == 1 ? '0$b' : b)
+        .join(':');
+
+    final normalizedWireless = wirelessMacs.map(norm).toSet();
+
+    final clients = <String, Client>{};
+    for (final lease in dhcpLeases) {
+      final client = Client.fromLease(lease);
+      final macNorm = norm(client.macAddress);
+      final isWireless = normalizedWireless.contains(macNorm);
+      clients[macNorm] = client.copyWith(
+        connectionType: isWireless ? ConnectionType.wireless : ConnectionType.wired,
+      );
+    }
+
+    for (final mac in normalizedWireless) {
+      if (!clients.containsKey(mac)) {
+        clients[mac] = Client.fromWirelessStation(mac);
+      }
+    }
+
+    final list = clients.values.toList();
+    list.sort((a, b) {
+      int typeOrder(ConnectionType t) {
+        switch (t) {
+          case ConnectionType.wireless:
+            return 0;
+          case ConnectionType.wired:
+            return 1;
+          default:
+            return 2;
+        }
+      }
+
+      final cmpType = typeOrder(a.connectionType).compareTo(typeOrder(b.connectionType));
+      if (cmpType != 0) return cmpType;
+      return a.hostname.toLowerCase().compareTo(b.hostname.toLowerCase());
+    });
+    return list;
+  }
 }
