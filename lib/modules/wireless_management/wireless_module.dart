@@ -25,12 +25,15 @@ class WirelessManagementModule extends LuciModule {
   int get priority => 25;
 
   @override
+  bool get showInBottomNav => true;
+
+  @override
   Widget buildScreen(BuildContext context, {Map<String, dynamic>? params}) {
     return const WirelessManagementScreen();
   }
 
   @override
-  Widget? buildDashboardWidget(BuildContext context) {
-    return null;
+  Widget buildDashboardWidget(BuildContext context) {
+    return const SizedBox.shrink();
   }
 }

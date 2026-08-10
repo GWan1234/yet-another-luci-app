@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
 import 'package:luci_mobile/state/app_state.dart';
 import 'package:luci_mobile/modules/dhcp_dns/models/dhcp_dns_info.dart';
+import 'package:luci_mobile/widgets/luci_app_bar.dart';
 import '../models/wireless_info.dart';
 
 class WirelessManagementScreen extends ConsumerWidget {
-  const WirelessManagementScreen({super.key});
+  final bool showBack;
+
+  const WirelessManagementScreen({super.key, this.showBack = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -17,8 +20,9 @@ class WirelessManagementScreen extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Wireless Management'),
+      appBar: LuciAppBar(
+        title: 'Wireless',
+        showBack: showBack,
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -84,7 +88,7 @@ class WirelessManagementScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(radio.name.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        Text('${radio.bandLabel} • Channel ${radio.channel}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                        Text('${radio.bandLabel} • Channel ${radio.channel}', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
                       ],
                     ),
                   ],
@@ -107,9 +111,9 @@ class WirelessManagementScreen extends ConsumerWidget {
               ],
             ),
             const Divider(height: 24),
-            _buildDetailRow('TX Power', '${radio.txPowerDbm ?? 20} dBm'),
-            _buildDetailRow('Frequency', freqStr),
-            _buildDetailRow('Country Code', radio.country),
+            _buildDetailRow(context, 'TX Power', '${radio.txPowerDbm ?? 20} dBm'),
+            _buildDetailRow(context, 'Frequency', freqStr),
+            _buildDetailRow(context, 'Country Code', radio.country),
             const SizedBox(height: 12),
             if (radio.interfaces.isNotEmpty) ...[
               const Text('Interfaces / SSIDs', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
@@ -147,13 +151,13 @@ class WirelessManagementScreen extends ConsumerWidget {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: (iface.pmfState == PmfState.required ? Colors.purple : Colors.blue).withValues(alpha: 0.15),
+                                    color: (iface.pmfState == PmfState.required ? theme.colorScheme.tertiary : theme.colorScheme.secondary).withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
                                     iface.pmfState.displayName,
                                     style: TextStyle(
-                                      color: iface.pmfState == PmfState.required ? Colors.purple : Colors.blue,
+                                      color: iface.pmfState == PmfState.required ? theme.colorScheme.tertiary : theme.colorScheme.secondary,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 10,
                                     ),
@@ -165,7 +169,7 @@ class WirelessManagementScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    Text('${iface.stations.length} clients', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text('${iface.stations.length} clients', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
                   ],
                 ),
               )),
@@ -270,13 +274,14 @@ class WirelessManagementScreen extends ConsumerWidget {
     return Colors.red;
   }
 
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(BuildContext context, String label, String value) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
+          Text(label, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
         ],
       ),

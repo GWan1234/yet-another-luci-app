@@ -287,6 +287,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       currentTxRate = appState.currentTxRate;
     }
 
+    final theme = Theme.of(context);
     // Show loading state if we don't have any throughput data yet
     final hasValidData =
         rxHistory.isNotEmpty ||
@@ -329,13 +330,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               children: [
                 _buildSpeedIndicator(
                   Icons.arrow_downward,
-                  Colors.green,
+                  theme.colorScheme.primary,
                   '',
                   isSwitchingRouter ? 0.0 : currentRxRate,
                 ),
                 _buildSpeedIndicator(
                   Icons.arrow_upward,
-                  Colors.blue,
+                  theme.colorScheme.secondary,
                   '',
                   isSwitchingRouter ? 0.0 : currentTxRate,
                 ),
@@ -380,13 +381,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: Colors.green.withValues(alpha: 0.15),
+                                  color: theme.colorScheme.primary.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   'RX: ${_formatSpeed(appState.currentRxRate)}',
-                                  style: const TextStyle(
-                                    color: Colors.green,
+                                  style: TextStyle(
+                                    color: theme.colorScheme.primary,
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -396,13 +397,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: Colors.blue.withValues(alpha: 0.15),
+                                  color: theme.colorScheme.secondary.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   'TX: ${_formatSpeed(appState.currentTxRate)}',
-                                  style: const TextStyle(
-                                    color: Colors.blue,
+                                  style: TextStyle(
+                                    color: theme.colorScheme.secondary,
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -485,12 +486,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 ),
                                 lineBarsData: [
                                   _buildLineChartBarData(rxHistory, [
-                                    Colors.green.shade700,
-                                    Colors.green.shade400,
+                                    theme.colorScheme.primary,
+                                    theme.colorScheme.primary.withValues(alpha: 0.6),
                                   ]),
                                   _buildLineChartBarData(txHistory, [
-                                    Colors.blue.shade700,
-                                    Colors.blue.shade400,
+                                    theme.colorScheme.secondary,
+                                    theme.colorScheme.secondary.withValues(alpha: 0.6),
                                   ]),
                                 ],
                               ),

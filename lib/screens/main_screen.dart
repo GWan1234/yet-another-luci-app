@@ -3,6 +3,7 @@ import 'package:luci_mobile/screens/dashboard_screen.dart';
 import 'package:luci_mobile/screens/clients_screen.dart';
 import 'package:luci_mobile/screens/interfaces_screen.dart';
 import 'package:luci_mobile/screens/more_screen.dart';
+import 'package:luci_mobile/modules/wireless_management/screens/wireless_management_screen.dart';
 import 'package:luci_mobile/main.dart';
 import 'package:luci_mobile/widgets/luci_navigation_enhancements.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,11 +55,12 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
   List<Widget> get _widgetOptions => [
     const DashboardScreen(),
-    const ClientsScreen(),
     InterfacesScreen(
       scrollToInterface: _currentInterfaceToScroll,
       onScrollComplete: _clearInterfaceToScroll,
     ),
+    const ClientsScreen(),
+    const WirelessManagementScreen(),
     const MoreScreen(),
   ];
 
@@ -67,7 +69,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       _selectedIndex = index;
     });
 
-    if (_selectedIndex != 2 && _currentInterfaceToScroll != null) {
+    if (_selectedIndex != 1 && _currentInterfaceToScroll != null) {
       _clearInterfaceToScroll();
     }
   }
@@ -130,14 +132,14 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           _buildNavItem(
-                            index: 2,
+                            index: 1,
                             label: 'Interfaces',
                             icon: Icons.lan_outlined,
                             selectedIcon: Icons.lan,
                             isRebooting: isRebooting,
                           ),
                           _buildNavItem(
-                            index: 1,
+                            index: 2,
                             label: 'Clients',
                             icon: Icons.people_outline,
                             selectedIcon: Icons.people,
@@ -147,17 +149,27 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                       ),
                     ),
                     // Center Clearance Spacer for Elevated Dashboard Badge
-                    const SizedBox(width: 68),
-                    // Right Wing (More)
+                    const SizedBox(width: 64),
+                    // Right Wing (Wireless & More)
                     Expanded(
-                      child: Center(
-                        child: _buildNavItem(
-                          index: 3,
-                          label: 'More',
-                          icon: Icons.more_horiz_outlined,
-                          selectedIcon: Icons.more_horiz,
-                          isRebooting: false,
-                        ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildNavItem(
+                            index: 3,
+                            label: 'Wireless',
+                            icon: Icons.wifi_outlined,
+                            selectedIcon: Icons.wifi,
+                            isRebooting: isRebooting,
+                          ),
+                          _buildNavItem(
+                            index: 4,
+                            label: 'More',
+                            icon: Icons.more_horiz_outlined,
+                            selectedIcon: Icons.more_horiz,
+                            isRebooting: false,
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -183,7 +195,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                           shape: BoxShape.circle,
                           gradient: LinearGradient(
                             colors: _selectedIndex == 0
-                                ? [colorScheme.primary, colorScheme.tertiary]
+                                ? [colorScheme.primary, colorScheme.secondary]
                                 : [
                                     colorScheme.surfaceContainerHigh,
                                     colorScheme.surfaceContainerHighest,
@@ -257,7 +269,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       onTap: isRebooting ? null : () => _onItemTapped(index),
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+        padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,

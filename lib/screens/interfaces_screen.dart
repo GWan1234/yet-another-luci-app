@@ -1024,6 +1024,7 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
       return '${(bytes / pow(1024, i)).toStringAsFixed(2)} ${suffixes[i]}';
     }
 
+    final theme = Theme.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
@@ -1032,14 +1033,14 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
           'Received',
           formatBytes(stats['rx_bytes'] ?? 0),
           Icons.arrow_downward,
-          Colors.green,
+          theme.colorScheme.primary,
         ),
         _buildStatColumn(
           context,
           'Transmitted',
           formatBytes(stats['tx_bytes'] ?? 0),
           Icons.arrow_upward,
-          Colors.blue,
+          theme.colorScheme.secondary,
         ),
       ],
     );

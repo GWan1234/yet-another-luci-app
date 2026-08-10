@@ -44,7 +44,6 @@ android {
     productFlavors {
         create("community") {
             dimension = "default"
-            applicationIdSuffix = ".community"
             resValue("string", "app_name", "LuCI Mobile")
         }
         create("playstore") {

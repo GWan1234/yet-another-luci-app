@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:luci_mobile/state/app_state.dart';
-import 'package:luci_mobile/screens/login_screen.dart';                                 
+import 'package:luci_mobile/screens/login_screen.dart';
 import 'package:luci_mobile/screens/main_screen.dart';
 import 'package:luci_mobile/screens/settings_screen.dart';
 import 'package:luci_mobile/screens/splash_screen.dart';
@@ -28,9 +28,7 @@ void main() async {
       if (kDebugMode) {
         await MobileAds.instance.updateRequestConfiguration(
           RequestConfiguration(
-            testDeviceIds: const [
-              
-            ],
+            testDeviceIds: const [],
           ),
         );
       }
@@ -63,10 +61,10 @@ class LuCIApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appState = ref.watch(appStateProvider);
-    
-    // Custom High-End Cyber Emerald Theme Palette
-    const emeraldPrimary = Color(0xFF10B981);
-    const cyanSecondary = Color(0xFF06B6D4);
+
+    // Official nightcode Brand Accent Palette (Orange #F97316 & Amber #FB923C)
+    const orangePrimary = Color(0xFFF97316);
+    const orangeSecondary = Color(0xFFFB923C);
 
     return MaterialApp(
       title: 'Yet Another LuCI App',
@@ -75,9 +73,9 @@ class LuCIApp extends ConsumerWidget {
         useMaterial3: true,
         brightness: Brightness.light,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: emeraldPrimary,
-          primary: emeraldPrimary,
-          secondary: cyanSecondary,
+          seedColor: orangePrimary,
+          primary: orangePrimary,
+          secondary: orangeSecondary,
           surface: const Color(0xFFFFFFFF),
           surfaceContainer: const Color(0xFFF8FAFC),
           surfaceContainerHighest: const Color(0xFFE2E8F0),
@@ -107,9 +105,9 @@ class LuCIApp extends ConsumerWidget {
         useMaterial3: true,
         brightness: Brightness.dark,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: emeraldPrimary,
-          primary: emeraldPrimary,
-          secondary: cyanSecondary,
+          seedColor: orangePrimary,
+          primary: orangePrimary,
+          secondary: orangeSecondary,
           surface: const Color(0xFF131B2E),
           surfaceContainer: const Color(0xFF1B2640),
           surfaceContainerHighest: const Color(0xFF243356),
