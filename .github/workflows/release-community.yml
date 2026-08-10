@@ -1,6 +1,9 @@
 name: Community Release (GitHub Releases)
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       enable_support_dev:
