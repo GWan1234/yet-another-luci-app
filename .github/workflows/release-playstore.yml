@@ -11,6 +11,14 @@ on:
         options:
           - 'false'
           - 'true'
+      enable_support_dev:
+        description: 'Enable Support the Developer UI in build (true/false)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 permissions:
   contents: write
@@ -82,7 +90,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.COMMUNITY_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.COMMUNITY_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.COMMUNITY_KEY_PASSWORD }}
-        run: flutter build appbundle --release --flavor playstore --dart-define=FLAVOR=playstore --dart-define=ENABLE_ADS=${{ github.event.inputs.enable_ads || 'false' }}
+        run: flutter build appbundle --release --flavor playstore --dart-define=FLAVOR=playstore --dart-define=ENABLE_ADS=${{ github.event.inputs.enable_ads || 'false' }} --dart-define=ENABLE_SUPPORT_DEV=${{ github.event.inputs.enable_support_dev || 'false' }}
 
       - name: Generate Play Store Release Notes
         run: |

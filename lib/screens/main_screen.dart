@@ -104,14 +104,14 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       ),
       bottomNavigationBar: SafeArea(
         child: SizedBox(
-          height: 76,
+          height: 72,
           child: Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.bottomCenter,
             children: [
               // Flat Bottom Bar Container
               Container(
-                height: 64,
+                height: 60,
                 decoration: BoxDecoration(
                   color: colorScheme.surfaceContainer,
                   boxShadow: [
@@ -123,33 +123,42 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                   ],
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    // Interfaces (Index 2)
-                    _buildNavItem(
-                      index: 2,
-                      label: 'Interfaces',
-                      icon: Icons.lan_outlined,
-                      selectedIcon: Icons.lan,
-                      isRebooting: isRebooting,
+                    // Left Wing (Interfaces & Clients)
+                    Expanded(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildNavItem(
+                            index: 2,
+                            label: 'Interfaces',
+                            icon: Icons.lan_outlined,
+                            selectedIcon: Icons.lan,
+                            isRebooting: isRebooting,
+                          ),
+                          _buildNavItem(
+                            index: 1,
+                            label: 'Clients',
+                            icon: Icons.people_outline,
+                            selectedIcon: Icons.people,
+                            isRebooting: isRebooting,
+                          ),
+                        ],
+                      ),
                     ),
-                    // Clients (Index 1)
-                    _buildNavItem(
-                      index: 1,
-                      label: 'Clients',
-                      icon: Icons.people_outline,
-                      selectedIcon: Icons.people,
-                      isRebooting: isRebooting,
-                    ),
-                    // Space for center elevated button
-                    const SizedBox(width: 60),
-                    // More (Index 3)
-                    _buildNavItem(
-                      index: 3,
-                      label: 'More',
-                      icon: Icons.more_horiz_outlined,
-                      selectedIcon: Icons.more_horiz,
-                      isRebooting: false,
+                    // Center Clearance Spacer for Elevated Dashboard Badge
+                    const SizedBox(width: 68),
+                    // Right Wing (More)
+                    Expanded(
+                      child: Center(
+                        child: _buildNavItem(
+                          index: 3,
+                          label: 'More',
+                          icon: Icons.more_horiz_outlined,
+                          selectedIcon: Icons.more_horiz,
+                          isRebooting: false,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -163,12 +172,13 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                     if (isRebooting) return;
                     _onItemTapped(0);
                   },
+                  behavior: HitTestBehavior.opaque,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        width: 54,
-                        height: 54,
+                        width: 52,
+                        height: 52,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           gradient: LinearGradient(
@@ -203,7 +213,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                           color: _selectedIndex == 0
                               ? colorScheme.onPrimary
                               : colorScheme.onSurfaceVariant,
-                          size: 26,
+                          size: 24,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -245,11 +255,12 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
     return InkWell(
       onTap: isRebooting ? null : () => _onItemTapped(index),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               isSelected ? selectedIcon : icon,

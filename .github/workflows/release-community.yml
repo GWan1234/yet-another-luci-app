@@ -2,6 +2,15 @@ name: Community Release (GitHub Releases)
 
 on:
   workflow_dispatch:
+    inputs:
+      enable_support_dev:
+        description: 'Enable Support the Developer UI in build (true/false)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 permissions:
   contents: write
@@ -83,7 +92,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.COMMUNITY_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.COMMUNITY_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.COMMUNITY_KEY_PASSWORD }}
-        run: flutter build apk --release --flavor community --dart-define=FLAVOR=community
+        run: flutter build apk --release --flavor community --dart-define=FLAVOR=community --dart-define=ENABLE_SUPPORT_DEV=${{ github.event.inputs.enable_support_dev || 'false' }}
 
       - name: Generate Community Release Notes
         run: |

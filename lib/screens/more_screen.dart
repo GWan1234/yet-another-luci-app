@@ -365,13 +365,13 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                       );
                     },
                   ),
-                if (!AppConfig.isCommunityFlavor)
+                if (AppConfig.isSupportDevEnabled)
                   _buildMoreTile(
                     context,
                     icon: Icons.favorite,
                     iconColor: Colors.pink.shade400,
                     title: 'Support the Developer',
-                    subtitle: 'Help keep this project alive & ad-free',
+                    subtitle: 'Help keep this project alive',
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(

@@ -34,6 +34,14 @@ class AppConfig {
     defaultValue: false,
   );
 
+  /// Explicit compile-time toggle for voluntary Support the Developer UI.
+  /// Set via `--dart-define=ENABLE_SUPPORT_DEV=true`. Defaults to `false`.
+  /// When false, the Support the Developer tile does not render in any screen.
+  static const bool _enableSupportDevFlag = bool.fromEnvironment(
+    'ENABLE_SUPPORT_DEV',
+    defaultValue: false,
+  );
+
   /// Google Play Billing Licensing RSA public key (Base64-encoded).
   /// Used for purchase verification. Safe to include in binary — public key only.
   static const String playBillingPublicKey =
@@ -50,6 +58,10 @@ class AppConfig {
   /// Requires BOTH playstore flavor AND explicit `ENABLE_ADS=true` dart-define.
   static bool get isAdsEnabled => flavor == AppFlavor.playstore && _enableAdsFlag;
 
+  /// Whether voluntary Support the Developer feature is enabled in UI.
+  /// Defaults to false in all release builds unless explicitly enabled via `ENABLE_SUPPORT_DEV=true`.
+  static bool get isSupportDevEnabled => _enableSupportDevFlag;
+
   /// Whether monetization features (Play Billing, Paywalls, Router Gating) are enabled.
   /// Strictly `false` for community builds to ensure zero billing SDK activity.
   /// Note: Ads are separately gated by [isAdsEnabled].
@@ -61,4 +73,3 @@ class AppConfig {
   /// Human-readable build channel description.
   static String get flavorName => flavor == AppFlavor.playstore ? 'Play Store' : 'Community';
 }
-

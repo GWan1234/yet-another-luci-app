@@ -4,8 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/providers/entitlement_provider.dart';
 
-/// Screen displaying voluntary developer support options with country-specific localization,
-/// minimum threshold ($20 USD / ₹899 INR), custom support amount entry, and purchase restoration.
+/// Screen displaying a single voluntary developer support purchase,
+/// a custom support amount input field, and purchase restoration.
 class PaywallScreen extends ConsumerStatefulWidget {
   const PaywallScreen({super.key});
 
@@ -46,7 +46,6 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     });
 
     FocusScope.of(context).unfocus();
-    ref.read(entitlementProvider.notifier).updateEntitlement(EntitlementTier.lifetime);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -60,11 +59,20 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final entitlement = ref.watch(entitlementProvider);
+    final entitlementState = ref.watch(entitlementProvider);
 
-    final minPriceStr = _isIndia ? '₹899' : '\$20';
-    final generousPriceStr = _isIndia ? '₹1,999' : '\$50';
-    final championPriceStr = _isIndia ? '₹3,999' : '\$100';
+    final minPriceStr = '$_currencySymbol$_minAmount';
+
+    // Check if user has completed a real purchase
+    final isPurchased = entitlementState.tier == EntitlementTier.lifetime;
+
+    // Check if real Play Store ProductDetails was fetched
+    final productDetails = entitlementState.availableProducts.cast<dynamic>().firstWhere(
+          (p) => p.id == PlayBillingProducts.lifetimeUnlimited,
+          orElse: () => null,
+        );
+
+    final displayPrice = productDetails != null ? productDetails.price as String : minPriceStr;
 
     return Scaffold(
       appBar: AppBar(
@@ -141,46 +149,46 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
 
-                  // Main Recommended Support Tier (Minimum Support)
-                  _buildTierCard(
-                    context,
-                    ref,
-                    title: 'Developer Supporter',
-                    price: '$minPriceStr one-time',
-                    productId: PlayBillingProducts.lifetimeUnlimited,
-                    limitDescription: 'Direct support for continuous updates & maintenance (Min. $minPriceStr)',
-                    badgeText: 'MINIMUM SUPPORT',
-                    isCurrent: entitlement.tier == EntitlementTier.lifetime,
-                    isHighlight: true,
-                    tier: EntitlementTier.lifetime,
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Preset Tier Options
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildSmallTipCard(
-                          context,
-                          ref,
-                          title: 'Generous',
-                          price: generousPriceStr,
-                          productId: PlayBillingProducts.plusMonthly,
+                  // Single Purchase Button (No tier names or checklists)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: isPurchased || entitlementState.isLoading
+                          ? null
+                          : () async {
+                              if (productDetails != null) {
+                                await ref.read(entitlementProvider.notifier).buyProduct(productDetails);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Thank you for supporting with $displayPrice! ❤️'),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: colorScheme.primary,
+                        foregroundColor: colorScheme.onPrimary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildSmallTipCard(
-                          context,
-                          ref,
-                          title: 'Champion',
-                          price: championPriceStr,
-                          productId: PlayBillingProducts.proMonthly,
+                      child: Text(
+                        isPurchased
+                            ? 'Active Supporter'
+                            : entitlementState.isLoading
+                                ? 'Processing...'
+                                : 'Support with $displayPrice',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ],
+                    ),
                   ),
                   const SizedBox(height: 24),
 
@@ -206,7 +214,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Want to give more? Enter a custom support amount (Minimum $_currencySymbol$_minAmount).',
+                            'Want to give a different amount? Enter a custom support amount below (Minimum $_currencySymbol$_minAmount).',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -234,8 +242,8 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                                 onPressed: _submitCustomSupport,
                                 style: ElevatedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                                  backgroundColor: colorScheme.primary,
-                                  foregroundColor: colorScheme.onPrimary,
+                                  backgroundColor: colorScheme.secondaryContainer,
+                                  foregroundColor: colorScheme.onSecondaryContainer,
                                 ),
                                 child: const Text('Support'),
                               ),
@@ -251,7 +259,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                   // Restore Purchases Action
                   Center(
                     child: TextButton.icon(
-                      onPressed: entitlement.isLoading
+                      onPressed: entitlementState.isLoading
                           ? null
                           : () async {
                               await ref.read(entitlementProvider.notifier).restorePurchases();
@@ -273,203 +281,6 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTierCard(
-    BuildContext context,
-    WidgetRef ref, {
-    required String title,
-    required String price,
-    required String productId,
-    required String limitDescription,
-    required String badgeText,
-    required EntitlementTier tier,
-    bool isCurrent = false,
-    bool isHighlight = false,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final entitlementState = ref.watch(entitlementProvider);
-
-    final productDetails = entitlementState.availableProducts.cast<dynamic>().firstWhere(
-          (p) => p.id == productId,
-          orElse: () => null,
-        );
-
-    final displayPrice = productDetails != null ? productDetails.price as String : price;
-
-    return Card(
-      elevation: isHighlight ? 4 : 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16.0),
-        side: BorderSide(
-          color: isHighlight
-              ? colorScheme.primary
-              : isCurrent
-                  ? colorScheme.outline
-                  : colorScheme.outlineVariant.withValues(alpha: 0.3),
-          width: isHighlight || isCurrent ? 2 : 1,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isHighlight
-                        ? colorScheme.primaryContainer
-                        : colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    badgeText,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: isHighlight
-                          ? colorScheme.onPrimaryContainer
-                          : colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              displayPrice,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.primary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.check_circle_outline, size: 16, color: colorScheme.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    limitDescription,
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(Icons.block_flipped, size: 16, color: colorScheme.primary),
-                const SizedBox(width: 8),
-                const Text(
-                  '100% Ad-Free Interface',
-                  style: TextStyle(fontSize: 12),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: isCurrent
-                    ? null
-                    : () async {
-                        if (productDetails != null) {
-                          await ref.read(entitlementProvider.notifier).buyProduct(productDetails);
-                        } else {
-                          await ref.read(entitlementProvider.notifier).updateEntitlement(tier);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Thank you for supporting Yet Another LuCI App! ($displayPrice)'),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        }
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isHighlight ? colorScheme.primary : null,
-                  foregroundColor: isHighlight ? colorScheme.onPrimary : null,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: Text(
-                  isCurrent
-                      ? 'Active Supporter'
-                      : entitlementState.isLoading
-                          ? 'Processing...'
-                          : 'Support ($displayPrice)',
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSmallTipCard(
-    BuildContext context,
-    WidgetRef ref, {
-    required String title,
-    required String price,
-    required String productId,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final entitlementState = ref.watch(entitlementProvider);
-
-    final productDetails = entitlementState.availableProducts.cast<dynamic>().firstWhere(
-          (p) => p.id == productId,
-          orElse: () => null,
-        );
-
-    final displayPrice = productDetails != null ? productDetails.price as String : price;
-
-    return OutlinedButton(
-      onPressed: entitlementState.isLoading
-          ? null
-          : () async {
-              if (productDetails != null) {
-                await ref.read(entitlementProvider.notifier).buyProduct(productDetails);
-              } else {
-                await ref.read(entitlementProvider.notifier).updateEntitlement(EntitlementTier.lifetime);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Thank you for supporting with $title ($displayPrice)! ❤️'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              }
-            },
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-      child: Text(
-        '$title ($displayPrice)',
-        style: theme.textTheme.labelMedium?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: colorScheme.primary,
         ),
       ),
     );

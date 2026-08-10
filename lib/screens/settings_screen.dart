@@ -198,7 +198,7 @@ class SettingsScreen extends ConsumerWidget {
                       },
                     ),
                   ),
-                  if (AppConfig.isMonetizationEnabled) ...[
+                  if (AppConfig.isMonetizationEnabled && AppConfig.isSupportDevEnabled) ...[
                     const Divider(height: 32),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
