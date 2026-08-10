@@ -1,0 +1,757 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:luci_mobile/models/client.dart';
+import 'package:luci_mobile/main.dart';
+import 'package:luci_mobile/widgets/luci_app_bar.dart';
+
+import 'package:luci_mobile/design/luci_design_system.dart';
+import 'package:luci_mobile/widgets/luci_loading_states.dart';
+import 'package:luci_mobile/widgets/luci_refresh_components.dart';
+
+class ClientsScreen extends ConsumerStatefulWidget {
+  const ClientsScreen({super.key});
+
+  @override
+  ConsumerState<ClientsScreen> createState() => _ClientsScreenState();
+}
+
+class _ClientsScreenState extends ConsumerState<ClientsScreen>
+    with SingleTickerProviderStateMixin {
+  String _searchQuery = '';
+  final Set<String> _expandedClientMacs = {};
+  late AnimationController _controller;
+  late TextEditingController _searchController;
+  Timer? _searchDebounceTimer;
+  bool _aggregateAllRouters = true;
+  Future<List<Client>>? _clientsFuture;
+  String? _lastSelectedRouterId;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _searchController = TextEditingController();
+    _searchController.addListener(_onSearchChanged);
+    // Initialize toggle from persisted state
+    final initState = ref.read(appStateProvider);
+    _aggregateAllRouters = initState.clientsAggregateAllRouters;
+    _lastSelectedRouterId = initState.selectedRouter?.id;
+    _computeClientsFuture();
+  }
+
+  void _onSearchChanged() {
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 200), () {
+      if (mounted && _searchQuery != _searchController.text) {
+        setState(() {
+          _searchQuery = _searchController.text;
+        });
+      }
+    });
+  }
+
+  void _computeClientsFuture() {
+    final appState = ref.read(appStateProvider);
+    _clientsFuture = _aggregateAllRouters
+        ? appState.fetchAggregatedClients()
+        : appState.fetchClientsForSelectedRouter();
+  }
+
+  @override
+  void dispose() {
+    _searchDebounceTimer?.cancel();
+    _controller.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final watchedAppState = ref.watch(appStateProvider);
+    // Recompute future only when selected router changes
+    Future<List<Client>>? future = _clientsFuture;
+    final currentId = watchedAppState.selectedRouter?.id;
+    if (currentId != _lastSelectedRouterId) {
+      _lastSelectedRouterId = currentId;
+      _computeClientsFuture();
+      future = _clientsFuture;
+    }
+    return FutureBuilder<List<Client>>(
+      future: future,
+      builder: (context, snapshot) {
+        final aggregatedClients = snapshot.data ?? [];
+        return Scaffold(
+          appBar: const LuciAppBar(title: 'Clients'),
+          body: Stack(
+            children: [
+              LuciPullToRefresh(
+                onRefresh: () async {
+                  // Trigger a refresh by re-fetching dashboard data for selected router
+                  await ref.read(appStateProvider).fetchDashboardData();
+                  setState(() { _computeClientsFuture(); });
+                },
+                child: Builder(
+                  builder: (context) {
+                    final appState = ref.watch(appStateProvider);
+                    final isLoading = snapshot.connectionState == ConnectionState.waiting && (aggregatedClients.isEmpty);
+                    final dashboardError = appState.dashboardError;
+
+                    if (isLoading) {
+                      return Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: LuciSpacing.md,
+                        ),
+                        child: Column(
+                          children: [
+                            SizedBox(height: LuciSpacing.md),
+                            // Search bar skeleton
+                            LuciSkeleton(
+                              width: double.infinity,
+                              height: 56,
+                              borderRadius: BorderRadius.circular(
+                                LuciSpacing.sm,
+                              ),
+                            ),
+                            SizedBox(height: LuciSpacing.md),
+                            // Client list skeletons
+                            Expanded(
+                              child: ListView.separated(
+                                itemCount: 6,
+                                separatorBuilder: (context, index) =>
+                                    SizedBox(height: LuciSpacing.sm),
+                                itemBuilder: (context, index) =>
+                                    LuciListItemSkeleton(
+                                      showLeading: true,
+                                      showTrailing: true,
+                                    ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    if (dashboardError != null && aggregatedClients.isEmpty) {
+                      return LuciErrorDisplay(
+                        title: 'Failed to Load Clients',
+                        message:
+                            'Could not connect to the router. Please check your network connection and the router\'s IP address.',
+                        actionLabel: 'Retry',
+                        onAction: () =>
+                            ref.read(appStateProvider).fetchDashboardData(),
+                        icon: Icons.wifi_off_rounded,
+                      );
+                    }
+
+                    final clients = aggregatedClients;
+                    final filteredClients = clients.where((client) {
+                      final query = _searchQuery.toLowerCase();
+                      return client.displayName.toLowerCase().contains(query) ||
+                          client.hostname.toLowerCase().contains(query) ||
+                          client.ipAddress.toLowerCase().contains(query) ||
+                          client.macAddress.toLowerCase().contains(query) ||
+                          (client.vendor != null &&
+                              client.vendor!.toLowerCase().contains(query)) ||
+                          (client.dnsName != null &&
+                              client.dnsName!.toLowerCase().contains(query)) ||
+                          (client.ssid != null &&
+                              client.ssid!.toLowerCase().contains(query));
+                    }).toList();
+
+                    return Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                            vertical: 8.0,
+                          ),
+                          child: TextField(
+                            autofocus: false,
+                            onChanged: (value) {
+                              // No need to setState here, listener handles it
+                            },
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: 'Search by name, IP, MAC, vendor...',
+                              prefixIcon: const Icon(Icons.search),
+                              suffixIcon: _searchQuery.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear),
+                                      onPressed: () {
+                                        setState(() {
+                                          _searchController.clear();
+                                        });
+                                      },
+                                      tooltip: 'Clear search',
+                                    )
+                                  : null,
+                              filled: true,
+                              fillColor: colorScheme.surfaceContainerHighest
+                                  .withValues(alpha: 0.8),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(24.0),
+                                borderSide: BorderSide.none,
+                              ),
+                              hintStyle: TextStyle(
+                                color: colorScheme.onSurfaceVariant.withValues(
+                                  alpha: 0.7,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: filteredClients.isEmpty
+                              ? LuciEmptyState(
+                                  title: _searchQuery.isEmpty
+                                      ? 'No Active Clients Found'
+                                      : 'No Matching Clients',
+                                  message: _searchQuery.isEmpty
+                                      ? 'No clients are currently connected to the router. Pull down to refresh the list.'
+                                      : 'No clients match your search criteria. Try a different search term.',
+                                  icon: Icons.people_outline,
+                                )
+                              : ListView.separated(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  separatorBuilder: (context, idx) =>
+                                      const SizedBox(height: 4),
+                                  itemCount: filteredClients.length,
+                                  itemBuilder: (context, index) {
+                                    final client = filteredClients[index];
+                                    final isExpanded = _expandedClientMacs
+                                        .contains(client.macAddress);
+
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16.0,
+                                        vertical: 8.0,
+                                      ),
+                                      child: _UnifiedClientCard(
+                                        client: client,
+                                        isExpanded: isExpanded,
+                                        onTap: () {
+                                          setState(() {
+                                            if (isExpanded) {
+                                              _expandedClientMacs.remove(
+                                                client.macAddress,
+                                              );
+                                            } else {
+                                              _expandedClientMacs.add(
+                                                client.macAddress,
+                                              );
+                                            }
+                                          });
+                                        },
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String normalizeMac(String mac) => mac.toUpperCase().replaceAll('-', ':');
+}
+
+class _UnifiedClientCard extends StatefulWidget {
+  final Client client;
+  final bool isExpanded;
+  final VoidCallback onTap;
+
+  const _UnifiedClientCard({
+    required this.client,
+    required this.isExpanded,
+    required this.onTap,
+  });
+
+  @override
+  State<_UnifiedClientCard> createState() => _UnifiedClientCardState();
+}
+
+class _UnifiedClientCardState extends State<_UnifiedClientCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+    if (widget.isExpanded) {
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(_UnifiedClientCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isExpanded != oldWidget.isExpanded) {
+      if (widget.isExpanded) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
+    }
+  }
+
+  // --- Three-state neighbor reachability helpers ---
+
+  /// Opacity for the entire card based on neighbor reachability state.
+  double _clientOpacity(Client client) {
+    if (!client.isConnected) return 0.55;
+    switch (client.neighState) {
+      case NeighborReachability.reachable:
+        return 1.0;
+      case NeighborReachability.stale:
+        return 0.75;
+      case NeighborReachability.failed:
+        return 0.55;
+      case NeighborReachability.unknown:
+        // /proc/net/arp fallback: use legacy binary behavior
+        return client.isConnected ? 1.0 : 0.55;
+    }
+  }
+
+  /// Status dot color: green (reachable), amber (stale/idle), grey (offline).
+  Color _statusDotColor(Client client) {
+    if (!client.isConnected) return Colors.grey.shade400;
+    switch (client.neighState) {
+      case NeighborReachability.reachable:
+        return Colors.green;
+      case NeighborReachability.stale:
+        return Colors.amber.shade600;
+      case NeighborReachability.failed:
+        return Colors.grey.shade400;
+      case NeighborReachability.unknown:
+        return client.isConnected ? Colors.green : Colors.grey.shade400;
+    }
+  }
+
+  /// Tooltip describing the connectivity state in plain language.
+  String _statusTooltip(Client client) {
+    if (!client.isConnected) return 'Client is offline (Lease active)';
+    switch (client.neighState) {
+      case NeighborReachability.reachable:
+        return 'Client is online';
+      case NeighborReachability.stale:
+        return 'Client is idle (no recent traffic)';
+      case NeighborReachability.failed:
+        return 'Client is offline (Lease active)';
+      case NeighborReachability.unknown:
+        return client.isConnected ? 'Client is online' : 'Client is offline (Lease active)';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Opacity(
+      opacity: _clientOpacity(widget.client),
+      child: Card(
+        elevation: widget.isExpanded ? 6 : 2,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18.0),
+          side: BorderSide(
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.10),
+            width: 1,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: AnimatedScale(
+          scale: widget.isExpanded ? 1.02 : 1.0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutBack,
+          child: Column(
+            children: [
+              InkWell(
+                onTap: widget.onTap,
+                borderRadius: BorderRadius.circular(18.0),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 8.0,
+                  ),
+                  child: Row(
+                    children: [
+                      Stack(
+                        alignment: Alignment.topRight,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8.0),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primaryContainer.withValues(
+                                alpha: widget.client.isConnected ? 0.13 : 0.05,
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                            child: AnimatedScale(
+                              scale: widget.isExpanded ? 1.1 : 1.0,
+                              duration: const Duration(milliseconds: 500),
+                              curve: Curves.elasticOut,
+                              child: Icon(
+                                Icons.person_outline,
+                                color: widget.client.isConnected
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurfaceVariant,
+                                size: 22,
+                                semanticLabel: 'Client icon',
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: Tooltip(
+                              message: _statusTooltip(widget.client),
+                              child: Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: _statusDotColor(widget.client),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: colorScheme.surface,
+                                    width: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.client.displayName,
+                              style: LuciTextStyles.cardTitle(context),
+                              semanticsLabel:
+                                  'Client name: ${widget.client.displayName}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: LuciSpacing.xs),
+                            Container(
+                              margin: const EdgeInsets.only(right: 32),
+                              child: Divider(
+                                color: colorScheme.surfaceContainerHighest
+                                    .withValues(alpha: 0.10),
+                                thickness: 1,
+                                height: 8,
+                              ),
+                            ),
+                            Text(
+                              _buildMinimalClientSubtitle(widget.client),
+                              style: LuciTextStyles.cardSubtitle(context),
+                              semanticsLabel:
+                                  'Client details: ${_buildMinimalClientSubtitle(widget.client)}',
+                            ),
+                            if (widget.client.vendor != null &&
+                                widget.client.vendor!.isNotEmpty)
+                              Text(
+                                widget.client.vendor!,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurface.withValues(
+                                    alpha: 0.7,
+                                  ),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                semanticsLabel: 'Vendor: ${widget.client.vendor}',
+                              ),
+                          ],
+                        ),
+                      ),
+                      _buildConnectionTypeChip(
+                        context,
+                        widget.client,
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        widget.isExpanded ? Icons.expand_less : Icons.expand_more,
+                        color: colorScheme.onSurfaceVariant,
+                        size: 26,
+                        semanticLabel: widget.isExpanded
+                            ? 'Collapse details'
+                            : 'Expand details',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (widget.isExpanded)
+                Column(
+                  children: [
+                    const Divider(height: 1, indent: 16, endIndent: 16),
+                    _buildClientDetails(context, widget.client),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConnectionTypeChip(BuildContext context, Client client) {
+    if (!client.isConnected || client.connectionType != ConnectionType.wireless) {
+      return const SizedBox.shrink();
+    }
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final bgColor = colorScheme.primaryContainer;
+    final fgColor = colorScheme.onPrimaryContainer;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Chip(
+          label: const Text('Wi-Fi'),
+          avatar: Icon(Icons.wifi, size: 16, color: fgColor),
+          backgroundColor: bgColor,
+          labelStyle: theme.textTheme.labelSmall?.copyWith(color: fgColor),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        if (client.ssid != null && client.ssid!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: Colors.blue.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'SSID: ${client.ssid}',
+                style: const TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Classifies an IPv6 address into a human-readable type label.
+  static String _classifyIPv6(String ipv6) {
+    final lower = ipv6.toLowerCase().split('/').first.split('%').first;
+    if (lower.startsWith('fe80')) return 'Link-Local IPv6';
+    if (lower.startsWith('fd') || lower.startsWith('fc')) return 'Private IPv6 (ULA)';
+    return 'Public IPv6';
+  }
+
+  /// Sort priority for IPv6 types: public first, private second, link-local last.
+  static int _ipv6SortPriority(String label) {
+    if (label.startsWith('Public')) return 0;
+    if (label.startsWith('Private')) return 1;
+    return 2;
+  }
+
+  Widget _buildClientDetails(BuildContext context, Client client) {
+    final theme = Theme.of(context);
+
+    Widget detailRow(
+      String title,
+      String value, {
+      Color? valueColor,
+      VoidCallback? onTap,
+      String? semanticsLabel,
+    }) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: LuciSpacing.md,
+            vertical: LuciSpacing.sm,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: LuciTextStyles.detailLabel(context),
+                semanticsLabel: title,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Flexible(
+                      child: SelectableText(
+                        value,
+                        style: valueColor != null
+                            ? LuciTextStyles.detailValue(
+                                context,
+                              ).copyWith(color: valueColor)
+                            : LuciTextStyles.detailValue(context),
+                        textAlign: TextAlign.end,
+                      ),
+                    ),
+                    if (onTap != null)
+                      GestureDetector(
+                        onTap: onTap,
+                        child: const Padding(
+                          padding: EdgeInsets.only(left: 8.0),
+                          child: Icon(
+                            Icons.copy_all_outlined,
+                            size: 16,
+                            semanticLabel: 'Copy',
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Build classified IPv6 rows, sorted: public → private → link-local
+    List<Widget> ipv6Rows = [];
+    if (client.ipv6Addresses != null && client.ipv6Addresses!.isNotEmpty) {
+      final classified = client.ipv6Addresses!.map((ipv6) {
+        final label = _classifyIPv6(ipv6);
+        return (label: label, address: ipv6);
+      }).toList();
+      classified.sort((a, b) => _ipv6SortPriority(a.label).compareTo(_ipv6SortPriority(b.label)));
+      ipv6Rows = classified.map(
+        (entry) => detailRow(
+          entry.label,
+          entry.address,
+          onTap: () => _copyToClipboard(context, entry.address, entry.label),
+          semanticsLabel: '${entry.label}: ${entry.address}',
+        ),
+      ).toList();
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.18,
+        ),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
+      ),
+      child: Column(
+        children: [
+          detailRow(
+            'IP Address',
+            client.ipAddress,
+            onTap: () =>
+                _copyToClipboard(context, client.ipAddress, 'IP Address'),
+            semanticsLabel: 'IP Address: ${client.ipAddress}',
+          ),
+          ...ipv6Rows,
+          detailRow(
+            'MAC Address',
+            client.macAddress,
+            onTap: () =>
+                _copyToClipboard(context, client.macAddress, 'MAC Address'),
+            semanticsLabel: 'MAC Address: ${client.macAddress}',
+          ),
+          if (client.vendor != null && client.vendor!.isNotEmpty)
+            detailRow(
+              'Vendor',
+              client.vendor!,
+              semanticsLabel: 'Vendor: ${client.vendor}',
+            ),
+          if (client.ssid != null && client.ssid!.isNotEmpty)
+            detailRow(
+              'Connected Wireless SSID',
+              client.ssid!,
+              semanticsLabel: 'SSID: ${client.ssid}',
+            ),
+          if (client.dnsName != null && client.dnsName!.isNotEmpty)
+            detailRow(
+              'DNS Name',
+              client.dnsName!,
+              onTap: () =>
+                  _copyToClipboard(context, client.dnsName!, 'DNS Name'),
+              semanticsLabel: 'DNS Name: ${client.dnsName}',
+            ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          const SizedBox(height: 8),
+          detailRow(
+            'Lease Time Remaining',
+            client.formattedLeaseTime,
+            valueColor: client.formattedLeaseTime == 'Expired'
+                ? theme.colorScheme.error
+                : null,
+            semanticsLabel:
+                'Lease Time Remaining: ${client.formattedLeaseTime}',
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  String _buildMinimalClientSubtitle(Client client) {
+    final v4 = client.ipAddress;
+    final v6s = client.ipv6Addresses ?? [];
+    final v6 = v6s.isNotEmpty ? v6s.first : null;
+    String? shown;
+    int extra = 0;
+    if (v4 != 'N/A') {
+      shown = v4;
+      if (v6 != null) extra++;
+    } else if (v6 != null) {
+      shown = v6;
+    }
+    if (shown == null) return '';
+    if (extra > 0) {
+      return '$shown  +$extra';
+    } else {
+      return shown;
+    }
+  }
+
+  void _copyToClipboard(BuildContext context, String text, String label) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$label copied to clipboard'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+}

@@ -1,5 +1,24 @@
 enum ConnectionType { wired, wireless, unknown }
 
+/// Neighbor Unreachability Detection (NUD) state from the kernel's neighbor table.
+/// Used for three-state wired client active status instead of binary on/off.
+enum NeighborReachability {
+  /// Confirmed active — kernel has verified reachability within reachable_time (~30s).
+  /// Also covers DELAY and PROBE states (kernel is in the process of confirming).
+  reachable,
+
+  /// Probably active but idle — device was reachable but hasn't communicated recently.
+  /// Entry persists until gc_stale_time, typically 60s.
+  stale,
+
+  /// Disconnected — ARP probe failed or entry absent from neighbor table entirely.
+  failed,
+
+  /// Unknown — fallback when `ip neigh` is unavailable and we're using /proc/net/arp
+  /// which can't distinguish REACHABLE from STALE.
+  unknown,
+}
+
 class Client {
   final String ipAddress;
   final String macAddress;
@@ -15,6 +34,7 @@ class Client {
   final List<String>? ipv6Addresses;
   final String? ssid;
   final bool isConnected;
+  final NeighborReachability neighState;
   final String? staticLeaseName;
 
   Client({
@@ -32,6 +52,7 @@ class Client {
     this.ipv6Addresses,
     this.ssid,
     this.isConnected = true,
+    this.neighState = NeighborReachability.unknown,
     this.staticLeaseName,
   });
 
@@ -152,6 +173,7 @@ class Client {
       macAddress: macAddress,
       hostname: 'Unknown',
       connectionType: ConnectionType.wireless,
+      neighState: NeighborReachability.reachable, // Wireless stations are confirmed live by association
       ssid: ssid,
     );
   }
@@ -250,6 +272,7 @@ class Client {
     List<String>? ipv6Addresses,
     String? ssid,
     bool? isConnected,
+    NeighborReachability? neighState,
     String? staticLeaseName,
   }) {
     return Client(
@@ -267,6 +290,7 @@ class Client {
       ipv6Addresses: ipv6Addresses ?? this.ipv6Addresses,
       ssid: ssid ?? this.ssid,
       isConnected: isConnected ?? this.isConnected,
+      neighState: neighState ?? this.neighState,
       staticLeaseName: staticLeaseName ?? this.staticLeaseName,
     );
   }

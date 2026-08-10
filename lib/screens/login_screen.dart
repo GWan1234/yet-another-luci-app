@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,11 +25,85 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   final _usernameController = TextEditingController(text: 'root');
   final _passwordController = TextEditingController();
   final _confirmationController = TextEditingController();
+
+  final _ipFocusNode = FocusNode();
+  final _usernameFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
+
   bool _isCheckingAutoLogin = true;
   bool _passwordVisible = false;
+  bool _detectingGatewayIp = false;
   late AnimationController _logoAnimController;
   late AnimationController _progressAnimController;
   bool _isActivatingReviewerMode = false;
+
+  Future<void> _detectGatewayIp() async {
+    if (_detectingGatewayIp) return;
+    setState(() {
+      _detectingGatewayIp = true;
+    });
+
+    try {
+      final interfaces = await NetworkInterface.list(
+        type: InternetAddressType.IPv4,
+        includeLinkLocal: false,
+      );
+
+      NetworkInterface? targetInterface;
+
+      // 1. First priority: Wi-Fi or Ethernet interfaces (e.g. wlan0, wifi0, eth0, en0, wlx)
+      for (final interface in interfaces) {
+        final name = interface.name.toLowerCase();
+        if (name.contains('wlan') ||
+            name.contains('wifi') ||
+            name.contains('wl') ||
+            name.contains('en') ||
+            name.contains('eth')) {
+          targetInterface = interface;
+          break;
+        }
+      }
+
+      // 2. Second priority: Fallback to any active non-loopback interface (excluding virtual tun/tap/docker/rmnet)
+      if (targetInterface == null) {
+        for (final interface in interfaces) {
+          final name = interface.name.toLowerCase();
+          final isVirtual = name.startsWith('rmnet') ||
+              name.startsWith('tun') ||
+              name.startsWith('tap') ||
+              name.startsWith('docker') ||
+              name.startsWith('veth') ||
+              name.startsWith('dummy');
+          if (!isVirtual && interface.addresses.any((a) => !a.isLoopback)) {
+            targetInterface = interface;
+            break;
+          }
+        }
+      }
+
+      if (targetInterface != null) {
+        for (final addr in targetInterface.addresses) {
+          if (!addr.isLoopback && addr.type == InternetAddressType.IPv4) {
+            final parts = addr.address.split('.');
+            if (parts.length == 4) {
+              // Dynamically derive subnet gateway (e.g. 10.0.0.45 -> 10.0.0.1, 172.16.2.14 -> 172.16.2.1)
+              final gateway = '${parts[0]}.${parts[1]}.${parts[2]}.1';
+              _ipController.text = gateway;
+              break;
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // Fail silently without clearing or locking inputs
+    } finally {
+      if (mounted) {
+        setState(() {
+          _detectingGatewayIp = false;
+        });
+      }
+    }
+  }
   @override
   void initState() {
     super.initState();
@@ -151,6 +226,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     _usernameController.dispose();
     _passwordController.dispose();
     _confirmationController.dispose();
+    _ipFocusNode.dispose();
+    _usernameFocusNode.dispose();
+    _passwordFocusNode.dispose();
     _logoAnimController.dispose();
     _progressAnimController.dispose();
     super.dispose();
@@ -409,12 +487,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 ),
                                 child: Form(
                                   key: _formKey,
-                                  child: Builder(
-                                    builder: (context) {
-                                      final appState = ref.watch(
-                                        appStateProvider,
-                                      );
-                                      return Column(
+                                  child: Column(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.stretch,
                                         mainAxisSize: MainAxisSize.min,
@@ -423,20 +496,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                             message:
                                                 'Enter the IP address, hostname, or full URL of your router',
                                             child: TextFormField(
+                                              key: const ValueKey('login_ip_field'),
                                               controller: _ipController,
-                                              autofocus: true,
+                                              focusNode: _ipFocusNode,
                                               autofillHints: const [
                                                 AutofillHints.url,
                                                 AutofillHints.username,
                                               ],
-                                              decoration: const InputDecoration(
+                                              decoration: InputDecoration(
                                                 labelText: 'Router Address',
-                                                border: OutlineInputBorder(),
-                                                prefixIcon: Icon(
+                                                border: const OutlineInputBorder(),
+                                                prefixIcon: const Icon(
                                                   Icons.router_outlined,
                                                 ),
+                                                suffixIcon: IconButton(
+                                                  icon: _detectingGatewayIp
+                                                      ? const SizedBox(
+                                                          width: 18,
+                                                          height: 18,
+                                                          child: CircularProgressIndicator(
+                                                            strokeWidth: 2,
+                                                          ),
+                                                        )
+                                                      : const Icon(
+                                                          Icons.my_location_rounded,
+                                                        ),
+                                                  tooltip:
+                                                      'Auto-detect Wi-Fi Gateway IP',
+                                                  onPressed: _detectGatewayIp,
+                                                ),
                                                 helperText:
-                                                    'e.g. 192.168.1.1, router.local:8080, https://192.168.1.1',
+                                                    'e.g. 192.168.1.1, router.local:8080',
                                               ),
                                               textInputAction:
                                                   TextInputAction.next,
@@ -461,7 +551,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                             message:
                                                 'Enter your router username',
                                             child: TextFormField(
+                                              key: const ValueKey('login_user_field'),
                                               controller: _usernameController,
+                                              focusNode: _usernameFocusNode,
                                               autofillHints: const [
                                                 AutofillHints.username,
                                               ],
@@ -490,7 +582,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                             message:
                                                 'Enter your router password',
                                             child: TextFormField(
+                                              key: const ValueKey('login_pass_field'),
                                               controller: _passwordController,
+                                              focusNode: _passwordFocusNode,
                                               obscureText: !_passwordVisible,
                                               autofillHints: const [
                                                 AutofillHints.password,
@@ -525,7 +619,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                                   TextInputAction.done,
                                             ),
                                           ),
-                                          AnimatedSwitcher(
+                                          Consumer(
+                                            builder: (context, ref, child) {
+                                              final appState = ref.watch(appStateProvider);
+                                              return AnimatedSwitcher(
                                             duration: const Duration(
                                               milliseconds: 300,
                                             ),
@@ -581,9 +678,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                                     ),
                                                   )
                                                 : const SizedBox.shrink(),
-                                          ),
+                                          );
+                                        },
+                                      ),
                                           const SizedBox(height: 16),
-                                          TweenAnimationBuilder<double>(
+                                          Consumer(
+                                            builder: (context, ref, child) {
+                                              final appState = ref.watch(appStateProvider);
+                                              return TweenAnimationBuilder<double>(
                                             duration: const Duration(
                                               milliseconds: 100,
                                             ),
@@ -649,7 +751,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                                       ),
                                               ),
                                             ),
-                                          ),
+                                          );
+                                        },
+                                      ),
                                           const SizedBox(height: 16),
                                           Container(
                                             padding: const EdgeInsets.all(12),
@@ -697,9 +801,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                             ),
                                           ),
                                         ],
-                                      );
-                                    },
-                                  ),
+                                      ),
                                 ),
                               ),
                             ),

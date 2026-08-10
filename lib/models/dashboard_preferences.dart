@@ -3,12 +3,14 @@ class DashboardPreferences {
   final Set<String> enabledWiredInterfaces;
   final String? primaryThroughputInterface;
   final bool showAllThroughput;
+  final bool maskPublicIp;
 
   DashboardPreferences({
     Set<String>? enabledWirelessInterfaces,
     Set<String>? enabledWiredInterfaces,
     this.primaryThroughputInterface,
     this.showAllThroughput = true,
+    this.maskPublicIp = false,
   }) : enabledWirelessInterfaces = enabledWirelessInterfaces ?? {},
        enabledWiredInterfaces = enabledWiredInterfaces ?? {};
 
@@ -17,6 +19,7 @@ class DashboardPreferences {
     Set<String>? enabledWiredInterfaces,
     String? primaryThroughputInterface,
     bool? showAllThroughput,
+    bool? maskPublicIp,
   }) {
     return DashboardPreferences(
       enabledWirelessInterfaces:
@@ -26,6 +29,7 @@ class DashboardPreferences {
       primaryThroughputInterface:
           primaryThroughputInterface ?? this.primaryThroughputInterface,
       showAllThroughput: showAllThroughput ?? this.showAllThroughput,
+      maskPublicIp: maskPublicIp ?? this.maskPublicIp,
     );
   }
 
@@ -34,6 +38,7 @@ class DashboardPreferences {
     'enabledWiredInterfaces': enabledWiredInterfaces.toList(),
     'primaryThroughputInterface': primaryThroughputInterface,
     'showAllThroughput': showAllThroughput,
+    'maskPublicIp': maskPublicIp,
   };
 
   factory DashboardPreferences.fromJson(Map<String, dynamic> json) {
@@ -46,6 +51,7 @@ class DashboardPreferences {
       ),
       primaryThroughputInterface: json['primaryThroughputInterface'],
       showAllThroughput: json['showAllThroughput'] ?? true,
+      maskPublicIp: json['maskPublicIp'] ?? false,
     );
   }
 

@@ -209,9 +209,47 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildTitleWithTimestamp(String title, AppState appState) {
-    return Column(
+    Color statusColor;
+    String tooltipMsg;
+
+    switch (appState.connectionStatus) {
+      case RouterConnectionStatus.connected:
+        statusColor = Colors.greenAccent.shade700;
+        tooltipMsg = 'Router Connected';
+        break;
+      case RouterConnectionStatus.reconnecting:
+        statusColor = Colors.amber.shade700;
+        tooltipMsg = 'Reconnecting to Router...';
+        break;
+      case RouterConnectionStatus.disconnected:
+        statusColor = Theme.of(context).colorScheme.error;
+        tooltipMsg = 'Router Disconnected';
+        break;
+    }
+
+    return Row(
       mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        Tooltip(
+          message: tooltipMsg,
+          child: Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: statusColor,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: statusColor.withValues(alpha: 0.5),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
         Text(
           title,
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -733,22 +771,98 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
+  bool _isPublicIp(String ipText) {
+    if (ipText.isEmpty || ipText == 'No IPv4' || ipText == 'No IPv6' || ipText == 'N/A') {
+      return false;
+    }
+    final raw = ipText.split('/')[0].trim();
+
+    if (raw.contains('.')) {
+      final parts = raw.split('.');
+      if (parts.length != 4) return false;
+      final octet1 = int.tryParse(parts[0]);
+      final octet2 = int.tryParse(parts[1]);
+      if (octet1 == null || octet2 == null) return false;
+
+      // Private IPv4 ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, loopback, link-local)
+      if (octet1 == 10) return false;
+      if (octet1 == 172 && octet2 >= 16 && octet2 <= 31) return false;
+      if (octet1 == 192 && octet2 == 168) return false;
+      if (octet1 == 127) return false;
+      if (octet1 == 169 && octet2 == 254) return false;
+
+      return true;
+    } else if (raw.contains(':')) {
+      final lower = raw.toLowerCase();
+      if (lower == '::1') return false; // Loopback
+      if (lower.startsWith('fe80:') ||
+          lower.startsWith('fe8') ||
+          lower.startsWith('fe9') ||
+          lower.startsWith('fea') ||
+          lower.startsWith('feb')) {
+        return false; // Link-local
+      }
+      if (lower.startsWith('fc') || lower.startsWith('fd')) {
+        return false; // Private ULA
+      }
+
+      return true;
+    }
+    return false;
+  }
+
+  String _maskIpString(String ipText) {
+    if (ipText == 'No IPv4' || ipText == 'No IPv6' || ipText == 'N/A' || ipText.isEmpty) {
+      return ipText;
+    }
+    final parts = ipText.split('/');
+    final rawIp = parts[0].trim();
+    final prefix = parts.length > 1 ? '/${parts[1]}' : '';
+
+    if (rawIp.contains('.')) {
+      final octets = rawIp.split('.');
+      if (octets.length == 4) {
+        return '${octets[0]}.***.***.${octets[3]}$prefix';
+      }
+      return '***.***.***.***$prefix';
+    }
+    if (rawIp.contains(':')) {
+      final segments = rawIp.split(':');
+      if (segments.length >= 3) {
+        return '${segments.first}:****:****::${segments.last}$prefix';
+      }
+      return '****:****::****$prefix';
+    }
+    return '••••••••$prefix';
+  }
+
+  Widget _buildSectionHeader(
+    BuildContext context,
+    String title,
+    IconData icon, {
+    Widget? action,
+  }) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(top: 14.0, bottom: 6.0),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(icon, size: 18, color: theme.colorScheme.primary),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.onSurface,
-              letterSpacing: 0.3,
-            ),
+          Row(
+            children: [
+              Icon(icon, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
           ),
+          if (action != null) action,
         ],
       ),
     );
@@ -1149,6 +1263,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         }
       }
 
+      final isPublic = _isPublicIp(ipText);
+      final displayIp = (prefs.maskPublicIp && isPublic) ? _maskIpString(ipText) : ipText;
+
       interfaceCardWidgets.add(
         Card(
           margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
@@ -1250,7 +1367,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          ipText,
+                          displayIp,
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                             fontFamily: 'monospace',
@@ -1638,7 +1755,32 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     _buildSystemVitalsCard(appState),
                     _buildSectionHeader(context, 'Wireless Radios & SSIDs', Icons.wifi),
                     _buildWirelessNetworksCard(appState),
-                    _buildSectionHeader(context, 'Network Interfaces', Icons.lan),
+                    _buildSectionHeader(
+                      context,
+                      'Network Interfaces',
+                      Icons.lan,
+                      action: IconButton(
+                        icon: Icon(
+                          appState.dashboardPreferences.maskPublicIp
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        tooltip: appState.dashboardPreferences.maskPublicIp
+                            ? 'Show IP Addresses'
+                            : 'Mask IP Addresses',
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        onPressed: () {
+                          final current = appState.dashboardPreferences;
+                          appState.saveDashboardPreferences(
+                            current.copyWith(maskPublicIp: !current.maskPublicIp),
+                          );
+                        },
+                      ),
+                    ),
                     _buildInterfaceStatusCards(appState),
                     _buildSectionHeader(context, 'System Modules & Storage', Icons.storage),
                     ..._buildModuleDashboardWidgets(context),

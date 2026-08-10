@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../design/luci_design_system.dart';
-import 'luci_advanced_animations.dart';
+import 'luci_animation_system.dart';
 
 /// Enhanced tab transition system for smooth navigation
 /// Provides consistent, engaging transitions between screens

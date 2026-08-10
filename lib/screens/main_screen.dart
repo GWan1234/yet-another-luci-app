@@ -34,12 +34,10 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   void didUpdateWidget(MainScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // Handle parameter changes
     if (widget.interfaceToScroll != oldWidget.interfaceToScroll) {
       _currentInterfaceToScroll = widget.interfaceToScroll;
     }
 
-    // Handle initial tab changes
     if (widget.initialTab != oldWidget.initialTab &&
         widget.initialTab != null) {
       _selectedIndex = widget.initialTab!;
@@ -69,7 +67,6 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       _selectedIndex = index;
     });
 
-    // Clear interface scroll state when navigating away from Interfaces tab
     if (_selectedIndex != 2 && _currentInterfaceToScroll != null) {
       _clearInterfaceToScroll();
     }
@@ -77,18 +74,15 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Listen for requestedTab in AppState
     final appState = ref.watch(appStateProvider);
     if (appState.requestedTab != null &&
         appState.requestedTab != _selectedIndex) {
-      // Store the values before the callback to avoid null reference issues
       final requestedTab = appState.requestedTab!;
       final requestedInterface = appState.requestedInterfaceToScroll;
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         setState(() {
           _selectedIndex = requestedTab;
-          // Update interface to scroll if provided
           if (requestedInterface != null) {
             _currentInterfaceToScroll = requestedInterface;
           }
@@ -97,6 +91,10 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         appState.requestedInterfaceToScroll = null;
       });
     }
+
+    final isRebooting = appState.isRebooting;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       body: Center(
         child: LuciTabTransition(
@@ -104,67 +102,171 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           child: _widgetOptions.elementAt(_selectedIndex),
         ),
       ),
-      bottomNavigationBar: Builder(
-        builder: (context) {
-          final isRebooting = ref.watch(appStateProvider).isRebooting;
-          Color? getTabColor(int index) =>
-              (isRebooting && index != 3) ? Colors.grey.withAlpha(128) : null;
-          double getTabOpacity(int index) =>
-              (isRebooting && index != 3) ? 0.5 : 1.0;
-          return NavigationBar(
-            onDestinationSelected: (index) {
-              if (isRebooting && index != 3) return; // Only allow 'More' tab
-              _onItemTapped(index);
-            },
-            selectedIndex: _selectedIndex,
-            destinations: [
-              NavigationDestination(
-                selectedIcon: Opacity(
-                  opacity: getTabOpacity(0),
-                  child: Icon(Icons.dashboard, color: getTabColor(0)),
+      bottomNavigationBar: SafeArea(
+        child: SizedBox(
+          height: 76,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.bottomCenter,
+            children: [
+              // Flat Bottom Bar Container
+              Container(
+                height: 64,
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainer,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 10,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
                 ),
-                icon: Opacity(
-                  opacity: getTabOpacity(0),
-                  child: Icon(Icons.dashboard_outlined, color: getTabColor(0)),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    // Interfaces (Index 2)
+                    _buildNavItem(
+                      index: 2,
+                      label: 'Interfaces',
+                      icon: Icons.lan_outlined,
+                      selectedIcon: Icons.lan,
+                      isRebooting: isRebooting,
+                    ),
+                    // Clients (Index 1)
+                    _buildNavItem(
+                      index: 1,
+                      label: 'Clients',
+                      icon: Icons.people_outline,
+                      selectedIcon: Icons.people,
+                      isRebooting: isRebooting,
+                    ),
+                    // Space for center elevated button
+                    const SizedBox(width: 60),
+                    // More (Index 3)
+                    _buildNavItem(
+                      index: 3,
+                      label: 'More',
+                      icon: Icons.more_horiz_outlined,
+                      selectedIcon: Icons.more_horiz,
+                      isRebooting: false,
+                    ),
+                  ],
                 ),
-                label: 'Dashboard',
               ),
-              NavigationDestination(
-                selectedIcon: Opacity(
-                  opacity: getTabOpacity(1),
-                  child: Icon(Icons.people, color: getTabColor(1)),
+
+              // Elevated Circular Center Dashboard Badge Button (Index 0)
+              Positioned(
+                top: -12,
+                child: GestureDetector(
+                  onTap: () {
+                    if (isRebooting) return;
+                    _onItemTapped(0);
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 54,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: _selectedIndex == 0
+                                ? [colorScheme.primary, colorScheme.tertiary]
+                                : [
+                                    colorScheme.surfaceContainerHigh,
+                                    colorScheme.surfaceContainerHighest,
+                                  ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: (_selectedIndex == 0
+                                      ? colorScheme.primary
+                                      : Colors.black)
+                                  .withValues(alpha: _selectedIndex == 0 ? 0.4 : 0.15),
+                              blurRadius: _selectedIndex == 0 ? 12 : 6,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                          border: Border.all(
+                            color: colorScheme.surface,
+                            width: 3,
+                          ),
+                        ),
+                        child: Icon(
+                          _selectedIndex == 0
+                              ? Icons.dashboard_rounded
+                              : Icons.dashboard_outlined,
+                          color: _selectedIndex == 0
+                              ? colorScheme.onPrimary
+                              : colorScheme.onSurfaceVariant,
+                          size: 26,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Dashboard',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: _selectedIndex == 0
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          color: _selectedIndex == 0
+                              ? colorScheme.primary
+                              : colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                icon: Opacity(
-                  opacity: getTabOpacity(1),
-                  child: Icon(Icons.people_outline, color: getTabColor(1)),
-                ),
-                label: 'Clients',
-              ),
-              NavigationDestination(
-                selectedIcon: Opacity(
-                  opacity: getTabOpacity(2),
-                  child: Icon(Icons.lan, color: getTabColor(2)),
-                ),
-                icon: Opacity(
-                  opacity: getTabOpacity(2),
-                  child: Icon(Icons.lan_outlined, color: getTabColor(2)),
-                ),
-                label: 'Interfaces',
-              ),
-              NavigationDestination(
-                selectedIcon: Opacity(
-                  opacity: getTabOpacity(3),
-                  child: Icon(Icons.more_horiz),
-                ),
-                icon: Opacity(
-                  opacity: getTabOpacity(3),
-                  child: Icon(Icons.more_horiz_outlined),
-                ),
-                label: 'More',
               ),
             ],
-          );
-        },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem({
+    required int index,
+    required String label,
+    required IconData icon,
+    required IconData selectedIcon,
+    required bool isRebooting,
+  }) {
+    final isSelected = _selectedIndex == index;
+    final colorScheme = Theme.of(context).colorScheme;
+    final color = isRebooting
+        ? colorScheme.onSurface.withValues(alpha: 0.38)
+        : (isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant);
+
+    return InkWell(
+      onTap: isRebooting ? null : () => _onItemTapped(index),
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isSelected ? selectedIcon : icon,
+              color: color,
+              size: 24,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: color,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

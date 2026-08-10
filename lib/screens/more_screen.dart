@@ -14,6 +14,7 @@ import 'package:luci_mobile/screens/manage_routers_screen.dart';
 import 'package:luci_mobile/utils/http_client_manager.dart';
 import 'package:luci_mobile/state/app_state.dart';
 import 'package:luci_mobile/modules/core/luci_module_registry.dart';
+import 'package:luci_mobile/screens/paywall_screen.dart';
 import 'package:luci_mobile/widgets/theme_router_logo.dart';
 
 class _MoreScreenSection extends StatelessWidget {
@@ -360,6 +361,21 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (context) => const ManageRoutersScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                if (!AppConfig.isCommunityFlavor)
+                  _buildMoreTile(
+                    context,
+                    icon: Icons.favorite,
+                    iconColor: Colors.pink.shade400,
+                    title: 'Support the Developer',
+                    subtitle: 'Help keep this project alive & ad-free',
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const PaywallScreen(),
                         ),
                       );
                     },
