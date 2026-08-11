@@ -13,6 +13,7 @@ class StorageMonitoringCard extends ConsumerWidget {
     final storage = StorageOverview.fromRpcData(mountData, isReviewerMode: appState.reviewerModeEnabled);
 
     final rootPercent = storage.rootFs?.usedPercent ?? 0.0;
+    final hasOverlay = storage.overlayFs != null;
     final overlayPercent = storage.overlayFs?.usedPercent ?? 0.0;
 
     return Card(
@@ -52,23 +53,39 @@ class StorageMonitoringCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 12),
-            _buildStorageBar(
-              context,
-              label: 'Root Filesystem (/)',
-              percent: rootPercent,
-              used: storage.rootFs?.usedBytes ?? 0,
-              total: storage.rootFs?.sizeBytes ?? 0,
-              color: Colors.teal,
-            ),
-            const SizedBox(height: 10),
-            _buildStorageBar(
-              context,
-              label: 'Overlay FS (/overlay)',
-              percent: overlayPercent,
-              used: storage.overlayFs?.usedBytes ?? 0,
-              total: storage.overlayFs?.sizeBytes ?? 0,
-              color: Colors.indigo,
-            ),
+            if (storage.mountPoints.isEmpty)
+              Text(
+                'No storage devices detected.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+              )
+            else ...[
+              _buildStorageBar(
+                context,
+                label: 'Root Filesystem (${storage.rootFs?.mountPath ?? '/'})',
+                percent: rootPercent,
+                used: storage.rootFs?.usedBytes ?? 0,
+                total: storage.rootFs?.sizeBytes ?? 0,
+                color: Colors.teal,
+              ),
+              const SizedBox(height: 10),
+              if (hasOverlay)
+                _buildStorageBar(
+                  context,
+                  label: 'Overlay FS (/overlay)',
+                  percent: overlayPercent,
+                  used: storage.overlayFs?.usedBytes ?? 0,
+                  total: storage.overlayFs?.sizeBytes ?? 0,
+                  color: Colors.indigo,
+                )
+              else
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Overlay FS (/overlay)', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500)),
+                    Text('Integrated into Root', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey, fontStyle: FontStyle.italic)),
+                  ],
+                ),
+            ],
           ],
         ),
       ),
@@ -84,8 +101,8 @@ class StorageMonitoringCard extends ConsumerWidget {
     required Color color,
   }) {
     final theme = Theme.of(context);
-    final formattedUsed = _formatBytes(used);
-    final formattedTotal = _formatBytes(total);
+    final formattedUsed = StorageOverview.formatBytes(used);
+    final formattedTotal = StorageOverview.formatBytes(total);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -112,14 +129,5 @@ class StorageMonitoringCard extends ConsumerWidget {
         ),
       ],
     );
-  }
-
-  String _formatBytes(int bytes) {
-    if (bytes <= 0) return '0 MB';
-    final mb = bytes / (1024 * 1024);
-    if (mb >= 1024) {
-      return '${(mb / 1024).toStringAsFixed(1)} GB';
-    }
-    return '${mb.toStringAsFixed(0)} MB';
   }
 }

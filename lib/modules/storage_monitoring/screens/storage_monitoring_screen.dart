@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
+import 'package:luci_mobile/widgets/luci_app_bar.dart';
 import '../models/storage_info.dart';
 
 class StorageMonitoringScreen extends ConsumerWidget {
@@ -9,38 +10,91 @@ class StorageMonitoringScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appState = ref.watch(appStateProvider);
+
+    if (appState.isDashboardLoading && appState.dashboardData == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Storage Monitoring'),
+        ),
+        body: const LuciLoadingWidget(),
+      );
+    }
+
     final mountData = appState.dashboardData?['mountPoints'];
     final storage = StorageOverview.fromRpcData(mountData, isReviewerMode: appState.reviewerModeEnabled);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Storage Monitoring'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh Storage',
+            onPressed: () => appState.fetchDashboardData(),
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
           await appState.fetchDashboardData();
         },
-        child: ListView(
-          padding: const EdgeInsets.all(16.0),
-          children: [
-            _buildSectionHeader(context, 'Filesystem Usage Overview', Icons.pie_chart_outline),
-            const SizedBox(height: 8),
-            _buildOverallUsageCard(context, storage),
-            const SizedBox(height: 16),
-            _buildSectionHeader(context, 'Overlay FS Status', Icons.layers_outlined),
-            const SizedBox(height: 8),
-            _buildOverlayFsCard(context, storage.overlayFs),
-            const SizedBox(height: 16),
-            _buildSectionHeader(context, 'Flash Memory & Root FS', Icons.memory_outlined),
-            const SizedBox(height: 8),
-            _buildFlashMemoryCard(context, storage.rootFs),
-            const SizedBox(height: 16),
-            _buildSectionHeader(context, 'Mounted Storage Devices', Icons.storage_outlined),
-            const SizedBox(height: 8),
-            ...storage.mountPoints.map((mp) => _buildMountPointCard(context, mp)),
-            const SizedBox(height: 32),
-          ],
-        ),
+        child: storage.mountPoints.isEmpty
+            ? ListView(
+                padding: const EdgeInsets.all(24.0),
+                children: [
+                  const SizedBox(height: 60),
+                  Icon(
+                    Icons.sd_card_alert_outlined,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No Storage Data Found',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Could not query filesystem mount points from the router. Ensure RPC permissions or busybox df executable are available.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                  const SizedBox(height: 24),
+                  Center(
+                    child: ElevatedButton.icon(
+                      onPressed: () => appState.fetchDashboardData(),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Refresh Data'),
+                    ),
+                  ),
+                ],
+              )
+            : ListView(
+                padding: const EdgeInsets.all(16.0),
+                children: [
+                  _buildSectionHeader(context, 'Filesystem Usage Overview', Icons.pie_chart_outline),
+                  const SizedBox(height: 8),
+                  _buildOverallUsageCard(context, storage),
+                  const SizedBox(height: 16),
+                  _buildSectionHeader(context, 'Overlay FS Status', Icons.layers_outlined),
+                  const SizedBox(height: 8),
+                  _buildOverlayFsCard(context, storage.overlayFs),
+                  const SizedBox(height: 16),
+                  _buildSectionHeader(context, 'Flash Memory & Root FS', Icons.memory_outlined),
+                  const SizedBox(height: 8),
+                  _buildFlashMemoryCard(context, storage.rootFs),
+                  const SizedBox(height: 16),
+                  _buildSectionHeader(context, 'Mounted Storage Devices', Icons.storage_outlined),
+                  const SizedBox(height: 8),
+                  ...storage.mountPoints.map((mp) => _buildMountPointCard(context, mp)),
+                  const SizedBox(height: 32),
+                ],
+              ),
       ),
     );
   }
@@ -96,9 +150,9 @@ class StorageMonitoringScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildStatColumn('Total Space', _formatBytes(storage.totalSizeBytes)),
-                _buildStatColumn('Used Space', _formatBytes(storage.totalUsedBytes)),
-                _buildStatColumn('Free Space', _formatBytes(storage.totalSizeBytes - storage.totalUsedBytes)),
+                _buildStatColumn('Total Space', StorageOverview.formatBytes(storage.totalSizeBytes)),
+                _buildStatColumn('Used Space', StorageOverview.formatBytes(storage.totalUsedBytes)),
+                _buildStatColumn('Free Space', StorageOverview.formatBytes(storage.totalSizeBytes - storage.totalUsedBytes)),
               ],
             ),
           ],
@@ -109,10 +163,23 @@ class StorageMonitoringScreen extends ConsumerWidget {
 
   Widget _buildOverlayFsCard(BuildContext context, MountPointItem? overlay) {
     if (overlay == null) {
-      return const Card(
-        child: Padding(
+      return Card(
+        elevation: 1,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: const Padding(
           padding: EdgeInsets.all(16.0),
-          child: Text('Overlay filesystem (/overlay) not detected or standard squashfs/ext4 layout in use.'),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.blue, size: 20),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Overlay filesystem (/overlay) is either integrated into Root FS or not separately mounted.',
+                  style: TextStyle(fontSize: 13),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -136,8 +203,8 @@ class StorageMonitoringScreen extends ConsumerWidget {
             _buildDetailRow('Mount Target', overlay.mountPath),
             _buildDetailRow('Block Device', overlay.device),
             _buildDetailRow('Filesystem Type', overlay.filesystemType.toUpperCase()),
-            _buildDetailRow('Used Space', '${_formatBytes(overlay.usedBytes)} (${overlay.usedPercent.toStringAsFixed(1)}%)'),
-            _buildDetailRow('Available Space', _formatBytes(overlay.availableBytes)),
+            _buildDetailRow('Used Space', '${StorageOverview.formatBytes(overlay.usedBytes)} (${overlay.usedPercent.toStringAsFixed(1)}%)'),
+            _buildDetailRow('Available Space', StorageOverview.formatBytes(overlay.availableBytes)),
           ],
         ),
       ),
@@ -158,8 +225,8 @@ class StorageMonitoringScreen extends ConsumerWidget {
             _buildDetailRow('Root Directory', root?.mountPath ?? '/'),
             _buildDetailRow('Flash Device', root?.device ?? '/dev/root'),
             _buildDetailRow('Root FS Format', (root?.filesystemType ?? 'squashfs').toUpperCase()),
-            _buildDetailRow('Size', _formatBytes(root?.sizeBytes ?? 0)),
-            _buildDetailRow('Free Space', _formatBytes(root?.availableBytes ?? 0)),
+            _buildDetailRow('Size', StorageOverview.formatBytes(root?.sizeBytes ?? 0)),
+            _buildDetailRow('Free Space', StorageOverview.formatBytes(root?.availableBytes ?? 0)),
           ],
         ),
       ),
@@ -186,7 +253,7 @@ class StorageMonitoringScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text('${item.usedPercent.toStringAsFixed(0)}% used', style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text('${_formatBytes(item.usedBytes)} / ${_formatBytes(item.sizeBytes)}', style: const TextStyle(fontSize: 11)),
+            Text('${StorageOverview.formatBytes(item.usedBytes)} / ${StorageOverview.formatBytes(item.sizeBytes)}', style: const TextStyle(fontSize: 11)),
           ],
         ),
       ),
@@ -215,14 +282,5 @@ class StorageMonitoringScreen extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  String _formatBytes(int bytes) {
-    if (bytes <= 0) return '0 MB';
-    final mb = bytes / (1024 * 1024);
-    if (mb >= 1024) {
-      return '${(mb / 1024).toStringAsFixed(2)} GB';
-    }
-    return '${mb.toStringAsFixed(1)} MB';
   }
 }

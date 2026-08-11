@@ -20,12 +20,19 @@ class MountPointItem {
     final mount = json['mount']?.toString() ??
         json['target']?.toString() ??
         json['mountpoint']?.toString() ??
+        json['dest']?.toString() ??
+        json['path']?.toString() ??
         '/';
-    final dev = json['device']?.toString() ?? json['dev']?.toString() ?? 'unknown';
+    final dev = json['device']?.toString() ??
+        json['dev']?.toString() ??
+        json['src']?.toString() ??
+        json['source']?.toString() ??
+        'unknown';
 
     String fs = json['fs']?.toString() ??
         json['fstype']?.toString() ??
         json['type']?.toString() ??
+        json['filesystem']?.toString() ??
         '';
 
     if (fs.isEmpty || fs.toLowerCase() == 'unknown') {
@@ -44,17 +51,49 @@ class MountPointItem {
       }
     }
 
-    int rawSize = (json['size'] as num?)?.toInt() ??
-        (json['total'] as num?)?.toInt() ??
-        (json['blocks'] as num?)?.toInt() ??
-        0;
+    int parseNum(dynamic val) {
+      if (val == null) return 0;
+      if (val is num) return val.toInt();
+      if (val is String) {
+        final clean = val.replaceAll(',', '').trim();
+        if (clean.endsWith('G') || clean.endsWith('GB') || clean.endsWith('g') || clean.endsWith('gb')) {
+          final n = double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
+          return (n * 1024 * 1024 * 1024).toInt();
+        }
+        if (clean.endsWith('M') || clean.endsWith('MB') || clean.endsWith('m') || clean.endsWith('mb')) {
+          final n = double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
+          return (n * 1024 * 1024).toInt();
+        }
+        if (clean.endsWith('K') || clean.endsWith('KB') || clean.endsWith('k') || clean.endsWith('kb')) {
+          final n = double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
+          return (n * 1024).toInt();
+        }
+        return int.tryParse(clean) ?? (double.tryParse(clean)?.toInt() ?? 0);
+      }
+      return 0;
+    }
 
-    int rawAvail = (json['avail'] as num?)?.toInt() ??
-        (json['available'] as num?)?.toInt() ??
-        (json['free'] as num?)?.toInt() ??
-        0;
+    int rawSize = parseNum(json['size'] ?? json['total'] ?? json['blocks'] ?? json['sizeBytes'] ?? json['bytes']);
+    int rawAvail = parseNum(json['avail'] ?? json['available'] ?? json['free'] ?? json['availableBytes']);
+    int rawUsed = parseNum(json['used'] ?? json['usedBytes']);
 
-    int rawUsed = (json['used'] as num?)?.toInt() ?? 0;
+    final bsize = parseNum(json['bsize'] ?? json['block_size'] ?? json['blockSize']);
+    if (bsize > 0) {
+      rawSize *= bsize;
+      rawAvail *= bsize;
+      rawUsed *= bsize;
+    } else {
+      final isExplicitBytes = json.containsKey('sizeBytes') ||
+          json['unit']?.toString().toLowerCase() == 'bytes' ||
+          json['bytes'] == true;
+      if (!isExplicitBytes && rawSize > 0 && rawSize < 100000000000) {
+        // Raw sizes from LuCI RPC / df are in 1K-blocks (KB), convert to Bytes
+        rawSize *= 1024;
+        rawAvail *= 1024;
+        rawUsed *= 1024;
+      }
+    }
+
     if (rawUsed == 0 && rawSize > rawAvail && rawAvail > 0) {
       rawUsed = rawSize - rawAvail;
     } else if (rawAvail == 0 && rawSize > rawUsed && rawUsed > 0) {
@@ -102,63 +141,219 @@ class StorageOverview {
 
   const StorageOverview({required this.mountPoints});
 
+  static String formatBytes(int bytes) {
+    if (bytes <= 0) return '0 MB';
+    final double b = bytes.toDouble();
+    if (b < 1024) {
+      return '$bytes B';
+    }
+    final double kb = b / 1024;
+    if (kb < 1024) {
+      return '${kb.toStringAsFixed(1)} KB';
+    }
+    final double mb = kb / 1024;
+    if (mb < 1024) {
+      return '${mb.toStringAsFixed(1)} MB';
+    }
+    final double gb = mb / 1024;
+    return '${gb.toStringAsFixed(2)} GB';
+  }
+
   factory StorageOverview.fromRpcData(dynamic data, {bool isReviewerMode = false}) {
     final list = <MountPointItem>[];
 
-    if (data is String) {
-      // Parse stdout of 'df -k' or 'df' (where blocks are given in 1K-blocks = KB)
-      final lines = data.split('\n');
-      for (final line in lines) {
-        final trimmed = line.trim();
-        if (trimmed.isEmpty || trimmed.startsWith('Filesystem')) continue;
-        final parts = trimmed.split(RegExp(r'\s+'));
-        if (parts.length >= 6) {
-          final dev = parts[0];
-          final blocks = int.tryParse(parts[1]) ?? 0;
-          final used = int.tryParse(parts[2]) ?? 0;
-          final avail = int.tryParse(parts[3]) ?? 0;
-          final target = parts[5];
+    int parseNum(dynamic val) {
+      if (val == null) return 0;
+      if (val is num) return val.toInt();
+      if (val is String) {
+        final clean = val.replaceAll(',', '').trim();
+        if (clean.endsWith('G') || clean.endsWith('GB') || clean.endsWith('g') || clean.endsWith('gb')) {
+          final n = double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
+          return (n * 1024 * 1024 * 1024).toInt();
+        }
+        if (clean.endsWith('M') || clean.endsWith('MB') || clean.endsWith('m') || clean.endsWith('mb')) {
+          final n = double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
+          return (n * 1024 * 1024).toInt();
+        }
+        if (clean.endsWith('K') || clean.endsWith('KB') || clean.endsWith('k') || clean.endsWith('kb')) {
+          final n = double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
+          return (n * 1024).toInt();
+        }
+        return int.tryParse(clean) ?? (double.tryParse(clean)?.toInt() ?? 0);
+      }
+      return 0;
+    }
 
-          String fs = 'ext4';
-          if (dev.contains('ubi')) {
-            fs = 'ubifs';
-          } else if (dev.contains('overlay')) {
-            fs = 'overlayfs';
-          } else if (dev == 'tmpfs' || target == '/tmp' || target == '/dev') {
-            fs = 'tmpfs';
-          } else if (dev.contains('root') || target == '/rom') {
-            fs = 'squashfs';
+    if (data is String) {
+      final rawLines = data.split('\n');
+      final lines = <String>[];
+
+      String pendingDev = '';
+      for (final l in rawLines) {
+        final trimmed = l.trim();
+        if (trimmed.isEmpty) continue;
+        if (trimmed.startsWith('Filesystem') ||
+            trimmed.startsWith('Sys.') ||
+            trimmed.startsWith('1K-blocks')) {
+          continue;
+        }
+
+        final parts = trimmed.split(RegExp(r'\s+'));
+        if (parts.length == 1 &&
+            (parts[0].startsWith('/') || parts[0].contains(':') || parts[0] == 'tmpfs' || parts[0].startsWith('overlay'))) {
+          pendingDev = parts[0];
+          continue;
+        }
+        if (pendingDev.isNotEmpty) {
+          lines.add('$pendingDev $trimmed');
+          pendingDev = '';
+        } else {
+          lines.add(trimmed);
+        }
+      }
+
+      for (final line in lines) {
+        final parts = line.split(RegExp(r'\s+'));
+        if (parts.length < 2) continue;
+
+        // /proc/mounts fallback line: <device> <target> <type> <options>...
+        if (parts.length >= 3 && int.tryParse(parts[1]) == null && (parts[1].startsWith('/') || parts[1] == 'swap')) {
+          final dev = parts[0];
+          final target = parts[1];
+          final fs = parts[2];
+
+          if (target.startsWith('/proc') ||
+              target.startsWith('/sys') ||
+              target.startsWith('/dev/pts') ||
+              target == '/dev/shm') {
+            continue;
           }
 
           list.add(MountPointItem(
             mountPath: target,
             device: dev,
             filesystemType: fs,
-            sizeBytes: blocks * 1024,
-            usedBytes: used * 1024,
-            availableBytes: avail * 1024,
+            sizeBytes: 0,
+            usedBytes: 0,
+            availableBytes: 0,
+          ));
+          continue;
+        }
+
+        // df output line matching: search for column with '%'
+        int percentIdx = -1;
+        for (int i = 0; i < parts.length; i++) {
+          if (parts[i].endsWith('%') || parts[i].contains('%')) {
+            percentIdx = i;
+            break;
+          }
+        }
+
+        if (percentIdx >= 1) {
+          final dev = parts[0];
+          String fs = '';
+          int blockIdx = 1;
+
+          if (percentIdx >= 5 && int.tryParse(parts[1]) == null && !parts[1].contains('%')) {
+            fs = parts[1];
+            blockIdx = 2;
+          }
+
+          int sizeVal = 0;
+          int usedVal = 0;
+          int availVal = 0;
+
+          if (percentIdx - blockIdx >= 3) {
+            sizeVal = parseNum(parts[blockIdx]);
+            usedVal = parseNum(parts[blockIdx + 1]);
+            availVal = parseNum(parts[blockIdx + 2]);
+          } else if (percentIdx - blockIdx == 2) {
+            sizeVal = parseNum(parts[blockIdx]);
+            usedVal = parseNum(parts[blockIdx + 1]);
+          }
+
+          final target = parts.sublist(percentIdx + 1).join(' ');
+          final mountPath = target.isEmpty ? '/' : target;
+
+          if (fs.isEmpty || fs.toLowerCase() == 'unknown') {
+            if (dev.contains('ubi')) {
+              fs = 'ubifs';
+            } else if (dev.contains('overlay') || mountPath.contains('overlay')) {
+              fs = 'overlayfs';
+            } else if (dev == 'tmpfs' || mountPath == '/tmp' || mountPath == '/dev') {
+              fs = 'tmpfs';
+            } else if (dev.contains('root') || mountPath == '/rom') {
+              fs = 'squashfs';
+            } else if (dev.contains('mtdblock')) {
+              fs = 'jffs2';
+            } else {
+              fs = 'ext4';
+            }
+          }
+
+          int sizeBytes = sizeVal;
+          int usedBytes = usedVal;
+          int availBytes = availVal < 0 ? 0 : availVal;
+
+          if (sizeBytes > 0 && sizeBytes < 100000000000) {
+            sizeBytes *= 1024;
+            usedBytes *= 1024;
+            availBytes *= 1024;
+          }
+
+          list.add(MountPointItem(
+            mountPath: mountPath,
+            device: dev,
+            filesystemType: fs,
+            sizeBytes: sizeBytes,
+            usedBytes: usedBytes,
+            availableBytes: availBytes,
           ));
         }
       }
     } else if (data is List) {
       for (final item in data) {
-        if (item is Map<String, dynamic>) {
-          list.add(MountPointItem.fromJson(item));
+        if (item is Map) {
+          list.add(MountPointItem.fromJson(Map<String, dynamic>.from(item)));
         }
       }
-    } else if (data is Map<String, dynamic>) {
-      final inner = data['mountPoints'] ?? data['mounts'] ?? data['result'];
+    } else if (data is Map) {
+      final mapData = Map<String, dynamic>.from(data);
+      final inner = mapData['mountPoints'] ??
+          mapData['mounts'] ??
+          mapData['result'] ??
+          mapData['values'] ??
+          mapData['data'] ??
+          mapData['fs'];
+
       if (inner is List) {
         for (final item in inner) {
-          if (item is Map<String, dynamic>) {
-            list.add(MountPointItem.fromJson(item));
+          if (item is Map) {
+            list.add(MountPointItem.fromJson(Map<String, dynamic>.from(item)));
           }
         }
-      } else {
-        data.forEach((key, val) {
-          if (val is Map<String, dynamic>) {
+      } else if (inner is Map) {
+        final targetMap = Map<String, dynamic>.from(inner);
+        targetMap.forEach((key, val) {
+          if (val is Map) {
             final copy = Map<String, dynamic>.from(val);
-            copy['mount'] ??= key;
+            if (copy['mount'] == null && copy['target'] == null && copy['mountpoint'] == null && copy['dest'] == null) {
+              copy['mount'] = key;
+            }
+            list.add(MountPointItem.fromJson(copy));
+          }
+        });
+      } else {
+        mapData.forEach((key, val) {
+          if (val is Map) {
+            final copy = Map<String, dynamic>.from(val);
+            final typeStr = copy['.type']?.toString();
+            if (typeStr != null && typeStr != 'mount' && typeStr != 'swap') {
+              return;
+            }
+            if (copy['mount'] == null && copy['target'] == null && copy['mountpoint'] == null && copy['dest'] == null) {
+              copy['mount'] = key;
+            }
             list.add(MountPointItem.fromJson(copy));
           }
         });

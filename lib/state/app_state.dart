@@ -24,6 +24,7 @@ import 'package:luci_mobile/models/rpc_result.dart';
 import 'package:luci_mobile/models/network_topology.dart';
 import 'package:luci_mobile/modules/firewall_security/models/firewall_info.dart';
 import 'package:luci_mobile/modules/wireless_management/models/wireless_info.dart';
+import 'package:luci_mobile/modules/storage_monitoring/models/storage_info.dart';
 
 enum RouterConnectionStatus {
   connected,
@@ -718,6 +719,32 @@ class AppState extends ChangeNotifier {
           'uciWirelessConfig': results[6][1],
           'uciNetworkConfig': results[7][1],
           'wan': _extractWanData(interfaceDump),
+          'mountPoints': [
+            {
+              'mount': '/',
+              'device': '/dev/root',
+              'fs': 'squashfs',
+              'size': 131072,
+              'used': 46080,
+              'avail': 84992,
+            },
+            {
+              'mount': '/overlay',
+              'device': '/dev/mtdblock6',
+              'fs': 'ext4',
+              'size': 65536,
+              'used': 16384,
+              'avail': 49152,
+            },
+            {
+              'mount': '/tmp',
+              'device': 'tmpfs',
+              'fs': 'tmpfs',
+              'size': 262144,
+              'used': 2048,
+              'avail': 260096,
+            },
+          ],
           'wireguard': <String, dynamic>{}, // Empty for reviewer mode
           '_lastUpdated':
               DateTime.now().millisecondsSinceEpoch, // Force UI updates
@@ -940,13 +967,19 @@ class AppState extends ChangeNotifier {
 
       Future<dynamic> fetchStorageData() async {
         try {
+          bool hasValidMounts(dynamic rawData) {
+            if (rawData == null) return false;
+            final overview = StorageOverview.fromRpcData(rawData);
+            return overview.mountPoints.isNotEmpty;
+          }
+
           final res1 = await callOptionalRpc(
             object: 'luci-rpc',
             method: 'getMountPoints',
             params: {},
           );
           final data1 = getOptionalData(res1, 'luci-rpc.getMountPoints');
-          if (data1 != null) return data1;
+          if (hasValidMounts(data1)) return data1;
 
           final res2 = await callOptionalRpc(
             object: 'system',
@@ -954,7 +987,7 @@ class AppState extends ChangeNotifier {
             params: {},
           );
           final data2 = getOptionalData(res2, 'system.mounts');
-          if (data2 != null) return data2;
+          if (hasValidMounts(data2)) return data2;
 
           final res3 = await callOptionalRpc(
             object: 'luci',
@@ -962,18 +995,76 @@ class AppState extends ChangeNotifier {
             params: {},
           );
           final data3 = getOptionalData(res3, 'luci.getMountPoints');
-          if (data3 != null) return data3;
+          if (hasValidMounts(data3)) return data3;
 
           final res4 = await callOptionalRpc(
-            object: 'file',
-            method: 'exec',
-            params: {'command': 'df', 'args': ['-k']},
+            object: 'uci',
+            method: 'get',
+            params: {'config': 'fstab'},
           );
-          final data4 = getOptionalData(res4, 'file.exec.df');
-          if (data4 is Map && data4['stdout'] != null) {
-            return data4['stdout'];
+          final data4 = getOptionalData(res4, 'uci.get.fstab');
+          if (hasValidMounts(data4)) return data4;
+
+          final dfVariations = [
+            {'command': 'df', 'params': ['-k'], 'args': ['-k']},
+            {'command': '/bin/df', 'params': ['-k'], 'args': ['-k']},
+            {'command': '/usr/bin/df', 'params': ['-k'], 'args': ['-k']},
+            {'command': 'df', 'params': ['-h'], 'args': ['-h']},
+            {'command': 'df', 'params': ['-P'], 'args': ['-P']},
+            {'command': 'df', 'params': <String>[], 'args': <String>[]},
+            {'command': 'sh', 'params': ['-c', 'df -k'], 'args': ['-c', 'df -k']},
+            {'command': '/bin/sh', 'params': ['-c', 'df -k'], 'args': ['-c', 'df -k']},
+            {'command': 'cat', 'params': ['/proc/mounts'], 'args': ['/proc/mounts']},
+          ];
+
+          for (final dfParams in dfVariations) {
+            final resDf = await callOptionalRpc(
+              object: 'file',
+              method: 'exec',
+              params: dfParams,
+            );
+            final dataDf = getOptionalData(resDf, 'file.exec.df');
+            if (dataDf is Map) {
+              final stdout = dataDf['stdout']?.toString();
+              if (hasValidMounts(stdout)) return stdout;
+            }
           }
-        } catch (_) {}
+
+          final resProc = await callOptionalRpc(
+            object: 'file',
+            method: 'read',
+            params: {'path': '/proc/mounts'},
+          );
+          final dataProc = getOptionalData(resProc, 'file.read.mounts');
+          if (dataProc is Map) {
+            final fileData = dataProc['data']?.toString();
+            if (hasValidMounts(fileData)) return fileData;
+          }
+
+          final resSelfProc = await callOptionalRpc(
+            object: 'file',
+            method: 'read',
+            params: {'path': '/proc/self/mounts'},
+          );
+          final dataSelfProc = getOptionalData(resSelfProc, 'file.read.selfmounts');
+          if (dataSelfProc is Map) {
+            final fileData = dataSelfProc['data']?.toString();
+            if (hasValidMounts(fileData)) return fileData;
+          }
+
+          final resMtab = await callOptionalRpc(
+            object: 'file',
+            method: 'read',
+            params: {'path': '/etc/mtab'},
+          );
+          final dataMtab = getOptionalData(resMtab, 'file.read.mtab');
+          if (dataMtab is Map) {
+            final fileData = dataMtab['data']?.toString();
+            if (hasValidMounts(fileData)) return fileData;
+          }
+        } catch (e) {
+          Logger.warning('Storage data RPC error: $e');
+        }
         return null;
       }
 
