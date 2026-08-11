@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.0.5] - 2026-08-11
+
+> [!NOTE]  
+> **Release Note**: Version `0.0.4-beta` was intentionally skipped due to internal release and stability issues to ensure full reliability for this release.
+
+### Added
+- **Wi-Fi Access Control & Auto-Revert Safety Guard**:
+  - Added per-radio/per-SSID MAC allow-list control with interactive device selection (from connected clients or manual MAC input).
+  - Implemented background shell script auto-revert timer (25 seconds) on the router to protect users from accidental lockout if Wi-Fi connectivity is severed during access rule updates.
+  - Added real-time UCI config pre-checking to automatically restore checkbox allow/deny states on client selection.
+- **Low-Risk Router Management Actions**:
+  - Integrated fast router actions: Reboot Router, Restart Network Services, Reload Wireless Services, and Toggle Wireless Radios with explicit user confirmation prompts.
+- **Multi-Platform Package Remediation Instructions**:
+  - Updated RPCD ACL remediation instructions to provide platform-specific commands for both modern APK (OpenWrt 25.x+) and legacy OPKG (OpenWrt 24.10 and earlier) package managers.
+
+### Fixed
+- **Storage Monitoring Unit-Conversion Engine**:
+  - Eliminated magnitude-based unit guessing heuristics (`rawSize < 100GB`), replacing it with explicit `StorageDataSource` format typing (`rpcJson`, `dfKBlocks`, `dfHuman`).
+  - Fixed double-conversion bug that caused `/tmp` (tmpfs) to report as `120.17 GB` and total system storage as `53.09 GB`.
+  - Ensured ground-truth byte calculations for all mount points (`/`, `/overlay`, `/rom`, `/tmp`, external USB storage) and aggregate storage metrics.
+
+---
+
 ## [0.0.4] - 2026-08-10
 
 ### Added
