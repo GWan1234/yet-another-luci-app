@@ -58,32 +58,46 @@ overlayfs:/overlay / overlay rw,noatime 0 0
       expect(overview.overlayFs!.filesystemType, equals('ubifs'));
     });
 
-    test('Parses JSON RPC mount points correctly', () {
+    test('Parses JSON RPC mount points (native byte units) correctly', () {
       final jsonRpcData = [
         {
           'mount': '/',
           'device': '/dev/root',
           'fs': 'squashfs',
-          'size': 131072, // 1K-blocks (128MB)
-          'used': 46080,
-          'avail': 84992,
+          'size': 134217728, // Bytes (128MB)
+          'used': 47185920,
+          'avail': 87031808,
         },
         {
           'mount': '/overlay',
           'device': '/dev/mtdblock6',
           'fs': 'ext4',
-          'size': 65536, // 1K-blocks (64MB)
-          'used': 16384,
-          'avail': 49152,
+          'size': 67108864, // Bytes (64MB)
+          'used': 16777216,
+          'avail': 50331648,
         },
       ];
 
       final overview = StorageOverview.fromRpcData(jsonRpcData);
       expect(overview.mountPoints.length, equals(2));
-      expect(overview.rootFs!.sizeBytes, equals(131072 * 1024));
-      expect(overview.overlayFs!.sizeBytes, equals(65536 * 1024));
+      expect(overview.rootFs!.sizeBytes, equals(134217728));
+      expect(overview.overlayFs!.sizeBytes, equals(67108864));
       expect(StorageOverview.formatBytes(overview.rootFs!.sizeBytes), equals('128.0 MB'));
       expect(StorageOverview.formatBytes(overview.overlayFs!.sizeBytes), equals('64.0 MB'));
+    });
+
+    test('Parses df -h human-readable format correctly without double conversion', () {
+      const dfHumanOutput = '''
+Filesystem           Size  Used Avail Use% Mounted on
+/dev/root            128M  128M     0 100% /rom
+tmpfs                123M  2.0M  121M   2% /tmp
+/dev/mtdblock6        53M  5.0M   48M  10% /overlay
+''';
+
+      final overview = StorageOverview.fromRpcData(dfHumanOutput);
+      expect(overview.mountPoints.length, equals(3));
+      expect(StorageOverview.formatBytes(overview.mountPoints[1].sizeBytes), equals('123.0 MB'));
+      expect(StorageOverview.formatBytes(overview.overlayFs!.sizeBytes), equals('53.0 MB'));
     });
 
     test('Parses dynamic map representations without strict String generics', () {

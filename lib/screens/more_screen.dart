@@ -148,12 +148,15 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
 
   Future<void> _showRebootDialog(BuildContext context) async {
     final appState = ref.read(appStateProvider);
+    final routerName = appState.selectedRouter?.lastKnownHostname ?? appState.selectedRouter?.ipAddress ?? 'the router';
     return showDialog<void>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Reboot Router?'),
-          content: const Text('Are you sure you want to reboot the router?'),
+          content: Text(
+            'This will reboot $routerName. The app will lose connection until it comes back online. Continue?',
+          ),
           actions: <Widget>[
             TextButton(
               child: const Text('Cancel'),
@@ -161,7 +164,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                 Navigator.of(context).pop();
               },
             ),
-            TextButton(
+            FilledButton(
               child: const Text('Reboot'),
               onPressed: () async {
                 Navigator.of(context).pop();
@@ -173,14 +176,14 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                     content: Row(
                       children: [
                         Icon(
-                          Icons.warning_amber_rounded,
+                          Icons.restart_alt_rounded,
                           color: colorScheme.onPrimary,
                           size: 20,
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Rebooting… Connection will be interrupted.',
+                            'Router is rebooting... The app will automatically reconnect once online.',
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: colorScheme.onPrimary,
                             ),
@@ -197,20 +200,20 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                       horizontal: 24,
                       vertical: 16,
                     ),
-                    duration: const Duration(days: 1), // effectively indefinite
+                    duration: const Duration(seconds: 15),
                   ),
                 );
-                final success = await appState.reboot();
+                final success = await appState.reboot(context: context);
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      success
-                          ? 'Reboot command sent successfully.'
-                          : 'Failed to send reboot command.',
+                if (!success) {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to send reboot command to router.'),
+                      backgroundColor: Colors.red,
                     ),
-                  ),
-                );
+                  );
+                }
               },
             ),
           ],

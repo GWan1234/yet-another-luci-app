@@ -87,4 +87,48 @@ abstract class IApiService {
     required String command,
     BuildContext? context,
   });
+  Future<bool> disconnectWirelessClient(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String macAddress,
+    String? iface,
+    BuildContext? context,
+  });
+  Future<bool> setSsidEnabled(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String ifaceSection,
+    required bool enabled,
+    BuildContext? context,
+  });
+  Future<bool> setWifiAccessControl(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required Map<String, List<String>> maclistByIface,
+    required Map<String, String> macfilterByIface,
+    BuildContext? context,
+  });
+  Future<bool> confirmWifiAccessControl(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  });
+  Future<bool> revertWifiAccessControl(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required Map<String, List<String>> maclistByIface,
+    required Map<String, String> macfilterByIface,
+    BuildContext? context,
+  });
+  Future<bool> autoFixPermissions(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  });
 }

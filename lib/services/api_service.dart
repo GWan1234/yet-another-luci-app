@@ -990,4 +990,302 @@ class RealApiService implements IApiService {
       context: context,
     );
   }
+
+  /// Helper to safely obtain mounted BuildContext across async gaps.
+  BuildContext? mountedContext(BuildContext? ctx) => (ctx != null && ctx.mounted) ? ctx : null;
+
+  @override
+  Future<bool> disconnectWirelessClient(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String macAddress,
+    String? iface,
+    BuildContext? context,
+  }) async {
+    try {
+      if (iface != null && iface.isNotEmpty) {
+        final res = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'hostapd.$iface',
+          method: 'del_client',
+          params: {'addr': macAddress, 'reason': 1, 'deauth': true, 'ban_time': 0},
+          context: context,
+        );
+        if (res is List && res.isNotEmpty && res[0] == 0) {
+          return true;
+        }
+      }
+
+      // Fallback via hostapd_cli or ubus call file.exec
+      final fallbackRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': '/bin/sh',
+          'params': [
+            '-c',
+            iface != null && iface.isNotEmpty
+                ? '/usr/sbin/hostapd_cli -i $iface deauth $macAddress || ubus call hostapd.$iface del_client \'{"addr":"$macAddress"}\''
+                : 'for i in /var/run/hostapd/*; do [ -S "\$i" ] && /usr/sbin/hostapd_cli -i "\${i##*/}" deauth $macAddress; done'
+          ],
+        },
+        context: mountedContext(context),
+      );
+      return fallbackRes is List && fallbackRes.isNotEmpty && fallbackRes[0] == 0;
+    } catch (e, stack) {
+      Logger.exception('disconnectWirelessClient failed', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> setSsidEnabled(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String ifaceSection,
+    required bool enabled,
+    BuildContext? context,
+  }) async {
+    try {
+      final setRes = await uciSet(
+        ipAddress,
+        sysauth,
+        useHttps,
+        config: 'wireless',
+        section: ifaceSection,
+        values: {'disabled': enabled ? '0' : '1'},
+        context: context,
+      );
+      if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) {
+        return false;
+      }
+
+      final commitRes = await uciCommit(
+        ipAddress,
+        sysauth,
+        useHttps,
+        config: 'wireless',
+        context: mountedContext(context),
+      );
+      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0) {
+        return false;
+      }
+
+      // Reload wifi configuration
+      await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': '/sbin/wifi',
+          'params': ['reload'],
+        },
+        context: mountedContext(context),
+      );
+      return true;
+    } catch (e, stack) {
+      Logger.exception('setSsidEnabled failed for $ifaceSection', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> setWifiAccessControl(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required Map<String, List<String>> maclistByIface,
+    required Map<String, String> macfilterByIface,
+    BuildContext? context,
+  }) async {
+    try {
+      final allSections = {...maclistByIface.keys, ...macfilterByIface.keys};
+      for (final section in allSections) {
+        final values = <String, dynamic>{};
+        if (macfilterByIface.containsKey(section)) {
+          values['macfilter'] = macfilterByIface[section]!;
+        }
+        if (maclistByIface.containsKey(section)) {
+          values['maclist'] = maclistByIface[section]!;
+        }
+
+        final res = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'set',
+          params: {'config': 'wireless', 'section': section, 'values': values},
+          context: mountedContext(context),
+        );
+        if (res is List && res.isNotEmpty && res[0] != 0) {
+          return false;
+        }
+      }
+
+      // Stage router-side fail-safe daemon and reload wifi without immediate uci commit.
+      // If phone loses Wi-Fi connection, router's background daemon will auto-revert after 25s!
+      await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': '/bin/sh',
+          'params': [
+            '-c',
+            'touch /tmp/wifi_access_control_pending && '
+            '(sleep 25 && [ -f /tmp/wifi_access_control_pending ] && { rm -f /tmp/wifi_access_control_pending; /sbin/uci revert wireless; /sbin/wifi reload; }) >/dev/null 2>&1 & '
+            '/sbin/wifi reload'
+          ],
+        },
+        context: mountedContext(context),
+      );
+      return true;
+    } catch (e, stack) {
+      Logger.exception('setWifiAccessControl failed', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> confirmWifiAccessControl(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  }) async {
+    try {
+      final res = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': '/bin/sh',
+          'params': [
+            '-c',
+            'rm -f /tmp/wifi_access_control_pending && /sbin/uci commit wireless'
+          ],
+        },
+        context: mountedContext(context),
+      );
+      return res is List && res.isNotEmpty && res[0] == 0;
+    } catch (e, stack) {
+      Logger.exception('confirmWifiAccessControl failed', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> revertWifiAccessControl(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required Map<String, List<String>> maclistByIface,
+    required Map<String, String> macfilterByIface,
+    BuildContext? context,
+  }) async {
+    try {
+      final res = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': '/bin/sh',
+          'params': [
+            '-c',
+            'rm -f /tmp/wifi_access_control_pending && /sbin/uci revert wireless && /sbin/wifi reload'
+          ],
+        },
+        context: mountedContext(context),
+      );
+
+      // Fallback: If uci revert didn't clean everything, explicitly re-apply prior state
+      final allSections = {...maclistByIface.keys, ...macfilterByIface.keys};
+      for (final section in allSections) {
+        final values = <String, dynamic>{};
+        if (macfilterByIface.containsKey(section)) {
+          values['macfilter'] = macfilterByIface[section]!;
+        }
+        if (maclistByIface.containsKey(section)) {
+          values['maclist'] = maclistByIface[section]!;
+        }
+        await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'set',
+          params: {'config': 'wireless', 'section': section, 'values': values},
+          context: mountedContext(context),
+        );
+      }
+      await uciCommit(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
+      await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': '/sbin/wifi',
+          'params': ['reload'],
+        },
+        context: mountedContext(context),
+      );
+
+      return res is List && res.isNotEmpty && res[0] == 0;
+    } catch (e, stack) {
+      Logger.exception('revertWifiAccessControl failed', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> autoFixPermissions(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  }) async {
+    try {
+      final res = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': '/bin/sh',
+          'params': [
+            '-c',
+            'if command -v apk >/dev/null 2>&1; then '
+            'apk update && apk add luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status; '
+            'else '
+            'opkg update && opkg install luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status; '
+            'fi && /etc/init.d/rpcd restart'
+          ],
+        },
+        context: context,
+      );
+      return res is List && res.isNotEmpty && res[0] == 0;
+    } catch (e, stack) {
+      Logger.exception('autoFixPermissions failed', e, stack);
+      return false;
+    }
+  }
 }

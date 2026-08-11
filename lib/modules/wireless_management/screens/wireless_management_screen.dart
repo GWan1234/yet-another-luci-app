@@ -5,6 +5,7 @@ import 'package:luci_mobile/state/app_state.dart';
 import 'package:luci_mobile/modules/dhcp_dns/models/dhcp_dns_info.dart';
 import 'package:luci_mobile/widgets/luci_app_bar.dart';
 import '../models/wireless_info.dart';
+import 'wifi_access_control_screen.dart';
 
 class WirelessManagementScreen extends ConsumerWidget {
   final bool showBack;
@@ -31,9 +32,30 @@ class WirelessManagementScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(16.0),
           children: [
-            _buildSectionHeader(context, 'Wireless Radios', Icons.cell_tower_outlined),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildSectionHeader(context, 'Wireless Radios', Icons.cell_tower_outlined),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const WifiAccessControlScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.security_rounded, size: 16),
+                  label: const Text('Access Control', style: TextStyle(fontSize: 12)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
-            ...overview.radios.map((radio) => _buildRadioCard(context, radio)),
+            ...overview.radios.map((radio) => _buildRadioCard(context, radio, appState)),
             const SizedBox(height: 16),
             _buildSectionHeader(context, 'Connected Wireless Stations', Icons.devices_other_outlined),
             const SizedBox(height: 8),
@@ -61,7 +83,7 @@ class WirelessManagementScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildRadioCard(BuildContext context, WirelessRadio radio) {
+  Widget _buildRadioCard(BuildContext context, WirelessRadio radio, AppState appState) {
     final theme = Theme.of(context);
     final freqStr = radio.formattedFrequency ?? 'Channel ${radio.channel} (Freq Unreported)';
 
@@ -127,7 +149,20 @@ class WirelessManagementScreen extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('${iface.ssid} (${iface.mode})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          Row(
+                            children: [
+                              Text('${iface.ssid} (${iface.mode})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              const SizedBox(width: 6),
+                              Text(
+                                iface.isEnabled ? '(Enabled)' : '(Disabled)',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: iface.isEnabled ? Colors.green : Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 2),
                           Row(
                             children: [
@@ -169,13 +204,110 @@ class WirelessManagementScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    Text('${iface.stations.length} clients', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
+                    Row(
+                      children: [
+                        Text('${iface.stations.length} clients', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
+                        const SizedBox(width: 8),
+                        Switch(
+                          value: iface.isEnabled,
+                          onChanged: (val) => _handleToggleSsid(context, radio, iface, val, appState),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               )),
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _handleToggleSsid(
+    BuildContext context,
+    WirelessRadio radio,
+    WirelessInterface iface,
+    bool enable,
+    AppState appState,
+  ) async {
+    bool isConnectedToThisSsid = false;
+    // Check if any connected client station matches active app session or router connection
+    for (final st in iface.stations) {
+      if (st.macAddress.toUpperCase() == (appState.dashboardData?['activeSessionMac']?.toString().toUpperCase())) {
+        isConnectedToThisSsid = true;
+        break;
+      }
+    }
+
+    if (!enable && isConnectedToThisSsid) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 36),
+          title: const Text('Self-Disconnect Warning'),
+          content: Text(
+            'You\'re currently connected via network "${iface.ssid}". Disabling it will disconnect your session; the app will attempt to reconnect automatically once you rejoin a working network.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Proceed & Disconnect'),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true) return;
+    } else {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('${enable ? "Enable" : "Disable"} SSID?'),
+          content: Text(
+            'Are you sure you want to ${enable ? "enable" : "disable"} SSID "${iface.ssid}" on ${radio.name}?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(enable ? 'Enable' : 'Disable'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${enable ? "Enabling" : "Disabling"} SSID "${iface.ssid}"...'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    final success = await appState.setSsidEnabled(
+      iface.sectionName,
+      enable,
+      context: context,
+    );
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? 'SSID "${iface.ssid}" ${enable ? "enabled" : "disabled"} successfully.'
+              : 'Failed to update SSID "${iface.ssid}".',
+        ),
+        backgroundColor: success ? Colors.green : Colors.red,
       ),
     );
   }

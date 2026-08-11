@@ -987,4 +987,78 @@ class MockApiService implements IApiService {
       'AA:BB:CC:44:55:66': {'name': 'MacBook-Pro', 'ipaddrs': ['192.168.1.101']},
     };
   }
+
+  @override
+  Future<bool> disconnectWirelessClient(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String macAddress,
+    String? iface,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    return true;
+  }
+
+  @override
+  Future<bool> setSsidEnabled(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String ifaceSection,
+    required bool enabled,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    return true;
+  }
+
+  @override
+  Future<bool> setWifiAccessControl(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required Map<String, List<String>> maclistByIface,
+    required Map<String, String> macfilterByIface,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    return true;
+  }
+
+  @override
+  Future<bool> confirmWifiAccessControl(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    return true;
+  }
+
+  @override
+  Future<bool> revertWifiAccessControl(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required Map<String, List<String>> maclistByIface,
+    required Map<String, String> macfilterByIface,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    return true;
+  }
+
+  @override
+  Future<bool> autoFixPermissions(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    return true;
+  }
 }

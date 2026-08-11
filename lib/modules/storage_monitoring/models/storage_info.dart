@@ -1,3 +1,9 @@
+enum StorageDataSource {
+  rpcJson,   // Natively in Bytes from OpenWrt RPC JSON (luci-rpc.getMountPoints, system.mounts, etc.)
+  dfKBlocks, // 1K-blocks (KB) from plain df or df -k command output
+  dfHuman,   // Human-readable string from df -h (e.g. 123M, 1.5G, 500K)
+}
+
 /// Representation of an individual mounted filesystem partition or device.
 class MountPointItem {
   final String mountPath;
@@ -16,7 +22,10 @@ class MountPointItem {
     required this.availableBytes,
   });
 
-  factory MountPointItem.fromJson(Map<String, dynamic> json) {
+  factory MountPointItem.fromJson(
+    Map<String, dynamic> json, {
+    StorageDataSource dataSource = StorageDataSource.rpcJson,
+  }) {
     final mount = json['mount']?.toString() ??
         json['target']?.toString() ??
         json['mountpoint']?.toString() ??
@@ -82,16 +91,13 @@ class MountPointItem {
       rawSize *= bsize;
       rawAvail *= bsize;
       rawUsed *= bsize;
-    } else {
-      final isExplicitBytes = json.containsKey('sizeBytes') ||
-          json['unit']?.toString().toLowerCase() == 'bytes' ||
-          json['bytes'] == true;
-      if (!isExplicitBytes && rawSize > 0 && rawSize < 100000000000) {
-        // Raw sizes from LuCI RPC / df are in 1K-blocks (KB), convert to Bytes
-        rawSize *= 1024;
-        rawAvail *= 1024;
-        rawUsed *= 1024;
-      }
+    } else if (dataSource == StorageDataSource.dfKBlocks ||
+        json['unit']?.toString().toLowerCase() == '1k-blocks' ||
+        json['unit']?.toString().toLowerCase() == 'kb') {
+      // 1K-blocks output from df / df -k (without unit suffix in line)
+      rawSize *= 1024;
+      rawAvail *= 1024;
+      rawUsed *= 1024;
     }
 
     if (rawUsed == 0 && rawSize > rawAvail && rawAvail > 0) {
@@ -188,6 +194,15 @@ class StorageOverview {
       final rawLines = data.split('\n');
       final lines = <String>[];
 
+      bool isHumanFormat = false;
+      for (final l in rawLines) {
+        if (l.contains('Size') || l.contains('Used') || l.contains('Avail')) {
+          if (l.contains('Human') || l.contains('-h') || l.contains('Size')) {
+            isHumanFormat = true;
+          }
+        }
+      }
+
       String pendingDev = '';
       for (final l in rawLines) {
         final trimmed = l.trim();
@@ -259,17 +274,20 @@ class StorageOverview {
             blockIdx = 2;
           }
 
-          int sizeVal = 0;
-          int usedVal = 0;
-          int availVal = 0;
+          final sizeRawStr = parts[blockIdx];
+          final hasUnitSuffix = RegExp(r'[a-zA-Z]$').hasMatch(sizeRawStr.trim());
+          final lineDataSource = (hasUnitSuffix || isHumanFormat)
+              ? StorageDataSource.dfHuman
+              : StorageDataSource.dfKBlocks;
 
-          if (percentIdx - blockIdx >= 3) {
-            sizeVal = parseNum(parts[blockIdx]);
-            usedVal = parseNum(parts[blockIdx + 1]);
-            availVal = parseNum(parts[blockIdx + 2]);
-          } else if (percentIdx - blockIdx == 2) {
-            sizeVal = parseNum(parts[blockIdx]);
-            usedVal = parseNum(parts[blockIdx + 1]);
+          int sizeBytes = parseNum(sizeRawStr);
+          int usedBytes = percentIdx - blockIdx >= 2 ? parseNum(parts[blockIdx + 1]) : 0;
+          int availBytes = percentIdx - blockIdx >= 3 ? parseNum(parts[blockIdx + 2]) : 0;
+
+          if (lineDataSource == StorageDataSource.dfKBlocks) {
+            sizeBytes *= 1024;
+            usedBytes *= 1024;
+            availBytes *= 1024;
           }
 
           final target = parts.sublist(percentIdx + 1).join(' ');
@@ -291,23 +309,13 @@ class StorageOverview {
             }
           }
 
-          int sizeBytes = sizeVal;
-          int usedBytes = usedVal;
-          int availBytes = availVal < 0 ? 0 : availVal;
-
-          if (sizeBytes > 0 && sizeBytes < 100000000000) {
-            sizeBytes *= 1024;
-            usedBytes *= 1024;
-            availBytes *= 1024;
-          }
-
           list.add(MountPointItem(
             mountPath: mountPath,
             device: dev,
             filesystemType: fs,
             sizeBytes: sizeBytes,
             usedBytes: usedBytes,
-            availableBytes: availBytes,
+            availableBytes: availBytes < 0 ? 0 : availBytes,
           ));
         }
       }

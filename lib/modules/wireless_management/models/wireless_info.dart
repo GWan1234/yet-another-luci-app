@@ -207,6 +207,7 @@ class WirelessStation {
 /// Represents a single Wi-Fi SSID / virtual interface on a radio.
 class WirelessInterface {
   final String ifName;
+  final String sectionName;
   final String ssid;
   final String mode; // AP, Client, Mesh, Ad-Hoc
   final String encryption;
@@ -218,6 +219,7 @@ class WirelessInterface {
 
   const WirelessInterface({
     required this.ifName,
+    required this.sectionName,
     required this.ssid,
     required this.mode,
     required this.encryption,
@@ -302,8 +304,16 @@ class WirelessInterface {
       }
     }
 
+    final sectionStr = json['section']?.toString() ??
+        json['.name']?.toString() ??
+        config['.name']?.toString() ??
+        json['ifname']?.toString() ??
+        config['ifname']?.toString() ??
+        name;
+
     return WirelessInterface(
       ifName: name,
+      sectionName: sectionStr,
       ssid: ssidStr,
       mode: modeStr,
       encryption: encStr,
@@ -451,6 +461,7 @@ class WirelessOverview {
           interfaces: [
             const WirelessInterface(
               ifName: 'wlan0',
+              sectionName: 'wifinet0',
               ssid: 'OpenWrt-2.4G',
               mode: 'AP',
               encryption: 'WPA2-PSK (CCMP)',
@@ -475,6 +486,7 @@ class WirelessOverview {
           interfaces: [
             const WirelessInterface(
               ifName: 'wlan1',
+              sectionName: 'wifinet1',
               ssid: 'OpenWrt-5G',
               mode: 'AP',
               encryption: 'WPA3-SAE (Mandatory PMF)',

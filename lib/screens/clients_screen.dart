@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/models/client.dart';
+import 'package:luci_mobile/state/app_state.dart';
 import 'package:luci_mobile/main.dart';
 import 'package:luci_mobile/widgets/luci_app_bar.dart';
 
@@ -777,9 +778,82 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                 'Lease Time Remaining: ${client.formattedLeaseTime}',
           ),
           const SizedBox(height: 8),
+          if (client.isConnected && client.connectionType == ConnectionType.wireless) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _showDisconnectConfirmation(context, client),
+                  icon: const Icon(Icons.wifi_off_rounded, color: Colors.red, size: 18),
+                  label: const Text(
+                    'Disconnect Wi-Fi Client',
+                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _showDisconnectConfirmation(BuildContext context, Client client) async {
+    final appState = AppState.instance;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.wifi_off_rounded, color: Colors.orange, size: 36),
+        title: const Text('Disconnect Client?'),
+        content: Text(
+          'Disconnect ${client.displayName} (${client.macAddress}) from Wi-Fi? The device can re-associate at any time.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Disconnect'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Disconnecting ${client.displayName}...'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      final success = await appState.disconnectWirelessClient(
+        client.macAddress,
+        iface: client.ssid,
+        context: context,
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success
+                ? 'Client ${client.displayName} disconnected.'
+                : 'Failed to disconnect client ${client.displayName}.',
+          ),
+          backgroundColor: success ? Colors.green : Colors.red,
+        ),
+      );
+    }
   }
 
   String _buildMinimalClientSubtitle(Client client) {

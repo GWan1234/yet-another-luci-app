@@ -72,6 +72,17 @@ class AppState extends ChangeNotifier {
   bool _isRebooting = false;
   bool get isRebooting => _isRebooting;
 
+  // Wi-Fi Access Control auto-revert state
+  Timer? _accessControlRevertTimer;
+  Timer? _accessControlCountdownTimer;
+  int _accessControlCountdownSeconds = 25;
+  bool _isAccessControlPendingConfirmation = false;
+  Map<String, List<String>> _priorMaclistSnapshot = {};
+  Map<String, String> _priorMacfilterSnapshot = {};
+
+  bool get isAccessControlPendingConfirmation => _isAccessControlPendingConfirmation;
+  int get accessControlCountdownSeconds => _accessControlCountdownSeconds;
+
   // Theme mode state
   ThemeMode _themeMode = ThemeMode.system;
   static const String _themeModeKey = 'themeMode';
@@ -117,6 +128,7 @@ class AppState extends ChangeNotifier {
     await _migrateGlobalDashboardPreferencesIfNeeded(); // Proactively migrate legacy prefs
     await _loadClientsViewMode();
     await loadDashboardPreferences(); // Load prefs scoped to selected router
+    await _loadPendingAccessControlState();
   }
 
   /// One-time migration: if a global 'dashboard_preferences' exists,
@@ -2406,6 +2418,272 @@ class AppState extends ChangeNotifier {
       _authService!.ipAddress!,
       _authService!.useHttps,
     );
+  }
+
+  Future<bool> disconnectWirelessClient(
+    String macAddress, {
+    String? iface,
+    BuildContext? context,
+  }) async {
+    if (_reviewerModeEnabled) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      await fetchDashboardData();
+      return true;
+    }
+    if (_authService?.sysauth == null || _authService?.ipAddress == null) {
+      return false;
+    }
+    final res = await _apiService!.disconnectWirelessClient(
+      _authService!.ipAddress!,
+      _authService!.sysauth!,
+      _authService!.useHttps,
+      macAddress: macAddress,
+      iface: iface,
+      context: context,
+    );
+    if (res) {
+      await fetchDashboardData();
+    }
+    return res;
+  }
+
+  Future<bool> setSsidEnabled(
+    String ifaceSection,
+    bool enabled, {
+    BuildContext? context,
+  }) async {
+    if (_reviewerModeEnabled) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      await fetchDashboardData();
+      return true;
+    }
+    if (_authService?.sysauth == null || _authService?.ipAddress == null) {
+      return false;
+    }
+    final res = await _apiService!.setSsidEnabled(
+      _authService!.ipAddress!,
+      _authService!.sysauth!,
+      _authService!.useHttps,
+      ifaceSection: ifaceSection,
+      enabled: enabled,
+      context: context,
+    );
+    if (res) {
+      await fetchDashboardData();
+    }
+    return res;
+  }
+
+  static const String _wifiAccessControlPendingKey = 'wifi_access_control_pending_revert';
+
+  Future<void> _saveAccessControlPendingState(int startTimeMs) async {
+    try {
+      final payload = {
+        'timestamp': startTimeMs,
+        'priorMaclist': _priorMaclistSnapshot,
+        'priorMacfilter': _priorMacfilterSnapshot,
+      };
+      await _secureStorageService.writeValue(_wifiAccessControlPendingKey, jsonEncode(payload));
+    } catch (e, stack) {
+      Logger.exception('Failed to save access control pending state', e, stack);
+    }
+  }
+
+  Future<void> _clearAccessControlPendingState() async {
+    try {
+      await _secureStorageService.deleteValue(_wifiAccessControlPendingKey);
+    } catch (e, stack) {
+      Logger.exception('Failed to clear access control pending state', e, stack);
+    }
+  }
+
+  Future<void> _loadPendingAccessControlState() async {
+    try {
+      final jsonStr = await _secureStorageService.readValue(_wifiAccessControlPendingKey);
+      if (jsonStr == null || jsonStr.isEmpty) return;
+      final Map<String, dynamic> data = jsonDecode(jsonStr);
+      final timestamp = data['timestamp'] as int? ?? 0;
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final elapsedSec = (now - timestamp) ~/ 1000;
+
+      final maclistMap = (data['priorMaclist'] as Map<String, dynamic>?)?.map(
+        (k, v) => MapEntry(k, (v as List).map((e) => e.toString()).toList()),
+      ) ?? {};
+      final macfilterMap = (data['priorMacfilter'] as Map<String, dynamic>?)?.map(
+        (k, v) => MapEntry(k, v.toString()),
+      ) ?? {};
+
+      _priorMaclistSnapshot = maclistMap;
+      _priorMacfilterSnapshot = macfilterMap;
+
+      if (elapsedSec < 25) {
+        final remaining = 25 - elapsedSec;
+        _startAccessControlAutoRevertTimer(initialSeconds: remaining);
+      } else {
+        await revertWifiAccessControlChanges();
+      }
+    } catch (e, stack) {
+      Logger.exception('Failed to load pending access control state', e, stack);
+    }
+  }
+
+  Future<bool> applyWifiAccessControl({
+    required Map<String, List<String>> newMaclistByIface,
+    required Map<String, String> newMacfilterByIface,
+    required Map<String, List<String>> priorMaclistSnapshot,
+    required Map<String, String> priorMacfilterSnapshot,
+    BuildContext? context,
+  }) async {
+    _priorMaclistSnapshot = priorMaclistSnapshot;
+    _priorMacfilterSnapshot = priorMacfilterSnapshot;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+
+    await _saveAccessControlPendingState(nowMs);
+
+    bool success = true;
+    if (!_reviewerModeEnabled) {
+      if (_authService?.sysauth == null || _authService?.ipAddress == null) {
+        return false;
+      }
+      success = await _apiService!.setWifiAccessControl(
+        _authService!.ipAddress!,
+        _authService!.sysauth!,
+        _authService!.useHttps,
+        maclistByIface: newMaclistByIface,
+        macfilterByIface: newMacfilterByIface,
+        context: context,
+      );
+    }
+
+    if (success) {
+      _startAccessControlAutoRevertTimer(initialSeconds: 25);
+      await fetchDashboardData();
+    } else {
+      await _clearAccessControlPendingState();
+    }
+    return success;
+  }
+
+  void _startAccessControlAutoRevertTimer({int initialSeconds = 25}) {
+    _accessControlRevertTimer?.cancel();
+    _accessControlCountdownTimer?.cancel();
+
+    _isAccessControlPendingConfirmation = true;
+    _accessControlCountdownSeconds = initialSeconds;
+    notifyListeners();
+
+    _accessControlCountdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_accessControlCountdownSeconds > 1) {
+        _accessControlCountdownSeconds--;
+        notifyListeners();
+      } else {
+        timer.cancel();
+      }
+    });
+
+    _accessControlRevertTimer = Timer(Duration(seconds: initialSeconds), () {
+      if (_isAccessControlPendingConfirmation) {
+        Logger.warning('Wi-Fi Access Control auto-revert timer expired. Reverting changes.');
+        revertWifiAccessControlChanges();
+      }
+    });
+  }
+
+  Future<bool> confirmWifiAccessControlChanges() async {
+    _accessControlRevertTimer?.cancel();
+    _accessControlCountdownTimer?.cancel();
+    _isAccessControlPendingConfirmation = false;
+    await _clearAccessControlPendingState();
+
+    bool success = true;
+    if (!_reviewerModeEnabled) {
+      if (_authService?.sysauth != null && _authService?.ipAddress != null) {
+        success = await _apiService!.confirmWifiAccessControl(
+          _authService!.ipAddress!,
+          _authService!.sysauth!,
+          _authService!.useHttps,
+        );
+      }
+    }
+
+    _priorMaclistSnapshot = {};
+    _priorMacfilterSnapshot = {};
+    notifyListeners();
+    return success;
+  }
+
+  Future<bool> revertWifiAccessControlChanges({BuildContext? context}) async {
+    _accessControlRevertTimer?.cancel();
+    _accessControlCountdownTimer?.cancel();
+    _isAccessControlPendingConfirmation = false;
+    await _clearAccessControlPendingState();
+    notifyListeners();
+
+    if (_priorMaclistSnapshot.isEmpty && _priorMacfilterSnapshot.isEmpty) {
+      return true;
+    }
+
+    bool success = true;
+    if (!_reviewerModeEnabled) {
+      if (_authService?.sysauth != null && _authService?.ipAddress != null) {
+        success = await _apiService!.revertWifiAccessControl(
+          _authService!.ipAddress!,
+          _authService!.sysauth!,
+          _authService!.useHttps,
+          maclistByIface: _priorMaclistSnapshot,
+          macfilterByIface: _priorMacfilterSnapshot,
+          context: context,
+        );
+
+        if (!success) {
+          int retries = 0;
+          Timer.periodic(const Duration(seconds: 3), (retryTimer) async {
+            retries++;
+            if (retries > 10) {
+              retryTimer.cancel();
+              return;
+            }
+            final retried = await _apiService!.revertWifiAccessControl(
+              _authService!.ipAddress!,
+              _authService!.sysauth!,
+              _authService!.useHttps,
+              maclistByIface: _priorMaclistSnapshot,
+              macfilterByIface: _priorMacfilterSnapshot,
+            );
+            if (retried) {
+              retryTimer.cancel();
+              await fetchDashboardData();
+            }
+          });
+        }
+      }
+    }
+
+    _priorMaclistSnapshot = {};
+    _priorMacfilterSnapshot = {};
+    await fetchDashboardData();
+    notifyListeners();
+    return success;
+  }
+
+  Future<bool> autoFixPermissions({BuildContext? context}) async {
+    if (_reviewerModeEnabled) {
+      await redetectCapabilities();
+      return true;
+    }
+    if (_authService?.sysauth == null || _authService?.ipAddress == null) {
+      return false;
+    }
+    final res = await _apiService!.autoFixPermissions(
+      _authService!.ipAddress!,
+      _authService!.sysauth!,
+      _authService!.useHttps,
+      context: context,
+    );
+    if (res) {
+      await redetectCapabilities();
+    }
+    return res;
   }
 
   Future<bool> setWirelessRadioState(
