@@ -10,90 +10,66 @@ class RouterService {
   List<model.Router> get routers => _routers;
   model.Router? get selectedRouter => _selectedRouter;
 
+  static String generateId(String ip, String user, bool useHttps) {
+    final scheme = useHttps ? 'https' : 'http';
+    return '$scheme://$ip-$user';
+  }
+
   Future<void> loadRouters() async {
     _routers = await _secureStorageService.getRouters();
 
-    // Try to restore the previously selected router
-    final selectedId = await _secureStorageService.getSelectedRouterId();
-    if (selectedId != null && _routers.isNotEmpty) {
-      // Try to find the router with the saved ID
-      try {
-        _selectedRouter = _routers.firstWhere((r) => r.id == selectedId);
-      } catch (e) {
-        // If not found, fall back to first router
-        _selectedRouter = _routers.first;
-      }
-    } else if (_routers.isNotEmpty && _selectedRouter == null) {
+    // Single active router mode: if routers exist, select the first router
+    if (_routers.isNotEmpty) {
       _selectedRouter = _routers.first;
-    }
-
-    // Save the selected router ID if we have one
-    if (_selectedRouter != null) {
+      // Enforce single item in list
+      _routers = [_selectedRouter!];
       await _secureStorageService.saveSelectedRouterId(_selectedRouter!.id);
+    } else {
+      _selectedRouter = null;
     }
   }
 
   Future<void> addRouter(model.Router router) async {
-    _routers.add(router);
+    // Single active router mode: replace any stored router with the current active router
+    _routers = [router];
+    _selectedRouter = router;
     await _secureStorageService.saveRouters(_routers);
-    if (_selectedRouter == null) {
-      _selectedRouter = router;
-      await _secureStorageService.saveSelectedRouterId(router.id);
-    }
+    await _secureStorageService.saveSelectedRouterId(router.id);
+  }
+
+  Future<void> clearAllRouters() async {
+    _routers = [];
+    _selectedRouter = null;
+    await _secureStorageService.saveRouters([]);
+    await _secureStorageService.saveSelectedRouterId(null);
   }
 
   Future<bool> removeRouter(String id) async {
-    final wasActive = _selectedRouter?.id == id;
-    _routers.removeWhere((r) => r.id == id);
-    await _secureStorageService.saveRouters(_routers);
-
-    if (wasActive) {
-      if (_routers.isNotEmpty) {
-        _selectedRouter = _routers.first;
-        await _secureStorageService.saveSelectedRouterId(_selectedRouter!.id);
-        return true; // Indicates need to switch to new router
-      } else {
-        _selectedRouter = null;
-        await _secureStorageService.saveSelectedRouterId(null);
-        return false; // No routers available
-      }
-    }
-    return false; // No router switch needed
+    _routers.clear();
+    _selectedRouter = null;
+    await _secureStorageService.saveRouters([]);
+    await _secureStorageService.saveSelectedRouterId(null);
+    return false;
   }
 
   model.Router? selectRouter(String id) {
     if (_routers.isEmpty) return null;
-
-    final found = _routers.firstWhere(
-      (r) => r.id == id,
-      orElse: () => _routers.first,
-    );
-
-    _selectedRouter = found;
-    // Save the selected router ID asynchronously
-    _secureStorageService.saveSelectedRouterId(found.id);
-    return found;
+    _selectedRouter = _routers.first;
+    return _selectedRouter;
   }
 
   Future<void> updateRouter(model.Router router) async {
-    final idx = _routers.indexWhere((r) => r.id == router.id);
-    if (idx != -1) {
-      _routers[idx] = router;
-      if (_selectedRouter?.id == router.id) {
-        _selectedRouter = router;
-      }
-      await _secureStorageService.saveRouters(_routers);
-    }
+    _routers = [router];
+    _selectedRouter = router;
+    await _secureStorageService.saveRouters(_routers);
+    await _secureStorageService.saveSelectedRouterId(router.id);
   }
 
   Future<void> updateSelectedRouterHostname(String hostname) async {
     if (_selectedRouter != null && hostname.isNotEmpty) {
-      final idx = _routers.indexWhere((r) => r.id == _selectedRouter!.id);
-      if (idx != -1) {
-        _routers[idx] = _routers[idx].copyWith(lastKnownHostname: hostname);
-        _selectedRouter = _routers[idx];
-        await _secureStorageService.saveRouters(_routers);
-      }
+      _selectedRouter = _selectedRouter!.copyWith(lastKnownHostname: hostname);
+      _routers = [_selectedRouter!];
+      await _secureStorageService.saveRouters(_routers);
     }
   }
 
@@ -103,7 +79,7 @@ class RouterService {
     String pass,
     bool useHttps,
   ) {
-    final id = '$ip-$user';
+    final id = generateId(ip, user, useHttps);
     return model.Router(
       id: id,
       ipAddress: ip,

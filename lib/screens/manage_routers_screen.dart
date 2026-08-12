@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
 import 'package:luci_mobile/models/router.dart' as model;
+import 'package:luci_mobile/services/router_service.dart';
 import 'package:luci_mobile/providers/entitlement_provider.dart';
 import 'package:luci_mobile/screens/paywall_screen.dart';
 import 'package:luci_mobile/widgets/luci_app_bar.dart';
 import 'package:luci_mobile/utils/url_parser.dart';
-import 'package:luci_mobile/widgets/theme_router_logo.dart';
 
 class ManageRoutersScreen extends ConsumerStatefulWidget {
   const ManageRoutersScreen({super.key});
@@ -84,6 +84,7 @@ class _ManageRoutersScreenState extends ConsumerState<ManageRoutersScreen> {
                               vertical: 8.0,
                             ),
                             child: _UnifiedRouterCard(
+                              routerIndex: index,
                               routerTitle: routerTitle,
                               subtitle:
                                   '${router.ipAddress} (${router.username})',
@@ -247,55 +248,54 @@ class _ManageRoutersScreenState extends ConsumerState<ManageRoutersScreen> {
                                                 minWidth: 320,
                                                 minHeight: 380,
                                               ),
-                                              child: Form(
-                                                key: formKey,
-                                                child: SingleChildScrollView(
-                                                  child: Padding(
-                                                    padding:
-                                                        const EdgeInsets.only(
-                                                          top: 32,
-                                                        ),
-                                                    child: Column(
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
-                                                      children: [
-                                                        TextFormField(
-                                                          controller:
-                                                              ipController,
-                                                          decoration: const InputDecoration(
-                                                            labelText:
-                                                                'Router Address',
-                                                            border:
-                                                                OutlineInputBorder(),
-                                                            prefixIcon: Icon(
-                                                              Icons
-                                                                  .router_outlined,
-                                                            ),
-                                                            helperText:
-                                                                'e.g. 192.168.1.1, router.local:8080, https://192.168.1.1',
+                                              child: AutofillGroup(
+                                                child: Form(
+                                                  key: formKey,
+                                                  child: SingleChildScrollView(
+                                                    child: Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                            top: 32,
                                                           ),
-                                                          validator: (value) {
-                                                            if (value == null ||
-                                                                value.isEmpty) {
-                                                              return 'Please enter the router address';
-                                                            }
-                                                            final parsed =
-                                                                UrlParser.parse(
-                                                                  value,
-                                                                );
-                                                            if (!parsed.isValid) {
-                                                              return parsed
-                                                                      .error ??
-                                                                  'Invalid address format';
-                                                            }
-                                                            return null;
-                                                          },
-                                                          autofillHints: const [
-                                                            AutofillHints.url,
-                                                            AutofillHints
-                                                                .username,
-                                                          ],
-                                                        ),
+                                                      child: Column(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          TextFormField(
+                                                            controller:
+                                                                ipController,
+                                                            decoration: const InputDecoration(
+                                                              labelText:
+                                                                  'Router Address',
+                                                              border:
+                                                                  OutlineInputBorder(),
+                                                              prefixIcon: Icon(
+                                                                Icons
+                                                                    .router_outlined,
+                                                              ),
+                                                              helperText:
+                                                                  'e.g. 192.168.1.1, router.local:8080, https://192.168.1.1',
+                                                            ),
+                                                            validator: (value) {
+                                                              if (value == null ||
+                                                                  value.isEmpty) {
+                                                                return 'Please enter the router address';
+                                                              }
+                                                              final parsed =
+                                                                  UrlParser.parse(
+                                                                    value,
+                                                                  );
+                                                              if (!parsed.isValid) {
+                                                                return parsed
+                                                                        .error ??
+                                                                    'Invalid address format';
+                                                              }
+                                                              return null;
+                                                            },
+                                                            autofillHints: const [
+                                                              AutofillHints.url,
+                                                            ],
+                                                          ),
                                                         const SizedBox(
                                                           height: 20,
                                                         ),
@@ -464,7 +464,7 @@ class _ManageRoutersScreenState extends ConsumerState<ManageRoutersScreen> {
                                                                           parsedUrl
                                                                               .useHttps;
                                                                       final id =
-                                                                          '$hostWithPort-$user';
+                                                                          RouterService.generateId(hostWithPort, user, useHttps);
  
                                                                       if (routers.any(
                                                                         (r) =>
@@ -624,6 +624,7 @@ class _ManageRoutersScreenState extends ConsumerState<ManageRoutersScreen> {
                                                   ),
                                                 ),
                                               ),
+                                                ),
                                             ),
                                           );
                                         },
@@ -652,6 +653,7 @@ class _ManageRoutersScreenState extends ConsumerState<ManageRoutersScreen> {
 }
 
 class _UnifiedRouterCard extends StatelessWidget {
+  final int routerIndex;
   final String routerTitle;
   final String subtitle;
   final bool isSelected;
@@ -660,6 +662,7 @@ class _UnifiedRouterCard extends StatelessWidget {
   final VoidCallback? onDelete;
 
   const _UnifiedRouterCard({
+    required this.routerIndex,
     required this.routerTitle,
     required this.subtitle,
     required this.isSelected,
@@ -690,9 +693,17 @@ class _UnifiedRouterCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           child: Row(
             children: [
-              const ThemeRouterLogo(
-                width: 34,
-                height: 34,
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: isSelected ? colorScheme.primary : colorScheme.surfaceContainerHighest,
+                child: Text(
+                  '${routerIndex + 1}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(

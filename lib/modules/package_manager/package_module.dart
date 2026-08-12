@@ -32,6 +32,6 @@ class PackageManagerModule extends LuciModule {
 
   @override
   Widget? buildDashboardWidget(BuildContext context) {
-    return const PackageManagerCard();
+    return null;
   }
 }

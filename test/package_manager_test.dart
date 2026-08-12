@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:luci_mobile/models/router_capabilities.dart';
 import 'package:luci_mobile/models/rpc_result.dart';
 import 'package:luci_mobile/modules/package_manager/models/package_info.dart';
+import 'package:luci_mobile/services/api_service.dart';
 
 void main() {
   group('Package Manager Engine Wiring Tests', () {
@@ -72,6 +73,37 @@ void main() {
       expect(result.data, equals('base-files - 1570-r23805\n'));
     });
 
+    test('fromDashboardData parses package-manager-call OPKG status output on APK routers', () {
+      const sampleOutput = '''
+Package: apk-mbedtls
+Version: 3.0.5-r2
+Depends: libc, libmbedtls21
+Status: install ok installed
+Description: apk package manager (mbedtls)
+
+Package: base-files
+Version: 1696~b21cfa8f8c
+Status: install ok installed
+Description: OpenWrt base files
+''';
+      final overview = PackageManagerOverview.fromDashboardData({
+        'packageManager': 'apk',
+        'installedPackages': sampleOutput,
+      });
+      expect(overview.installedPackages.length, 2);
+      expect(overview.installedPackages[0].name, 'apk-mbedtls');
+      expect(overview.installedPackages[0].version, '3.0.5-r2');
+      expect(overview.installedPackages[1].name, 'base-files');
+    });
+
+    test('fromDashboardData returns empty installed list when RPC data is missing', () {
+      final overview = PackageManagerOverview.fromDashboardData(
+        {'packageManager': 'apk', 'installedPackages': null},
+      );
+      expect(overview.installedPackages, isEmpty);
+      expect(overview.availablePackages, isEmpty);
+    });
+
     test('OpenWrtPackageRepository correctly parses OPKG feeds', () {
       const line = 'src/gz openwrt_core https://downloads.openwrt.org/snapshots/packages/x86_64/base';
       final repo = OpenWrtPackageRepository.parseOpkgLine(line);
@@ -89,6 +121,93 @@ void main() {
       expect(repo, isNotNull);
       expect(repo!.url, equals('https://downloads.openwrt.org/snapshots/packages/x86_64/base'));
       expect(repo.engine, equals(PackageManagerEngine.apk));
+    });
+
+    test('PackageManagerOverview parses OPKG status file blocks (/usr/lib/opkg/status)', () {
+      const opkgStatus = '''
+Package: base-files
+Version: 1570-r23805
+Status: install ok installed
+Architecture: x86_64
+Description: OpenWrt core base files
+
+Package: luci-app-firewall
+Version: 1.0.0-1
+Status: install ok installed
+Description: Firewall configuration user interface
+''';
+      final overview = PackageManagerOverview.fromDashboardData({
+        'packageManager': 'opkg',
+        'installedPackages': opkgStatus,
+      });
+
+      expect(overview.installedPackages.length, equals(2));
+      expect(overview.installedPackages[0].name, equals('base-files'));
+      expect(overview.installedPackages[0].version, equals('1570-r23805'));
+      expect(overview.installedPackages[1].name, equals('luci-app-firewall'));
+    });
+
+    test('PackageManagerOverview parses APK database blocks (/lib/apk/db/installed)', () {
+      const apkDb = '''
+C:Q1abc123
+P:zlib
+V:1.2.13-r1
+T:Compression library
+
+C:Q1def456
+P:busybox
+V:1.36.1-r2
+T:Essential command line utilities
+''';
+      final overview = PackageManagerOverview.fromDashboardData({
+        'packageManager': 'apk',
+        'installedPackages': apkDb,
+      });
+
+      expect(overview.installedPackages.length, equals(2));
+      expect(overview.installedPackages[0].name, equals('zlib'));
+      expect(overview.installedPackages[0].version, equals('1.2.13-r1'));
+      expect(overview.installedPackages[1].name, equals('busybox'));
+    });
+
+    test('PackageManagerOverview parses apk info -v single-word output lines', () {
+      const apkInfo = '''
+zlib-1.2.13-r1
+busybox-1.36.1-r2
+luci-mod-status-24.10.0-r1
+''';
+      final overview = PackageManagerOverview.fromDashboardData({
+        'packageManager': 'apk',
+        'installedPackages': apkInfo,
+      });
+
+      expect(overview.installedPackages.length, equals(3));
+      expect(overview.installedPackages[0].name, equals('zlib'));
+      expect(overview.installedPackages[0].version, equals('1.2.13-r1'));
+      expect(overview.installedPackages[1].name, equals('busybox'));
+      expect(overview.installedPackages[1].version, equals('1.36.1-r2'));
+    });
+
+    test('fileExecParams and fileExecArgs preserve RPC compatibility for file.exec', () {
+      final params = RealApiService.fileExecParams('/usr/libexec/package-manager-call', ['list-installed']);
+      expect(params, containsPair('command', '/usr/libexec/package-manager-call'));
+      expect(params, contains('params'));
+      expect(params, isNot(contains('args')));
+
+      final args = RealApiService.fileExecArgs('/usr/libexec/package-manager-call', ['list-installed']);
+      expect(args, containsPair('command', '/usr/libexec/package-manager-call'));
+      expect(args, contains('args'));
+      expect(args, isNot(contains('params')));
+    });
+
+    test('RpcResult correctly identifies permissionDenied status (ubus code 6)', () {
+      final ubusPermError = [
+        6,
+        'Access denied'
+      ];
+      final res = RpcResult.fromUbusResponse<String>(ubusPermError, (d) => d.toString());
+      expect(res.isPermissionDenied, isTrue);
+      expect(res.status, equals(RpcCallStatus.permissionDenied));
     });
   });
 }

@@ -91,7 +91,21 @@ class StorageMonitoringScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
                   _buildSectionHeader(context, 'Mounted Storage Devices', Icons.storage_outlined),
                   const SizedBox(height: 8),
-                  ...storage.mountPoints.map((mp) => _buildMountPointCard(context, mp)),
+                  Builder(
+                    builder: (context) {
+                      final sortedMounts = List<MountPointItem>.from(storage.mountPoints);
+                      sortedMounts.sort((a, b) {
+                        if (a.mountPath == '/' || a.mountPath == '/overlay') return -1;
+                        if (b.mountPath == '/' || b.mountPath == '/overlay') return 1;
+                        if (a.mountPath == '/tmp') return -1;
+                        if (b.mountPath == '/tmp') return 1;
+                        return a.mountPath.compareTo(b.mountPath);
+                      });
+                      return Column(
+                        children: sortedMounts.map((mp) => _buildMountPointCard(context, mp)).toList(),
+                      );
+                    },
+                  ),
                   const SizedBox(height: 32),
                 ],
               ),

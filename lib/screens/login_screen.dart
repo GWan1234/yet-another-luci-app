@@ -86,9 +86,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           if (!addr.isLoopback && addr.type == InternetAddressType.IPv4) {
             final parts = addr.address.split('.');
             if (parts.length == 4) {
-              // Dynamically derive subnet gateway (e.g. 10.0.0.45 -> 10.0.0.1, 172.16.2.14 -> 172.16.2.1)
+              final detectedIp = addr.address;
               final gateway = '${parts[0]}.${parts[1]}.${parts[2]}.1';
-              _ipController.text = gateway;
+              // If user already typed a specific non-empty IP (e.g. 10.0.0.125), show feedback without forcibly overriding
+              if (_ipController.text.trim().isNotEmpty && _ipController.text.trim() != gateway && _ipController.text.trim() != '192.168.1.1') {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Subnet detected ($detectedIp). Keeping user IP: ${_ipController.text.trim()}'),
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }
+              } else {
+                _ipController.text = gateway;
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Auto-detected Gateway IP: $gateway'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              }
               break;
             }
           }
@@ -252,19 +272,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (_formKey.currentState!.validate()) {
       final appState = ref.read(appStateProvider);
       final input = _ipController.text.trim();
-      final user = _usernameController.text;
+      final user = _usernameController.text.trim();
       final pass = _passwordController.text;
 
       // Parse the input to extract host, port, and protocol
       final parsedUrl = UrlParser.parse(input);
 
       if (!parsedUrl.isValid) {
-        // Show error message
         appState.setError(parsedUrl.error ?? 'Invalid address format');
         return;
       }
 
-      // Use the parsed values
+      FocusScope.of(context).unfocus();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Attempting connection to ${parsedUrl.displayUrl}...'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+
+      // Execute login request across HTTP / HTTPS protocols
       final success = await appState.login(
         parsedUrl.hostWithPort,
         user,
@@ -275,7 +305,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       );
 
       if (success && mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         unawaited(Navigator.of(context).pushReplacementNamed('/'));
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        final errorMsg = appState.errorMessage ??
+            'Connection failed to ${parsedUrl.displayUrl}. Please check host reachability, username, and password.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 6),
+          ),
+        );
       }
     }
   }
@@ -501,7 +543,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                               focusNode: _ipFocusNode,
                                               autofillHints: const [
                                                 AutofillHints.url,
-                                                AutofillHints.username,
                                               ],
                                               decoration: InputDecoration(
                                                 labelText: 'Router Address',
@@ -555,7 +596,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                               controller: _usernameController,
                                               focusNode: _usernameFocusNode,
                                               autofillHints: const [
-                                                AutofillHints.username,
                                               ],
                                               decoration: const InputDecoration(
                                                 labelText: 'Username',

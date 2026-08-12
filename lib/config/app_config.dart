@@ -26,21 +26,17 @@ class AppConfig {
     defaultValue: 'community',
   );
 
-  /// Explicit compile-time toggle for ads SDK.
-  /// Set via `--dart-define=ENABLE_ADS=true`. Defaults to `false`.
-  /// When false, AdMob and UMP consent SDK are not initialized and no ad widgets render.
-  static const bool _enableAdsFlag = bool.fromEnvironment(
-    'ENABLE_ADS',
-    defaultValue: false,
-  );
+  /// Whether the ads SDK should be compiled, initialized, and rendered.
+  /// Controlled via compile-time flag --dart-define=ENABLE_ADS=true. Defaults to false.
+  static bool get isAdsEnabled => const bool.fromEnvironment('ENABLE_ADS', defaultValue: false);
 
-  /// Explicit compile-time toggle for voluntary Support the Developer UI.
-  /// Set via `--dart-define=ENABLE_SUPPORT_DEV=true`. Defaults to `false`.
-  /// When false, the Support the Developer tile does not render in any screen.
-  static const bool _enableSupportDevFlag = bool.fromEnvironment(
-    'ENABLE_SUPPORT_DEV',
-    defaultValue: false,
-  );
+  /// Whether voluntary Support the Developer feature is enabled in UI.
+  /// Controlled via compile-time flag --dart-define=ENABLE_SUPPORT_DEV=true. Defaults to false.
+  static bool get isSupportDevEnabled => const bool.fromEnvironment('ENABLE_SUPPORT_DEV', defaultValue: false);
+
+  /// Whether monetization features (Play Billing, Paywalls, Router Gating) are enabled.
+  /// Explicitly disabled across all builds.
+  static bool get isMonetizationEnabled => false;
 
   /// Google Play Billing Licensing RSA public key (Base64-encoded).
   /// Used for purchase verification. Safe to include in binary — public key only.
@@ -53,18 +49,6 @@ class AppConfig {
     }
     return AppFlavor.community;
   }
-
-  /// Whether the ads SDK should be compiled, initialized, and rendered.
-  /// Explicitly disabled across all builds (Play Store & Community).
-  static bool get isAdsEnabled => false;
-
-  /// Whether voluntary Support the Developer feature is enabled in UI.
-  /// Explicitly disabled until feature is explicitly requested.
-  static bool get isSupportDevEnabled => false;
-
-  /// Whether monetization features (Play Billing, Paywalls, Router Gating) are enabled.
-  /// Explicitly disabled across all builds.
-  static bool get isMonetizationEnabled => false;
 
   /// Whether the current build is the FOSS community flavor.
   static bool get isCommunityFlavor => flavor == AppFlavor.community;

@@ -122,12 +122,14 @@ class OpenVpnInstance {
 
 /// Tailscale node status.
 class TailscaleStatus {
+  final bool isConfigured;
   final bool isRunning;
   final String nodeName;
   final String tailscaleIp;
   final String backendState;
 
   const TailscaleStatus({
+    required this.isConfigured,
     required this.isRunning,
     required this.nodeName,
     required this.tailscaleIp,
@@ -137,28 +139,36 @@ class TailscaleStatus {
   factory TailscaleStatus.fromJson(Map<String, dynamic>? json) {
     if (json == null) {
       return const TailscaleStatus(
+        isConfigured: false,
         isRunning: false,
         nodeName: '',
         tailscaleIp: '',
         backendState: 'Disabled',
       );
     }
+    final nodeName = json['node_name']?.toString() ?? json['hostname']?.toString() ?? '';
+    final ip = json['ip']?.toString() ?? json['tailscale_ip']?.toString() ?? '';
+    final state = json['state']?.toString() ?? 'Disabled';
+    final isConfig = json['configured'] == true || nodeName.isNotEmpty || ip.isNotEmpty;
     return TailscaleStatus(
-      isRunning: json['running'] == true || json['state'] == 'Running',
-      nodeName: json['node_name']?.toString() ?? 'OpenWrt-Node',
-      tailscaleIp: json['ip']?.toString() ?? '',
-      backendState: json['state']?.toString() ?? 'Disabled',
+      isConfigured: isConfig,
+      isRunning: json['running'] == true || state == 'Running',
+      nodeName: nodeName.isNotEmpty ? nodeName : 'OpenWrt-Node',
+      tailscaleIp: ip,
+      backendState: state,
     );
   }
 }
 
 /// NextDNS / Encrypted DNS status.
 class NextDnsStatus {
+  final bool isConfigured;
   final bool isEnabled;
   final String profileId;
   final bool reportClientInfo;
 
   const NextDnsStatus({
+    required this.isConfigured,
     required this.isEnabled,
     required this.profileId,
     required this.reportClientInfo,
@@ -167,14 +177,18 @@ class NextDnsStatus {
   factory NextDnsStatus.fromJson(Map<String, dynamic>? json) {
     if (json == null) {
       return const NextDnsStatus(
+        isConfigured: false,
         isEnabled: false,
         profileId: '',
         reportClientInfo: false,
       );
     }
+    final profile = json['profile']?.toString() ?? '';
+    final isConfig = json['configured'] == true || profile.isNotEmpty;
     return NextDnsStatus(
+      isConfigured: isConfig,
       isEnabled: json['enabled'] == '1' || json['enabled'] == true,
-      profileId: json['profile']?.toString() ?? '',
+      profileId: profile,
       reportClientInfo: json['report_client_info'] == '1' || json['report_client_info'] == true,
     );
   }
@@ -271,8 +285,8 @@ class VpnConnectivityOverview {
     return VpnConnectivityOverview(
       wireguardInterfaces: wgList,
       openvpnInstances: ovpnList,
-      tailscale: isReviewerMode ? (tsRaw != null ? TailscaleStatus.fromJson(tsRaw) : const TailscaleStatus(isRunning: true, nodeName: 'OpenWrt-Router', tailscaleIp: '100.64.0.15', backendState: 'Running')) : TailscaleStatus.fromJson(tsRaw),
-      nextdns: isReviewerMode ? (ndnsRaw != null ? NextDnsStatus.fromJson(ndnsRaw) : const NextDnsStatus(isEnabled: true, profileId: 'abcdef', reportClientInfo: true)) : NextDnsStatus.fromJson(ndnsRaw),
+      tailscale: isReviewerMode ? (tsRaw != null ? TailscaleStatus.fromJson(tsRaw) : const TailscaleStatus(isConfigured: true, isRunning: true, nodeName: 'OpenWrt-Router', tailscaleIp: '100.64.0.15', backendState: 'Running')) : TailscaleStatus.fromJson(tsRaw),
+      nextdns: isReviewerMode ? (ndnsRaw != null ? NextDnsStatus.fromJson(ndnsRaw) : const NextDnsStatus(isConfigured: true, isEnabled: true, profileId: 'abcdef', reportClientInfo: true)) : NextDnsStatus.fromJson(ndnsRaw),
     );
   }
 

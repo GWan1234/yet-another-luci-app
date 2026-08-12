@@ -314,7 +314,16 @@ class SettingsScreen extends ConsumerWidget {
                         Icons.info_outline,
                         color: Colors.orange,
                       ),
-                      title: const Text('Reviewer Mode Active'),
+                      title: Row(
+                        children: [
+                          const Text('Reviewer Mode Active'),
+                          const SizedBox(width: 6),
+                          Tooltip(
+                            message: 'Bypasses live router connection and populates mock metrics for testing and review.',
+                            child: Icon(Icons.info_outline, size: 16, color: Theme.of(context).colorScheme.primary),
+                          ),
+                        ],
+                      ),
                       subtitle: Text(
                         'Mock data is being used for demonstration',
                         style: Theme.of(context).textTheme.bodySmall,

@@ -515,16 +515,14 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
         List<String> currentMaclist = [];
         String currentFilterMode = 'disable';
 
-        if (rawUci is Map<String, dynamic> && rawUci.containsKey(secName)) {
-          final secMap = rawUci[secName];
-          if (secMap is Map<String, dynamic>) {
-            currentFilterMode = secMap['macfilter']?.toString() ?? 'disable';
-            final rawList = secMap['maclist'];
-            if (rawList is List) {
-              currentMaclist = rawList.map((e) => _normalizeMac(e.toString())).toList();
-            } else if (rawList is String) {
-              currentMaclist = rawList.split(RegExp(r'\s+')).map((e) => _normalizeMac(e)).toList();
-            }
+        final secMap = _findSecMap(rawUci, secName);
+        if (secMap != null) {
+          currentFilterMode = secMap['macfilter']?.toString().toLowerCase() ?? 'disable';
+          final rawList = secMap['maclist'];
+          if (rawList is List) {
+            currentMaclist = rawList.map((e) => _normalizeMac(e.toString())).toList();
+          } else if (rawList is String) {
+            currentMaclist = rawList.split(RegExp(r'\s+')).map((e) => _normalizeMac(e)).toList();
           }
         }
 

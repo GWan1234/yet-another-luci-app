@@ -399,41 +399,74 @@ class WirelessManagementScreen extends ConsumerWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  st.formattedSignal,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: _getSignalColor(st.signalDbm),
-                    fontSize: 12,
-                  ),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      st.formattedSignal,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: _getSignalColor(st.signalDbm),
+                        fontSize: 12,
+                      ),
+                    ),
+                    if (st.rxRate != null)
+                      Text(
+                        'Rx: ${_formatBandwidthRate(st.rxRate)}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    if (st.txRate != null)
+                      Text(
+                        'Tx: ${_formatBandwidthRate(st.txRate)}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    if (st.rxRate == null && st.txRate == null)
+                      Text(
+                        st.signalQualityLabel,
+                        style: const TextStyle(fontSize: 10, color: Colors.grey),
+                      ),
+                  ],
                 ),
-                if (st.rxRate != null)
-                  Text(
-                    'Rx: ${_formatBandwidthRate(st.rxRate)}',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                if (st.txRate != null)
-                  Text(
-                    'Tx: ${_formatBandwidthRate(st.txRate)}',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                if (st.rxRate == null && st.txRate == null)
-                  Text(
-                    st.signalQualityLabel,
-                    style: const TextStyle(fontSize: 10, color: Colors.grey),
-                  ),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, size: 20),
+                  onSelected: (val) {
+                    final isPaused = appState.isInternetPaused(st.macAddress);
+                    if (val == 'pause') {
+                      _toggleInternetPause(context, st.macAddress, titleText, !isPaused, appState);
+                    }
+                  },
+                  itemBuilder: (ctx) {
+                    final isPaused = appState.isInternetPaused(st.macAddress);
+                    return [
+                      PopupMenuItem(
+                        value: 'pause',
+                        child: Row(
+                          children: [
+                            Icon(
+                              isPaused ? Icons.play_circle_outline : Icons.pause_circle_outline,
+                              color: isPaused ? Colors.green : Colors.orange,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(isPaused ? 'Resume Internet' : 'Pause Internet'),
+                          ],
+                        ),
+                      ),
+                    ];
+                  },
+                ),
               ],
             ),
           ),
@@ -442,19 +475,46 @@ class WirelessManagementScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _toggleInternetPause(
+    BuildContext context,
+    String mac,
+    String name,
+    bool pause,
+    AppState appState,
+  ) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${pause ? "Pausing" : "Resuming"} internet for $name...'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    final success = await appState.pauseClientInternet(
+      mac,
+      pause: pause,
+      context: context,
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? 'Internet ${pause ? "paused" : "restored"} for $name.'
+              : 'Failed to ${pause ? "pause" : "resume"} internet for $name.',
+        ),
+        backgroundColor: success ? Colors.green : Colors.red,
+      ),
+    );
+  }
+
   String _formatBandwidthRate(num? rawRate) {
     if (rawRate == null) return 'N/A';
     double rate = rawRate.toDouble();
     if (rate <= 0) return '0 Mbps';
 
-    // Normalize raw rate to Mbps based on standard OpenWrt payload scales:
-    // 1. bps (>= 10,000,000)
-    // 2. Kbps (>= 10,000 or integer >= 1,000)
-    // 3. Mbps (< 10,000 with decimals or direct Mbps)
     double rateMbps;
     if (rate >= 10000000) {
       rateMbps = rate / 1000000;
-    } else if (rate >= 10000 || (rate >= 1000 && rate % 1 == 0)) {
+    } else if (rate >= 1000 || (rate >= 1000 && rate % 1 == 0)) {
       rateMbps = rate / 1000;
     } else {
       rateMbps = rate;

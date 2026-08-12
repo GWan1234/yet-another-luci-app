@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/luci_module.dart';
 import 'screens/system_monitoring_screen.dart';
-import 'widgets/system_monitoring_card.dart';
 
 class SystemMonitoringModule extends LuciModule {
   @override
@@ -32,6 +31,6 @@ class SystemMonitoringModule extends LuciModule {
 
   @override
   Widget? buildDashboardWidget(BuildContext context) {
-    return const SystemMonitoringCard();
+    return null;
   }
 }

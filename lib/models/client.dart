@@ -33,6 +33,7 @@ class Client {
   final ConnectionType connectionType;
   final List<String>? ipv6Addresses;
   final String? ssid;
+  final String? wirelessIface;
   final bool isConnected;
   final NeighborReachability neighState;
   final String? staticLeaseName;
@@ -51,6 +52,7 @@ class Client {
     this.connectionType = ConnectionType.unknown,
     this.ipv6Addresses,
     this.ssid,
+    this.wirelessIface,
     this.isConnected = true,
     this.neighState = NeighborReachability.unknown,
     this.staticLeaseName,
@@ -167,7 +169,7 @@ class Client {
 
   /// Creates a Client from a wireless association MAC address (no DHCP data).
   /// Used as a fallback for AP-mode routers where DHCP is handled upstream.
-  factory Client.fromWirelessStation(String macAddress, {String? ssid}) {
+  factory Client.fromWirelessStation(String macAddress, {String? ssid, String? wirelessIface}) {
     return Client(
       ipAddress: 'N/A',
       macAddress: macAddress,
@@ -175,6 +177,7 @@ class Client {
       connectionType: ConnectionType.wireless,
       neighState: NeighborReachability.reachable, // Wireless stations are confirmed live by association
       ssid: ssid,
+      wirelessIface: wirelessIface,
     );
   }
 
@@ -271,6 +274,7 @@ class Client {
     ConnectionType? connectionType,
     List<String>? ipv6Addresses,
     String? ssid,
+    String? wirelessIface,
     bool? isConnected,
     NeighborReachability? neighState,
     String? staticLeaseName,
@@ -289,6 +293,7 @@ class Client {
       connectionType: connectionType ?? this.connectionType,
       ipv6Addresses: ipv6Addresses ?? this.ipv6Addresses,
       ssid: ssid ?? this.ssid,
+      wirelessIface: wirelessIface ?? this.wirelessIface,
       isConnected: isConnected ?? this.isConnected,
       neighState: neighState ?? this.neighState,
       staticLeaseName: staticLeaseName ?? this.staticLeaseName,

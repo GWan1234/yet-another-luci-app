@@ -48,8 +48,11 @@ class SystemMetrics {
     if (loadList != null && loadList.isNotEmpty) {
       double parseLoad(dynamic val) {
         if (val == null) return 0.0;
-        final numVal = (val as num).toDouble();
-        return numVal > 500 ? numVal / 65536.0 : numVal;
+        if (val is int) {
+          return val.toDouble() / 65536.0;
+        }
+        final double dVal = (val as num).toDouble();
+        return dVal > 10.0 ? dVal / 65536.0 : dVal;
       }
 
       l1 = parseLoad(loadList[0]);

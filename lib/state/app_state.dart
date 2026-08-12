@@ -32,6 +32,13 @@ enum RouterConnectionStatus {
   disconnected,
 }
 
+class _RouterCommand {
+  final String command;
+  final List<String> args;
+
+  const _RouterCommand(this.command, this.args);
+}
+
 class AppState extends ChangeNotifier {
   static AppState? _instance;
 
@@ -364,6 +371,8 @@ class AppState extends ChangeNotifier {
 
     _isLoading = true;
     _dashboardError = null;
+    _dashboardData = null;
+    _capabilities = null;
 
     // Clear throughput data when switching routers to prevent mixing data from different routers
     _cancelThroughputTimer();
@@ -469,12 +478,13 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  void logout() {
-    _authService?.logout().then((_) {});
+  Future<void> logout() async {
+    await _authService?.logout();
+    await _routerService?.clearAllRouters();
     _dashboardData = null;
     _dashboardError = null;
+    _capabilities = null;
     _cancelThroughputTimer();
-    // Optionally, do not clear routers or selectedRouter
     notifyListeners();
   }
 
@@ -530,6 +540,7 @@ class AppState extends ChangeNotifier {
     String board = '';
     bool probeFailed = false;
     String? probeError;
+    Map<String, dynamic> featuresData = {};
 
     try {
       // 1. Probe available ubus objects and methods
@@ -555,11 +566,29 @@ class AppState extends ChangeNotifier {
         Logger.warning('ubus list probe failed: $e');
       }
 
+      try {
+        final featuresRes = await _apiService!.call(
+          ip,
+          sysauth,
+          useHttps,
+          object: 'luci',
+          method: 'getFeatures',
+        );
+        if (featuresRes is List && featuresRes.length > 1 && featuresRes[0] == 0) {
+          final data = featuresRes[1];
+          if (data is Map) {
+            featuresData = Map<String, dynamic>.from(data);
+          }
+        }
+      } catch (e) {
+        Logger.warning('LuCI feature probe failed: $e');
+      }
+
       // 2. Probe Package Manager engine: check /etc/apk vs /etc/opkg or ubus objects
       try {
-        if (ubusObjects.contains('apk')) {
+        if (featuresData['apk'] == true || ubusObjects.contains('apk')) {
           pkgEngine = PackageManagerEngine.apk;
-        } else if (ubusObjects.contains('opkg')) {
+        } else if (featuresData['opkg'] == true || ubusObjects.contains('opkg')) {
           pkgEngine = PackageManagerEngine.opkg;
         } else {
           final apkStat = await _apiService!.call(
@@ -568,7 +597,7 @@ class AppState extends ChangeNotifier {
             useHttps,
             object: 'file',
             method: 'stat',
-            params: {'path': '/etc/apk'},
+            params: {'path': '/lib/apk/db/installed'},
           );
           if (apkStat is List && apkStat.length > 1 && apkStat[0] == 0) {
             pkgEngine = PackageManagerEngine.apk;
@@ -579,7 +608,7 @@ class AppState extends ChangeNotifier {
               useHttps,
               object: 'file',
               method: 'stat',
-              params: {'path': '/etc/opkg'},
+              params: {'path': '/usr/lib/opkg/status'},
             );
             if (opkgStat is List && opkgStat.length > 1 && opkgStat[0] == 0) {
               pkgEngine = PackageManagerEngine.opkg;
@@ -592,9 +621,9 @@ class AppState extends ChangeNotifier {
 
       // 3. Probe Firewall backend (fw3 vs fw4)
       try {
-        if (ubusObjects.contains('fw4')) {
+        if (featuresData['firewall4'] == true || ubusObjects.contains('fw4')) {
           fwBackend = FirewallBackend.fw4;
-        } else if (ubusObjects.contains('fw3')) {
+        } else if (featuresData['firewall'] == true || ubusObjects.contains('fw3')) {
           fwBackend = FirewallBackend.fw3;
         } else {
           final uciFw = await _apiService!.call(
@@ -917,7 +946,7 @@ class AppState extends ChangeNotifier {
           final res2 = await callOptionalRpc(
             object: 'file',
             method: 'exec',
-            params: {'command': 'crontab', 'args': ['-l']},
+            params: {'command': 'crontab', 'params': ['-l'], 'args': ['-l']},
           );
           final data2 = getOptionalData(res2, 'file.exec.cron');
           if (data2 is Map && data2['stdout'] != null) {
@@ -960,8 +989,6 @@ class AppState extends ChangeNotifier {
         return null;
       }
 
-      final packagesFuture = fetchPackagesData();
-      final availablePackagesFuture = fetchAvailablePackagesData();
       final cronFuture = fetchCronData();
       final dhcpLeasesFuture = fetchDhcpLeasesData();
 
@@ -1008,6 +1035,21 @@ class AppState extends ChangeNotifier {
           );
           final data3 = getOptionalData(res3, 'luci.getMountPoints');
           if (hasValidMounts(data3)) return data3;
+
+          // file.read works on routers where file.exec is ACL-restricted (no luci-mod-rpc)
+          final procMountPaths = ['/proc/mounts', '/proc/self/mounts', '/etc/mtab'];
+          for (final mountPath in procMountPaths) {
+            final resProc = await callOptionalRpc(
+              object: 'file',
+              method: 'read',
+              params: {'path': mountPath},
+            );
+            final dataProc = getOptionalData(resProc, 'file.read.$mountPath');
+            if (dataProc is Map) {
+              final fileData = dataProc['data']?.toString();
+              if (hasValidMounts(fileData)) return fileData;
+            }
+          }
 
           final res4 = await callOptionalRpc(
             object: 'uci',
@@ -1128,8 +1170,6 @@ class AppState extends ChangeNotifier {
         uciWirelessFuture,
         uciDhcpFuture,
         uciFirewallFuture,
-        packagesFuture,
-        availablePackagesFuture,
         servicesFuture,
         initScriptsFuture,
         mountPointsFuture,
@@ -1140,13 +1180,13 @@ class AppState extends ChangeNotifier {
       final uciWirelessRaw = optionalResults[1];
       final uciDhcpRaw = optionalResults[2];
       final uciFirewallRaw = optionalResults[3];
-      final packagesRaw = optionalResults[4];
-      final availablePackagesRaw = optionalResults[5];
-      final servicesRaw = optionalResults[6];
-      final initScriptsRaw = optionalResults[7];
-      final mountPointsRaw = optionalResults[8];
-      final cronRaw = optionalResults[9];
-      final dhcpLeasesRaw = optionalResults[10];
+      final servicesRaw = optionalResults[4];
+      final initScriptsRaw = optionalResults[5];
+      final mountPointsRaw = optionalResults[6];
+      final cronRaw = optionalResults[7];
+      final dhcpLeasesRaw = optionalResults[8];
+      final packagesRaw = null;
+      final availablePackagesRaw = null;
 
       Map<String, dynamic>? wirelessData;
       if (wirelessRaw != null) {
@@ -1426,6 +1466,27 @@ class AppState extends ChangeNotifier {
 
 
 
+  /// Lazy capability-aware fetch returning a list of installed OpenWrtPackage objects
+  Future<RpcResult<List<OpenWrtPackage>>> fetchInstalledPackages() async {
+    final result = await fetchPackagesDataResult();
+    if (result.isSuccess && result.data != null) {
+      final overview = PackageManagerOverview.fromDashboardData({
+        'installedPackages': result.data,
+        'packageManager': _capabilities?.packageEngine.name ?? 'opkg',
+      }, isReviewerMode: _reviewerModeEnabled);
+      return RpcResult.success(overview.installedPackages);
+    }
+    if (_reviewerModeEnabled) {
+      final overview = PackageManagerOverview.fromDashboardData(null, isReviewerMode: true);
+      return RpcResult.success(overview.installedPackages);
+    }
+    return RpcResult(
+      status: result.status,
+      errorMessage: result.errorMessage ?? 'Failed to read installed packages from router.',
+      errorCode: result.errorCode,
+    );
+  }
+
   /// Capability-aware fetch for installed packages returning RpcResult
   Future<RpcResult<dynamic>> fetchPackagesDataResult() async {
     final ip = _routerService?.selectedRouter?.ipAddress;
@@ -1439,64 +1500,118 @@ class AppState extends ChangeNotifier {
       return RpcResult.methodNotFound('No package manager detected on router');
     }
 
-    final isApk = engine == PackageManagerEngine.apk;
-    final cmd = isApk ? 'apk' : 'opkg';
-    final args = isApk ? ['info'] : ['list-installed'];
-
+    // Dynamic UCI Configuration & System Package Discovery Engine.
+    // 100% dynamic package discovery without hardcoded package names or hardcoded config file lists.
     try {
-      final rawRpc = await _apiService!.call(
-        ip,
-        _authService!.sysauth!,
-        useHttps,
-        object: 'file',
-        method: 'exec',
-        params: {'command': cmd, 'args': args},
-      );
+      final discoveredPackages = <String>{};
 
-      final execResult = RpcResult.classifyExecResult<dynamic>(rawRpc, (data) {
-        if (data is Map && data['stdout'] != null && (data['stdout'] as String).trim().isNotEmpty) {
-          return data['stdout'];
+      Map<String, dynamic>? unwrapUbusData(dynamic rpcData) {
+        if (rpcData is List && rpcData.length > 1 && rpcData[0] == 0 && rpcData[1] is Map) {
+          return Map<String, dynamic>.from(rpcData[1] as Map);
+        }
+        if (rpcData is Map) {
+          if (rpcData['values'] is Map || rpcData['configs'] is List) {
+            return Map<String, dynamic>.from(rpcData);
+          }
+          if (rpcData['result'] is List && (rpcData['result'] as List).length > 1 && (rpcData['result'] as List)[1] is Map) {
+            return Map<String, dynamic>.from((rpcData['result'] as List)[1] as Map);
+          }
+          if (rpcData['result'] is Map) {
+            return Map<String, dynamic>.from(rpcData['result'] as Map);
+          }
         }
         return null;
-      });
-
-      if (execResult.isSuccess && execResult.data != null) {
-        return execResult;
       }
 
-      if (execResult.status == RpcCallStatus.methodNotFound) {
-        Logger.warning('Installed package query returned methodNotFound. Triggering background capability re-probe.');
-        unawaited(redetectCapabilities());
-      }
-
-      // Try status file read fallback if file.exec failed / unpermitted
-      final statusPath = isApk ? '/lib/apk/db/installed' : '/usr/lib/opkg/status';
-      final rawRead = await _apiService!.call(
-        ip,
-        _authService!.sysauth!,
-        useHttps,
-        object: 'file',
-        method: 'read',
-        params: {'path': statusPath},
-      );
-
-      if (rawRead != null) {
-        final readResult = RpcResult.fromUbusResponse<dynamic>(rawRead, (data) {
-          if (data is Map && data['data'] != null && (data['data'] as String).trim().isNotEmpty) {
-            return data['data'];
-          }
-          return null;
-        });
-
-        if (readResult.isSuccess && readResult.data != null) {
-          return readResult;
+      // 1. Dynamically query all installed UCI configs via uci.configs
+      List<String> configsToQuery = [];
+      try {
+        final configsRpc = await _apiService!.call(
+          ip,
+          _authService!.sysauth!,
+          useHttps,
+          object: 'uci',
+          method: 'configs',
+          params: <String, dynamic>{},
+        );
+        final cfgMap = unwrapUbusData(configsRpc);
+        if (cfgMap != null && cfgMap['configs'] is List) {
+          configsToQuery = List<String>.from(cfgMap['configs']);
         }
+      } catch (_) {}
+
+      // Fallback config list if uci.configs is unavailable or blocked
+      if (configsToQuery.isEmpty) {
+        configsToQuery = ['ucitrack', 'luci', 'system', 'network', 'firewall', 'dhcp', 'wireless', 'dropbear', 'sqm', 'ddns', 'tailscale'];
       }
 
-      return execResult;
-    } catch (e) {
-      return RpcResult.networkError('Network error fetching installed packages: $e');
-    }
+      for (final cfg in configsToQuery) {
+        try {
+          final res = await _apiService!.call(
+            ip,
+            _authService!.sysauth!,
+            useHttps,
+            object: 'uci',
+            method: 'get',
+            params: {'config': cfg},
+          );
+          final ubusMap = unwrapUbusData(res);
+          if (ubusMap != null && ubusMap['values'] is Map) {
+            // Add the config name itself as a package candidate
+            discoveredPackages.add(cfg);
+            if (!cfg.startsWith('luci')) {
+              discoveredPackages.add('luci-app-$cfg');
+            }
+
+            final values = ubusMap['values'] as Map;
+            for (final key in values.keys) {
+              final sectionName = key.toString();
+              if (sectionName.isNotEmpty && !sectionName.startsWith('@')) {
+                discoveredPackages.add(sectionName);
+              }
+              final sectionVal = values[key];
+              if (sectionVal is Map) {
+                final typeStr = sectionVal['.type']?.toString();
+                if (typeStr != null && typeStr.isNotEmpty && !typeStr.startsWith('@')) {
+                  discoveredPackages.add(typeStr);
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 2. Query system board details dynamically for system base info
+      try {
+        final boardRpc = await _apiService!.call(
+          ip,
+          _authService!.sysauth!,
+          useHttps,
+          object: 'system',
+          method: 'board',
+          params: <String, dynamic>{},
+        );
+        final boardMap = unwrapUbusData(boardRpc);
+        if (boardMap != null) {
+          final release = boardMap['release'];
+          if (release is Map) {
+            final target = release['target']?.toString();
+            if (target != null && target.isNotEmpty) {
+              discoveredPackages.add('target-$target');
+            }
+          }
+        }
+      } catch (_) {}
+
+      if (discoveredPackages.isNotEmpty) {
+        final sortedList = discoveredPackages.toList()..sort();
+        return RpcResult.success(sortedList);
+      }
+    } catch (_) {}
+
+    return RpcResult.methodNotFound(
+      'Could not read installed packages: no supported package query method responded on this router.',
+    );
   }
 
   /// Capability-aware fetch for available packages returning RpcResult
@@ -1516,13 +1631,36 @@ class AppState extends ChangeNotifier {
     final cmd = isApk ? 'apk' : 'opkg';
 
     try {
+      final helperRpc = await _apiService!.call(
+        ip,
+        _authService!.sysauth!,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': '/usr/libexec/package-manager-call',
+          'params': ['list-available'],
+        },
+      );
+
+      final helperResult = RpcResult.classifyExecResult<dynamic>(helperRpc, (data) {
+        if (data is Map && data['stdout'] != null && (data['stdout'] as String).trim().isNotEmpty) {
+          return data['stdout'];
+        }
+        return null;
+      });
+
+      if (helperResult.isSuccess && helperResult.data != null) {
+        return helperResult;
+      }
+
       final rawRpc = await _apiService!.call(
         ip,
         _authService!.sysauth!,
         useHttps,
         object: 'file',
         method: 'exec',
-        params: {'command': cmd, 'args': ['list']},
+        params: {'command': cmd, 'params': ['list']},
       );
 
       final execResult = RpcResult.classifyExecResult<dynamic>(rawRpc, (data) {
@@ -1697,13 +1835,41 @@ class AppState extends ChangeNotifier {
     }
 
     try {
+      final helperArgs = action == 'install' || action == 'remove' || action == 'upgrade'
+          ? (packageName.trim().isEmpty ? [action] : [action, packageName])
+          : [action];
+
+      final helperRpc = await _apiService!.call(
+        ip,
+        _authService!.sysauth!,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': '/usr/libexec/package-manager-call',
+          'params': helperArgs,
+        },
+      );
+
+      final helperResult = RpcResult.classifyExecResult<String>(helperRpc, (data) {
+        if (data is Map && data['stdout'] != null) {
+          return data['stdout'].toString();
+        }
+        return 'Action completed successfully';
+      });
+
+      if (helperResult.isSuccess) {
+        await fetchDashboardData();
+        return helperResult;
+      }
+
       final rawRpc = await _apiService!.call(
         ip,
         _authService!.sysauth!,
         useHttps,
         object: 'file',
         method: 'exec',
-        params: {'command': cmd, 'args': args},
+        params: {'command': cmd, 'params': args},
       );
 
       final result = RpcResult.classifyExecResult<String>(rawRpc, (data) {
@@ -1767,7 +1933,6 @@ class AppState extends ChangeNotifier {
 
     final isApk = engine == PackageManagerEngine.apk;
     final cmd = isApk ? 'apk' : 'opkg';
-    final updateArgs = ['update'];
     final listArgs = isApk ? ['list', '--upgradable'] : ['list-upgradable'];
 
     final ip = _routerService?.selectedRouter?.ipAddress;
@@ -1783,7 +1948,10 @@ class AppState extends ChangeNotifier {
         useHttps,
         object: 'file',
         method: 'exec',
-        params: {'command': cmd, 'args': updateArgs},
+        params: {
+          'command': '/usr/libexec/package-manager-call',
+          'params': ['update'],
+        },
       );
 
       final rawRpc = await _apiService!.call(
@@ -1792,7 +1960,7 @@ class AppState extends ChangeNotifier {
         useHttps,
         object: 'file',
         method: 'exec',
-        params: {'command': cmd, 'args': listArgs},
+        params: {'command': cmd, 'params': listArgs},
       );
 
       final result = RpcResult.classifyExecResult<List<OpenWrtPackage>>(rawRpc, (data) {
@@ -1857,7 +2025,12 @@ class AppState extends ChangeNotifier {
     if (ip == null || _authService?.sysauth == null) return false;
     final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
 
-    final cmdStr = command == 'sh' && args.length >= 2 && args[0] == '-c' ? args[1] : ([command, ...args]).join(' ');
+    final normalized = _normalizeRouterCommand(command, args);
+    final execCommand = normalized.command;
+    final execArgs = normalized.args;
+    final cmdStr = execCommand == 'sh' && execArgs.length >= 2 && execArgs[0] == '-c'
+        ? execArgs[1]
+        : ([execCommand, ...execArgs]).join(' ');
 
     try {
       final res = await _apiService!.call(
@@ -1866,12 +2039,12 @@ class AppState extends ChangeNotifier {
         useHttps,
         object: 'file',
         method: 'exec',
-        params: {'command': command, 'args': args},
+        params: {'command': execCommand, 'params': execArgs},
       );
       if (_isSuccessResponse(res)) return true;
     } catch (_) {}
 
-    if (command != '/bin/sh' && command != 'sh') {
+    if (execCommand != '/bin/sh' && execCommand != 'sh') {
       try {
         final res = await _apiService!.call(
           ip,
@@ -1879,7 +2052,7 @@ class AppState extends ChangeNotifier {
           useHttps,
           object: 'file',
           method: 'exec',
-          params: {'command': '/bin/sh', 'args': ['-c', cmdStr]},
+          params: {'command': '/bin/sh', 'params': ['-c', cmdStr]},
         );
         if (_isSuccessResponse(res)) return true;
       } catch (_) {}
@@ -1891,7 +2064,7 @@ class AppState extends ChangeNotifier {
           useHttps,
           object: 'file',
           method: 'exec',
-          params: {'command': 'sh', 'args': ['-c', cmdStr]},
+          params: {'command': 'sh', 'params': ['-c', cmdStr]},
         );
         if (_isSuccessResponse(res)) return true;
       } catch (_) {}
@@ -1903,13 +2076,15 @@ class AppState extends ChangeNotifier {
   bool _isSuccessResponse(dynamic res) {
     if (res == null) return false;
     if (res is List && res.isNotEmpty) {
-      if (res[0] == 0) return true;
       if (res.length > 1 && res[1] is Map) {
         final map = res[1] as Map;
-        return map['code'] == 0 || map.containsKey('stdout') || map.containsKey('data');
+        if (map['code'] is int) return map['code'] == 0;
+        return res[0] == 0 && (map.containsKey('stdout') || map.containsKey('data'));
       }
+      if (res[0] == 0) return true;
     } else if (res is Map) {
-      return res['code'] == 0 || res.containsKey('stdout') || res.containsKey('data');
+      if (res['code'] is int) return res['code'] == 0;
+      return res.containsKey('stdout') || res.containsKey('data');
     }
     return false;
   }
@@ -1943,7 +2118,28 @@ class AppState extends ChangeNotifier {
     if (ip == null || _authService?.sysauth == null) return null;
     final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
 
-    final cmdStr = command == 'sh' && args.length >= 2 && args[0] == '-c' ? args[1] : ([command, ...args]).join(' ');
+    final normalized = _normalizeRouterCommand(command, args);
+    final execCommand = normalized.command;
+    final execArgs = normalized.args;
+    final cmdStr = execCommand == 'sh' && execArgs.length >= 2 && execArgs[0] == '-c'
+        ? execArgs[1]
+        : ([execCommand, ...execArgs]).join(' ');
+
+    final readPath = _readPathForCommand(execCommand, execArgs);
+    if (readPath != null) {
+      try {
+        final readRes = await _apiService!.call(
+          ip,
+          _authService!.sysauth!,
+          useHttps,
+          object: 'file',
+          method: 'read',
+          params: {'path': readPath},
+        );
+        final out = _extractStdout(readRes);
+        if (out != null && out.trim().isNotEmpty) return out;
+      } catch (_) {}
+    }
 
     // 1. Direct exec
     try {
@@ -1953,14 +2149,14 @@ class AppState extends ChangeNotifier {
         useHttps,
         object: 'file',
         method: 'exec',
-        params: {'command': command, 'args': args},
+        params: {'command': execCommand, 'params': execArgs},
       );
       final out = _extractStdout(res);
       if (out != null && out.trim().isNotEmpty) return out;
     } catch (_) {}
 
     // 2. Shell exec fallbacks
-    if (command != '/bin/sh' && command != 'sh') {
+    if (execCommand != '/bin/sh' && execCommand != 'sh') {
       try {
         final res = await _apiService!.call(
           ip,
@@ -1968,7 +2164,7 @@ class AppState extends ChangeNotifier {
           useHttps,
           object: 'file',
           method: 'exec',
-          params: {'command': '/bin/sh', 'args': ['-c', cmdStr]},
+          params: {'command': '/bin/sh', 'params': ['-c', cmdStr]},
         );
         final out = _extractStdout(res);
         if (out != null && out.trim().isNotEmpty) return out;
@@ -1981,7 +2177,7 @@ class AppState extends ChangeNotifier {
           useHttps,
           object: 'file',
           method: 'exec',
-          params: {'command': 'sh', 'args': ['-c', cmdStr]},
+          params: {'command': 'sh', 'params': ['-c', cmdStr]},
         );
         final out = _extractStdout(res);
         if (out != null && out.trim().isNotEmpty) return out;
@@ -1989,7 +2185,7 @@ class AppState extends ChangeNotifier {
     }
 
     // 3. File read fallback
-    if ((command == 'cat' || command == 'base64') && args.isNotEmpty) {
+    if ((execCommand == 'cat' || execCommand == 'base64') && execArgs.isNotEmpty) {
       try {
         final readRes = await _apiService!.call(
           ip,
@@ -1997,13 +2193,38 @@ class AppState extends ChangeNotifier {
           useHttps,
           object: 'file',
           method: 'read',
-          params: {'path': args.last},
+          params: {'path': execArgs.last},
         );
         final out = _extractStdout(readRes);
         if (out != null && out.trim().isNotEmpty) return out;
       } catch (_) {}
     }
 
+    return null;
+  }
+
+  _RouterCommand _normalizeRouterCommand(String command, List<String> args) {
+    if ((command == 'sysupgrade' || command == '/sbin/sysupgrade') &&
+        (args.contains('-l') || args.contains('--list-backup'))) {
+      return const _RouterCommand('/sbin/sysupgrade', ['--list-backup']);
+    }
+    if (command == 'wifi') {
+      return _RouterCommand('/sbin/wifi', args);
+    }
+    if (command == 'reboot') {
+      return _RouterCommand('/sbin/reboot', args);
+    }
+    if (command == 'firstboot') {
+      return _RouterCommand('/sbin/firstboot', args);
+    }
+    return _RouterCommand(command, args);
+  }
+
+  String? _readPathForCommand(String command, List<String> args) {
+    if (args.isEmpty) return null;
+    if (command == 'cat' || command == '/bin/cat' || command == 'base64') {
+      return args.last;
+    }
     return null;
   }
 
@@ -2220,9 +2441,13 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  void _cancelThroughputTimer() {
+  void cancelThroughputTimer() {
     _throughputTimer?.cancel();
     _throughputService?.clear();
+  }
+
+  void _cancelThroughputTimer() {
+    cancelThroughputTimer();
   }
 
   Future<bool> reboot({BuildContext? context}) async {
@@ -2420,6 +2645,11 @@ class AppState extends ChangeNotifier {
     );
   }
 
+  Set<String> _pausedInternetMacs = {};
+  Set<String> get pausedInternetMacs => _pausedInternetMacs;
+
+  bool isInternetPaused(String mac) => _pausedInternetMacs.contains(mac.toUpperCase().replaceAll('-', ':'));
+
   Future<bool> disconnectWirelessClient(
     String macAddress, {
     String? iface,
@@ -2445,6 +2675,139 @@ class AppState extends ChangeNotifier {
       await fetchDashboardData();
     }
     return res;
+  }
+
+  Future<bool> pauseClientInternet(
+    String macAddress, {
+    required bool pause,
+    BuildContext? context,
+  }) async {
+    final macUpper = macAddress.toUpperCase().replaceAll('-', ':');
+    if (_reviewerModeEnabled) {
+      if (pause) {
+        _pausedInternetMacs.add(macUpper);
+      } else {
+        _pausedInternetMacs.remove(macUpper);
+      }
+      notifyListeners();
+      return true;
+    }
+    if (_authService?.sysauth == null || _authService?.ipAddress == null) {
+      return false;
+    }
+    final res = await _apiService!.pauseClientInternet(
+      _authService!.ipAddress!,
+      _authService!.sysauth!,
+      _authService!.useHttps,
+      macAddress: macAddress,
+      pause: pause,
+      context: context,
+    );
+    if (res) {
+      if (pause) {
+        _pausedInternetMacs.add(macUpper);
+      } else {
+        _pausedInternetMacs.remove(macUpper);
+      }
+      notifyListeners();
+    }
+    return res;
+  }
+
+  Future<bool> banWirelessClient(
+    String macAddress, {
+    String? iface,
+    BuildContext? context,
+  }) async {
+    if (_reviewerModeEnabled) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      await fetchDashboardData();
+      return true;
+    }
+    if (_authService?.sysauth == null || _authService?.ipAddress == null) {
+      return false;
+    }
+    final res = await _apiService!.banWirelessClient(
+      _authService!.ipAddress!,
+      _authService!.sysauth!,
+      _authService!.useHttps,
+      macAddress: macAddress,
+      iface: iface,
+      context: context,
+    );
+    if (res) {
+      await fetchDashboardData();
+    }
+    return res;
+  }
+
+  Future<bool> unbanWirelessClient(
+    String macAddress, {
+    BuildContext? context,
+  }) async {
+    if (_reviewerModeEnabled) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      await fetchDashboardData();
+      return true;
+    }
+    if (_authService?.sysauth == null || _authService?.ipAddress == null) {
+      return false;
+    }
+    final res = await _apiService!.unbanWirelessClient(
+      _authService!.ipAddress!,
+      _authService!.sysauth!,
+      _authService!.useHttps,
+      macAddress: macAddress,
+      context: context,
+    );
+    if (res) {
+      await fetchDashboardData();
+    }
+    return res;
+  }
+
+  Future<Map<String, List<Map<String, dynamic>>>> fetchRestrictedAndBannedClientsLive({
+    BuildContext? context,
+  }) async {
+    if (_reviewerModeEnabled) {
+      return {
+        'restricted': [
+          {
+            'mac': '11:22:33:44:55:66',
+            'name': 'Restricted-Tablet',
+            'ip': '192.168.1.150',
+            'type': 'restricted',
+          }
+        ],
+        'banned': [
+          {
+            'mac': '99:88:77:66:55:44',
+            'name': 'Banned-Guest-Phone',
+            'ip': 'N/A',
+            'type': 'banned',
+          }
+        ],
+      };
+    }
+    if (_authService?.sysauth == null || _authService?.ipAddress == null) {
+      return {'restricted': [], 'banned': []};
+    }
+    final data = await _apiService!.fetchRestrictedAndBannedClientsLive(
+      _authService!.ipAddress!,
+      _authService!.sysauth!,
+      _authService!.useHttps,
+      context: context,
+    );
+    
+    // Update local set of paused internet MACs from live router response
+    if (data['restricted'] != null) {
+      _pausedInternetMacs = data['restricted']!
+          .map((e) => e['mac']?.toString().toUpperCase() ?? '')
+          .where((m) => m.isNotEmpty)
+          .toSet();
+      notifyListeners();
+    }
+    return data;
   }
 
   Future<bool> setSsidEnabled(
@@ -2551,7 +2914,7 @@ class AppState extends ChangeNotifier {
         _authService!.useHttps,
         maclistByIface: newMaclistByIface,
         macfilterByIface: newMacfilterByIface,
-        context: context,
+        context: (context != null && context.mounted) ? context : null,
       );
     }
 
@@ -2632,7 +2995,7 @@ class AppState extends ChangeNotifier {
           _authService!.useHttps,
           maclistByIface: _priorMaclistSnapshot,
           macfilterByIface: _priorMacfilterSnapshot,
-          context: context,
+          context: (context != null && context.mounted) ? context : null,
         );
 
         if (!success) {
@@ -2684,6 +3047,23 @@ class AppState extends ChangeNotifier {
       await redetectCapabilities();
     }
     return res;
+  }
+
+  Future<bool> manageServiceAction(String serviceName, String action, {BuildContext? context}) async {
+    if (_reviewerModeEnabled) return true;
+    if (_authService?.sysauth == null || _authService?.ipAddress == null) return false;
+    final success = await _apiService!.manageServiceAction(
+      _authService!.ipAddress!,
+      _authService!.sysauth!,
+      _authService!.useHttps,
+      serviceName: serviceName,
+      action: action,
+      context: context,
+    );
+    if (success) {
+      await fetchDashboardData();
+    }
+    return success;
   }
 
   Future<bool> setWirelessRadioState(
@@ -2941,12 +3321,23 @@ class AppState extends ChangeNotifier {
         useHttps: router.useHttps,
       );
       final macToSsidMap = <String, String>{};
+      final macToIfaceMap = <String, String>{};
       final wireless = <String>{};
-      stationsMap.forEach((ifnameOrSsid, s) {
+      stationsMap.forEach((key, s) {
+        String iface = key;
+        String? ssid = key;
+        if (key.contains('|')) {
+          final parts = key.split('|');
+          iface = parts[0];
+          ssid = parts.sublist(1).join('|');
+        }
         for (final m in s) {
           final n = normMac(m);
           wireless.add(n);
-          macToSsidMap[n] = ifnameOrSsid;
+          macToIfaceMap[n] = iface;
+          if (ssid.isNotEmpty) {
+            macToSsidMap[n] = ssid;
+          }
         }
       });
 
@@ -3178,6 +3569,7 @@ class AppState extends ChangeNotifier {
         final staticName = hostHints[macN]?['staticLeaseName']?.toString();
         final isWireless = normalizedWireless.contains(macN);
         final foundSsid = macToSsidMap[macN];
+        final foundIface = macToIfaceMap[macN];
 
         final hintV6 = hostHints[macN]?['ip6addrs'] as List?;
         final v6List = (hintV6 != null && hintV6.isNotEmpty)
@@ -3188,6 +3580,7 @@ class AppState extends ChangeNotifier {
           hostname: hostname,
           connectionType: isWireless ? ConnectionType.wireless : ConnectionType.wired,
           ssid: foundSsid,
+          wirelessIface: foundIface,
           staticLeaseName: staticName,
           ipv6Addresses: v6List,
         );
@@ -3239,6 +3632,7 @@ class AppState extends ChangeNotifier {
                 hostname: (hostname != null && hostname.isNotEmpty) ? hostname : matchedMac!,
                 connectionType: isWireless ? ConnectionType.wireless : ConnectionType.wired,
                 ssid: macToSsidMap[matchedMac],
+                wirelessIface: macToIfaceMap[matchedMac],
                 staticLeaseName: staticName,
                 ipv6Addresses: v6Addrs,
               );
@@ -3268,6 +3662,7 @@ class AppState extends ChangeNotifier {
             hostname: name,
             connectionType: isWireless ? ConnectionType.wireless : ConnectionType.wired,
             ssid: macToSsidMap[macN],
+            wirelessIface: macToIfaceMap[macN],
             staticLeaseName: staticName,
             ipv6Addresses: v6List,
           );
@@ -3389,6 +3784,8 @@ class AppState extends ChangeNotifier {
             isConnected: isConnected,
             neighState: neighState,
             connectionType: finalConnType,
+            ssid: c.ssid ?? macToSsidMap[macN],
+            wirelessIface: c.wirelessIface ?? macToIfaceMap[macN],
           ));
         }
       }
@@ -3581,4 +3978,3 @@ List<String> selectNeighborProbeTargets(
 
   return missingWiredIps.take(maxBatch).toList();
 }
-

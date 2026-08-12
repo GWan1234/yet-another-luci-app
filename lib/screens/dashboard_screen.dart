@@ -258,6 +258,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }
 
     final theme = Theme.of(context);
+
+    double maxDataVal = 1024.0;
+    for (final val in rxHistory) {
+      if (val > maxDataVal) maxDataVal = val;
+    }
+    for (final val in txHistory) {
+      if (val > maxDataVal) maxDataVal = val;
+    }
+    final chartMaxY = maxDataVal * 1.25;
+    final chartInterval = chartMaxY / 4.0;
     // Show loading state if we don't have any throughput data yet
     final hasValidData =
         rxHistory.isNotEmpty ||
@@ -383,90 +393,106 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           ),
                           const SizedBox(height: 6),
                           Expanded(
-                            child: LineChart(
-                              key: ValueKey('chart_${appState.selectedRouter?.id}'),
-                              LineChartData(
-                                gridData: FlGridData(
-                                  show: true,
-                                  drawVerticalLine: false,
-                                  getDrawingHorizontalLine: (val) => FlLine(
-                                    color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.2),
-                                    strokeWidth: 1,
-                                  ),
-                                ),
-                                titlesData: FlTitlesData(
-                                  show: true,
-                                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                  bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                                  leftTitles: AxisTitles(
-                                    sideTitles: SideTitles(
-                                      showTitles: true,
-                                      reservedSize: 42,
-                                      getTitlesWidget: (value, meta) {
-                                        return Padding(
-                                          padding: const EdgeInsets.only(right: 4.0),
-                                          child: Text(
-                                            _formatSpeed(value),
-                                            style: TextStyle(
-                                              fontSize: 9,
-                                              color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                            textAlign: TextAlign.right,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ),
-                                borderData: FlBorderData(show: false),
-                                lineTouchData: LineTouchData(
-                                  touchTooltipData: LineTouchTooltipData(
-                                    fitInsideVertically: true,
-                                    getTooltipColor: (LineBarSpot spot) => Theme.of(
-                                      context,
-                                    ).colorScheme.surface.withValues(alpha: 0.9),
-                                    tooltipBorderRadius: BorderRadius.circular(8),
-                                    tooltipPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
-                                    ),
-                                    getTooltipItems:
-                                        (List<LineBarSpot> touchedSpots) {
-                                          return touchedSpots.map((barSpot) {
-                                            final flSpot = barSpot;
-                                            final isRx = barSpot.barIndex == 0;
-                                            final Color color =
-                                                flSpot.bar.gradient?.colors.first ??
-                                                flSpot.bar.color ??
-                                                Colors.white;
-
-                                            return LineTooltipItem(
-                                              '${isRx ? "RX" : "TX"}: ${_formatSpeed(flSpot.y)}',
-                                              TextStyle(
-                                                color: color,
-                                                fontWeight: FontWeight.w900,
-                                              ),
-                                              textAlign: TextAlign.left,
-                                            );
-                                          }).toList();
-                                        },
-                                  ),
-                                ),
-                                lineBarsData: [
-                                  _buildLineChartBarData(rxHistory, [
-                                    theme.colorScheme.primary,
-                                    theme.colorScheme.primary.withValues(alpha: 0.6),
-                                  ]),
-                                  _buildLineChartBarData(txHistory, [
-                                    theme.colorScheme.secondary,
-                                    theme.colorScheme.secondary.withValues(alpha: 0.6),
-                                  ]),
-                                ],
+                            child: Padding(
+                              padding: const EdgeInsets.only(
+                                bottom: 12.0,
+                                left: 4.0,
+                                right: 12.0,
                               ),
-                              duration: const Duration(milliseconds: 800),
-                              curve: Curves.easeInOut,
+                              child: LineChart(
+                                key: ValueKey('chart_${appState.selectedRouter?.id}'),
+                                LineChartData(
+                                  minY: 0,
+                                  maxY: chartMaxY,
+                                  gridData: FlGridData(
+                                    show: true,
+                                    drawVerticalLine: false,
+                                    horizontalInterval: chartInterval,
+                                    getDrawingHorizontalLine: (val) => FlLine(
+                                      color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.2),
+                                      strokeWidth: 1,
+                                    ),
+                                  ),
+                                  titlesData: FlTitlesData(
+                                    show: true,
+                                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                    bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                                    leftTitles: AxisTitles(
+                                      sideTitles: SideTitles(
+                                        showTitles: true,
+                                        reservedSize: 72,
+                                        interval: chartInterval,
+                                        getTitlesWidget: (value, meta) {
+                                          if (value < 0 || value > chartMaxY) {
+                                            return const SizedBox.shrink();
+                                          }
+                                          return SideTitleWidget(
+                                            meta: meta,
+                                            space: 6,
+                                            fitInside: SideTitleFitInsideData.fromTitleMeta(meta),
+                                            child: Text(
+                                              _formatSpeed(value),
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              textAlign: TextAlign.right,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                  borderData: FlBorderData(show: false),
+                                  lineTouchData: LineTouchData(
+                                    touchTooltipData: LineTouchTooltipData(
+                                      fitInsideVertically: true,
+                                      getTooltipColor: (LineBarSpot spot) => Theme.of(
+                                        context,
+                                      ).colorScheme.surface.withValues(alpha: 0.9),
+                                      tooltipBorderRadius: BorderRadius.circular(8),
+                                      tooltipPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
+                                      getTooltipItems:
+                                          (List<LineBarSpot> touchedSpots) {
+                                            return touchedSpots.map((barSpot) {
+                                              final flSpot = barSpot;
+                                              final isRx = barSpot.barIndex == 0;
+                                              final Color color =
+                                                  flSpot.bar.gradient?.colors.first ??
+                                                  flSpot.bar.color ??
+                                                  Colors.white;
+
+                                              return LineTooltipItem(
+                                                '${isRx ? "RX" : "TX"}: ${_formatSpeed(flSpot.y)}',
+                                                TextStyle(
+                                                  color: color,
+                                                  fontWeight: FontWeight.w900,
+                                                ),
+                                                textAlign: TextAlign.left,
+                                              );
+                                            }).toList();
+                                          },
+                                    ),
+                                  ),
+                                  lineBarsData: [
+                                    _buildLineChartBarData(rxHistory, [
+                                      theme.colorScheme.primary,
+                                      theme.colorScheme.primary.withValues(alpha: 0.6),
+                                    ]),
+                                    _buildLineChartBarData(txHistory, [
+                                      theme.colorScheme.secondary,
+                                      theme.colorScheme.secondary.withValues(alpha: 0.6),
+                                    ]),
+                                  ],
+                                ),
+                                duration: const Duration(milliseconds: 800),
+                                curve: Curves.easeInOut,
+                              ),
                             ),
                           ),
                         ],
@@ -520,27 +546,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final displaySpeed = speed.isNaN || speed.isInfinite || speed < 0
         ? 0.0
         : speed;
-    final speedText = AnimatedSwitcher(
-      duration: const Duration(milliseconds: 400),
-      transitionBuilder: (Widget child, Animation<double> animation) {
-        return FadeTransition(
-          opacity: animation,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.1),
-              end: Offset.zero,
-            ).animate(animation),
-            child: child,
-          ),
-        );
-      },
-      child: Text(
-        _formatSpeed(displaySpeed),
-        key: ValueKey(displaySpeed),
-        style: Theme.of(
-          context,
-        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-      ),
+    final speedText = Text(
+      _formatSpeed(displaySpeed),
+      style: Theme.of(
+        context,
+      ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
     );
 
     return Row(
@@ -693,6 +703,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final cpuLoad = rawCpuLoad is List ? rawCpuLoad : (rawCpuLoad is Map ? rawCpuLoad.values.toList() : null);
     final cpuLoadValue = cpuLoad != null ? _formatCpuLoad(cpuLoad) : 'N/A';
 
+    String loadAvgValue = 'N/A';
+    if (cpuLoad != null && cpuLoad.isNotEmpty) {
+      if (cpuLoad[0] is num) {
+        final num rawVal = cpuLoad[0] as num;
+        final double l1 = rawVal is int
+            ? rawVal.toDouble() / 65536.0
+            : (rawVal.toDouble() > 10.0
+                ? rawVal.toDouble() / 65536.0
+                : rawVal.toDouble());
+        loadAvgValue = l1.toStringAsFixed(2);
+      }
+    }
+
     final totalMem = (sysInfo?['memory']?['total'] is num)
         ? (sysInfo!['memory']['total'] as num).toInt()
         : (sysInfo?['memory']?['total'] is String ? int.tryParse(sysInfo!['memory']['total']) ?? 0 : 0);
@@ -725,8 +748,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             Expanded(
               child: _buildVitalsColumn(
                 context,
-                label: 'Memory',
+                label: 'RAM Usage',
                 value: memoryValue,
+              ),
+            ),
+            Expanded(
+              child: _buildVitalsColumn(
+                context,
+                label: 'Load Avg',
+                value: loadAvgValue,
               ),
             ),
             Expanded(
@@ -833,7 +863,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
             ],
           ),
-          if (action != null) action,
+          ?action,
         ],
       ),
     );
@@ -972,21 +1002,71 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             'IP: $ip\nMAC: ${st.macAddress}',
                             style: const TextStyle(fontSize: 11),
                           ),
-                          trailing: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                st.formattedSignal,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: st.signalDbm != null && st.signalDbm! > -65 ? Colors.green : Colors.orange,
-                                  fontSize: 12,
-                                ),
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    st.formattedSignal,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: st.signalDbm != null && st.signalDbm! > -65 ? Colors.green : Colors.orange,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  Text(
+                                    st.signalQualityLabel,
+                                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                st.signalQualityLabel,
-                                style: const TextStyle(fontSize: 10, color: Colors.grey),
+                              PopupMenuButton<String>(
+                                icon: const Icon(Icons.more_vert, size: 20),
+                                onSelected: (val) async {
+                                  Navigator.pop(context);
+                                  final isPaused = appState.isInternetPaused(st.macAddress);
+                                  if (val == 'pause') {
+                                    final res = await appState.pauseClientInternet(
+                                      st.macAddress,
+                                      pause: !isPaused,
+                                      context: context,
+                                    );
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            res
+                                                ? 'Internet ${!isPaused ? "paused" : "restored"} for $hostname.'
+                                                : 'Failed to update internet access for $hostname.',
+                                          ),
+                                          backgroundColor: res ? Colors.green : Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                                itemBuilder: (ctx) {
+                                  final isPaused = appState.isInternetPaused(st.macAddress);
+                                  return [
+                                    PopupMenuItem(
+                                      value: 'pause',
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            isPaused ? Icons.play_circle_outline : Icons.pause_circle_outline,
+                                            color: isPaused ? Colors.green : Colors.orange,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(isPaused ? 'Resume Internet' : 'Pause Internet'),
+                                        ],
+                                      ),
+                                    ),
+                                  ];
+                                },
                               ),
                             ],
                           ),
@@ -1419,222 +1499,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       appBar: LuciAppBar(
         centerTitle: true,
         title: null, // Always use titleWidget now
-        titleWidget: routers.length > 1
-            ? Center(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerLowest,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.outlineVariant,
-                      width: 1.1,
-                    ),
-                  ),
-                  constraints: const BoxConstraints(minHeight: 36),
-                  child: Material(
-                    color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(10),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(10),
-                      onTap: () async {
-                        final selectedId = await showModalBottomSheet<String>(
-                          context: context,
-                          isScrollControlled: false,
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.surface,
-                          shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(18),
-                            ),
-                          ),
-                          builder: (context) {
-                            return SafeArea(
-                              child: Padding(
-                                padding: const EdgeInsets.only(
-                                  top: 12,
-                                  left: 8,
-                                  right: 8,
-                                  bottom: 8,
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Center(
-                                      child: Container(
-                                        width: 40,
-                                        height: 4,
-                                        margin: const EdgeInsets.only(
-                                          bottom: 12,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.outlineVariant,
-                                          borderRadius: BorderRadius.circular(
-                                            2,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12.0,
-                                        vertical: 4,
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          'Select Router',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleMedium
-                                              ?.copyWith(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                      ),
-                                    ),
-                                    const Divider(height: 16),
-                                    ...routers.map((r) {
-                                      final isSelected = r.id == selected?.id;
-                                      String routerTitle;
-                                      bool isStale = false;
-                                      if (isSelected && boardInfo != null) {
-                                        final hostname = boardInfo['hostname']
-                                            ?.toString();
-                                        routerTitle =
-                                            (hostname != null &&
-                                                hostname.isNotEmpty)
-                                            ? hostname
-                                            : (r.lastKnownHostname ??
-                                                  r.ipAddress);
-                                      } else if (r.lastKnownHostname != null &&
-                                          r.lastKnownHostname!.isNotEmpty) {
-                                        routerTitle = r.lastKnownHostname!;
-                                        isStale = true;
-                                      } else {
-                                        routerTitle = r.ipAddress;
-                                      }
-                                      return ListTile(
-                                        leading: const ThemeRouterLogo(
-                                          width: 26,
-                                          height: 26,
-                                        ),
-                                        title: Tooltip(
-                                          message: isStale
-                                              ? 'Last known hostname (may be out of date)'
-                                              : '',
-                                          child: Text(
-                                            routerTitle,
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .titleMedium
-                                                ?.copyWith(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: isStale
-                                                      ? Theme.of(context)
-                                                            .colorScheme
-                                                            .onSurfaceVariant
-                                                            .withValues(
-                                                              alpha: 0.7,
-                                                            )
-                                                      : Theme.of(
-                                                          context,
-                                                        ).colorScheme.onSurface,
-                                                ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        subtitle: Text(
-                                          r.ipAddress,
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.bodySmall,
-                                        ),
-                                        trailing: isSelected
-                                            ? Icon(
-                                                Icons.check_circle,
-                                                color: Theme.of(
-                                                  context,
-                                                ).colorScheme.primary,
-                                              )
-                                            : null,
-                                        selected: isSelected,
-                                        selectedTileColor: Theme.of(context)
-                                            .colorScheme
-                                            .primary
-                                            .withValues(alpha: 0.07),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                        onTap: () =>
-                                            Navigator.of(context).pop(r.id),
-                                      );
-                                    }),
-                                    const SizedBox(height: 8),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                        if (selectedId != null &&
-                            selectedId != selected?.id &&
-                            context.mounted) {
-                          await appState.selectRouter(
-                            selectedId,
-                            context: context,
-                          );
-                        }
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.only(
-                          left: 16.0,
-                          right: 8.0,
-                          top: 4.0,
-                          bottom: 4.0,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text(
-                              headerText,
-                              style:
-                                  Theme.of(
-                                    context,
-                                  ).appBarTheme.titleTextStyle ??
-                                  Theme.of(
-                                    context,
-                                  ).textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: Theme.of(
-                                      context,
-                                    ).appBarTheme.titleTextStyle?.color,
-                                  ),
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(width: 2),
-                            Icon(
-                              Icons.arrow_drop_down,
-                              size: 20,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              )
-            : _buildTitleWithTimestamp(headerText, appState),
+        titleWidget: _buildTitleWithTimestamp(headerText, appState),
       ),
       body: Stack(children: [_buildBody(appState)]),
     );
@@ -1739,8 +1604,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           color: Theme.of(context).colorScheme.primary,
                         ),
                         tooltip: appState.dashboardPreferences.maskPublicIp
-                            ? 'Show IP Addresses'
-                            : 'Mask IP Addresses',
+                            ? 'Show public WAN IP address'
+                            : 'Mask public WAN IP address for privacy',
                         visualDensity: VisualDensity.compact,
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),

@@ -11,6 +11,8 @@ import 'package:luci_mobile/design/luci_design_system.dart';
 import 'package:luci_mobile/widgets/luci_loading_states.dart';
 import 'package:luci_mobile/widgets/luci_refresh_components.dart';
 
+import 'restricted_clients_screen.dart';
+
 class ClientsScreen extends ConsumerStatefulWidget {
   const ClientsScreen({super.key});
 
@@ -89,7 +91,27 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
       builder: (context, snapshot) {
         final aggregatedClients = snapshot.data ?? [];
         return Scaffold(
-          appBar: const LuciAppBar(title: 'Clients'),
+          appBar: LuciAppBar(
+            title: 'Clients',
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.shield_outlined),
+                tooltip: 'Restricted & Banned Clients',
+                onPressed: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const RestrictedClientsScreen(),
+                    ),
+                  );
+                  if (mounted) {
+                    setState(() {
+                      _computeClientsFuture();
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
           body: Stack(
             children: [
               LuciPullToRefresh(
@@ -778,82 +800,77 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                 'Lease Time Remaining: ${client.formattedLeaseTime}',
           ),
           const SizedBox(height: 8),
-          if (client.isConnected && client.connectionType == ConnectionType.wireless) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _showDisconnectConfirmation(context, client),
-                  icon: const Icon(Icons.wifi_off_rounded, color: Colors.red, size: 18),
-                  label: const Text(
-                    'Disconnect Wi-Fi Client',
-                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.red),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+            child: Column(
+              children: [
+                // Option 1: Temporarily pause local network access / internet access
+                ListenableBuilder(
+                  listenable: AppState.instance,
+                  builder: (ctx, _) {
+                    final appState = AppState.instance;
+                    final isPaused = appState.isInternetPaused(client.macAddress);
+                    return SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _toggleInternetPause(context, client, !isPaused),
+                        icon: Icon(
+                          isPaused ? Icons.play_circle_outline_rounded : Icons.pause_circle_outline_rounded,
+                          color: isPaused ? Colors.green : Colors.orange,
+                          size: 20,
+                        ),
+                        label: Text(
+                          isPaused ? 'Resume Internet Access' : 'Pause Internet Access',
+                          style: TextStyle(
+                            color: isPaused ? Colors.green : Colors.orange.shade800,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                            color: isPaused ? Colors.green : Colors.orange.shade600,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              ),
+              ],
             ),
-            const SizedBox(height: 4),
-          ],
+          ),
         ],
       ),
     );
   }
 
-  Future<void> _showDisconnectConfirmation(BuildContext context, Client client) async {
+  Future<void> _toggleInternetPause(BuildContext context, Client client, bool pause) async {
     final appState = AppState.instance;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.wifi_off_rounded, color: Colors.orange, size: 36),
-        title: const Text('Disconnect Client?'),
-        content: Text(
-          'Disconnect ${client.displayName} (${client.macAddress}) from Wi-Fi? The device can re-associate at any time.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Disconnect'),
-          ),
-        ],
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${pause ? "Pausing" : "Resuming"} internet for ${client.displayName}...'),
+        duration: const Duration(seconds: 2),
       ),
     );
-
-    if (confirmed == true && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Disconnecting ${client.displayName}...'),
-          duration: const Duration(seconds: 2),
+    final success = await appState.pauseClientInternet(
+      client.macAddress,
+      pause: pause,
+      context: context,
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? 'Internet ${pause ? "paused" : "restored"} for ${client.displayName}.'
+              : 'Failed to ${pause ? "pause" : "resume"} internet for ${client.displayName}.',
         ),
-      );
-      final success = await appState.disconnectWirelessClient(
-        client.macAddress,
-        iface: client.ssid,
-        context: context,
-      );
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            success
-                ? 'Client ${client.displayName} disconnected.'
-                : 'Failed to disconnect client ${client.displayName}.',
-          ),
-          backgroundColor: success ? Colors.green : Colors.red,
-        ),
-      );
-    }
+        backgroundColor: success ? Colors.green : Colors.red,
+      ),
+    );
+    setState(() {});
   }
 
   String _buildMinimalClientSubtitle(Client client) {

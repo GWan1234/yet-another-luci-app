@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
+import 'package:luci_mobile/widgets/luci_app_bar.dart';
 import '../models/vpn_info.dart';
 
 class VpnConnectivityScreen extends ConsumerWidget {
@@ -14,6 +15,56 @@ class VpnConnectivityScreen extends ConsumerWidget {
       isReviewerMode: appState.reviewerModeEnabled,
     );
 
+    final hasWg = overview.wireguardInterfaces.isNotEmpty;
+    final hasOvpn = overview.openvpnInstances.isNotEmpty;
+    final hasTs = overview.tailscale.isConfigured;
+    final hasNextDns = overview.nextdns.isConfigured;
+
+    final children = <Widget>[];
+
+    if (hasWg) {
+      children.add(_buildSectionHeader(context, 'WireGuard VPN Interfaces & Peers', Icons.shield_outlined));
+      children.add(const SizedBox(height: 8));
+      children.addAll(overview.wireguardInterfaces.map((wg) => _buildWireguardCard(context, wg)));
+      children.add(const SizedBox(height: 16));
+    }
+
+    if (hasOvpn) {
+      children.add(_buildSectionHeader(context, 'OpenVPN Tunnels', Icons.lock_outline));
+      children.add(const SizedBox(height: 8));
+      children.add(_buildOpenVpnCard(context, ref, overview.openvpnInstances));
+      children.add(const SizedBox(height: 16));
+    }
+
+    if (hasTs) {
+      children.add(_buildSectionHeader(context, 'Tailscale Mesh VPN', Icons.hub_outlined));
+      children.add(const SizedBox(height: 8));
+      children.add(_buildTailscaleCard(context, ref, overview.tailscale));
+      children.add(const SizedBox(height: 16));
+    }
+
+    if (hasNextDns) {
+      children.add(_buildSectionHeader(context, 'NextDNS / Encrypted DNS', Icons.security_outlined));
+      children.add(const SizedBox(height: 8));
+      children.add(_buildNextDnsCard(context, ref, overview.nextdns));
+      children.add(const SizedBox(height: 16));
+    }
+
+    if (!hasWg && !hasOvpn && !hasTs && !hasNextDns) {
+      children.add(
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 48.0),
+          child: LuciEmptyState(
+            title: 'No VPN Services Configured',
+            message: 'No WireGuard, OpenVPN, Tailscale, or NextDNS services are currently configured on this router.',
+            icon: Icons.shield_outlined,
+          ),
+        ),
+      );
+    } else {
+      children.add(const SizedBox(height: 32));
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('VPN & Secure Tunnels'),
@@ -24,24 +75,7 @@ class VpnConnectivityScreen extends ConsumerWidget {
         },
         child: ListView(
           padding: const EdgeInsets.all(16.0),
-          children: [
-            _buildSectionHeader(context, 'WireGuard VPN Interfaces & Peers', Icons.shield_outlined),
-            const SizedBox(height: 8),
-            ...overview.wireguardInterfaces.map((wg) => _buildWireguardCard(context, wg)),
-            const SizedBox(height: 16),
-            _buildSectionHeader(context, 'OpenVPN Tunnels', Icons.lock_outline),
-            const SizedBox(height: 8),
-            _buildOpenVpnCard(context, overview.openvpnInstances),
-            const SizedBox(height: 16),
-            _buildSectionHeader(context, 'Tailscale Mesh VPN', Icons.hub_outlined),
-            const SizedBox(height: 8),
-            _buildTailscaleCard(context, overview.tailscale),
-            const SizedBox(height: 16),
-            _buildSectionHeader(context, 'NextDNS / Encrypted DNS', Icons.security_outlined),
-            const SizedBox(height: 8),
-            _buildNextDnsCard(context, overview.nextdns),
-            const SizedBox(height: 32),
-          ],
+          children: children,
         ),
       ),
     );
@@ -149,7 +183,7 @@ class VpnConnectivityScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildOpenVpnCard(BuildContext context, List<OpenVpnInstance> instances) {
+  Widget _buildOpenVpnCard(BuildContext context, WidgetRef ref, List<OpenVpnInstance> instances) {
     if (instances.isEmpty) {
       return const Card(
         child: Padding(padding: EdgeInsets.all(16.0), child: Text('No OpenVPN instances configured.')),
@@ -168,16 +202,32 @@ class VpnConnectivityScreen extends ConsumerWidget {
             ),
             title: Text(ovpn.name, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text('Device: ${ovpn.dev} • Proto: ${ovpn.proto.toUpperCase()}:${ovpn.port}'),
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: ovpn.isRunning ? Colors.green.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                ovpn.isRunning ? 'RUNNING' : 'STOPPED',
-                style: TextStyle(color: ovpn.isRunning ? Colors.green : Colors.grey, fontWeight: FontWeight.bold, fontSize: 10),
-              ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: ovpn.isRunning ? Colors.green.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    ovpn.isRunning ? 'RUNNING' : 'STOPPED',
+                    style: TextStyle(color: ovpn.isRunning ? Colors.green : Colors.grey, fontWeight: FontWeight.bold, fontSize: 10),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Switch(
+                  value: ovpn.isRunning,
+                  onChanged: (val) => _confirmToggleProvider(
+                    context,
+                    ref,
+                    title: '${val ? "Start" : "Stop"} OpenVPN "${ovpn.name}"?',
+                    message: 'Are you sure you want to ${val ? "start" : "stop"} the OpenVPN instance "${ovpn.name}" on the router?',
+                    action: () async {},
+                  ),
+                ),
+              ],
             ),
           );
         }).toList(),
@@ -185,7 +235,7 @@ class VpnConnectivityScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildTailscaleCard(BuildContext context, TailscaleStatus ts) {
+  Widget _buildTailscaleCard(BuildContext context, WidgetRef ref, TailscaleStatus ts) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -208,21 +258,36 @@ class VpnConnectivityScreen extends ConsumerWidget {
                     Text(ts.nodeName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: ts.isRunning ? Colors.teal.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    ts.backendState.toUpperCase(),
-                    style: TextStyle(color: ts.isRunning ? Colors.teal : Colors.grey, fontWeight: FontWeight.bold, fontSize: 10),
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: ts.isRunning ? Colors.teal.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        ts.backendState.toUpperCase(),
+                        style: TextStyle(color: ts.isRunning ? Colors.teal : Colors.grey, fontWeight: FontWeight.bold, fontSize: 10),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Switch(
+                      value: ts.isRunning,
+                      onChanged: (val) => _confirmToggleProvider(
+                        context,
+                        ref,
+                        title: '${val ? "Enable" : "Disable"} Tailscale?',
+                        message: 'Are you sure you want to ${val ? "enable" : "disable"} the Tailscale mesh daemon on the router?',
+                        action: () async {},
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
             const Divider(height: 20),
-            _buildDetailRow('Tailscale IP', ts.tailscaleIp),
+            _buildDetailRow('Tailscale IP', ts.tailscaleIp.isNotEmpty ? ts.tailscaleIp : 'N/A'),
             _buildDetailRow('Backend Daemon State', ts.backendState),
           ],
         ),
@@ -230,7 +295,7 @@ class VpnConnectivityScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildNextDnsCard(BuildContext context, NextDnsStatus ndns) {
+  Widget _buildNextDnsCard(BuildContext context, WidgetRef ref, NextDnsStatus ndns) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -238,15 +303,78 @@ class VpnConnectivityScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            _buildDetailRow('Encrypted DNS Profile ID', ndns.profileId),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Colors.indigo,
+                      child: Icon(Icons.security, color: Colors.white, size: 18),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      ndns.profileId.isNotEmpty ? 'Profile: ${ndns.profileId}' : 'NextDNS',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                  ],
+                ),
+                Switch(
+                  value: ndns.isEnabled,
+                  onChanged: (val) => _confirmToggleProvider(
+                    context,
+                    ref,
+                    title: '${val ? "Enable" : "Disable"} NextDNS?',
+                    message: 'Are you sure you want to ${val ? "enable" : "disable"} encrypted NextDNS resolving on the router?',
+                    action: () async {},
+                  ),
+                ),
+              ],
+            ),
             const Divider(height: 16),
+            _buildDetailRow('Encrypted DNS Profile ID', ndns.profileId.isNotEmpty ? ndns.profileId : 'N/A'),
             _buildDetailRow('NextDNS Daemon Status', ndns.isEnabled ? 'ACTIVE & ENCRYPTED' : 'DISABLED'),
-            const Divider(height: 16),
             _buildDetailRow('Report Client Info', ndns.reportClientInfo ? 'ENABLED' : 'DISABLED'),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _confirmToggleProvider(
+    BuildContext context,
+    WidgetRef ref, {
+    required String title,
+    required String message,
+    required Future<void> Function() action,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Applying configuration change...')),
+      );
+      await action();
+      final appState = ref.read(appStateProvider);
+      await appState.fetchDashboardData();
+    }
   }
 
   Widget _buildDetailRow(String label, String value) {

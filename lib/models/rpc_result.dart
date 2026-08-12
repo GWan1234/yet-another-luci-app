@@ -131,20 +131,30 @@ class RpcResult<T> {
       final combined = '$stdout $stderr'.trim().toLowerCase();
 
       // Command level exit-code / stderr classification
-      if (code == 127 || combined.contains('command not found') || combined.contains('not found')) {
+      if (code == 127 || combined.contains('command not found')) {
         return RpcResult.methodNotFound('Package manager binary not found on router (exit code 127)');
       }
       if (code == 126 || combined.contains('permission denied') || combined.contains('access denied')) {
         return RpcResult.permissionDenied('Permission denied executing command on router (exit code 126)');
       }
+
+      // Check if parseData can extract valid non-empty output from stdout (e.g. apk info returning exit code 1 due to repo cache warnings)
+      final parsed = parseData(execData);
+      final isValidParsed = parsed != null &&
+          (parsed is! String || parsed.trim().isNotEmpty) &&
+          (parsed is! List || parsed.isNotEmpty) &&
+          (parsed is! Map || parsed.isNotEmpty);
+
+      if (isValidParsed) {
+        return RpcResult.success(parsed);
+      }
+
       if (code != 0) {
         final errorDetail = stderr.trim().isNotEmpty ? stderr.trim() : (stdout.trim().isNotEmpty ? stdout.trim() : 'Command exited with code $code');
         return RpcResult.failed(errorDetail, code: code);
       }
 
-      // Exit code 0
-      final parsed = parseData(execData);
-      return RpcResult.success(parsed);
+      return RpcResult.failed('Command succeeded but returned no usable package output');
     }
 
     return RpcResult.failed('Unexpected payload format from exec RPC');

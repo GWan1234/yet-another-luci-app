@@ -1061,4 +1061,83 @@ class MockApiService implements IApiService {
     await Future.delayed(const Duration(milliseconds: 500));
     return true;
   }
+
+  @override
+  Future<bool> manageServiceAction(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String serviceName,
+    required String action,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return true;
+  }
+
+  @override
+  Future<bool> pauseClientInternet(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String macAddress,
+    required bool pause,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    return true;
+  }
+
+  @override
+  Future<bool> banWirelessClient(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String macAddress,
+    String? iface,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    return true;
+  }
+
+  @override
+  Future<bool> unbanWirelessClient(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String macAddress,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    return true;
+  }
+
+  @override
+  Future<Map<String, List<Map<String, dynamic>>>> fetchRestrictedAndBannedClientsLive(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return {
+      'restricted': [
+        {
+          'mac': '11:22:33:44:55:66',
+          'name': 'Restricted-Tablet',
+          'ip': '192.168.1.150',
+          'type': 'restricted',
+        }
+      ],
+      'banned': [
+        {
+          'mac': '99:88:77:66:55:44',
+          'name': 'Banned-Guest-Phone',
+          'ip': 'N/A',
+          'type': 'banned',
+        }
+      ],
+    };
+  }
 }

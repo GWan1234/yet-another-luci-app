@@ -131,4 +131,41 @@ abstract class IApiService {
     bool useHttps, {
     BuildContext? context,
   });
+  Future<bool> manageServiceAction(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String serviceName,
+    required String action,
+    BuildContext? context,
+  });
+  Future<bool> pauseClientInternet(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String macAddress,
+    required bool pause,
+    BuildContext? context,
+  });
+  Future<bool> banWirelessClient(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String macAddress,
+    String? iface,
+    BuildContext? context,
+  });
+  Future<bool> unbanWirelessClient(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String macAddress,
+    BuildContext? context,
+  });
+  Future<Map<String, List<Map<String, dynamic>>>> fetchRestrictedAndBannedClientsLive(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  });
 }

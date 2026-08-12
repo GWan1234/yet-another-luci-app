@@ -27,7 +27,7 @@ class ServicesSystemScreen extends ConsumerWidget {
           children: [
             _buildSectionHeader(context, 'Procd System Services', Icons.miscellaneous_services_outlined),
             const SizedBox(height: 8),
-            ...overview.services.map((svc) => _buildProcdServiceCard(context, svc)),
+            ...overview.services.map((svc) => _buildProcdServiceCard(context, ref, svc)),
             const SizedBox(height: 16),
             _buildSectionHeader(context, 'Startup Init Scripts (/etc/init.d)', Icons.playlist_add_check_outlined),
             const SizedBox(height: 8),
@@ -59,7 +59,7 @@ class ServicesSystemScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildProcdServiceCard(BuildContext context, ProcdService svc) {
+  Widget _buildProcdServiceCard(BuildContext context, WidgetRef ref, ProcdService svc) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 1,
@@ -115,10 +115,19 @@ class ServicesSystemScreen extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 OutlinedButton.icon(
-                  onPressed: () {
+                  onPressed: () async {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Triggered restart for ${svc.name}')),
+                      SnackBar(content: Text('Triggered restart for ${svc.name}...')),
                     );
+                    final success = await ref.read(appStateProvider).manageServiceAction(svc.name, 'restart', context: context);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(success ? 'Successfully restarted ${svc.name}' : 'Failed to restart ${svc.name}'),
+                          backgroundColor: success ? Colors.green : Colors.red,
+                        ),
+                      );
+                    }
                   },
                   icon: const Icon(Icons.refresh, size: 16),
                   label: const Text('Restart', style: TextStyle(fontSize: 11)),
@@ -130,10 +139,20 @@ class ServicesSystemScreen extends ConsumerWidget {
                 ),
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
-                  onPressed: () {
+                  onPressed: () async {
+                    final targetAction = svc.isRunning ? 'stop' : 'start';
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Triggered ${svc.isRunning ? "stop" : "start"} for ${svc.name}')),
+                      SnackBar(content: Text('Triggered $targetAction for ${svc.name}...')),
                     );
+                    final success = await ref.read(appStateProvider).manageServiceAction(svc.name, targetAction, context: context);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(success ? 'Successfully performed $targetAction for ${svc.name}' : 'Failed to $targetAction ${svc.name}'),
+                          backgroundColor: success ? Colors.green : Colors.red,
+                        ),
+                      );
+                    }
                   },
                   icon: Icon(svc.isRunning ? Icons.stop : Icons.play_arrow, size: 16),
                   label: Text(svc.isRunning ? 'Stop' : 'Start', style: const TextStyle(fontSize: 11)),

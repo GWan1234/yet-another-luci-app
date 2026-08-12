@@ -181,11 +181,19 @@ class PackageManagerOverview {
               pkgName = parts[0].trim();
               if (parts.length > 1) pkgVer = parts[1].trim();
               if (parts.length > 2) pkgDesc = parts[2].trim();
-            } else {
+            } else if (trimmed.contains(' ')) {
               final parts = trimmed.split(RegExp(r'\s+'));
               pkgName = parts[0].trim();
               if (parts.length > 1) pkgVer = parts[1].trim();
               if (parts.length > 2) pkgDesc = parts.sublist(2).join(' ');
+            } else {
+              final match = RegExp(r'^([a-zA-Z0-9_\-]+?)-([0-9].*)$').firstMatch(trimmed);
+              if (match != null) {
+                pkgName = match.group(1)!;
+                pkgVer = match.group(2)!;
+              } else {
+                pkgName = trimmed;
+              }
             }
 
             if (pkgName.isNotEmpty && pkgName != 'Package:' && pkgName != 'Status:') {
@@ -237,26 +245,7 @@ class PackageManagerOverview {
         });
       }
 
-      // Guarantee installed package list is never empty
-      if (installed.isEmpty) {
-        final commonDefaults = [
-          OpenWrtPackage(name: 'base-files', version: '1570-r23805', description: 'OpenWrt core system configuration files', isInstalled: true, managerType: type),
-          OpenWrtPackage(name: 'busybox', version: '1.36.1-1', description: 'Essential multi-call binary utilities', isInstalled: true, managerType: type),
-          OpenWrtPackage(name: 'dnsmasq', version: '2.89-1', description: 'Lightweight DHCP and DNS caching server', isInstalled: true, managerType: type),
-          OpenWrtPackage(name: 'dropbear', version: '2022.82-1', description: 'Small SSH2 server and client daemon', isInstalled: true, managerType: type),
-          OpenWrtPackage(name: 'firewall4', version: '2023-09-11', description: 'OpenWrt nftables-based firewall manager', isInstalled: true, managerType: type),
-          OpenWrtPackage(name: 'luci', version: 'git-23.332', description: 'LuCI Web Interface core application', isInstalled: true, managerType: type),
-          OpenWrtPackage(name: 'luci-app-firewall', version: 'git-23.332', description: 'LuCI support for Firewall4 rules configuration', isInstalled: true, managerType: type),
-          OpenWrtPackage(name: 'luci-mod-admin-full', version: 'git-23.332', description: 'LuCI Full Administration User Interface', isInstalled: true, managerType: type),
-          OpenWrtPackage(name: 'netifd', version: '2023-08-30', description: 'OpenWrt Network Interface Daemon', isInstalled: true, managerType: type),
-          OpenWrtPackage(name: 'odhcpd-ipv6only', version: '2023-01-02', description: 'OpenWrt IPv6 DHCP & RA server daemon', isInstalled: true, managerType: type),
-          OpenWrtPackage(name: 'procd', version: '2023-08-16', description: 'OpenWrt Process Control and init system daemon', isInstalled: true, managerType: type),
-          OpenWrtPackage(name: 'ubus', version: '2023-06-05', description: 'OpenWrt Micro Bus architecture RPC daemon', isInstalled: true, managerType: type),
-          OpenWrtPackage(name: 'uci', version: '2023-08-10', description: 'Unified Configuration Interface tool', isInstalled: true, managerType: type),
-          OpenWrtPackage(name: 'uhttpd', version: '2023-06-25', description: 'Tiny single-threaded HTTP web server', isInstalled: true, managerType: type),
-        ];
-        installed.addAll(commonDefaults);
-      }
+      // Do not inject placeholder packages in production — empty means RPC unavailable.
 
       final availableRaw = data['availablePackages'];
       if (availableRaw is String) {
@@ -306,42 +295,6 @@ class PackageManagerOverview {
             available.add(OpenWrtPackage.fromJson(item, isInstalled: false, managerType: type));
           }
         });
-      }
-    }
-
-    // Populate common OpenWrt packages if available list is empty
-    if (available.isEmpty) {
-      final defaultCommonPackages = [
-        {'name': 'wireguard-tools', 'desc': 'WireGuard VPN command line control tool', 'ver': '1.0.20210914'},
-        {'name': 'luci-app-wireguard', 'desc': 'LuCI support for WireGuard VPN', 'ver': 'git-23.332'},
-        {'name': 'luci-app-sqm', 'desc': 'Smart Queue Management traffic shaping control', 'ver': '1.5.3'},
-        {'name': 'luci-app-openvpn', 'desc': 'OpenVPN Web User Interface for LuCI', 'ver': 'git-23.200'},
-        {'name': 'luci-app-mwan3', 'desc': 'Multi-WAN Load Balancing and Failover UI', 'ver': '2.14.0'},
-        {'name': 'luci-app-adblock', 'desc': 'Adblock Web User Interface for LuCI', 'ver': '4.1.5'},
-        {'name': 'luci-app-statistics', 'desc': 'RRDtool graphing and router stats UI', 'ver': 'git-23.150'},
-        {'name': 'luci-app-ttyd', 'desc': 'Web-based Terminal Interface over WebSocket', 'ver': '1.7.3'},
-        {'name': 'luci-app-tailscale', 'desc': 'Tailscale Mesh VPN control interface', 'ver': '1.48.0'},
-        {'name': 'luci-app-upnp', 'desc': 'Universal Plug and Play (UPnP) daemon UI', 'ver': 'git-23.090'},
-        {'name': 'scm-scripts', 'desc': 'SCM router management utility package', 'ver': '1.0-1'},
-        {'name': 'curl', 'desc': 'Command line tool for transferring data with URLs', 'ver': '8.4.0-1'},
-        {'name': 'wget-ssl', 'desc': 'Retrieving files using HTTP/HTTPS and FTP', 'ver': '1.21.4-1'},
-        {'name': 'htop', 'desc': 'Interactive process viewer for system monitoring', 'ver': '3.2.2-1'},
-        {'name': 'iperf3', 'desc': 'TCP, UDP, and SCTP network bandwidth measurement tool', 'ver': '3.14-1'},
-        {'name': 'tcpdump', 'desc': 'Command line network packet analysis utility', 'ver': '4.99.4-1'},
-        {'name': 'nano', 'desc': 'Small and friendly text editor', 'ver': '7.2-1'},
-        {'name': 'bash', 'desc': 'GNU Bourne Again SHell', 'ver': '5.2.15-1'},
-      ];
-
-      for (final pkg in defaultCommonPackages) {
-        if (!installed.any((p) => p.name == pkg['name'])) {
-          available.add(OpenWrtPackage(
-            name: pkg['name']!,
-            version: pkg['ver']!,
-            description: pkg['desc']!,
-            isInstalled: false,
-            managerType: type,
-          ));
-        }
       }
     }
 
