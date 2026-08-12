@@ -12,9 +12,7 @@ class StorageMonitoringCard extends ConsumerWidget {
     final mountData = appState.dashboardData?['mountPoints'];
     final storage = StorageOverview.fromRpcData(mountData, isReviewerMode: appState.reviewerModeEnabled);
 
-    final rootPercent = storage.rootFs?.usedPercent ?? 0.0;
-    final hasOverlay = storage.overlayFs != null;
-    final overlayPercent = storage.overlayFs?.usedPercent ?? 0.0;
+    final displayItems = storage.priorityDisplayMounts;
 
     return Card(
       elevation: 2,
@@ -53,42 +51,52 @@ class StorageMonitoringCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 12),
-            if (storage.mountPoints.isEmpty)
+            if (displayItems.isEmpty)
               Text(
                 'No storage devices detected.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
               )
-            else ...[
-              _buildStorageBar(
-                context,
-                label: 'Root Filesystem (${storage.rootFs?.mountPath ?? '/'})',
-                percent: rootPercent,
-                used: storage.rootFs?.usedBytes ?? 0,
-                total: storage.rootFs?.sizeBytes ?? 0,
-                color: Colors.teal,
-              ),
-              const SizedBox(height: 10),
-              if (hasOverlay)
-                _buildStorageBar(
-                  context,
-                  label: 'Overlay FS (/overlay)',
-                  percent: overlayPercent,
-                  used: storage.overlayFs?.usedBytes ?? 0,
-                  total: storage.overlayFs?.sizeBytes ?? 0,
-                  color: Colors.indigo,
-                )
-              else
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Overlay FS (/overlay)', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500)),
-                    Text('Integrated into Root', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey, fontStyle: FontStyle.italic)),
+            else
+              Column(
+                children: [
+                  for (int i = 0; i < displayItems.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 10),
+                    _buildStorageBarForItem(context, item: displayItems[i], index: i),
                   ],
-                ),
-            ],
+                ],
+              ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildStorageBarForItem(
+    BuildContext context, {
+    required MountPointItem item,
+    required int index,
+  }) {
+    String label;
+    if (item.mountPath == '/' || item.isRoot) {
+      label = 'Root Filesystem (${item.mountPath})';
+    } else if (item.mountPath == '/tmp' || item.isTmp) {
+      label = 'TempFS (/tmp)';
+    } else if (item.mountPath == '/overlay' || item.isOverlay) {
+      label = 'Overlay FS (${item.mountPath})';
+    } else {
+      label = '${item.filesystemType.isNotEmpty ? item.filesystemType.toUpperCase() : "FS"} (${item.mountPath})';
+    }
+
+    final colors = [Colors.teal, Colors.indigo, Colors.amber.shade700, Colors.purple];
+    final color = colors[index % colors.length];
+
+    return _buildStorageBar(
+      context,
+      label: label,
+      percent: item.usedPercent,
+      used: item.usedBytes,
+      total: item.sizeBytes,
+      color: color,
     );
   }
 

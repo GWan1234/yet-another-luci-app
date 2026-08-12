@@ -60,22 +60,32 @@ class MountPointItem {
       }
     }
 
+    bool hasUnitSuffix = false;
     int parseNum(dynamic val) {
       if (val == null) return 0;
       if (val is num) return val.toInt();
       if (val is String) {
         final clean = val.replaceAll(',', '').trim();
-        if (clean.endsWith('G') || clean.endsWith('GB') || clean.endsWith('g') || clean.endsWith('gb')) {
+        final lower = clean.toLowerCase();
+        if (lower.endsWith('g') || lower.endsWith('gb')) {
+          hasUnitSuffix = true;
           final n = double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
           return (n * 1024 * 1024 * 1024).toInt();
         }
-        if (clean.endsWith('M') || clean.endsWith('MB') || clean.endsWith('m') || clean.endsWith('mb')) {
+        if (lower.endsWith('m') || lower.endsWith('mb')) {
+          hasUnitSuffix = true;
           final n = double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
           return (n * 1024 * 1024).toInt();
         }
-        if (clean.endsWith('K') || clean.endsWith('KB') || clean.endsWith('k') || clean.endsWith('kb')) {
+        if (lower.endsWith('k') || lower.endsWith('kb')) {
+          hasUnitSuffix = true;
           final n = double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
           return (n * 1024).toInt();
+        }
+        if (lower.endsWith('b')) {
+          hasUnitSuffix = true;
+          final n = double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
+          return n.toInt();
         }
         return int.tryParse(clean) ?? (double.tryParse(clean)?.toInt() ?? 0);
       }
@@ -87,14 +97,26 @@ class MountPointItem {
     int rawUsed = parseNum(json['used'] ?? json['usedBytes']);
 
     final bsize = parseNum(json['bsize'] ?? json['block_size'] ?? json['blockSize']);
+    final unitStr = json['unit']?.toString().toLowerCase() ?? '';
+
+    final isExplicitBytes = hasUnitSuffix ||
+        json.containsKey('sizeBytes') ||
+        json.containsKey('bytes') ||
+        json.containsKey('usedBytes') ||
+        unitStr == 'bytes' ||
+        unitStr == 'b';
+
     if (bsize > 0) {
       rawSize *= bsize;
       rawAvail *= bsize;
       rawUsed *= bsize;
+    } else if (isExplicitBytes) {
+      // Values are already in bytes
     } else if (dataSource == StorageDataSource.dfKBlocks ||
-        json['unit']?.toString().toLowerCase() == '1k-blocks' ||
-        json['unit']?.toString().toLowerCase() == 'kb') {
-      // 1K-blocks output from df / df -k (without unit suffix in line)
+        unitStr == '1k-blocks' ||
+        unitStr == 'kb' ||
+        (!isExplicitBytes && rawSize > 0 && rawSize < 50000000)) {
+      // 1K-blocks (KB) from OpenWrt RPC getMountPoints / system.mounts / df -k
       rawSize *= 1024;
       rawAvail *= 1024;
       rawUsed *= 1024;
@@ -423,6 +445,62 @@ class StorageOverview {
       }
     }
     return null;
+  }
+
+  MountPointItem? get tmpFs {
+    if (mountPoints.isEmpty) return null;
+    for (final m in mountPoints) {
+      if (m.mountPath == '/tmp') return m;
+    }
+    for (final m in mountPoints) {
+      if (m.isTmp) return m;
+    }
+    return null;
+  }
+
+  /// Priority order for primary dashboard storage display:
+  /// 1. Root (/) [1st priority]
+  /// 2. TempFS (/tmp) [2nd priority]
+  /// Fallback: If any one or both are not found, fill from other mounted partitions in order.
+  List<MountPointItem> get priorityDisplayMounts {
+    if (mountPoints.isEmpty) return [];
+
+    final selected = <MountPointItem>[];
+
+    // 1st priority: Root (/)
+    MountPointItem? rootItem;
+    for (final m in mountPoints) {
+      if (m.mountPath == '/') {
+        rootItem = m;
+        break;
+      }
+    }
+    rootItem ??= rootFs;
+    if (rootItem != null && mountPoints.contains(rootItem)) {
+      selected.add(rootItem);
+    }
+
+    // 2nd priority: TempFS (/tmp)
+    MountPointItem? tmpItem;
+    for (final m in mountPoints) {
+      if ((m.mountPath == '/tmp' || m.isTmp) && !selected.contains(m)) {
+        tmpItem = m;
+        break;
+      }
+    }
+    if (tmpItem != null) {
+      selected.add(tmpItem);
+    }
+
+    // Fallback: If we have fewer than 2 partitions, pick from any remaining mount points
+    for (final m in mountPoints) {
+      if (selected.length >= 2) break;
+      if (!selected.contains(m)) {
+        selected.add(m);
+      }
+    }
+
+    return selected;
   }
 
   List<MountPointItem> get mountedDevices {

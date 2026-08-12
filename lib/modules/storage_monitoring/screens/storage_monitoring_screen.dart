@@ -95,10 +95,15 @@ class StorageMonitoringScreen extends ConsumerWidget {
                     builder: (context) {
                       final sortedMounts = List<MountPointItem>.from(storage.mountPoints);
                       sortedMounts.sort((a, b) {
-                        if (a.mountPath == '/' || a.mountPath == '/overlay') return -1;
-                        if (b.mountPath == '/' || b.mountPath == '/overlay') return 1;
-                        if (a.mountPath == '/tmp') return -1;
-                        if (b.mountPath == '/tmp') return 1;
+                        int rank(MountPointItem item) {
+                          if (item.mountPath == '/' || item.isRoot) return 1;
+                          if (item.mountPath == '/tmp' || item.isTmp) return 2;
+                          if (item.mountPath == '/overlay' || item.isOverlay) return 3;
+                          return 4;
+                        }
+                        final rA = rank(a);
+                        final rB = rank(b);
+                        if (rA != rB) return rA.compareTo(rB);
                         return a.mountPath.compareTo(b.mountPath);
                       });
                       return Column(
