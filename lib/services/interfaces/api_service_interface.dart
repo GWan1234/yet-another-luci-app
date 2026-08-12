@@ -87,6 +87,7 @@ abstract class IApiService {
     required String command,
     BuildContext? context,
   });
+  bool execSucceeded(dynamic res);
   Future<bool> disconnectWirelessClient(
     String ipAddress,
     String sysauth,
@@ -163,6 +164,29 @@ abstract class IApiService {
     BuildContext? context,
   });
   Future<Map<String, List<Map<String, dynamic>>>> fetchRestrictedAndBannedClientsLive(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  });
+  Future<bool> addStaticLease(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String macAddress,
+    required String targetIp,
+    required String hostname,
+    String? leaseTime,
+    BuildContext? context,
+  });
+  Future<bool> deleteStaticLease(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String macAddress,
+    BuildContext? context,
+  });
+  Future<Map<String, String?>> fetchPublicIps(
     String ipAddress,
     String sysauth,
     bool useHttps, {

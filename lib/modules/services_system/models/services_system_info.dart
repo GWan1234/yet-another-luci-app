@@ -100,6 +100,20 @@ class InitScript {
     required this.startPriority,
   });
 
+  InitScript copyWith({
+    String? name,
+    bool? isEnabled,
+    bool? isRunning,
+    int? startPriority,
+  }) {
+    return InitScript(
+      name: name ?? this.name,
+      isEnabled: isEnabled ?? this.isEnabled,
+      isRunning: isRunning ?? this.isRunning,
+      startPriority: startPriority ?? this.startPriority,
+    );
+  }
+
   factory InitScript.fromJson(String name, Map<String, dynamic> json) {
     final enabled = json['enabled'] == true || json['enabled'] == 1 || json['enabled'] == '1';
     bool running = json['running'] == true || json['running'] == 1 || json['running'] == '1';

@@ -965,6 +965,14 @@ class MockApiService implements IApiService {
   }
 
   @override
+  bool execSucceeded(dynamic res) {
+    if (res == null) return false;
+    if (res is List && res.isNotEmpty) return res[0] == 0;
+    if (res is Map && res['code'] is int) return res['code'] == 0;
+    return res == 0 || res == true;
+  }
+
+  @override
   Future<Map<String, Set<String>>> fetchAllAssociatedWirelessMacsWithContext({
     required String ipAddress,
     required String sysauth,
@@ -1138,6 +1146,47 @@ class MockApiService implements IApiService {
           'type': 'banned',
         }
       ],
+    };
+  }
+
+  @override
+  Future<bool> addStaticLease(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String macAddress,
+    required String targetIp,
+    required String hostname,
+    String? leaseTime,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return true;
+  }
+
+  @override
+  Future<bool> deleteStaticLease(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String macAddress,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return true;
+  }
+
+  @override
+  Future<Map<String, String?>> fetchPublicIps(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return {
+      'ipv4': '203.0.113.195',
+      'ipv6': '2001:db8:85a3::8a2e:0370:7334',
     };
   }
 }

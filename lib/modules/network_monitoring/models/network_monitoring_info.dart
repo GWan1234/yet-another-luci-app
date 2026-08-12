@@ -61,6 +61,60 @@ class NetworkMonitoringInfo {
     }
   }
 
+  String? get publicIpv4 {
+    final gw = defaultGatewayInterface;
+    if (gw?.ipAddress != null && gw!.ipAddress!.trim().isNotEmpty) {
+      return gw.ipAddress;
+    }
+    for (final iface in interfaces) {
+      if (iface.name.toLowerCase().startsWith('wan') && iface.ipAddress != null && iface.ipAddress!.trim().isNotEmpty) {
+        return iface.ipAddress;
+      }
+    }
+    return null;
+  }
+
+  String? get publicIpv6 {
+    // 1. Check default gateway interface first for global IPv6
+    final gw = defaultGatewayInterface;
+    if (gw?.ipv6Addresses != null) {
+      final globalV6 = gw!.ipv6Addresses!.firstWhere(
+        (addr) => _isGlobalIpv6(addr),
+        orElse: () => '',
+      );
+      if (globalV6.isNotEmpty) return globalV6;
+    }
+
+    // 2. Check wan6 / WAN-related interfaces
+    for (final iface in interfaces) {
+      if (iface.name.toLowerCase().contains('wan') && iface.ipv6Addresses != null) {
+        final globalV6 = iface.ipv6Addresses!.firstWhere(
+          (addr) => _isGlobalIpv6(addr),
+          orElse: () => '',
+        );
+        if (globalV6.isNotEmpty) return globalV6;
+      }
+    }
+
+    // 3. Fallback: Check any interface for a global IPv6 address
+    for (final iface in interfaces) {
+      if (iface.ipv6Addresses != null) {
+        final globalV6 = iface.ipv6Addresses!.firstWhere(
+          (addr) => _isGlobalIpv6(addr),
+          orElse: () => '',
+        );
+        if (globalV6.isNotEmpty) return globalV6;
+      }
+    }
+
+    return null;
+  }
+
+  static bool _isGlobalIpv6(String addr) {
+    final clean = addr.toLowerCase().trim();
+    return !clean.startsWith('fe80') && !clean.startsWith('fd') && !clean.startsWith('fc') && clean.contains(':');
+  }
+
   num get totalRxBytes {
     return deviceStats.values.fold(0, (sum, s) => sum + (s['rx_bytes'] ?? 0));
   }

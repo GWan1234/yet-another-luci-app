@@ -26,7 +26,7 @@ class NetworkMonitoringScreen extends ConsumerWidget {
           children: [
             _buildSectionHeader(context, 'Gateway Status', Icons.router_outlined),
             const SizedBox(height: 8),
-            _buildGatewayCard(context, gw),
+            _buildGatewayCard(context, appState, netInfo, gw),
             const SizedBox(height: 16),
             _buildSectionHeader(context, 'RX/TX Throughput Metrics (Tabular)', Icons.table_chart_outlined),
             const SizedBox(height: 8),
@@ -34,7 +34,7 @@ class NetworkMonitoringScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             _buildSectionHeader(context, 'IPv4 / IPv6 Addresses & Subnets', Icons.dns_outlined),
             const SizedBox(height: 8),
-            ...netInfo.interfaces.map((iface) => _buildIpAddressCard(context, iface)),
+            ...netInfo.interfaces.map((iface) => _buildIpAddressCard(context, appState, netInfo, iface)),
             const SizedBox(height: 16),
             _buildSectionHeader(context, 'Network Interfaces Status', Icons.lan_outlined),
             const SizedBox(height: 8),
@@ -62,7 +62,10 @@ class NetworkMonitoringScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildGatewayCard(BuildContext context, model.NetworkInterface? gw) {
+  Widget _buildGatewayCard(BuildContext context, dynamic appState, NetworkMonitoringInfo netInfo, model.NetworkInterface? gw) {
+    final publicV4 = appState.publicIpv4 ?? netInfo.publicIpv4 ?? gw?.ipAddress ?? 'N/A';
+    final publicV6 = appState.publicIpv6 ?? netInfo.publicIpv6 ?? 'N/A';
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -88,6 +91,8 @@ class NetworkMonitoringScreen extends ConsumerWidget {
             const Divider(height: 20),
             _buildDetailRow('Gateway IP Address', gw?.gateway ?? 'N/A'),
             _buildDetailRow('WAN IP Address', gw?.ipAddress ?? 'N/A'),
+            _buildDetailRow('Public IPv4', publicV4),
+            _buildDetailRow('Public IPv6', publicV6),
             _buildDetailRow('Subnet Mask', gw?.netmask ?? 'N/A'),
             _buildDetailRow('Interface Device', gw?.device ?? 'N/A'),
             _buildDetailRow('Protocol', gw?.protocol.toUpperCase() ?? 'N/A'),
@@ -140,7 +145,10 @@ class NetworkMonitoringScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildIpAddressCard(BuildContext context, model.NetworkInterface iface) {
+  Widget _buildIpAddressCard(BuildContext context, dynamic appState, NetworkMonitoringInfo netInfo, model.NetworkInterface iface) {
+    final isWan = iface.name.toLowerCase().contains('wan');
+    final publicV4 = appState.publicIpv4 ?? netInfo.publicIpv4 ?? iface.ipAddress ?? 'N/A';
+    final publicV6 = appState.publicIpv6 ?? netInfo.publicIpv6 ?? 'N/A';
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 1,
@@ -173,6 +181,10 @@ class NetworkMonitoringScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 6),
             _buildDetailRow('IPv4 Address', iface.ipAddress != null ? '${iface.ipAddress} / ${iface.netmask ?? "24"}' : 'None'),
+            if (isWan) ...[
+              _buildDetailRow('Public IPv4', publicV4),
+              _buildDetailRow('Public IPv6', publicV6),
+            ],
             if (iface.ipv6Addresses != null && iface.ipv6Addresses!.isNotEmpty)
               ...iface.ipv6Addresses!.map((v6) => _buildDetailRow('IPv6 Address', v6)),
           ],

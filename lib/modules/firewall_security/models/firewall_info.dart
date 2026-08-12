@@ -124,6 +124,7 @@ class FirewallPortForwarding {
 
 /// Custom security rule.
 class FirewallCustomRule {
+  final String sectionKey;
   final String name;
   final String srcZone;
   final String destZone;
@@ -145,6 +146,7 @@ class FirewallCustomRule {
   ];
 
   const FirewallCustomRule({
+    required this.sectionKey,
     required this.name,
     required this.srcZone,
     required this.destZone,
@@ -153,11 +155,33 @@ class FirewallCustomRule {
     this.isUnrecognizedTarget = false,
   });
 
-  factory FirewallCustomRule.fromJson(Map<String, dynamic> json) {
+  FirewallCustomRule copyWith({
+    String? sectionKey,
+    String? name,
+    String? srcZone,
+    String? destZone,
+    String? target,
+    bool? enabled,
+    bool? isUnrecognizedTarget,
+  }) {
+    return FirewallCustomRule(
+      sectionKey: sectionKey ?? this.sectionKey,
+      name: name ?? this.name,
+      srcZone: srcZone ?? this.srcZone,
+      destZone: destZone ?? this.destZone,
+      target: target ?? this.target,
+      enabled: enabled ?? this.enabled,
+      isUnrecognizedTarget: isUnrecognizedTarget ?? this.isUnrecognizedTarget,
+    );
+  }
+
+  factory FirewallCustomRule.fromJson(String key, Map<String, dynamic> json) {
     final rawTarget = (json['target']?.toString() ?? 'ACCEPT').toUpperCase();
     final isUnknown = !knownTargets.contains(rawTarget);
+    final secName = json['.name']?.toString() ?? key;
 
     return FirewallCustomRule(
+      sectionKey: secName.isNotEmpty ? secName : key,
       name: json['name']?.toString() ?? 'Custom Rule',
       srcZone: json['src']?.toString() ?? 'wan',
       destZone: json['dest']?.toString() ?? 'lan',
@@ -277,7 +301,7 @@ class Fw3FirewallParser {
           } else if (type == 'redirect') {
             pfList.add(FirewallPortForwarding.fromJson(Map<String, dynamic>.from(val)));
           } else if (type == 'rule') {
-            ruleList.add(FirewallCustomRule.fromJson(Map<String, dynamic>.from(val)));
+            ruleList.add(FirewallCustomRule.fromJson(key, Map<String, dynamic>.from(val)));
           }
         }
       });
@@ -347,7 +371,7 @@ class Fw4FirewallParser {
           } else if (type == 'redirect') {
             pfList.add(FirewallPortForwarding.fromJson(Map<String, dynamic>.from(val)));
           } else if (type == 'rule') {
-            ruleList.add(FirewallCustomRule.fromJson(Map<String, dynamic>.from(val)));
+            ruleList.add(FirewallCustomRule.fromJson(key, Map<String, dynamic>.from(val)));
           }
         }
       });

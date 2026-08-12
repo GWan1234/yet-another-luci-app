@@ -105,6 +105,7 @@ class AppState extends ChangeNotifier {
 
   List<model.Router> get routers => _routerService?.routers ?? [];
   model.Router? get selectedRouter => _routerService?.selectedRouter;
+  String? get currentRouterIp => selectedRouter?.ipAddress;
 
   VoidCallback? onRouterBackOnline;
   DateTime? _lastNeighborProbeTime;
@@ -308,6 +309,44 @@ class AppState extends ChangeNotifier {
   double get currentTxRate => _throughputService?.currentTxRate ?? 0.0;
   bool get isDashboardLoading => _isDashboardLoading;
   String? get dashboardError => _dashboardError;
+
+  String? _publicIpv4;
+  String? _publicIpv6;
+  bool _isFetchingPublicIps = false;
+
+  String? get publicIpv4 => _publicIpv4;
+  String? get publicIpv6 => _publicIpv6;
+  bool get isFetchingPublicIps => _isFetchingPublicIps;
+
+  Future<void> fetchPublicIps({BuildContext? context}) async {
+    if (_reviewerModeEnabled) {
+      _publicIpv4 = '203.0.113.195';
+      _publicIpv6 = '2001:db8:85a3::8a2e:0370:7334';
+      notifyListeners();
+      return;
+    }
+
+    final selected = selectedRouter;
+    final sys = sysauth;
+    if (selected == null || sys == null || _apiService == null) return;
+
+    _isFetchingPublicIps = true;
+    try {
+      final res = await _apiService!.fetchPublicIps(
+        selected.ipAddress,
+        sys,
+        selected.useHttps,
+        context: context,
+      );
+      _publicIpv4 = res['ipv4'];
+      _publicIpv6 = res['ipv6'];
+    } catch (e) {
+      Logger.warning('fetchPublicIps failed in AppState: $e');
+    } finally {
+      _isFetchingPublicIps = false;
+      notifyListeners();
+    }
+  }
 
   // Interface-specific throughput getters
   List<double> getRxHistoryForInterface(String interface) {
@@ -790,6 +829,9 @@ class AppState extends ChangeNotifier {
           '_lastUpdated':
               DateTime.now().millisecondsSinceEpoch, // Force UI updates
         };
+
+        _publicIpv4 = '203.0.113.195';
+        _publicIpv6 = '2001:db8:85a3::8a2e:0370:7334';
 
         // Update throughput data with mock network data for reviewer mode
         if (_throughputService != null) {
@@ -1416,6 +1458,9 @@ class AppState extends ChangeNotifier {
 
       // Ensure throughput timer is running
       _startThroughputTimer();
+
+      // Fetch public IP information asynchronously
+      unawaited(fetchPublicIps());
 
       // Schedule an immediate throughput update to get initial data faster
       Future.delayed(const Duration(milliseconds: 100), () {
@@ -2714,6 +2759,80 @@ class AppState extends ChangeNotifier {
     return res;
   }
 
+  Future<bool> addStaticLease({
+    required String macAddress,
+    required String targetIp,
+    required String hostname,
+    String? leaseTime,
+    BuildContext? context,
+  }) async {
+    final macUpper = macAddress.toUpperCase().replaceAll('-', ':');
+    if (_reviewerModeEnabled) {
+      if (dashboardData != null) {
+        final hints = dashboardData!['hostHints'] as Map<String, dynamic>? ?? {};
+        hints[macUpper] = {
+          'name': hostname,
+          'staticLeaseName': hostname,
+          'ipaddrs': [targetIp],
+          'staticLeaseIp': targetIp,
+          'isStaticLease': true,
+        };
+      }
+      notifyListeners();
+      await fetchDashboardData();
+      return true;
+    }
+    if (_authService?.sysauth == null || _authService?.ipAddress == null) {
+      return false;
+    }
+    final res = await _apiService!.addStaticLease(
+      _authService!.ipAddress!,
+      _authService!.sysauth!,
+      _authService!.useHttps,
+      macAddress: macAddress,
+      targetIp: targetIp,
+      hostname: hostname,
+      leaseTime: leaseTime,
+      context: context,
+    );
+    if (res) {
+      await fetchDashboardData();
+      notifyListeners();
+    }
+    return res;
+  }
+
+  Future<bool> deleteStaticLease({
+    required String macAddress,
+    BuildContext? context,
+  }) async {
+    final macUpper = macAddress.toUpperCase().replaceAll('-', ':');
+    if (_reviewerModeEnabled) {
+      if (dashboardData != null) {
+        final hints = dashboardData!['hostHints'] as Map<String, dynamic>? ?? {};
+        hints.removeWhere((key, val) => key.toUpperCase().replaceAll('-', ':') == macUpper);
+      }
+      notifyListeners();
+      await fetchDashboardData();
+      return true;
+    }
+    if (_authService?.sysauth == null || _authService?.ipAddress == null) {
+      return false;
+    }
+    final res = await _apiService!.deleteStaticLease(
+      _authService!.ipAddress!,
+      _authService!.sysauth!,
+      _authService!.useHttps,
+      macAddress: macAddress,
+      context: context,
+    );
+    if (res) {
+      await fetchDashboardData();
+      notifyListeners();
+    }
+    return res;
+  }
+
   Future<bool> banWirelessClient(
     String macAddress, {
     String? iface,
@@ -3064,6 +3183,407 @@ class AppState extends ChangeNotifier {
       await fetchDashboardData();
     }
     return success;
+  }
+
+  Future<bool> updateFirewallCustomRuleStatus(
+    String sectionKey,
+    bool enabled, {
+    BuildContext? context,
+  }) async {
+    if (_reviewerModeEnabled) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      return true;
+    }
+    if (_authService?.sysauth == null || _authService?.ipAddress == null) {
+      return false;
+    }
+
+    try {
+      final setRes = await _apiService!.uciSet(
+        _authService!.ipAddress!,
+        _authService!.sysauth!,
+        _authService!.useHttps,
+        config: 'firewall',
+        section: sectionKey,
+        values: {'enabled': enabled ? '1' : '0'},
+        context: context,
+      );
+      if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) {
+        return false;
+      }
+
+      final commitRes = await _apiService!.uciCommit(
+        _authService!.ipAddress!,
+        _authService!.sysauth!,
+        _authService!.useHttps,
+        config: 'firewall',
+        context: (context != null && context.mounted) ? context : null,
+      );
+      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0) {
+        return false;
+      }
+
+      await _apiService!.manageServiceAction(
+        _authService!.ipAddress!,
+        _authService!.sysauth!,
+        _authService!.useHttps,
+        serviceName: 'firewall',
+        action: 'reload',
+        context: (context != null && context.mounted) ? context : null,
+      );
+
+      return true;
+    } catch (e, stack) {
+      Logger.exception('updateFirewallCustomRuleStatus failed for $sectionKey', e, stack);
+      return false;
+    }
+  }
+
+  Future<bool> updateWiredInterfaceStatus(
+    String interfaceName,
+    bool enabled, {
+    BuildContext? context,
+  }) async {
+    if (_reviewerModeEnabled) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      return true;
+    }
+    if (_authService?.sysauth == null || _authService?.ipAddress == null) {
+      return false;
+    }
+
+    try {
+      final setRes = await _apiService!.uciSet(
+        _authService!.ipAddress!,
+        _authService!.sysauth!,
+        _authService!.useHttps,
+        config: 'network',
+        section: interfaceName,
+        values: {'disabled': enabled ? '0' : '1'},
+        context: context,
+      );
+      if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) {
+        return false;
+      }
+
+      final commitRes = await _apiService!.uciCommit(
+        _authService!.ipAddress!,
+        _authService!.sysauth!,
+        _authService!.useHttps,
+        config: 'network',
+        context: (context != null && context.mounted) ? context : null,
+      );
+      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0) {
+        return false;
+      }
+
+      await _apiService!.manageServiceAction(
+        _authService!.ipAddress!,
+        _authService!.sysauth!,
+        _authService!.useHttps,
+        serviceName: 'network',
+        action: 'reload',
+        context: (context != null && context.mounted) ? context : null,
+      );
+
+      return true;
+    } catch (e, stack) {
+      Logger.exception('updateWiredInterfaceStatus failed for $interfaceName', e, stack);
+      return false;
+    }
+  }
+
+  Future<bool> updateWirelessInterfaceStatus(
+    String sectionKey,
+    bool enabled, {
+    BuildContext? context,
+  }) async {
+    if (_reviewerModeEnabled) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      return true;
+    }
+    if (_authService?.sysauth == null || _authService?.ipAddress == null) {
+      return false;
+    }
+
+    try {
+      final setRes = await _apiService!.uciSet(
+        _authService!.ipAddress!,
+        _authService!.sysauth!,
+        _authService!.useHttps,
+        config: 'wireless',
+        section: sectionKey,
+        values: {'disabled': enabled ? '0' : '1'},
+        context: context,
+      );
+      if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) {
+        return false;
+      }
+
+      final commitRes = await _apiService!.uciCommit(
+        _authService!.ipAddress!,
+        _authService!.sysauth!,
+        _authService!.useHttps,
+        config: 'wireless',
+        context: (context != null && context.mounted) ? context : null,
+      );
+      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0) {
+        return false;
+      }
+
+      await _apiService!.systemExec(
+        _authService!.ipAddress!,
+        _authService!.sysauth!,
+        _authService!.useHttps,
+        command: 'wifi reload',
+        context: (context != null && context.mounted) ? context : null,
+      );
+
+      return true;
+    } catch (e, stack) {
+      Logger.exception('updateWirelessInterfaceStatus failed for $sectionKey', e, stack);
+      return false;
+    }
+  }
+
+  Future<bool> restartWiredInterface(
+    String interfaceName, {
+    BuildContext? context,
+  }) async {
+    if (_reviewerModeEnabled) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      return true;
+    }
+    if (_authService?.sysauth == null || _authService?.ipAddress == null) {
+      return false;
+    }
+
+    try {
+      final ip = _authService!.ipAddress!;
+      final sysauth = _authService!.sysauth!;
+      final useHttps = _authService!.useHttps;
+      final ctx = (context != null && context.mounted) ? context : null;
+
+      bool success = false;
+
+      // 1. Direct binary exec via rpcd: /sbin/ifdown and /sbin/ifup
+      try {
+        final downRes = await _apiService!.call(
+          ip,
+          sysauth,
+          useHttps,
+          object: 'file',
+          method: 'exec',
+          params: {
+            'command': '/sbin/ifdown',
+            'params': [interfaceName],
+          },
+          context: ctx,
+        );
+        await Future.delayed(const Duration(milliseconds: 400));
+        final upRes = await _apiService!.call(
+          ip,
+          sysauth,
+          useHttps,
+          object: 'file',
+          method: 'exec',
+          params: {
+            'command': '/sbin/ifup',
+            'params': [interfaceName],
+          },
+          context: ctx,
+        );
+        if (_apiService!.execSucceeded(upRes) || _apiService!.execSucceeded(downRes)) {
+          success = true;
+        }
+      } catch (_) {}
+
+      // 2. ubus network.interface down & up
+      if (!success) {
+        try {
+          final downRes = await _apiService!.call(
+            ip,
+            sysauth,
+            useHttps,
+            object: 'network.interface.$interfaceName',
+            method: 'down',
+            params: {},
+            context: ctx,
+          );
+          await Future.delayed(const Duration(milliseconds: 400));
+          final upRes = await _apiService!.call(
+            ip,
+            sysauth,
+            useHttps,
+            object: 'network.interface.$interfaceName',
+            method: 'up',
+            params: {},
+            context: ctx,
+          );
+          if ((downRes is List && downRes.isNotEmpty && downRes[0] == 0) ||
+              (upRes is List && upRes.isNotEmpty && upRes[0] == 0)) {
+            success = true;
+          }
+        } catch (_) {}
+      }
+
+      // 3. Shell fallback
+      if (!success) {
+        final execRes = await _apiService!.systemExec(
+          ip,
+          sysauth,
+          useHttps,
+          command: 'ifdown $interfaceName 2>/dev/null; sleep 1; ifup $interfaceName 2>/dev/null',
+          context: ctx,
+        );
+        if (_apiService!.execSucceeded(execRes)) {
+          success = true;
+        }
+      }
+
+      return success;
+    } catch (e, stack) {
+      Logger.exception('restartWiredInterface failed for $interfaceName', e, stack);
+      return false;
+    }
+  }
+
+  Future<bool> restartWirelessInterface(
+    String sectionKey, {
+    String? radioName,
+    BuildContext? context,
+  }) async {
+    if (_reviewerModeEnabled) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      return true;
+    }
+    if (_authService?.sysauth == null || _authService?.ipAddress == null) {
+      return false;
+    }
+
+    try {
+      final ip = _authService!.ipAddress!;
+      final sysauth = _authService!.sysauth!;
+      final useHttps = _authService!.useHttps;
+      final ctx = (context != null && context.mounted) ? context : null;
+
+      bool success = false;
+
+      // 1. Direct binary exec via rpcd: /sbin/wifi reload [radioName]
+      final wifiReloadArgs = (radioName != null && radioName.isNotEmpty)
+          ? ['reload', radioName]
+          : ['reload'];
+      try {
+        final reloadRes = await _apiService!.call(
+          ip,
+          sysauth,
+          useHttps,
+          object: 'file',
+          method: 'exec',
+          params: {
+            'command': '/sbin/wifi',
+            'params': wifiReloadArgs,
+          },
+          context: ctx,
+        );
+        if (_apiService!.execSucceeded(reloadRes)) {
+          success = true;
+        }
+      } catch (_) {}
+
+      // 2. Direct binary exec via rpcd: /sbin/wifi down [radioName] && /sbin/wifi up [radioName]
+      if (!success) {
+        final wifiDownArgs = (radioName != null && radioName.isNotEmpty)
+            ? ['down', radioName]
+            : ['down'];
+        final wifiUpArgs = (radioName != null && radioName.isNotEmpty)
+            ? ['up', radioName]
+            : ['up'];
+        try {
+          await _apiService!.call(
+            ip,
+            sysauth,
+            useHttps,
+            object: 'file',
+            method: 'exec',
+            params: {
+              'command': '/sbin/wifi',
+              'params': wifiDownArgs,
+            },
+            context: ctx,
+          );
+          await Future.delayed(const Duration(milliseconds: 500));
+          final upRes = await _apiService!.call(
+            ip,
+            sysauth,
+            useHttps,
+            object: 'file',
+            method: 'exec',
+            params: {
+              'command': '/sbin/wifi',
+              'params': wifiUpArgs,
+            },
+            context: ctx,
+          );
+          if (_apiService!.execSucceeded(upRes)) {
+            success = true;
+          }
+        } catch (_) {}
+      }
+
+      // 3. ubus network.wireless down/up if radioName is available
+      if (!success && radioName != null && radioName.isNotEmpty) {
+        try {
+          final downRes = await _apiService!.call(
+            ip,
+            sysauth,
+            useHttps,
+            object: 'network.wireless',
+            method: 'down',
+            params: {'device': radioName},
+            context: ctx,
+          );
+          await Future.delayed(const Duration(milliseconds: 400));
+          final upRes = await _apiService!.call(
+            ip,
+            sysauth,
+            useHttps,
+            object: 'network.wireless',
+            method: 'up',
+            params: {'device': radioName},
+            context: ctx,
+          );
+          if ((downRes is List && downRes.isNotEmpty && downRes[0] == 0) ||
+              (upRes is List && upRes.isNotEmpty && upRes[0] == 0)) {
+            success = true;
+          }
+        } catch (_) {}
+      }
+
+      // 4. Shell fallback via systemExec
+      if (!success) {
+        final rName = (radioName != null && radioName.isNotEmpty) ? radioName : '';
+        final cmd = rName.isNotEmpty
+            ? 'wifi reload $rName 2>/dev/null || (wifi down $rName 2>/dev/null; sleep 1; wifi up $rName 2>/dev/null) || wifi reload'
+            : 'wifi reload 2>/dev/null || (wifi down 2>/dev/null; sleep 1; wifi up 2>/dev/null)';
+
+        final execRes = await _apiService!.systemExec(
+          ip,
+          sysauth,
+          useHttps,
+          command: cmd,
+          context: ctx,
+        );
+        if (_apiService!.execSucceeded(execRes)) {
+          success = true;
+        }
+      }
+
+      return success;
+    } catch (e, stack) {
+      Logger.exception('restartWirelessInterface failed for $sectionKey', e, stack);
+      return false;
+    }
   }
 
   Future<bool> setWirelessRadioState(
@@ -3567,6 +4087,7 @@ class AppState extends ChangeNotifier {
         }
 
         final staticName = hostHints[macN]?['staticLeaseName']?.toString();
+        final isStaticEntry = hostHints[macN]?['isStaticLease'] == true;
         final isWireless = normalizedWireless.contains(macN);
         final foundSsid = macToSsidMap[macN];
         final foundIface = macToIfaceMap[macN];
@@ -3582,6 +4103,7 @@ class AppState extends ChangeNotifier {
           ssid: foundSsid,
           wirelessIface: foundIface,
           staticLeaseName: staticName,
+          isStaticLease: isStaticEntry,
           ipv6Addresses: v6List,
         );
       }
@@ -3626,6 +4148,7 @@ class AppState extends ChangeNotifier {
             } else {
               final isWireless = normalizedWireless.contains(matchedMac!);
               final staticName = hostHints[matchedMac]?['staticLeaseName']?.toString();
+              final isStaticEntry = hostHints[matchedMac]?['isStaticLease'] == true;
               clientMap[matchedMac!] = Client(
                 ipAddress: 'N/A',
                 macAddress: matchedMac!,
@@ -3634,6 +4157,7 @@ class AppState extends ChangeNotifier {
                 ssid: macToSsidMap[matchedMac],
                 wirelessIface: macToIfaceMap[matchedMac],
                 staticLeaseName: staticName,
+                isStaticLease: isStaticEntry,
                 ipv6Addresses: v6Addrs,
               );
             }
@@ -3647,6 +4171,7 @@ class AppState extends ChangeNotifier {
         if (!clientMap.containsKey(macN)) {
           final hintName = info['name']?.toString();
           final staticName = info['staticLeaseName']?.toString();
+          final isStaticEntry = info['isStaticLease'] == true;
           final ipaddrs = info['ipaddrs'] as List?;
           final ip = (ipaddrs != null && ipaddrs.isNotEmpty) ? ipaddrs.first.toString() : 'N/A';
           final name = (hintName != null && hintName.isNotEmpty && hintName != '*') ? hintName : macN;
@@ -3664,6 +4189,7 @@ class AppState extends ChangeNotifier {
             ssid: macToSsidMap[macN],
             wirelessIface: macToIfaceMap[macN],
             staticLeaseName: staticName,
+            isStaticLease: isStaticEntry,
             ipv6Addresses: v6List,
           );
         }
@@ -3775,8 +4301,7 @@ class AppState extends ChangeNotifier {
         final finalConnType = isWirelessActive ? ConnectionType.wireless : ConnectionType.wired;
 
         final isLeaseExpired = c.leaseTime != null && c.leaseTime! < 0;
-        final isStaticLease = hostHints[macN]?['isStaticLease'] == true ||
-            (c.staticLeaseName != null && c.staticLeaseName!.isNotEmpty);
+        final isStaticLease = hostHints[macN]?['isStaticLease'] == true || c.isStaticLease;
 
         if (isConnected || !isLeaseExpired || isStaticLease) {
           processedClients.add(c.copyWith(

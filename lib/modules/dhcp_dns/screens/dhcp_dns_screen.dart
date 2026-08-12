@@ -35,7 +35,7 @@ class DhcpDnsScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             _buildSectionHeader(context, 'Static IP Reservations (Host Mappings)', Icons.pin_drop_outlined),
             const SizedBox(height: 8),
-            _buildStaticMappingsList(context, overview.staticMappings),
+            _buildStaticMappingsList(context, ref, overview.staticMappings),
             const SizedBox(height: 32),
           ],
         ),
@@ -113,7 +113,7 @@ class DhcpDnsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStaticMappingsList(BuildContext context, List<DhcpStaticMapping> mappings) {
+  Widget _buildStaticMappingsList(BuildContext context, WidgetRef ref, List<DhcpStaticMapping> mappings) {
     if (mappings.isEmpty) {
       return const Card(
         child: Padding(padding: EdgeInsets.all(16.0), child: Text('No static host reservations configured.')),
@@ -133,18 +133,103 @@ class DhcpDnsScreen extends ConsumerWidget {
             ),
             title: Text(mapping.hostname, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text('Reserved IP: ${mapping.ipAddress} • MAC: ${mapping.macAddress}'),
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: Colors.teal.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Text('STATIC', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 11)),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text('STATIC', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold, fontSize: 11)),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                  tooltip: 'Remove Static Lease',
+                  onPressed: () => _confirmDeleteStaticLease(context, ref, mapping),
+                ),
+              ],
             ),
           ),
         );
       }).toList(),
     );
+  }
+
+  Future<void> _confirmDeleteStaticLease(BuildContext context, WidgetRef ref, DhcpStaticMapping mapping) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Remove Static Lease',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to remove the static IP reservation for "${mapping.hostname}" (${mapping.macAddress})?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Remove Reservation'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Removing static lease for ${mapping.hostname}...'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      final appState = ref.read(appStateProvider);
+      final success = await appState.deleteStaticLease(
+        macAddress: mapping.macAddress,
+        context: context,
+      );
+
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            success
+                ? 'Static lease removed for ${mapping.hostname}.'
+                : 'Failed to remove static lease for ${mapping.hostname}.',
+          ),
+          backgroundColor: success ? Colors.green : Colors.red,
+        ),
+      );
+    }
   }
 
   Widget _buildDetailRow(String label, String value) {

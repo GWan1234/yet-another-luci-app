@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:http/http.dart' as http;
 import 'package:luci_mobile/services/interfaces/api_service_interface.dart';
 import '../utils/http_client_manager.dart';
 import '../utils/logger.dart';
@@ -800,23 +801,19 @@ class RealApiService implements IApiService {
                 }
               }
               final existing = hints[normMac];
-              final validName = (name != null && name.isNotEmpty && name != '*') ? name : null;
               final newIps = info['ipaddrs'] as List?;
               final newV6Ips = info['ip6addrs'] as List?;
               if (existing == null) {
                 hints[normMac] = {
                   'name': name ?? '',
-                  'staticLeaseName': validName,
                   'ipaddrs': newIps ?? [],
                   'ip6addrs': newV6Ips ?? [],
+                  'isStaticLease': false,
                 };
               } else {
-                // Keep static lease name if set, otherwise update missing fields
+                // Keep static lease info if set from UCI in step 1, otherwise update missing dynamic fields
                 if (existing['name'] == null || existing['name'].toString().isEmpty) {
                   existing['name'] = name ?? '';
-                }
-                if (existing['staticLeaseName'] == null && validName != null) {
-                  existing['staticLeaseName'] = validName;
                 }
                 if (newIps != null && newIps.isNotEmpty) {
                   existing['ipaddrs'] = newIps;
@@ -1001,9 +998,9 @@ class RealApiService implements IApiService {
       ipAddress,
       sysauth,
       useHttps,
-      object: 'system',
+      object: 'file',
       method: 'exec',
-      params: {'command': command},
+      params: fileExecParams('/bin/sh', ['-c', command]),
       context: context,
     );
   }
@@ -1011,7 +1008,8 @@ class RealApiService implements IApiService {
   /// Helper to safely obtain mounted BuildContext across async gaps.
   BuildContext? mountedContext(BuildContext? ctx) => (ctx != null && ctx.mounted) ? ctx : null;
 
-  bool _execSucceeded(dynamic res) {
+  @override
+  bool execSucceeded(dynamic res) {
     if (res == null) return false;
     if (res is List && res.isNotEmpty) {
       if (res.length > 1 && res[1] is Map) {
@@ -1028,6 +1026,8 @@ class RealApiService implements IApiService {
     }
     return res == 0;
   }
+
+  bool _execSucceeded(dynamic res) => execSucceeded(res);
 
 
 
@@ -2021,5 +2021,286 @@ echo "\$ALL_BANNED"
       Logger.exception('fetchRestrictedAndBannedClientsLive failed', e, stack);
       return {'restricted': [], 'banned': []};
     }
+  }
+
+  @override
+  Future<bool> addStaticLease(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String macAddress,
+    required String targetIp,
+    required String hostname,
+    String? leaseTime,
+    BuildContext? context,
+  }) async {
+    try {
+      final macUpper = macAddress.toUpperCase().replaceAll('-', ':');
+      final values = <String, String>{
+        'name': hostname.trim(),
+        'mac': macUpper,
+        'ip': targetIp.trim(),
+      };
+      if (leaseTime != null && leaseTime.trim().isNotEmpty) {
+        values['leasetime'] = leaseTime.trim();
+      }
+
+      // 1. Try ubus uci.add call
+      final addRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'add',
+        params: {
+          'config': 'dhcp',
+          'type': 'host',
+          'values': values,
+        },
+        context: mountedContext(context),
+      );
+
+      bool addSuccess = addRes is List && addRes.isNotEmpty && addRes[0] == 0;
+
+      if (!addSuccess) {
+        // Fallback: Shell execution via /bin/sh
+        final cmdList = [
+          'SECNAME=\$(uci add dhcp host)',
+          'uci set dhcp.\$SECNAME.name="${hostname.trim()}"',
+          'uci set dhcp.\$SECNAME.mac="$macUpper"',
+          'uci set dhcp.\$SECNAME.ip="${targetIp.trim()}"',
+        ];
+        if (leaseTime != null && leaseTime.trim().isNotEmpty) {
+          cmdList.add('uci set dhcp.\$SECNAME.leasetime="${leaseTime.trim()}"');
+        }
+        cmdList.add('uci commit dhcp');
+
+        final shellRes = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'file',
+          method: 'exec',
+          params: {
+            'command': '/bin/sh',
+            'params': ['-c', cmdList.join(' && ')],
+          },
+          context: mountedContext(context),
+        );
+        addSuccess = _execSucceeded(shellRes);
+      } else {
+        await uciCommit(ipAddress, sysauth, useHttps, config: 'dhcp', context: mountedContext(context));
+      }
+
+      // Reload dnsmasq service to apply static lease
+      await manageServiceAction(
+        ipAddress,
+        sysauth,
+        useHttps,
+        serviceName: 'dnsmasq',
+        action: 'reload',
+        context: mountedContext(context),
+      );
+
+      return addSuccess;
+    } catch (e, stack) {
+      Logger.exception('addStaticLease failed for $macAddress', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> deleteStaticLease(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String macAddress,
+    BuildContext? context,
+  }) async {
+    try {
+      final cleanMac = macAddress.trim().toLowerCase();
+      String? sectionToDelete;
+
+      // 1. Attempt to find section via UCI ubus call
+      try {
+        final getRes = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'get',
+          params: {'config': 'dhcp'},
+          context: mountedContext(context),
+        );
+
+        if (getRes is List && getRes.length > 1 && getRes[0] == 0) {
+          final uciData = getRes[1];
+          final valuesMap = (uciData is Map && uciData['values'] is Map)
+              ? uciData['values'] as Map
+              : (uciData is Map ? uciData : {});
+          valuesMap.forEach((key, val) {
+            if (sectionToDelete != null) return;
+            if (val is Map && val['.type'] == 'host') {
+              final macVal = val['mac'];
+              if (macVal is String) {
+                if (macVal.toLowerCase().contains(cleanMac)) {
+                  sectionToDelete = key.toString();
+                }
+              } else if (macVal is List) {
+                for (final item in macVal) {
+                  if (item.toString().toLowerCase().contains(cleanMac)) {
+                    sectionToDelete = key.toString();
+                    break;
+                  }
+                }
+              }
+            }
+          });
+        }
+      } catch (e) {
+        Logger.warning('ubus dhcp config lookup failed during deleteStaticLease: $e');
+      }
+
+      bool deleteSuccess = false;
+
+      if (sectionToDelete != null) {
+        // Delete identified section via ubus
+        final delRes = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'delete',
+          params: {
+            'config': 'dhcp',
+            'section': sectionToDelete,
+          },
+          context: mountedContext(context),
+        );
+        deleteSuccess = delRes is List && delRes.isNotEmpty && delRes[0] == 0;
+        if (deleteSuccess) {
+          await uciCommit(ipAddress, sysauth, useHttps, config: 'dhcp', context: mountedContext(context));
+        }
+      }
+
+      // 2. Fallback to shell execution if ubus delete failed or section wasn't matched via ubus
+      if (!deleteSuccess) {
+        final shellRes = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'file',
+          method: 'exec',
+          params: {
+            'command': '/bin/sh',
+            'params': ['-c', "sec=\$(uci show dhcp | grep -i '$cleanMac' | head -n1 | cut -d. -f2); if [ -n \"\$sec\" ]; then uci delete dhcp.\$sec && uci commit dhcp && /etc/init.d/dnsmasq reload; fi"],
+          },
+          context: mountedContext(context),
+        );
+        deleteSuccess = _execSucceeded(shellRes);
+      } else {
+        // Reload dnsmasq service to apply change
+        await manageServiceAction(
+          ipAddress,
+          sysauth,
+          useHttps,
+          serviceName: 'dnsmasq',
+          action: 'reload',
+          context: mountedContext(context),
+        );
+      }
+
+      return deleteSuccess;
+    } catch (e, stack) {
+      Logger.exception('deleteStaticLease failed for $macAddress', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<Map<String, String?>> fetchPublicIps(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  }) async {
+    String? publicV4;
+    String? publicV6;
+
+    // 1. Attempt router-side URL fetch via /bin/sh exec (handles CGNAT from router WAN context)
+    try {
+      final cmd = 'V4=\$(wget -q -O - http://api.ipify.org 2>/dev/null || wget -q -O - http://checkip.amazonaws.com 2>/dev/null || curl -s -m 3 http://api.ipify.org 2>/dev/null || uclient-fetch -q -O - http://api.ipify.org 2>/dev/null); '
+                  'V6=\$(wget -q -O - http://api6.ipify.org 2>/dev/null || wget -q -O - http://v6.ipv6-test.com/api/myip.php 2>/dev/null || curl -s -6 -m 3 http://api6.ipify.org 2>/dev/null || uclient-fetch -q -O - http://api6.ipify.org 2>/dev/null); '
+                  'echo "V4:\$V4"; echo "V6:\$V6"';
+
+      final shellRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': '/bin/sh',
+          'params': ['-c', cmd],
+        },
+        context: mountedContext(context),
+      );
+
+      if (shellRes is List && shellRes.length > 1 && shellRes[0] == 0) {
+        final stdout = shellRes[1]['stdout']?.toString() ?? '';
+        for (final line in stdout.split('\n')) {
+          final trimmed = line.trim();
+          if (trimmed.startsWith('V4:')) {
+            final candidate = trimmed.substring(3).trim();
+            if (candidate.isNotEmpty && _isValidIpv4Candidate(candidate)) {
+              publicV4 = candidate;
+            }
+          } else if (trimmed.startsWith('V6:')) {
+            final candidate = trimmed.substring(3).trim();
+            if (candidate.isNotEmpty && candidate.contains(':')) {
+              publicV6 = candidate;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      Logger.warning('Router-side public IP resolution failed: $e');
+    }
+
+    // 2. Client-side HTTP fallback if router execution returned null
+    if (publicV4 == null) {
+      try {
+        final res = await http.get(Uri.parse('http://api.ipify.org')).timeout(const Duration(seconds: 3));
+        if (res.statusCode == 200) {
+          final body = res.body.trim();
+          if (_isValidIpv4Candidate(body)) {
+            publicV4 = body;
+          }
+        }
+      } catch (e) {
+        Logger.debug('Client-side IPv4 lookup failed: $e');
+      }
+    }
+
+    if (publicV6 == null) {
+      try {
+        final res = await http.get(Uri.parse('http://api6.ipify.org')).timeout(const Duration(seconds: 3));
+        if (res.statusCode == 200) {
+          final body = res.body.trim();
+          if (body.contains(':')) {
+            publicV6 = body;
+          }
+        }
+      } catch (e) {
+        Logger.debug('Client-side IPv6 lookup failed: $e');
+      }
+    }
+
+    return {'ipv4': publicV4, 'ipv6': publicV6};
+  }
+
+  static bool _isValidIpv4Candidate(String ip) {
+    final reg = RegExp(r'^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.){3}(25[0-5]|(2[0-4]|1\d|[1-9]|)\d)$');
+    return reg.hasMatch(ip);
   }
 }

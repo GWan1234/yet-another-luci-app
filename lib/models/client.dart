@@ -37,6 +37,7 @@ class Client {
   final bool isConnected;
   final NeighborReachability neighState;
   final String? staticLeaseName;
+  final bool isStaticLease;
 
   Client({
     required this.ipAddress,
@@ -56,6 +57,7 @@ class Client {
     this.isConnected = true,
     this.neighState = NeighborReachability.unknown,
     this.staticLeaseName,
+    this.isStaticLease = false,
   });
 
   // Helper function to determine connection type from interface parameters
@@ -260,6 +262,9 @@ class Client {
     return macAddress;
   }
 
+  /// Whether this client is configured as a static lease in UCI dhcp
+  bool get isStatic => isStaticLease || (staticLeaseName != null && staticLeaseName!.trim().isNotEmpty);
+
   Client copyWith({
     String? ipAddress,
     String? macAddress,
@@ -278,6 +283,7 @@ class Client {
     bool? isConnected,
     NeighborReachability? neighState,
     String? staticLeaseName,
+    bool? isStaticLease,
   }) {
     return Client(
       ipAddress: ipAddress ?? this.ipAddress,
@@ -297,6 +303,7 @@ class Client {
       isConnected: isConnected ?? this.isConnected,
       neighState: neighState ?? this.neighState,
       staticLeaseName: staticLeaseName ?? this.staticLeaseName,
+      isStaticLease: isStaticLease ?? this.isStaticLease,
     );
   }
 
