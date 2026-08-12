@@ -7,8 +7,8 @@ import 'package:url_launcher/url_launcher_string.dart';
 
 /// Manages manual update checks against GitHub Releases for the Community build flavor.
 class UpdateCheckerService {
-  static const String _githubLatestReleaseUrl =
-      'https://api.github.com/repos/nightcodex7/yet-another-luci-app/releases/latest';
+  static const String _githubReleasesUrl =
+      'https://api.github.com/repos/nightcodex7/yet-another-luci-app/releases';
 
   /// Performs a manual check for updates on GitHub Releases and displays an interactive dialog.
   static Future<void> checkForUpdates(BuildContext context) async {
@@ -40,8 +40,11 @@ class UpdateCheckerService {
       final currentVersionStr = info.version.trim();
 
       final response = await http.get(
-        Uri.parse(_githubLatestReleaseUrl),
-        headers: {'Accept': 'application/vnd.github.v3+json'},
+        Uri.parse(_githubReleasesUrl),
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'YetAnotherLuCIApp/${info.version}',
+        },
       ).timeout(const Duration(seconds: 10));
 
       if (context.mounted) {
@@ -49,31 +52,50 @@ class UpdateCheckerService {
       }
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        final rawTagName = (data['tag_name'] as String? ?? '').trim();
-        final latestVersionStr = rawTagName.startsWith('v')
-            ? rawTagName.substring(1)
-            : rawTagName;
-        final htmlUrl = data['html_url'] as String? ??
-            'https://github.com/nightcodex7/yet-another-luci-app/releases';
-        final releaseNotes =
-            data['body'] as String? ?? 'No release notes available.';
+        final rawData = json.decode(response.body);
+        Map<String, dynamic>? latestRelease;
 
-        final bool isUpdateAvailable =
-            _isVersionNewer(currentVersionStr, latestVersionStr);
+        if (rawData is List && rawData.isNotEmpty) {
+          final validReleases = rawData
+              .whereType<Map<String, dynamic>>()
+              .where((r) => r['draft'] != true)
+              .toList();
+          if (validReleases.isNotEmpty) {
+            latestRelease = validReleases.first;
+          }
+        } else if (rawData is Map<String, dynamic>) {
+          latestRelease = rawData;
+        }
 
-        if (!context.mounted) return;
+        if (latestRelease != null) {
+          final rawTagName = (latestRelease['tag_name'] as String? ?? '').trim();
+          final latestVersionStr = rawTagName.startsWith('v')
+              ? rawTagName.substring(1)
+              : rawTagName;
+          final htmlUrl = latestRelease['html_url'] as String? ??
+              'https://github.com/nightcodex7/yet-another-luci-app/releases';
+          final releaseNotes =
+              latestRelease['body'] as String? ?? 'No release notes available.';
 
-        if (isUpdateAvailable) {
-          _showUpdateAvailableDialog(
-            context,
-            currentVersion: currentVersionStr,
-            latestVersion: latestVersionStr,
-            releaseNotes: releaseNotes,
-            downloadUrl: htmlUrl,
-          );
+          final bool isUpdateAvailable =
+              _isVersionNewer(currentVersionStr, latestVersionStr);
+
+          if (!context.mounted) return;
+
+          if (isUpdateAvailable) {
+            _showUpdateAvailableDialog(
+              context,
+              currentVersion: currentVersionStr,
+              latestVersion: latestVersionStr,
+              releaseNotes: releaseNotes,
+              downloadUrl: htmlUrl,
+            );
+          } else {
+            _showUpToDateDialog(context, currentVersion: currentVersionStr);
+          }
         } else {
-          _showUpToDateDialog(context, currentVersion: currentVersionStr);
+          if (!context.mounted) return;
+          _showErrorDialog(context, 'No releases found on GitHub.');
         }
       } else {
         if (!context.mounted) return;
@@ -92,11 +114,18 @@ class UpdateCheckerService {
 
   static bool _isVersionNewer(String current, String latest) {
     if (current == latest) return false;
-    final currentParts = current
+
+    // Strip build numbers (+1) and prerelease suffixes (-beta) for semantic comparison
+    final currentClean = current.split('+').first.split('-').first.trim();
+    final latestClean = latest.split('+').first.split('-').first.trim();
+
+    if (currentClean == latestClean) return false;
+
+    final currentParts = currentClean
         .split('.')
         .map((e) => int.tryParse(e.replaceAll(RegExp(r'\D'), '')) ?? 0)
         .toList();
-    final latestParts = latest
+    final latestParts = latestClean
         .split('.')
         .map((e) => int.tryParse(e.replaceAll(RegExp(r'\D'), '')) ?? 0)
         .toList();
