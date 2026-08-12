@@ -58,23 +58,23 @@ overlayfs:/overlay / overlay rw,noatime 0 0
       expect(overview.overlayFs!.filesystemType, equals('ubifs'));
     });
 
-    test('Parses JSON RPC mount points (native byte units) correctly', () {
+    test('Parses JSON RPC mount points with explicit byte keys correctly', () {
       final jsonRpcData = [
         {
           'mount': '/',
           'device': '/dev/root',
           'fs': 'squashfs',
-          'size': 134217728, // Bytes (128MB)
-          'used': 47185920,
-          'avail': 87031808,
+          'sizeBytes': 134217728, // Bytes (128MB)
+          'usedBytes': 47185920,
+          'availableBytes': 87031808,
         },
         {
           'mount': '/overlay',
           'device': '/dev/mtdblock6',
           'fs': 'ext4',
-          'size': 67108864, // Bytes (64MB)
-          'used': 16777216,
-          'avail': 50331648,
+          'sizeBytes': 67108864, // Bytes (64MB)
+          'usedBytes': 16777216,
+          'availableBytes': 50331648,
         },
       ];
 

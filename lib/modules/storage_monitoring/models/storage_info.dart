@@ -111,12 +111,9 @@ class MountPointItem {
       rawAvail *= bsize;
       rawUsed *= bsize;
     } else if (isExplicitBytes) {
-      // Values are already in bytes
-    } else if (dataSource == StorageDataSource.dfKBlocks ||
-        unitStr == '1k-blocks' ||
-        unitStr == 'kb' ||
-        (!isExplicitBytes && rawSize > 0 && rawSize < 50000000)) {
-      // 1K-blocks (KB) from OpenWrt RPC getMountPoints / system.mounts / df -k
+      // Values are explicitly in bytes (via sizeBytes/usedBytes keys, unit='bytes', or unit suffixes like 'M'/'G'/'K')
+    } else {
+      // OpenWrt RPC standard (luci-rpc.getMountPoints, system.mounts, df -k) outputs values natively in 1K-blocks (KB)
       rawSize *= 1024;
       rawAvail *= 1024;
       rawUsed *= 1024;
