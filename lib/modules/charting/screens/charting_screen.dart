@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
+import '../../system_monitoring/models/system_metrics.dart';
 import '../services/metrics_chart_engine.dart';
 import '../widgets/realtime_line_chart.dart';
 
@@ -21,15 +22,9 @@ class ChartingScreen extends ConsumerWidget {
       });
     }
 
-    final rawLoad = sysInfo?['load'];
-    final cpuLoadList = rawLoad is List ? rawLoad : (rawLoad is Map ? rawLoad.values.toList() : null);
-    final cpuLoad = cpuLoadList?.firstOrNull as num?;
-    final cpuVal = cpuLoad != null ? (cpuLoad > 500 ? (cpuLoad / 65536.0 * 100) : cpuLoad.toDouble() * 100).clamp(0.0, 100.0) : 0.0;
-
-    final totalMem = (sysInfo?['memory']?['total'] as num?)?.toDouble() ?? 0.0;
-    final freeMem = (sysInfo?['memory']?['free'] as num?)?.toDouble() ?? 0.0;
-    final buffMem = (sysInfo?['memory']?['buffered'] as num?)?.toDouble() ?? 0.0;
-    final ramVal = totalMem > 0 ? (((totalMem - freeMem - buffMem) / totalMem) * 100).clamp(0.0, 100.0) : 0.0;
+    final systemMetrics = SystemMetrics.fromSysInfo(sysInfo);
+    final cpuVal = systemMetrics.cpuUsagePercent;
+    final ramVal = systemMetrics.memoryUsagePercent;
 
     final rxVal = appState.currentRxRate;
     final txVal = appState.currentTxRate;
@@ -165,6 +160,7 @@ class ChartingScreen extends ConsumerWidget {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      clipBehavior: Clip.antiAlias,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(

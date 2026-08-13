@@ -37,21 +37,21 @@ class SystemMetrics {
       );
     }
 
-    final uptime = (sysInfo['uptime'] as num?)?.toInt() ?? 0;
+    final uptime = (sysInfo['uptime'] as num?)?.toInt() ?? int.tryParse(sysInfo['uptime']?.toString() ?? '') ?? 0;
 
     // Load averages
     double l1 = 0.0;
     double l5 = 0.0;
     double l15 = 0.0;
-    final rawLoad = sysInfo['load'];
-    final loadList = rawLoad is List ? rawLoad : (rawLoad is Map ? rawLoad.values.toList() : null);
+    final rawLoad = sysInfo['load'] ?? sysInfo['sysload'] ?? sysInfo['cpu_load'] ?? sysInfo['loadavg'];
+    final loadList = rawLoad is List ? rawLoad : (rawLoad is Map ? rawLoad.values.toList() : (rawLoad != null ? [rawLoad] : null));
+
     if (loadList != null && loadList.isNotEmpty) {
       double parseLoad(dynamic val) {
         if (val == null) return 0.0;
-        if (val is int) {
-          return val.toDouble() / 65536.0;
-        }
-        final double dVal = (val as num).toDouble();
+        final num? n = val is num ? val : num.tryParse(val.toString().trim());
+        if (n == null) return 0.0;
+        final double dVal = n.toDouble();
         return dVal > 10.0 ? dVal / 65536.0 : dVal;
       }
 
@@ -61,14 +61,24 @@ class SystemMetrics {
     }
 
     // CPU percentage estimate from 1m load normalized to 100%
-    final cpuPercent = (l1 * 100).clamp(0.0, 100.0);
+    double cpuPercent = (l1 * 100).clamp(0.0, 100.0);
+
+    // Direct CPU percentage override if provided directly in sysInfo
+    final rawCpuDirect = sysInfo['cpu'] ?? sysInfo['cpu_usage'] ?? sysInfo['cpuload'] ?? sysInfo['cpu_percent'];
+    if (rawCpuDirect != null) {
+      final num? parsedCpu = rawCpuDirect is num ? rawCpuDirect : num.tryParse(rawCpuDirect.toString().replaceAll('%', '').trim());
+      if (parsedCpu != null) {
+        final double val = parsedCpu.toDouble();
+        cpuPercent = (val > 500.0 ? (val / 65536.0 * 100.0) : (val <= 1.0 ? val * 100.0 : val)).clamp(0.0, 100.0);
+      }
+    }
 
     // Memory parsing
     final memMap = sysInfo['memory'] as Map<String, dynamic>?;
-    final total = (memMap?['total'] as num?)?.toInt() ?? 0;
-    final free = (memMap?['free'] as num?)?.toInt() ?? 0;
-    final buffered = (memMap?['buffered'] as num?)?.toInt() ?? 0;
-    final cached = (memMap?['cached'] as num?)?.toInt() ?? 0;
+    final total = (memMap?['total'] as num?)?.toInt() ?? int.tryParse(memMap?['total']?.toString() ?? '') ?? 0;
+    final free = (memMap?['free'] as num?)?.toInt() ?? int.tryParse(memMap?['free']?.toString() ?? '') ?? 0;
+    final buffered = (memMap?['buffered'] as num?)?.toInt() ?? int.tryParse(memMap?['buffered']?.toString() ?? '') ?? 0;
+    final cached = (memMap?['cached'] as num?)?.toInt() ?? int.tryParse(memMap?['cached']?.toString() ?? '') ?? 0;
 
     return SystemMetrics(
       uptimeSeconds: uptime,

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
@@ -21,6 +22,7 @@ class RealtimeLineChart extends StatelessWidget {
   final double? maxY;
   final double height;
   final bool showGrid;
+  final int maxPoints;
 
   const RealtimeLineChart({
     super.key,
@@ -29,8 +31,53 @@ class RealtimeLineChart extends StatelessWidget {
     this.minY,
     this.maxY,
     this.height = 140,
-    this.showGrid = false,
+    this.showGrid = true,
+    this.maxPoints = 30,
   });
+
+  double _calculateNiceMax(double maxVal, {bool isThroughput = false}) {
+    if (isThroughput) {
+      final double bitsPerSec = maxVal * 8.0;
+      final double target = math.max(bitsPerSec * 1.25, 64000.0);
+      final double exponent = (math.log(target) / math.ln10).floorToDouble();
+      final double magnitude = math.pow(10, exponent).toDouble();
+      final double residual = target / magnitude;
+
+      double niceResidual;
+      if (residual <= 1.0) {
+        niceResidual = 1.0;
+      } else if (residual <= 1.5) {
+        niceResidual = 1.5;
+      } else if (residual <= 2.0) {
+        niceResidual = 2.0;
+      } else if (residual <= 2.5) {
+        niceResidual = 2.5;
+      } else if (residual <= 5.0) {
+        niceResidual = 5.0;
+      } else {
+        niceResidual = 10.0;
+      }
+
+      return (niceResidual * magnitude) / 8.0;
+    } else {
+      final double target = math.max(maxVal * 1.2, 10.0);
+      final double exponent = (math.log(target) / math.ln10).floorToDouble();
+      final double magnitude = math.pow(10, exponent).toDouble();
+      final double residual = target / magnitude;
+
+      double niceResidual;
+      if (residual <= 1.0) {
+        niceResidual = 1.0;
+      } else if (residual <= 2.0) {
+        niceResidual = 2.0;
+      } else if (residual <= 5.0) {
+        niceResidual = 5.0;
+      } else {
+        niceResidual = 10.0;
+      }
+      return niceResidual * magnitude;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,16 +97,28 @@ class RealtimeLineChart extends StatelessWidget {
 
     final colorScheme = Theme.of(context).colorScheme;
 
+    double effectiveMaxY = maxY ?? 100.0;
+    if (maxY == null) {
+      double maxVal = 0.0;
+      for (final s in series) {
+        for (final spot in s.spots) {
+          if (spot > maxVal) maxVal = spot;
+        }
+      }
+      effectiveMaxY = _calculateNiceMax(maxVal, isThroughput: valueFormatter != null);
+    }
+    final double interval = effectiveMaxY / 4.0;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Live line legend text row
         Padding(
-          padding: const EdgeInsets.only(bottom: 16.0),
+          padding: const EdgeInsets.only(bottom: 12.0),
           child: Wrap(
-            spacing: 12,
-            runSpacing: 8,
+            spacing: 10,
+            runSpacing: 6,
             children: series.map((s) {
               final latestVal = s.spots.isNotEmpty ? s.spots.last : 0.0;
               final formattedText = valueFormatter != null
@@ -81,8 +140,8 @@ class RealtimeLineChart extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      width: 10,
-                      height: 10,
+                      width: 8,
+                      height: 8,
                       decoration: BoxDecoration(
                         color: primaryColor,
                         shape: BoxShape.circle,
@@ -111,123 +170,136 @@ class RealtimeLineChart extends StatelessWidget {
         ),
         SizedBox(
           height: height,
-          child: LineChart(
-            LineChartData(
-              minY: minY ?? 0.0,
-              maxY: maxY,
-              gridData: FlGridData(
-                show: showGrid,
-                drawVerticalLine: false,
-                horizontalInterval: maxY != null ? maxY! / 4 : null,
-                getDrawingHorizontalLine: (val) => FlLine(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.3),
-                  strokeWidth: 1,
+          child: Padding(
+            padding: const EdgeInsets.only(right: 8.0, bottom: 4.0),
+            child: LineChart(
+              LineChartData(
+                minX: 0,
+                maxX: (maxPoints - 1).toDouble(),
+                minY: minY ?? 0.0,
+                maxY: effectiveMaxY,
+                clipData: const FlClipData.all(),
+                gridData: FlGridData(
+                  show: showGrid,
+                  drawVerticalLine: false,
+                  horizontalInterval: interval > 0 ? interval : 1.0,
+                  getDrawingHorizontalLine: (val) => FlLine(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.25),
+                    strokeWidth: 1,
+                  ),
                 ),
-              ),
-              titlesData: FlTitlesData(
-                show: true,
-                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                leftTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 48,
-                    getTitlesWidget: (value, meta) {
-                      // Suppress top Y-axis label if near peak to prevent label collision with header badges
-                      if (meta.max > 0 && value >= meta.max * 0.95) {
-                        return const SizedBox.shrink();
-                      }
-                      if (valueFormatter != null) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6.0),
+                titlesData: FlTitlesData(
+                  show: true,
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 64,
+                      interval: interval > 0 ? interval : 1.0,
+                      getTitlesWidget: (value, meta) {
+                        if (value < -0.001 || value >= effectiveMaxY * 0.95) {
+                          return const SizedBox.shrink();
+                        }
+                        final String text = valueFormatter != null
+                            ? valueFormatter!(value)
+                            : value.toStringAsFixed(0);
+
+                        return SideTitleWidget(
+                          meta: meta,
+                          space: 6,
+                          fitInside: SideTitleFitInsideData.fromTitleMeta(meta),
                           child: Text(
-                            valueFormatter!(value),
+                            text,
                             style: TextStyle(
-                              fontSize: 9,
-                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                              fontWeight: FontWeight.bold,
+                              fontSize: 9.5,
+                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+                              fontWeight: FontWeight.w600,
                             ),
                             textAlign: TextAlign.right,
                           ),
                         );
-                      }
-                      return Text(
-                        value.toInt().toString(),
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                        ),
-                      );
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    fitInsideVertically: true,
+                    getTooltipColor: (spot) => Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
+                    tooltipBorderRadius: BorderRadius.circular(8),
+                    tooltipPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    getTooltipItems: (touchedSpots) {
+                      return touchedSpots.map((spot) {
+                        final seriesData = spot.barIndex < series.length ? series[spot.barIndex] : null;
+                        final labelName = seriesData?.label ?? 'Metric';
+                        final color = spot.bar.gradient?.colors.first ?? spot.bar.color ?? Colors.white;
+                        final formatted = valueFormatter != null
+                            ? valueFormatter!(spot.y)
+                            : spot.y.toStringAsFixed(1);
+                        return LineTooltipItem(
+                          '$labelName: $formatted',
+                          TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12),
+                        );
+                      }).toList();
                     },
                   ),
                 ),
+                lineBarsData: series.asMap().entries.map((e) => _buildBarData(e.value, barIndex: e.key)).toList(),
               ),
-              borderData: FlBorderData(show: false),
-              lineTouchData: LineTouchData(
-                touchTooltipData: LineTouchTooltipData(
-                  fitInsideVertically: true,
-                  getTooltipColor: (spot) => Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
-                  tooltipBorderRadius: BorderRadius.circular(8),
-                  tooltipPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  getTooltipItems: (touchedSpots) {
-                    return touchedSpots.map((spot) {
-                      final seriesData = spot.barIndex < series.length ? series[spot.barIndex] : null;
-                      final labelName = seriesData?.label ?? 'Metric';
-                      final color = spot.bar.gradient?.colors.first ?? spot.bar.color ?? Colors.white;
-                      final formatted = valueFormatter != null
-                          ? valueFormatter!(spot.y)
-                          : spot.y.toStringAsFixed(1);
-                      return LineTooltipItem(
-                        '$labelName: $formatted',
-                        TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12),
-                      );
-                    }).toList();
-                  },
-                ),
-              ),
-              lineBarsData: series.map((s) => _buildBarData(s)).toList(),
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
             ),
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
           ),
         ),
       ],
     );
   }
 
-  LineChartBarData _buildBarData(ChartSeriesData seriesData) {
+  LineChartBarData _buildBarData(ChartSeriesData seriesData, {int barIndex = 0}) {
     final data = seriesData.spots;
     final colors = seriesData.gradientColors;
 
-    if (data.length == 1) {
+    if (data.isEmpty) {
       return LineChartBarData(
-        spots: [FlSpot(0, data[0]), FlSpot(1, data[0])],
+        spots: [const FlSpot(0, 0), FlSpot((maxPoints - 1).toDouble(), 0)],
         isCurved: false,
         gradient: LinearGradient(colors: colors),
-        barWidth: 2.5,
+        barWidth: barIndex == 0 ? 2.5 : 2.0,
         isStrokeCapRound: true,
-        dotData: const FlDotData(show: true),
-        belowBarData: BarAreaData(
-          show: true,
-          gradient: LinearGradient(
-            colors: colors.map((c) => c.withValues(alpha: 0.15)).toList(),
-          ),
-        ),
+        dotData: const FlDotData(show: false),
+        belowBarData: BarAreaData(show: false),
       );
     }
 
+    final int n = data.length;
+    final int offset = maxPoints > n ? maxPoints - n : 0;
+
+    final spots = data.asMap().entries.map((e) {
+      final x = (offset + e.key).toDouble();
+      return FlSpot(x, e.value);
+    }).toList();
+
     return LineChartBarData(
-      spots: data.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value)).toList(),
-      isCurved: true,
+      spots: spots,
+      isCurved: spots.length > 1,
+      preventCurveOverShooting: true,
+      preventCurveOvershootingThreshold: 0.0,
       gradient: LinearGradient(colors: colors),
-      barWidth: 2.5,
+      barWidth: barIndex == 0 ? 2.5 : 2.0,
       isStrokeCapRound: true,
       dotData: const FlDotData(show: false),
       belowBarData: BarAreaData(
         show: true,
         gradient: LinearGradient(
-          colors: colors.map((c) => c.withValues(alpha: 0.25)).toList(),
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            colors.first.withValues(alpha: barIndex == 0 ? 0.25 : 0.15),
+            colors.first.withValues(alpha: 0.0),
+          ],
         ),
       ),
     );

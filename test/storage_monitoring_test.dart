@@ -191,5 +191,78 @@ tmpfs                   124808       988    123820   1% /tmp
       expect(StorageOverview.formatBytes(overview.rootFs!.sizeBytes), equals('384.0 MB'));
       expect(StorageOverview.formatBytes(overview.rootFs!.usedBytes), equals('192.0 MB'));
     });
+
+    test('Parses RPC mount points with size ALREADY in Bytes (e.g. 10.0.0.0 router) correctly', () {
+      final rpcDataBytes = [
+        {
+          'mount': '/',
+          'device': '/dev/root',
+          'fs': 'squashfs',
+          'size': 402653184, // 384 MB in Bytes
+          'used': 201326592, // 192 MB in Bytes
+          'avail': 201326592,
+        }
+      ];
+
+      final overview = StorageOverview.fromRpcData(rpcDataBytes);
+      expect(overview.rootFs, isNotNull);
+      expect(StorageOverview.formatBytes(overview.rootFs!.sizeBytes), equals('384.0 MB'));
+      expect(StorageOverview.formatBytes(overview.rootFs!.usedBytes), equals('192.0 MB'));
+    });
+
+    test('Parses RPC mount points with 1K-blocks (e.g. 192.168.1.1 router) correctly', () {
+      final rpcDataKb = [
+        {
+          'mount': '/',
+          'device': 'overlayfs:/overlay',
+          'fs': 'overlay',
+          'size': 131072, // 128 MB in 1K-blocks
+          'used': 65536,  // 64 MB in 1K-blocks
+          'avail': 65536,
+        }
+      ];
+
+      final overview = StorageOverview.fromRpcData(rpcDataKb);
+      expect(overview.rootFs, isNotNull);
+      expect(StorageOverview.formatBytes(overview.rootFs!.sizeBytes), equals('128.0 MB'));
+      expect(StorageOverview.formatBytes(overview.rootFs!.usedBytes), equals('64.0 MB'));
+    });
+
+    test('Parses RPC mount points with size in Megabytes correctly', () {
+      final rpcDataMb = [
+        {
+          'mount': '/',
+          'device': '/dev/root',
+          'fs': 'squashfs',
+          'size': 384, // in Megabytes
+          'used': 192,
+          'avail': 192,
+        }
+      ];
+
+      final overview = StorageOverview.fromRpcData(rpcDataMb);
+      expect(overview.rootFs, isNotNull);
+      expect(StorageOverview.formatBytes(overview.rootFs!.sizeBytes), equals('384.0 MB'));
+      expect(StorageOverview.formatBytes(overview.rootFs!.usedBytes), equals('192.0 MB'));
+    });
+
+    test('Parses ubus system mounts with explicit block_size correctly', () {
+      final ubusData = [
+        {
+          'mount': '/overlay',
+          'device': '/dev/ubi0_1',
+          'fs': 'ubifs',
+          'size': 98304,
+          'used': 49152,
+          'avail': 49152,
+          'bsize': 4096, // 98304 * 4096 = 402,653,184 Bytes (384 MB)
+        }
+      ];
+
+      final overview = StorageOverview.fromRpcData(ubusData);
+      expect(overview.overlayFs, isNotNull);
+      expect(StorageOverview.formatBytes(overview.overlayFs!.sizeBytes), equals('384.0 MB'));
+      expect(StorageOverview.formatBytes(overview.overlayFs!.usedBytes), equals('192.0 MB'));
+    });
   });
 }

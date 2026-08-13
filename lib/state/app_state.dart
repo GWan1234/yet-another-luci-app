@@ -2379,10 +2379,19 @@ class AppState extends ChangeNotifier {
     }
 
     if (_reviewerModeEnabled) {
-      // For reviewer mode, get network devices data only
+      // For reviewer mode, get network devices and system info
       try {
-        final result = await _apiService!.callSimple('network', 'device', {});
-        final networkData = result[1] as Map<String, dynamic>?;
+        final results = await Future.wait([
+          _apiService!.callSimple('network', 'device', {}),
+          _apiService!.callSimple('system', 'info', {}),
+        ]);
+        final networkData = results[0][1] as Map<String, dynamic>?;
+        final sysInfoData = results[1][1] as Map<String, dynamic>?;
+        if (sysInfoData != null) {
+          _dashboardData ??= <String, dynamic>{};
+          _dashboardData!['sysInfo'] = sysInfoData;
+        }
+
         final wanDeviceNames = {'eth0'}; // Mock WAN device
 
         // Check if we should track specific interface
@@ -2423,18 +2432,39 @@ class AppState extends ChangeNotifier {
     final useHttps = _routerService!.selectedRouter!.useHttps;
 
     try {
-      // Only fetch network devices for throughput calculation
-      final result = await _apiService!.call(
-        ip,
-        _authService!.sysauth!,
-        useHttps,
-        object: 'luci-rpc',
-        method: 'getNetworkDevices',
-        params: {},
-      );
+      // Fetch network devices and system info in parallel for real-time charts
+      final results = await Future.wait([
+        _apiService!.call(
+          ip,
+          _authService!.sysauth!,
+          useHttps,
+          object: 'luci-rpc',
+          method: 'getNetworkDevices',
+          params: {},
+        ),
+        _apiService!.call(
+          ip,
+          _authService!.sysauth!,
+          useHttps,
+          object: 'system',
+          method: 'info',
+          params: {},
+        ),
+      ]);
 
-      if (result is List && result.length > 1 && result[0] == 0) {
-        final networkData = result[1] as Map<String, dynamic>?;
+      final netResult = results[0];
+      final sysResult = results[1];
+
+      if (sysResult is List && sysResult.length > 1 && sysResult[0] == 0) {
+        final sysInfoData = sysResult[1] as Map<String, dynamic>?;
+        if (sysInfoData != null) {
+          _dashboardData ??= <String, dynamic>{};
+          _dashboardData!['sysInfo'] = sysInfoData;
+        }
+      }
+
+      if (netResult is List && netResult.length > 1 && netResult[0] == 0) {
+        final networkData = netResult[1] as Map<String, dynamic>?;
 
         // Get ALL device names from cached dashboard data (except loopback)
         final wanDeviceNames = <String>{};

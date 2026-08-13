@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:luci_mobile/models/interface.dart';
+import 'package:luci_mobile/modules/system_monitoring/models/system_metrics.dart';
 
 /// Tests for wired-only router support (GitHub issues #46, #24, #6).
 ///
@@ -166,6 +167,64 @@ void main() {
       expect(interfacesList, hasLength(2));
       expect(interfacesList[0].name, 'lan');
       expect(interfacesList[1].name, 'wan');
+    });
+  });
+
+  group('SystemMetrics.fromSysInfo CPU parsing', () {
+    test('parses ubus 16-bit integer load array correctly', () {
+      final sysInfo = {
+        'uptime': 3600,
+        'load': [2580, 1920, 1024],
+        'memory': {'total': 134217728, 'free': 67108864, 'buffered': 4194304}
+      };
+
+      final metrics = SystemMetrics.fromSysInfo(sysInfo);
+      expect(metrics.load1m, closeTo(0.0393, 0.001));
+      expect(metrics.cpuUsagePercent, closeTo(3.93, 0.1));
+    });
+
+    test('parses String load array correctly', () {
+      final sysInfo = {
+        'uptime': 3600,
+        'load': ['2580', '1920', '1024'],
+        'memory': {'total': 134217728, 'free': 67108864, 'buffered': 4194304}
+      };
+
+      final metrics = SystemMetrics.fromSysInfo(sysInfo);
+      expect(metrics.load1m, closeTo(0.0393, 0.001));
+      expect(metrics.cpuUsagePercent, closeTo(3.93, 0.1));
+    });
+
+    test('parses float load average correctly', () {
+      final sysInfo = {
+        'uptime': 3600,
+        'load': [0.15, 0.10, 0.05],
+        'memory': {'total': 100, 'free': 50, 'buffered': 10}
+      };
+
+      final metrics = SystemMetrics.fromSysInfo(sysInfo);
+      expect(metrics.load1m, equals(0.15));
+      expect(metrics.cpuUsagePercent, equals(15.0));
+    });
+
+    test('parses Map load format correctly', () {
+      final sysInfo = {
+        'uptime': 3600,
+        'load': {'1m': 2580, '5m': 1920},
+      };
+
+      final metrics = SystemMetrics.fromSysInfo(sysInfo);
+      expect(metrics.cpuUsagePercent, closeTo(3.93, 0.1));
+    });
+
+    test('parses explicit cpu_usage key correctly', () {
+      final sysInfo = {
+        'uptime': 3600,
+        'cpu_usage': 18.5,
+      };
+
+      final metrics = SystemMetrics.fromSysInfo(sysInfo);
+      expect(metrics.cpuUsagePercent, equals(18.5));
     });
   });
 }

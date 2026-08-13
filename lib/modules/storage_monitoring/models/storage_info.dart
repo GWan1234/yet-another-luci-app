@@ -92,8 +92,8 @@ class MountPointItem {
       return 0;
     }
 
-    int rawSize = parseNum(json['size'] ?? json['total'] ?? json['blocks'] ?? json['sizeBytes'] ?? json['bytes']);
-    int rawAvail = parseNum(json['avail'] ?? json['available'] ?? json['free'] ?? json['availableBytes']);
+    int rawSize = parseNum(json['size'] ?? json['total'] ?? json['blocks'] ?? json['sizeBytes'] ?? json['bytes'] ?? json['capacity']);
+    int rawAvail = parseNum(json['avail'] ?? json['available'] ?? json['free'] ?? json['availableBytes'] ?? json['freeBytes']);
     int rawUsed = parseNum(json['used'] ?? json['usedBytes']);
 
     final bsize = parseNum(json['bsize'] ?? json['block_size'] ?? json['blockSize']);
@@ -103,36 +103,117 @@ class MountPointItem {
         json.containsKey('sizeBytes') ||
         json.containsKey('bytes') ||
         json.containsKey('usedBytes') ||
+        json.containsKey('availableBytes') ||
+        json.containsKey('size_bytes') ||
+        json.containsKey('used_bytes') ||
+        json.containsKey('avail_bytes') ||
+        json.containsKey('total_bytes') ||
         unitStr == 'bytes' ||
         unitStr == 'b';
 
-    if (bsize > 0) {
-      rawSize *= bsize;
-      rawAvail *= bsize;
-      rawUsed *= bsize;
-    } else if (isExplicitBytes) {
-      // Values are explicitly in bytes (via sizeBytes/usedBytes keys, unit='bytes', or unit suffixes like 'M'/'G'/'K')
-    } else {
-      // OpenWrt RPC standard (luci-rpc.getMountPoints, system.mounts, df -k) outputs values natively in 1K-blocks (KB)
-      rawSize *= 1024;
-      rawAvail *= 1024;
-      rawUsed *= 1024;
-    }
+    final multiplier = determineByteMultiplier(
+      rawSize: rawSize,
+      rawUsed: rawUsed,
+      rawAvail: rawAvail,
+      bsize: bsize,
+      hasExplicitByteKey: isExplicitBytes,
+      hasUnitSuffix: hasUnitSuffix,
+      unitStr: unitStr,
+      mountPath: mount,
+      dataSource: dataSource,
+    );
 
-    if (rawUsed == 0 && rawSize > rawAvail && rawAvail > 0) {
-      rawUsed = rawSize - rawAvail;
-    } else if (rawAvail == 0 && rawSize > rawUsed && rawUsed > 0) {
-      rawAvail = rawSize - rawUsed;
+    int sizeBytes = rawSize * multiplier;
+    int availBytes = rawAvail * multiplier;
+    int usedBytes = rawUsed * multiplier;
+
+    if (usedBytes == 0 && sizeBytes > availBytes && availBytes > 0) {
+      usedBytes = sizeBytes - availBytes;
+    } else if (availBytes == 0 && sizeBytes > usedBytes && usedBytes > 0) {
+      availBytes = sizeBytes - usedBytes;
     }
 
     return MountPointItem(
       mountPath: mount,
       device: dev,
       filesystemType: fs,
-      sizeBytes: rawSize,
-      usedBytes: rawUsed,
-      availableBytes: rawAvail < 0 ? 0 : rawAvail,
+      sizeBytes: sizeBytes,
+      usedBytes: usedBytes,
+      availableBytes: availBytes < 0 ? 0 : availBytes,
     );
+  }
+
+  static int determineByteMultiplier({
+    required int rawSize,
+    required int rawUsed,
+    required int rawAvail,
+    required int bsize,
+    required bool hasExplicitByteKey,
+    required bool hasUnitSuffix,
+    required String unitStr,
+    required String mountPath,
+    required StorageDataSource dataSource,
+  }) {
+    if (bsize > 0) {
+      return bsize;
+    }
+
+    if (hasExplicitByteKey || hasUnitSuffix || unitStr == 'bytes' || unitStr == 'b') {
+      return 1;
+    }
+
+    if (unitStr == 'kb' || unitStr == 'k' || unitStr == 'kblocks') {
+      return 1024;
+    }
+    if (unitStr == 'mb' || unitStr == 'm') {
+      return 1024 * 1024;
+    }
+    if (unitStr == 'gb' || unitStr == 'g') {
+      return 1024 * 1024 * 1024;
+    }
+
+    if (rawSize <= 0) {
+      return 1024;
+    }
+
+    final bool isSystemMount = mountPath == '/' ||
+        mountPath == '/overlay' ||
+        mountPath == '/rom' ||
+        mountPath == '/tmp' ||
+        mountPath == '/dev';
+
+    if (rawSize >= 1048576) {
+      final bool isExactMbMultiple = (rawSize % 1048576 == 0);
+      final double ifKbToGb = (rawSize.toDouble() * 1024.0) / (1024.0 * 1024.0 * 1024.0);
+
+      if (isSystemMount) {
+        if (ifKbToGb > 32.0 || isExactMbMultiple) {
+          return 1;
+        }
+      } else {
+        if (ifKbToGb > 100000.0 || (isExactMbMultiple && rawSize >= 16777216)) {
+          return 1;
+        }
+      }
+    }
+
+    if (rawSize > 0 && rawSize <= 8192) {
+      if (rawSize == 16 ||
+          rawSize == 32 ||
+          rawSize == 64 ||
+          rawSize == 128 ||
+          rawSize == 256 ||
+          rawSize == 384 ||
+          rawSize == 512 ||
+          rawSize == 1024 ||
+          rawSize == 2048 ||
+          rawSize == 4096 ||
+          rawSize == 8192) {
+        return 1024 * 1024;
+      }
+    }
+
+    return 1024;
   }
 
   double get usedPercent {
@@ -299,18 +380,28 @@ class StorageOverview {
               ? StorageDataSource.dfHuman
               : StorageDataSource.dfKBlocks;
 
-          int sizeBytes = parseNum(sizeRawStr);
-          int usedBytes = percentIdx - blockIdx >= 2 ? parseNum(parts[blockIdx + 1]) : 0;
-          int availBytes = percentIdx - blockIdx >= 3 ? parseNum(parts[blockIdx + 2]) : 0;
-
-          if (lineDataSource == StorageDataSource.dfKBlocks) {
-            sizeBytes *= 1024;
-            usedBytes *= 1024;
-            availBytes *= 1024;
-          }
+          int rawSize = parseNum(sizeRawStr);
+          int rawUsed = percentIdx - blockIdx >= 2 ? parseNum(parts[blockIdx + 1]) : 0;
+          int rawAvail = percentIdx - blockIdx >= 3 ? parseNum(parts[blockIdx + 2]) : 0;
 
           final target = parts.sublist(percentIdx + 1).join(' ');
           final mountPath = target.isEmpty ? '/' : target;
+
+          final multiplier = MountPointItem.determineByteMultiplier(
+            rawSize: rawSize,
+            rawUsed: rawUsed,
+            rawAvail: rawAvail,
+            bsize: 0,
+            hasExplicitByteKey: hasUnitSuffix,
+            hasUnitSuffix: hasUnitSuffix,
+            unitStr: hasUnitSuffix ? 'human' : '',
+            mountPath: mountPath,
+            dataSource: lineDataSource,
+          );
+
+          int sizeBytes = rawSize * multiplier;
+          int usedBytes = rawUsed * multiplier;
+          int availBytes = rawAvail * multiplier;
 
           if (fs.isEmpty || fs.toLowerCase() == 'unknown') {
             if (dev.contains('ubi')) {

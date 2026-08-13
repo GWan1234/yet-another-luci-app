@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -9,7 +10,6 @@ import 'package:luci_mobile/models/router.dart' as model;
 import 'package:luci_mobile/modules/core/luci_module_registry.dart';
 import 'package:luci_mobile/modules/wireless_management/models/wireless_info.dart';
 import 'package:luci_mobile/utils/release_utils.dart';
-import 'package:luci_mobile/widgets/theme_router_logo.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -231,10 +231,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
+  double _calculateNiceMaxBits(double maxDataBytesPerSec) {
+    final double bitsPerSec = maxDataBytesPerSec * 8.0;
+    final double target = math.max(bitsPerSec * 1.25, 64000.0);
+
+    final double exponent = (math.log(target) / math.ln10).floorToDouble();
+    final double magnitude = math.pow(10, exponent).toDouble();
+    final double residual = target / magnitude;
+
+    double niceResidual;
+    if (residual <= 1.0) {
+      niceResidual = 1.0;
+    } else if (residual <= 1.5) {
+      niceResidual = 1.5;
+    } else if (residual <= 2.0) {
+      niceResidual = 2.0;
+    } else if (residual <= 2.5) {
+      niceResidual = 2.5;
+    } else if (residual <= 5.0) {
+      niceResidual = 5.0;
+    } else {
+      niceResidual = 10.0;
+    }
+
+    return niceResidual * magnitude;
+  }
+
   Widget _buildRealtimeThroughputCard(AppState appState) {
     final prefs = appState.dashboardPreferences;
 
-    // Determine which throughput data to use
     List<double> rxHistory;
     List<double> txHistory;
     double currentRxRate;
@@ -242,7 +267,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     String throughputLabel = '';
 
     if (!prefs.showAllThroughput && prefs.primaryThroughputInterface != null) {
-      // Use specific interface throughput
       final interface = prefs.primaryThroughputInterface!;
       rxHistory = appState.getRxHistoryForInterface(interface);
       txHistory = appState.getTxHistoryForInterface(interface);
@@ -250,7 +274,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       currentTxRate = appState.getCurrentTxRateForInterface(interface);
       throughputLabel = ' - $interface';
     } else {
-      // Use combined throughput
       rxHistory = appState.rxHistory;
       txHistory = appState.txHistory;
       currentRxRate = appState.currentRxRate;
@@ -259,22 +282,23 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     final theme = Theme.of(context);
 
-    double maxDataVal = 1024.0;
+    double maxDataVal = 0.0;
     for (final val in rxHistory) {
       if (val > maxDataVal) maxDataVal = val;
     }
     for (final val in txHistory) {
       if (val > maxDataVal) maxDataVal = val;
     }
-    final chartMaxY = maxDataVal * 1.25;
-    final chartInterval = chartMaxY / 4.0;
-    // Show loading state if we don't have any throughput data yet
+
+    final double niceMaxBits = _calculateNiceMaxBits(maxDataVal);
+    final double chartMaxY = niceMaxBits / 8.0;
+    final double chartInterval = chartMaxY / 4.0;
+
     final hasValidData =
         rxHistory.isNotEmpty ||
         txHistory.isNotEmpty ||
         currentRxRate > 0 ||
-        currentTxRate > 0; // Show data as soon as we have any throughput info
-    // Only show switching state if we're loading AND no dashboard data is available (true router switch)
+        currentTxRate > 0;
     final isSwitchingRouter =
         appState.isLoading && appState.dashboardData == null;
 
@@ -328,11 +352,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             child: Padding(
               padding: const EdgeInsets.only(
                 top: 16.0,
-              ), // Add space above the chart
+              ),
               child: AnimatedSwitcher(
                 duration: const Duration(
                   milliseconds: 600,
-                ), // Smoother transition
+                ),
                 transitionBuilder: (Widget child, Animation<double> animation) {
                   return FadeTransition(
                     opacity: animation,
@@ -402,12 +426,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               child: LineChart(
                                 key: ValueKey('chart_${appState.selectedRouter?.id}'),
                                 LineChartData(
+                                  minX: 0,
+                                  maxX: 49,
                                   minY: 0,
                                   maxY: chartMaxY,
                                   gridData: FlGridData(
                                     show: true,
                                     drawVerticalLine: false,
-                                    horizontalInterval: chartInterval,
+                                    horizontalInterval: chartInterval > 0 ? chartInterval : 1.0,
                                     getDrawingHorizontalLine: (val) => FlLine(
                                       color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.2),
                                       strokeWidth: 1,
@@ -422,9 +448,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                       sideTitles: SideTitles(
                                         showTitles: true,
                                         reservedSize: 72,
-                                        interval: chartInterval,
+                                        interval: chartInterval > 0 ? chartInterval : 1.0,
                                         getTitlesWidget: (value, meta) {
-                                          if (value < 0 || value > chartMaxY) {
+                                          if (value < -0.001 || value >= chartMaxY * 0.95) {
                                             return const SizedBox.shrink();
                                           }
                                           return SideTitleWidget(
@@ -432,10 +458,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                             space: 6,
                                             fitInside: SideTitleFitInsideData.fromTitleMeta(meta),
                                             child: Text(
-                                              _formatSpeed(value),
+                                              _formatSpeedCompact(value),
                                               style: TextStyle(
                                                 fontSize: 10,
-                                                color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                                                color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
                                                 fontWeight: FontWeight.w600,
                                               ),
                                               textAlign: TextAlign.right,
@@ -451,7 +477,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                       fitInsideVertically: true,
                                       getTooltipColor: (LineBarSpot spot) => Theme.of(
                                         context,
-                                      ).colorScheme.surface.withValues(alpha: 0.9),
+                                      ).colorScheme.surface.withValues(alpha: 0.95),
                                       tooltipBorderRadius: BorderRadius.circular(8),
                                       tooltipPadding: const EdgeInsets.symmetric(
                                         horizontal: 12,
@@ -480,14 +506,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                     ),
                                   ),
                                   lineBarsData: [
-                                    _buildLineChartBarData(rxHistory, [
-                                      theme.colorScheme.primary,
-                                      theme.colorScheme.primary.withValues(alpha: 0.6),
-                                    ]),
-                                    _buildLineChartBarData(txHistory, [
-                                      theme.colorScheme.secondary,
-                                      theme.colorScheme.secondary.withValues(alpha: 0.6),
-                                    ]),
+                                    _buildLineChartBarData(
+                                      rxHistory,
+                                      [
+                                        theme.colorScheme.primary,
+                                        theme.colorScheme.primary.withValues(alpha: 0.6),
+                                      ],
+                                      isRx: true,
+                                    ),
+                                    _buildLineChartBarData(
+                                      txHistory,
+                                      [
+                                        theme.colorScheme.secondary,
+                                        theme.colorScheme.secondary.withValues(alpha: 0.6),
+                                      ],
+                                      isRx: false,
+                                    ),
                                   ],
                                 ),
                                 duration: const Duration(milliseconds: 800),
@@ -500,6 +534,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     : Center(
                         key: ValueKey('loading_${appState.selectedRouter?.id}'),
                         child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
@@ -532,7 +567,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ),
     );
 
-    // Always return the card without fixed height - let parent control sizing
     return card;
   }
 
@@ -542,7 +576,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     String label,
     double speed,
   ) {
-    // Show 0 if we don't have valid throughput data yet
     final displaySpeed = speed.isNaN || speed.isInfinite || speed < 0
         ? 0.0
         : speed;
@@ -578,70 +611,48 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   LineChartBarData _buildLineChartBarData(
     List<double> data,
-    List<Color> gradientColors,
-  ) {
-    // Handle single data point case - show a flat line at that value
-    if (data.length == 1) {
-      return LineChartBarData(
-        spots: [
-          FlSpot(0, data[0]),
-          FlSpot(1, data[0]), // Duplicate the point to create a flat line
-        ],
-        isCurved: false, // Don't curve a flat line
-        gradient: LinearGradient(colors: gradientColors),
-        barWidth: 3,
-        isStrokeCapRound: true,
-        dotData: FlDotData(
-          show: true,
-          getDotPainter: (spot, percent, barData, index) {
-            return FlDotCirclePainter(
-              radius: 3,
-              color: gradientColors.first,
-              strokeWidth: 0,
-            );
-          },
-        ),
-        belowBarData: BarAreaData(
-          show: true,
-          gradient: LinearGradient(
-            colors: gradientColors
-                .map((color) => color.withValues(alpha: 0.1))
-                .toList(),
-          ),
-        ),
-      );
-    }
-
-    // Don't show chart data if we don't have any data points
+    List<Color> gradientColors, {
+    int maxPoints = 50,
+    bool isRx = true,
+  }) {
     if (data.isEmpty) {
       return LineChartBarData(
-        spots: [],
-        isCurved: true,
+        spots: [const FlSpot(0, 0), FlSpot((maxPoints - 1).toDouble(), 0)],
+        isCurved: false,
         gradient: LinearGradient(colors: gradientColors),
-        barWidth: 3,
+        barWidth: isRx ? 2.5 : 2.0,
         isStrokeCapRound: true,
-        dotData: FlDotData(show: false),
+        dotData: const FlDotData(show: false),
         belowBarData: BarAreaData(show: false),
       );
     }
 
+    final int n = data.length;
+    final int offset = maxPoints > n ? maxPoints - n : 0;
+
+    final spots = data.asMap().entries.map((e) {
+      final x = (offset + e.key).toDouble();
+      return FlSpot(x, e.value);
+    }).toList();
+
     return LineChartBarData(
-      spots: data
-          .asMap()
-          .entries
-          .map((e) => FlSpot(e.key.toDouble(), e.value))
-          .toList(),
-      isCurved: true,
+      spots: spots,
+      isCurved: spots.length > 1,
+      preventCurveOverShooting: true,
+      preventCurveOvershootingThreshold: 0.0,
       gradient: LinearGradient(colors: gradientColors),
-      barWidth: 3,
+      barWidth: isRx ? 2.5 : 2.0,
       isStrokeCapRound: true,
-      dotData: FlDotData(show: false),
+      dotData: const FlDotData(show: false),
       belowBarData: BarAreaData(
         show: true,
         gradient: LinearGradient(
-          colors: gradientColors
-              .map((color) => color.withValues(alpha: 0.3))
-              .toList(),
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            gradientColors.first.withValues(alpha: isRx ? 0.25 : 0.15),
+            gradientColors.first.withValues(alpha: 0.0),
+          ],
         ),
       ),
     );
@@ -661,6 +672,26 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       return '${(bitsPerSecond / 1_000).toStringAsFixed(1)} Kbps';
     }
     return '${(bitsPerSecond / 1_000_000).toStringAsFixed(2)} Mbps';
+  }
+
+  String _formatSpeedCompact(double bytesPerSecond) {
+    if (bytesPerSecond.isNaN ||
+        bytesPerSecond.isInfinite ||
+        bytesPerSecond <= 0) {
+      return '0 bps';
+    }
+    final bits = bytesPerSecond * 8;
+    if (bits < 1000) {
+      return '${bits.toStringAsFixed(0)} bps';
+    } else if (bits < 1000000) {
+      final val = bits / 1000;
+      final str = val % 1 == 0 ? val.toStringAsFixed(0) : val.toStringAsFixed(1);
+      return '$str Kbps';
+    } else {
+      final val = bits / 1000000;
+      final str = val % 1 == 0 ? val.toStringAsFixed(0) : val.toStringAsFixed(1);
+      return '$str Mbps';
+    }
   }
 
   // Consistent card builder for all dashboard vitals and summary cards
