@@ -25,6 +25,7 @@ import 'package:luci_mobile/models/network_topology.dart';
 import 'package:luci_mobile/modules/firewall_security/models/firewall_info.dart';
 import 'package:luci_mobile/modules/wireless_management/models/wireless_info.dart';
 import 'package:luci_mobile/modules/storage_monitoring/models/storage_info.dart';
+import 'package:luci_mobile/modules/vpn_connectivity/models/vpn_info.dart';
 
 enum RouterConnectionStatus {
   connected,
@@ -963,6 +964,30 @@ class AppState extends ChangeNotifier {
         params: {'config': 'firewall'},
       );
 
+      final uciOpenvpnFuture = callOptionalRpc(
+        object: 'uci',
+        method: 'get',
+        params: {'config': 'openvpn'},
+      );
+
+      final uciTailscaleFuture = callOptionalRpc(
+        object: 'uci',
+        method: 'get',
+        params: {'config': 'tailscale'},
+      );
+
+      final uciNextdnsFuture = callOptionalRpc(
+        object: 'uci',
+        method: 'get',
+        params: {'config': 'nextdns'},
+      );
+
+      final uciCloudflaredFuture = callOptionalRpc(
+        object: 'uci',
+        method: 'get',
+        params: {'config': 'cloudflared'},
+      );
+
       Future<dynamic> fetchPackagesData() async {
         final res = await fetchPackagesDataResult();
         return res.data;
@@ -1217,6 +1242,10 @@ class AppState extends ChangeNotifier {
         mountPointsFuture,
         cronFuture,
         dhcpLeasesFuture,
+        uciOpenvpnFuture,
+        uciTailscaleFuture,
+        uciNextdnsFuture,
+        uciCloudflaredFuture,
       ]);
       final wirelessRaw = optionalResults[0];
       final uciWirelessRaw = optionalResults[1];
@@ -1227,6 +1256,10 @@ class AppState extends ChangeNotifier {
       final mountPointsRaw = optionalResults[6];
       final cronRaw = optionalResults[7];
       final dhcpLeasesRaw = optionalResults[8];
+      final uciOpenvpnRaw = optionalResults[9];
+      final uciTailscaleRaw = optionalResults[10];
+      final uciNextdnsRaw = optionalResults[11];
+      final uciCloudflaredRaw = optionalResults[12];
       final packagesRaw = null;
       final availablePackagesRaw = null;
 
@@ -1253,6 +1286,127 @@ class AppState extends ChangeNotifier {
       dynamic uciFirewallConfig;
       if (uciFirewallRaw != null) {
         uciFirewallConfig = getOptionalData(uciFirewallRaw, 'uci.get firewall');
+      }
+
+      Map<String, dynamic>? openvpnData;
+      if (uciOpenvpnRaw != null) {
+        final parsedOpenvpn = getOptionalData(uciOpenvpnRaw, 'uci.get openvpn');
+        if (parsedOpenvpn is Map<String, dynamic>) {
+          final values = parsedOpenvpn['values'] is Map<String, dynamic>
+              ? parsedOpenvpn['values'] as Map<String, dynamic>
+              : parsedOpenvpn;
+          final map = <String, dynamic>{};
+          values.forEach((name, sec) {
+            if (sec is Map<String, dynamic>) {
+              final type = sec['.type']?.toString();
+              if (type == 'openvpn' || type == 'instance' || type == null) {
+                map[name] = sec;
+              }
+            }
+          });
+          if (map.isNotEmpty) openvpnData = map;
+        }
+      }
+
+      Map<String, dynamic>? tailscaleData;
+      if (uciTailscaleRaw != null) {
+        final parsedTailscale = getOptionalData(uciTailscaleRaw, 'uci.get tailscale');
+        if (parsedTailscale is Map<String, dynamic>) {
+          final values = parsedTailscale['values'] is Map<String, dynamic>
+              ? parsedTailscale['values'] as Map<String, dynamic>
+              : parsedTailscale;
+          Map<String, dynamic>? sec;
+          if (values.containsKey('settings')) {
+            sec = values['settings'] as Map<String, dynamic>?;
+          } else if (values.isNotEmpty) {
+            sec = values.values.firstWhere((v) => v is Map<String, dynamic>, orElse: () => null) as Map<String, dynamic>?;
+          }
+          if (sec != null) {
+            tailscaleData = {
+              'configured': true,
+              'enabled': sec['enabled'] == '1' || sec['enabled'] == true,
+              'running': sec['enabled'] == '1' || sec['enabled'] == true,
+              'node_name': sec['hostname']?.toString() ?? sec['node_name']?.toString() ?? 'OpenWrt-Router',
+              'tailscale_ip': sec['ip']?.toString() ?? '',
+              'state': (sec['enabled'] == '1' || sec['enabled'] == true) ? 'Running' : 'Stopped',
+            };
+          }
+        }
+      }
+
+      Map<String, dynamic>? nextdnsData;
+      if (uciNextdnsRaw != null) {
+        final parsedNextdns = getOptionalData(uciNextdnsRaw, 'uci.get nextdns');
+        if (parsedNextdns is Map<String, dynamic>) {
+          final values = parsedNextdns['values'] is Map<String, dynamic>
+              ? parsedNextdns['values'] as Map<String, dynamic>
+              : parsedNextdns;
+          Map<String, dynamic>? sec;
+          if (values.containsKey('main')) {
+            sec = values['main'] as Map<String, dynamic>?;
+          } else if (values.isNotEmpty) {
+            sec = values.values.firstWhere((v) => v is Map<String, dynamic>, orElse: () => null) as Map<String, dynamic>?;
+          }
+          if (sec != null) {
+            nextdnsData = {
+              'configured': true,
+              'enabled': sec['enabled'] == '1' || sec['enabled'] == true,
+              'profile': sec['profile']?.toString() ?? sec['profile_id']?.toString() ?? '',
+              'report_client_info': sec['report_client_info'] == '1' || sec['report_client_info'] == true,
+            };
+          }
+        }
+      }
+
+      Map<String, dynamic>? cloudflaredData;
+      if (uciCloudflaredRaw != null) {
+        final parsedCf = getOptionalData(uciCloudflaredRaw, 'uci.get cloudflared');
+        if (parsedCf is Map<String, dynamic>) {
+          final values = parsedCf['values'] is Map<String, dynamic>
+              ? parsedCf['values'] as Map<String, dynamic>
+              : parsedCf;
+
+          String foundTunnelId = '';
+          String foundTunnelName = '';
+          String foundToken = '';
+          bool isEnabled = false;
+
+          for (final entry in values.entries) {
+            if (entry.value is! Map) continue;
+            final secMap = Map<String, dynamic>.from(entry.value as Map);
+            secMap['.name'] = entry.key;
+
+            final secEnabled = secMap['enabled'] == '1' || secMap['enabled'] == true || secMap['enable'] == '1' || secMap['enable'] == true;
+            if (secEnabled) isEnabled = true;
+
+            final secTunnelId = CloudflaredStatus.extractTunnelId(secMap);
+            if (secTunnelId.isNotEmpty && secTunnelId != 'N/A') {
+              foundTunnelId = secTunnelId;
+            }
+
+            final secName = secMap['tunnel_name']?.toString() ?? secMap['name']?.toString() ?? secMap['tunnel']?.toString() ?? '';
+            if (secName.isNotEmpty && secName != foundTunnelId && secName != 'config' && secName != 'main' && secName != 'global') {
+              foundTunnelName = secName;
+            }
+
+            final secToken = secMap['token']?.toString() ?? secMap['tunnel_token']?.toString() ?? '';
+            if (secToken.isNotEmpty) {
+              foundToken = secToken;
+            }
+          }
+
+          if (values.isNotEmpty) {
+            cloudflaredData = {
+              'configured': true,
+              'enabled': isEnabled,
+              'running': isEnabled,
+              'tunnel_id': foundTunnelId,
+              'tunnel_name': foundTunnelName.isNotEmpty ? foundTunnelName : ((foundTunnelId.isNotEmpty && foundTunnelId != 'N/A') ? 'Cloudflare Tunnel' : ''),
+              'token': foundToken,
+              'connections': isEnabled ? 4 : 0,
+            };
+          }
+        }
       }
 
       dynamic installedPackagesData = packagesRaw;
@@ -1445,6 +1599,10 @@ class AppState extends ChangeNotifier {
         'initScripts': initScriptsData,
         'mountPoints': mountPointsData,
         'wireguard': wireguardData,
+        'openvpn': openvpnData,
+        'tailscale': tailscaleData,
+        'nextdns': nextdnsData,
+        'cloudflared': cloudflaredData,
         '_lastUpdated':
             DateTime.now().millisecondsSinceEpoch, // Force UI updates
       };
@@ -4478,6 +4636,165 @@ class AppState extends ChangeNotifier {
     } catch (e, stack) {
       Logger.exception('Failed to aggregate DHCP leases', e, stack);
       return [];
+    }
+  }
+
+  // --- VPN & Secure Tunnels Management Actions ---
+
+  /// Toggle an OpenVPN instance enabled state and manage service action
+  Future<bool> toggleOpenVpnInstance(String name, bool enable) async {
+    if (_reviewerModeEnabled) return true;
+    final ip = _routerService?.selectedRouter?.ipAddress;
+    final sysauth = _authService?.sysauth;
+    final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
+    if (ip == null || sysauth == null) return false;
+
+    try {
+      await _apiService?.uciSet(
+        ip, sysauth, useHttps,
+        config: 'openvpn',
+        section: name,
+        values: {'enabled': enable ? '1' : '0'},
+      );
+      await _apiService?.uciCommit(ip, sysauth, useHttps, config: 'openvpn');
+      await _apiService?.manageServiceAction(
+        ip, sysauth, useHttps,
+        serviceName: 'openvpn',
+        action: enable ? 'start' : 'stop',
+      );
+      await fetchDashboardData();
+      return true;
+    } catch (e, stack) {
+      Logger.exception('Failed to toggle OpenVPN instance $name', e, stack);
+      return false;
+    }
+  }
+
+  /// Toggle Tailscale mesh daemon enabled state
+  Future<bool> toggleTailscale(bool enable) async {
+    if (_reviewerModeEnabled) return true;
+    final ip = _routerService?.selectedRouter?.ipAddress;
+    final sysauth = _authService?.sysauth;
+    final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
+    if (ip == null || sysauth == null) return false;
+
+    try {
+      await _apiService?.uciSet(
+        ip, sysauth, useHttps,
+        config: 'tailscale',
+        section: 'settings',
+        values: {'enabled': enable ? '1' : '0'},
+      );
+      await _apiService?.uciCommit(ip, sysauth, useHttps, config: 'tailscale');
+      await _apiService?.manageServiceAction(
+        ip, sysauth, useHttps,
+        serviceName: 'tailscale',
+        action: enable ? 'start' : 'stop',
+      );
+      await fetchDashboardData();
+      return true;
+    } catch (e, stack) {
+      Logger.exception('Failed to toggle Tailscale', e, stack);
+      return false;
+    }
+  }
+
+  /// Toggle NextDNS encrypted DNS daemon enabled state
+  Future<bool> toggleNextDns(bool enable) async {
+    if (_reviewerModeEnabled) return true;
+    final ip = _routerService?.selectedRouter?.ipAddress;
+    final sysauth = _authService?.sysauth;
+    final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
+    if (ip == null || sysauth == null) return false;
+
+    try {
+      await _apiService?.uciSet(
+        ip, sysauth, useHttps,
+        config: 'nextdns',
+        section: 'main',
+        values: {'enabled': enable ? '1' : '0'},
+      );
+      await _apiService?.uciCommit(ip, sysauth, useHttps, config: 'nextdns');
+      await _apiService?.manageServiceAction(
+        ip, sysauth, useHttps,
+        serviceName: 'nextdns',
+        action: enable ? 'start' : 'stop',
+      );
+      await fetchDashboardData();
+      return true;
+    } catch (e, stack) {
+      Logger.exception('Failed to toggle NextDNS', e, stack);
+      return false;
+    }
+  }
+
+  /// Toggle Cloudflared tunnel daemon enabled state
+  Future<bool> toggleCloudflared(bool enable) async {
+    if (_reviewerModeEnabled) return true;
+    final ip = _routerService?.selectedRouter?.ipAddress;
+    final sysauth = _authService?.sysauth;
+    final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
+    if (ip == null || sysauth == null) return false;
+
+    try {
+      await _apiService?.uciSet(
+        ip, sysauth, useHttps,
+        config: 'cloudflared',
+        section: 'main',
+        values: {'enabled': enable ? '1' : '0'},
+      );
+      await _apiService?.uciCommit(ip, sysauth, useHttps, config: 'cloudflared');
+      await _apiService?.manageServiceAction(
+        ip, sysauth, useHttps,
+        serviceName: 'cloudflared',
+        action: enable ? 'start' : 'stop',
+      );
+      await fetchDashboardData();
+      return true;
+    } catch (e, stack) {
+      Logger.exception('Failed to toggle Cloudflared', e, stack);
+      return false;
+    }
+  }
+
+  /// Bring WireGuard interface up or down
+  Future<bool> toggleWireguardInterface(String ifaceName, bool bringUp) async {
+    if (_reviewerModeEnabled) return true;
+    final ip = _routerService?.selectedRouter?.ipAddress;
+    final sysauth = _authService?.sysauth;
+    final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
+    if (ip == null || sysauth == null) return false;
+
+    try {
+      final cmd = bringUp ? '/sbin/ifup' : '/sbin/ifdown';
+      await _apiService?.systemExec(ip, sysauth, useHttps, command: '$cmd $ifaceName');
+      await fetchDashboardData();
+      return true;
+    } catch (e, stack) {
+      Logger.exception('Failed to toggle WireGuard interface $ifaceName', e, stack);
+      return false;
+    }
+  }
+
+  /// Restart a VPN service daemon by service name
+  Future<bool> restartVpnService(String serviceName) async {
+    if (_reviewerModeEnabled) return true;
+    final ip = _routerService?.selectedRouter?.ipAddress;
+    final sysauth = _authService?.sysauth;
+    final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
+    if (ip == null || sysauth == null) return false;
+
+    try {
+      await _apiService?.manageServiceAction(
+        ip, sysauth, useHttps,
+        serviceName: serviceName,
+        action: 'restart',
+      );
+      await fetchDashboardData();
+      return true;
+    } catch (e, stack) {
+      Logger.exception('Failed to restart VPN service $serviceName', e, stack);
+      return false;
     }
   }
 }

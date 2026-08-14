@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// WireGuard Peer details.
 class WireguardPeer {
   final String publicKey;
@@ -194,18 +196,159 @@ class NextDnsStatus {
   }
 }
 
+/// Cloudflared / Cloudflare Tunnel status.
+class CloudflaredStatus {
+  final bool isConfigured;
+  final bool isEnabled;
+  final bool isRunning;
+  final String tunnelId;
+  final String tunnelName;
+  final String token;
+  final int connectionsCount;
+
+  const CloudflaredStatus({
+    required this.isConfigured,
+    required this.isEnabled,
+    required this.isRunning,
+    required this.tunnelId,
+    required this.tunnelName,
+    required this.token,
+    required this.connectionsCount,
+  });
+
+  factory CloudflaredStatus.fromJson(Map<String, dynamic>? json) {
+    if (json == null) {
+      return const CloudflaredStatus(
+        isConfigured: false,
+        isEnabled: false,
+        isRunning: false,
+        tunnelId: '',
+        tunnelName: '',
+        token: '',
+        connectionsCount: 0,
+      );
+    }
+    final tunnelId = extractTunnelId(json);
+    final tunnelName = json['tunnel_name']?.toString() ?? json['name']?.toString() ?? '';
+    final token = json['token']?.toString() ?? json['tunnel_token']?.toString() ?? '';
+    final isConfigured = json['configured'] == true || (tunnelId.isNotEmpty && tunnelId != 'N/A') || token.isNotEmpty || tunnelName.isNotEmpty;
+    final isEnabled = json['enabled'] == '1' || json['enabled'] == true || json['enable'] == '1' || json['enable'] == true;
+    final isRunning = json['running'] == true || json['running'] == 1 || (isEnabled && isConfigured);
+    final connCount = (json['connections'] as num?)?.toInt() ?? (json['connections_count'] as num?)?.toInt() ?? (isRunning ? 4 : 0);
+
+    return CloudflaredStatus(
+      isConfigured: isConfigured,
+      isEnabled: isEnabled,
+      isRunning: isRunning,
+      tunnelId: tunnelId.isNotEmpty ? tunnelId : 'N/A',
+      tunnelName: tunnelName.isNotEmpty ? tunnelName : ((tunnelId.isNotEmpty && tunnelId != 'N/A') ? 'Cloudflare Tunnel' : ''),
+      token: token,
+      connectionsCount: connCount,
+    );
+  }
+
+  static String extractTunnelId(Map<String, dynamic> json) {
+    // 1. Check explicit keys
+    final explicitKeys = ['tunnel_id', 'tunnelid', 'tunnel_uuid', 'uuid', 'id', 'tunnel'];
+    for (final k in explicitKeys) {
+      final val = json[k]?.toString().trim();
+      if (val != null && val.isNotEmpty) {
+        if (val != 'config' && val != 'main' && val != 'global' && val != 'true' && val != 'false') {
+          return val;
+        }
+      }
+    }
+
+    // 2. Check section name or .name for UUID
+    final nameKey = json['.name']?.toString() ?? json['name']?.toString() ?? '';
+    final uuidRegex = RegExp(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}');
+    final nameMatch = uuidRegex.firstMatch(nameKey);
+    if (nameMatch != null) {
+      return nameMatch.group(0)!;
+    }
+
+    // 3. Check credentials_file, origincert, config_file, or config paths for UUID
+    final pathKeys = ['credentials_file', 'credentials', 'origincert', 'config_file', 'config'];
+    for (final k in pathKeys) {
+      final pathVal = json[k]?.toString();
+      if (pathVal != null && pathVal.isNotEmpty) {
+        final match = uuidRegex.firstMatch(pathVal);
+        if (match != null) {
+          return match.group(0)!;
+        }
+      }
+    }
+
+    // 4. Try decoding token (Base64 / JWT Cloudflare Tunnel Token)
+    final tokenVal = json['token']?.toString() ?? json['tunnel_token']?.toString() ?? json['secret']?.toString() ?? '';
+    if (tokenVal.isNotEmpty) {
+      final decodedId = _extractTunnelIdFromToken(tokenVal);
+      if (decodedId.isNotEmpty) {
+        return decodedId;
+      }
+    }
+
+    // 5. Fallback: check any string value in the json map for UUID regex match
+    for (final val in json.values) {
+      if (val is String && val.isNotEmpty) {
+        final match = uuidRegex.firstMatch(val);
+        if (match != null) {
+          return match.group(0)!;
+        }
+      }
+    }
+
+    return '';
+  }
+
+  static String _extractTunnelIdFromToken(String token) {
+    try {
+      String cleanToken = token.trim();
+      if (cleanToken.contains('.')) {
+        final parts = cleanToken.split('.');
+        if (parts.length >= 2) {
+          cleanToken = parts[1];
+        }
+      }
+
+      final normalized = base64.normalize(cleanToken);
+      final decodedBytes = base64.decode(normalized);
+      final decodedStr = utf8.decode(decodedBytes, allowMalformed: true);
+
+      final uuidRegex = RegExp(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}');
+      final match = uuidRegex.firstMatch(decodedStr);
+      if (match != null) {
+        return match.group(0)!;
+      }
+
+      if (decodedStr.contains('{')) {
+        final parsed = jsonDecode(decodedStr);
+        if (parsed is Map) {
+          final tVal = parsed['t']?.toString() ?? parsed['tunnel_id']?.toString() ?? parsed['tunnelId']?.toString();
+          if (tVal != null && tVal.isNotEmpty) {
+            return tVal;
+          }
+        }
+      }
+    } catch (_) {}
+    return '';
+  }
+}
+
 /// Complete VPN & Connectivity overview container.
 class VpnConnectivityOverview {
   final List<WireguardInterface> wireguardInterfaces;
   final List<OpenVpnInstance> openvpnInstances;
   final TailscaleStatus tailscale;
   final NextDnsStatus nextdns;
+  final CloudflaredStatus cloudflared;
 
   const VpnConnectivityOverview({
     required this.wireguardInterfaces,
     required this.openvpnInstances,
     required this.tailscale,
     required this.nextdns,
+    required this.cloudflared,
   });
 
   factory VpnConnectivityOverview.fromDashboardData(Map<String, dynamic>? data, {bool isReviewerMode = false}) {
@@ -213,6 +356,7 @@ class VpnConnectivityOverview {
     final ovpnList = <OpenVpnInstance>[];
     Map<String, dynamic>? tsRaw;
     Map<String, dynamic>? ndnsRaw;
+    Map<String, dynamic>? cfRaw;
 
     if (data != null) {
       final wgMap = data['wireguard'] as Map<String, dynamic>?;
@@ -235,6 +379,7 @@ class VpnConnectivityOverview {
 
       tsRaw = data['tailscale'] as Map<String, dynamic>?;
       ndnsRaw = data['nextdns'] as Map<String, dynamic>?;
+      cfRaw = data['cloudflared'] as Map<String, dynamic>?;
     }
 
     // Default mock data only if in Reviewer Mode
@@ -285,10 +430,62 @@ class VpnConnectivityOverview {
     return VpnConnectivityOverview(
       wireguardInterfaces: wgList,
       openvpnInstances: ovpnList,
-      tailscale: isReviewerMode ? (tsRaw != null ? TailscaleStatus.fromJson(tsRaw) : const TailscaleStatus(isConfigured: true, isRunning: true, nodeName: 'OpenWrt-Router', tailscaleIp: '100.64.0.15', backendState: 'Running')) : TailscaleStatus.fromJson(tsRaw),
-      nextdns: isReviewerMode ? (ndnsRaw != null ? NextDnsStatus.fromJson(ndnsRaw) : const NextDnsStatus(isConfigured: true, isEnabled: true, profileId: 'abcdef', reportClientInfo: true)) : NextDnsStatus.fromJson(ndnsRaw),
+      tailscale: isReviewerMode
+          ? (tsRaw != null
+              ? TailscaleStatus.fromJson(tsRaw)
+              : const TailscaleStatus(
+                  isConfigured: true,
+                  isRunning: true,
+                  nodeName: 'OpenWrt-Router',
+                  tailscaleIp: '100.64.0.15',
+                  backendState: 'Running',
+                ))
+          : TailscaleStatus.fromJson(tsRaw),
+      nextdns: isReviewerMode
+          ? (ndnsRaw != null
+              ? NextDnsStatus.fromJson(ndnsRaw)
+              : const NextDnsStatus(
+                  isConfigured: true,
+                  isEnabled: true,
+                  profileId: 'abcdef',
+                  reportClientInfo: true,
+                ))
+          : NextDnsStatus.fromJson(ndnsRaw),
+      cloudflared: isReviewerMode
+          ? (cfRaw != null
+              ? CloudflaredStatus.fromJson(cfRaw)
+              : const CloudflaredStatus(
+                  isConfigured: true,
+                  isEnabled: true,
+                  isRunning: true,
+                  tunnelId: '8f92a10b-4c3d-2e1f-0a9b-8c7d6e5f4a3b',
+                  tunnelName: 'home-router-tunnel',
+                  token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+                  connectionsCount: 4,
+                ))
+          : CloudflaredStatus.fromJson(cfRaw),
     );
   }
 
   int get totalWgPeers => wireguardInterfaces.fold(0, (sum, i) => sum + i.peers.length);
+
+  int get activeServicesCount {
+    int count = 0;
+    if (wireguardInterfaces.any((w) => w.isUp)) count++;
+    if (openvpnInstances.any((o) => o.isRunning)) count++;
+    if (tailscale.isRunning) count++;
+    if (nextdns.isEnabled) count++;
+    if (cloudflared.isRunning) count++;
+    return count;
+  }
+
+  int get totalConfiguredServices {
+    int count = 0;
+    if (wireguardInterfaces.isNotEmpty) count++;
+    if (openvpnInstances.isNotEmpty) count++;
+    if (tailscale.isConfigured) count++;
+    if (nextdns.isConfigured) count++;
+    if (cloudflared.isConfigured) count++;
+    return count;
+  }
 }

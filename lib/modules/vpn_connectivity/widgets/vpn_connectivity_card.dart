@@ -9,14 +9,17 @@ class VpnConnectivityCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appState = ref.watch(appStateProvider);
-    final overview = VpnConnectivityOverview.fromDashboardData(appState.dashboardData);
+    final overview = VpnConnectivityOverview.fromDashboardData(
+      appState.dashboardData,
+      isReviewerMode: appState.reviewerModeEnabled,
+    );
 
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 0),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 14.0),
+        padding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 10.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -32,7 +35,7 @@ class VpnConnectivityCard extends ConsumerWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'VPN & Secure Tunneling',
+                      'VPN & Secure Tunnels',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -40,56 +43,124 @@ class VpnConnectivityCard extends ConsumerWidget {
                   ],
                 ),
                 Text(
-                  '${overview.totalWgPeers} WG Peers',
+                  '${overview.activeServicesCount}/${overview.totalConfiguredServices} Active',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildMetricTile(
-                    context,
-                    label: 'WireGuard',
-                    value: '${overview.wireguardInterfaces.length} Tunnels',
-                    icon: Icons.shield_outlined,
-                    color: Colors.blue,
-                  ),
-                ),
-                Expanded(
-                  child: _buildMetricTile(
-                    context,
-                    label: 'OpenVPN',
-                    value: overview.openvpnInstances.any((o) => o.isRunning) ? 'ACTIVE' : 'STOPPED',
-                    icon: Icons.lock_outline,
-                    color: overview.openvpnInstances.any((o) => o.isRunning) ? Colors.green : Colors.grey,
-                  ),
-                ),
-                Expanded(
-                  child: _buildMetricTile(
-                    context,
-                    label: 'Tailscale',
-                    value: overview.tailscale.backendState.toUpperCase(),
-                    icon: Icons.hub_outlined,
-                    color: overview.tailscale.isRunning ? Colors.teal : Colors.grey,
-                  ),
-                ),
-                Expanded(
-                  child: _buildMetricTile(
-                    context,
-                    label: 'NextDNS',
-                    value: overview.nextdns.isEnabled ? 'ENCRYPTED' : 'DISABLED',
-                    icon: Icons.security_outlined,
-                    color: overview.nextdns.isEnabled ? Colors.indigo : Colors.grey,
-                  ),
-                ),
-              ],
-            ),
+            _buildActiveConnectionsRow(context, overview),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildActiveConnectionsRow(BuildContext context, VpnConnectivityOverview overview) {
+    final activeTiles = <Widget>[];
+
+    final activeWg = overview.wireguardInterfaces.where((w) => w.isUp).toList();
+    if (activeWg.isNotEmpty) {
+      activeTiles.add(
+        Expanded(
+          child: _buildMetricTile(
+            context,
+            label: 'WireGuard',
+            value: '${activeWg.length} Active',
+            icon: Icons.shield_outlined,
+            color: Colors.blue,
+          ),
+        ),
+      );
+    }
+
+    final activeOvpn = overview.openvpnInstances.where((o) => o.isRunning).toList();
+    if (activeOvpn.isNotEmpty) {
+      activeTiles.add(
+        Expanded(
+          child: _buildMetricTile(
+            context,
+            label: 'OpenVPN',
+            value: '${activeOvpn.length} Active',
+            icon: Icons.lock_outline,
+            color: Colors.green,
+          ),
+        ),
+      );
+    }
+
+    if (overview.tailscale.isConfigured && overview.tailscale.isRunning) {
+      activeTiles.add(
+        Expanded(
+          child: _buildMetricTile(
+            context,
+            label: 'Tailscale',
+            value: overview.tailscale.backendState.toUpperCase(),
+            icon: Icons.hub_outlined,
+            color: Colors.teal,
+          ),
+        ),
+      );
+    }
+
+    if (overview.nextdns.isConfigured && overview.nextdns.isEnabled) {
+      activeTiles.add(
+        Expanded(
+          child: _buildMetricTile(
+            context,
+            label: 'NextDNS',
+            value: 'ENCRYPTED',
+            icon: Icons.security_outlined,
+            color: Colors.indigo,
+          ),
+        ),
+      );
+    }
+
+    if (overview.cloudflared.isConfigured && overview.cloudflared.isRunning) {
+      activeTiles.add(
+        Expanded(
+          child: _buildMetricTile(
+            context,
+            label: 'Cloudflared',
+            value: 'ACTIVE',
+            icon: Icons.cloud_done_outlined,
+            color: Colors.orange,
+          ),
+        ),
+      );
+    }
+
+    if (activeTiles.isNotEmpty) {
+      return Row(children: activeTiles);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.shield_outlined,
+            size: 16,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'No Active Connections',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

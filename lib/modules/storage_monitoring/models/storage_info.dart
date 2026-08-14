@@ -127,10 +127,17 @@ class MountPointItem {
     int availBytes = rawAvail * multiplier;
     int usedBytes = rawUsed * multiplier;
 
-    if (usedBytes == 0 && sizeBytes > availBytes && availBytes > 0) {
-      usedBytes = sizeBytes - availBytes;
-    } else if (availBytes == 0 && sizeBytes > usedBytes && usedBytes > 0) {
-      availBytes = sizeBytes - usedBytes;
+    if (mount == '/rom' || fs.toLowerCase() == 'squashfs') {
+      availBytes = 0;
+      if (usedBytes == 0) {
+        usedBytes = sizeBytes;
+      }
+    } else {
+      if (usedBytes == 0 && sizeBytes > availBytes && availBytes > 0) {
+        usedBytes = sizeBytes - availBytes;
+      } else if (availBytes == 0 && sizeBytes > usedBytes && usedBytes > 0) {
+        availBytes = sizeBytes - usedBytes;
+      }
     }
 
     return MountPointItem(
@@ -176,6 +183,14 @@ class MountPointItem {
       return 1024;
     }
 
+    if (dataSource == StorageDataSource.dfKBlocks) {
+      return 1024;
+    }
+
+    if (dataSource == StorageDataSource.dfHuman) {
+      return 1;
+    }
+
     final bool isSystemMount = mountPath == '/' ||
         mountPath == '/overlay' ||
         mountPath == '/rom' ||
@@ -183,18 +198,16 @@ class MountPointItem {
         mountPath == '/dev';
 
     if (rawSize >= 1048576) {
+      if (isSystemMount) {
+        return 1;
+      }
       final bool isExactMbMultiple = (rawSize % 1048576 == 0);
       final double ifKbToGb = (rawSize.toDouble() * 1024.0) / (1024.0 * 1024.0 * 1024.0);
 
-      if (isSystemMount) {
-        if (ifKbToGb > 32.0 || isExactMbMultiple) {
-          return 1;
-        }
-      } else {
-        if (ifKbToGb > 100000.0 || (isExactMbMultiple && rawSize >= 16777216)) {
-          return 1;
-        }
+      if (ifKbToGb > 100000.0 || (isExactMbMultiple && rawSize >= 16777216)) {
+        return 1;
       }
+      return 1;
     }
 
     if (rawSize > 0 && rawSize <= 8192) {
@@ -416,6 +429,13 @@ class StorageOverview {
               fs = 'jffs2';
             } else {
               fs = 'ext4';
+            }
+          }
+
+          if (mountPath == '/rom' || fs.toLowerCase() == 'squashfs') {
+            availBytes = 0;
+            if (usedBytes == 0) {
+              usedBytes = sizeBytes;
             }
           }
 

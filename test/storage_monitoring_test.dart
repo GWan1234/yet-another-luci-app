@@ -264,5 +264,30 @@ tmpfs                   124808       988    123820   1% /tmp
       expect(StorageOverview.formatBytes(overview.overlayFs!.sizeBytes), equals('384.0 MB'));
       expect(StorageOverview.formatBytes(overview.overlayFs!.usedBytes), equals('192.0 MB'));
     });
+
+    test('Parses /rom squashfs mount with non-exact MB multiple byte size correctly', () {
+      final romRpcData = [
+        {
+          'mount': '/rom',
+          'device': '/dev/root',
+          'fs': 'squashfs',
+          'size': 15400960, // 14.68 MB in Bytes (not an exact 1MB multiple)
+          'used': 15400960,
+          'avail': 0,
+        }
+      ];
+
+      final overview = StorageOverview.fromRpcData(romRpcData);
+      expect(overview.mountPoints.length, equals(1));
+      final rom = overview.mountPoints.first;
+      expect(rom.mountPath, equals('/rom'));
+      expect(rom.sizeBytes, equals(15400960));
+      expect(rom.usedBytes, equals(15400960));
+      expect(rom.availableBytes, equals(0));
+      expect(rom.usedPercent, equals(100.0));
+      expect(StorageOverview.formatBytes(rom.sizeBytes), equals('14.7 MB'));
+      expect(StorageOverview.formatBytes(rom.usedBytes), equals('14.7 MB'));
+      expect(StorageOverview.formatBytes(rom.availableBytes), equals('0 MB'));
+    });
   });
 }

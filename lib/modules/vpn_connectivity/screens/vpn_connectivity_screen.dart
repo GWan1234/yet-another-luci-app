@@ -19,14 +19,24 @@ class VpnConnectivityScreen extends ConsumerWidget {
     final hasOvpn = overview.openvpnInstances.isNotEmpty;
     final hasTs = overview.tailscale.isConfigured;
     final hasNextDns = overview.nextdns.isConfigured;
+    final hasCf = overview.cloudflared.isConfigured;
 
     final children = <Widget>[];
+    final unconfiguredCards = <Widget>[];
 
+    // Configured Services (Top of page)
     if (hasWg) {
       children.add(_buildSectionHeader(context, 'WireGuard VPN Interfaces & Peers', Icons.shield_outlined));
       children.add(const SizedBox(height: 8));
-      children.addAll(overview.wireguardInterfaces.map((wg) => _buildWireguardCard(context, wg)));
+      children.addAll(overview.wireguardInterfaces.map((wg) => _buildWireguardCard(context, ref, wg)));
       children.add(const SizedBox(height: 16));
+    } else {
+      unconfiguredCards.add(_buildUnconfiguredCard(
+        context,
+        title: 'WireGuard VPN',
+        message: 'No WireGuard interfaces or peer configurations found on this router.',
+        icon: Icons.shield_outlined,
+      ));
     }
 
     if (hasOvpn) {
@@ -34,6 +44,13 @@ class VpnConnectivityScreen extends ConsumerWidget {
       children.add(const SizedBox(height: 8));
       children.add(_buildOpenVpnCard(context, ref, overview.openvpnInstances));
       children.add(const SizedBox(height: 16));
+    } else {
+      unconfiguredCards.add(_buildUnconfiguredCard(
+        context,
+        title: 'OpenVPN Tunnels',
+        message: 'No OpenVPN instances configured in router setup (/etc/config/openvpn).',
+        icon: Icons.lock_outline,
+      ));
     }
 
     if (hasTs) {
@@ -41,33 +58,67 @@ class VpnConnectivityScreen extends ConsumerWidget {
       children.add(const SizedBox(height: 8));
       children.add(_buildTailscaleCard(context, ref, overview.tailscale));
       children.add(const SizedBox(height: 16));
+    } else {
+      unconfiguredCards.add(_buildUnconfiguredCard(
+        context,
+        title: 'Tailscale Mesh VPN',
+        message: 'No Tailscale configuration or authenticated node found on this router.',
+        icon: Icons.hub_outlined,
+      ));
     }
 
     if (hasNextDns) {
-      children.add(_buildSectionHeader(context, 'NextDNS / Encrypted DNS', Icons.security_outlined));
+      children.add(_buildSectionHeader(context, 'NextDNS Encrypted Resolver', Icons.security_outlined));
       children.add(const SizedBox(height: 8));
       children.add(_buildNextDnsCard(context, ref, overview.nextdns));
       children.add(const SizedBox(height: 16));
+    } else {
+      unconfiguredCards.add(_buildUnconfiguredCard(
+        context,
+        title: 'NextDNS Resolver',
+        message: 'No NextDNS profile ID or resolver configuration found on this router.',
+        icon: Icons.security_outlined,
+      ));
     }
 
-    if (!hasWg && !hasOvpn && !hasTs && !hasNextDns) {
-      children.add(
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 48.0),
-          child: LuciEmptyState(
-            title: 'No VPN Services Configured',
-            message: 'No WireGuard, OpenVPN, Tailscale, or NextDNS services are currently configured on this router.',
-            icon: Icons.shield_outlined,
-          ),
-        ),
-      );
+    if (hasCf) {
+      children.add(_buildSectionHeader(context, 'Cloudflare Tunnels (cloudflared)', Icons.cloud_done_outlined));
+      children.add(const SizedBox(height: 8));
+      children.add(_buildCloudflaredCard(context, ref, overview.cloudflared));
+      children.add(const SizedBox(height: 16));
     } else {
-      children.add(const SizedBox(height: 32));
+      unconfiguredCards.add(_buildUnconfiguredCard(
+        context,
+        title: 'Cloudflare Tunnel (cloudflared)',
+        message: 'No Cloudflare Tunnel ID or token configuration found on this router.',
+        icon: Icons.cloud_off_outlined,
+      ));
     }
+
+    // Unconfigured Services (Bottom of page)
+    if (unconfiguredCards.isNotEmpty) {
+      if (children.isNotEmpty) {
+        children.add(const Divider(height: 32, thickness: 1));
+      }
+      children.add(_buildSectionHeader(context, 'Unconfigured Tunnels & Services', Icons.do_not_disturb_on_outlined));
+      children.add(const SizedBox(height: 8));
+      children.addAll(unconfiguredCards);
+    }
+
+    children.add(const SizedBox(height: 32));
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('VPN & Secure Tunnels'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh Status',
+            onPressed: () async {
+              await appState.fetchDashboardData();
+            },
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -97,7 +148,7 @@ class VpnConnectivityScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildWireguardCard(BuildContext context, WireguardInterface wg) {
+  Widget _buildWireguardCard(BuildContext context, WidgetRef ref, WireguardInterface wg) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
@@ -124,16 +175,35 @@ class VpnConnectivityScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: wg.isUp ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    wg.isUp ? 'UP' : 'DOWN',
-                    style: TextStyle(color: wg.isUp ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 11),
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: wg.isUp ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        wg.isUp ? 'UP' : 'DOWN',
+                        style: TextStyle(color: wg.isUp ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 11),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: Icon(wg.isUp ? Icons.power_settings_new : Icons.play_arrow, size: 20),
+                      tooltip: wg.isUp ? 'Bring Down' : 'Bring Up',
+                      onPressed: () => _confirmToggleProvider(
+                        context,
+                        ref,
+                        title: '${wg.isUp ? "Bring Down" : "Bring Up"} Interface "${wg.name}"?',
+                        message: 'Are you sure you want to ${wg.isUp ? "bring down" : "bring up"} the WireGuard interface "${wg.name}" on the router?',
+                        action: () async {
+                          final appState = ref.read(appStateProvider);
+                          await appState.toggleWireguardInterface(wg.name, !wg.isUp);
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -143,7 +213,13 @@ class VpnConnectivityScreen extends ConsumerWidget {
             const Divider(height: 20),
             Text('Connected WireGuard Peers (${wg.peers.length})', style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            ...wg.peers.map((p) => _buildPeerTile(context, p)),
+            if (wg.peers.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.0),
+                child: Text('No active peers configured or connected.', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              )
+            else
+              ...wg.peers.map((p) => _buildPeerTile(context, p)),
           ],
         ),
       ),
@@ -224,7 +300,10 @@ class VpnConnectivityScreen extends ConsumerWidget {
                     ref,
                     title: '${val ? "Start" : "Stop"} OpenVPN "${ovpn.name}"?',
                     message: 'Are you sure you want to ${val ? "start" : "stop"} the OpenVPN instance "${ovpn.name}" on the router?',
-                    action: () async {},
+                    action: () async {
+                      final appState = ref.read(appStateProvider);
+                      await appState.toggleOpenVpnInstance(ovpn.name, val);
+                    },
                   ),
                 ),
               ],
@@ -279,7 +358,10 @@ class VpnConnectivityScreen extends ConsumerWidget {
                         ref,
                         title: '${val ? "Enable" : "Disable"} Tailscale?',
                         message: 'Are you sure you want to ${val ? "enable" : "disable"} the Tailscale mesh daemon on the router?',
-                        action: () async {},
+                        action: () async {
+                          final appState = ref.read(appStateProvider);
+                          await appState.toggleTailscale(val);
+                        },
                       ),
                     ),
                   ],
@@ -289,6 +371,26 @@ class VpnConnectivityScreen extends ConsumerWidget {
             const Divider(height: 20),
             _buildDetailRow('Tailscale IP', ts.tailscaleIp.isNotEmpty ? ts.tailscaleIp : 'N/A'),
             _buildDetailRow('Backend Daemon State', ts.backendState),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _confirmToggleProvider(
+                    context,
+                    ref,
+                    title: 'Restart Tailscale Service?',
+                    message: 'Restarting Tailscale will temporarily drop active mesh connections.',
+                    action: () async {
+                      final appState = ref.read(appStateProvider);
+                      await appState.restartVpnService('tailscale');
+                    },
+                  ),
+                  icon: const Icon(Icons.restart_alt, size: 16),
+                  label: const Text('Restart Daemon'),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -327,7 +429,10 @@ class VpnConnectivityScreen extends ConsumerWidget {
                     ref,
                     title: '${val ? "Enable" : "Disable"} NextDNS?',
                     message: 'Are you sure you want to ${val ? "enable" : "disable"} encrypted NextDNS resolving on the router?',
-                    action: () async {},
+                    action: () async {
+                      final appState = ref.read(appStateProvider);
+                      await appState.toggleNextDns(val);
+                    },
                   ),
                 ),
               ],
@@ -336,6 +441,113 @@ class VpnConnectivityScreen extends ConsumerWidget {
             _buildDetailRow('Encrypted DNS Profile ID', ndns.profileId.isNotEmpty ? ndns.profileId : 'N/A'),
             _buildDetailRow('NextDNS Daemon Status', ndns.isEnabled ? 'ACTIVE & ENCRYPTED' : 'DISABLED'),
             _buildDetailRow('Report Client Info', ndns.reportClientInfo ? 'ENABLED' : 'DISABLED'),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _confirmToggleProvider(
+                    context,
+                    ref,
+                    title: 'Restart NextDNS Service?',
+                    message: 'Restarting NextDNS will reload DNS filtering configurations.',
+                    action: () async {
+                      final appState = ref.read(appStateProvider);
+                      await appState.restartVpnService('nextdns');
+                    },
+                  ),
+                  icon: const Icon(Icons.restart_alt, size: 16),
+                  label: const Text('Restart Resolver'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCloudflaredCard(BuildContext context, WidgetRef ref, CloudflaredStatus cf) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Colors.orange,
+                      child: Icon(Icons.cloud_done, color: Colors.white, size: 18),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      cf.tunnelName.isNotEmpty ? cf.tunnelName : 'Cloudflare Tunnel',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: cf.isRunning ? Colors.orange.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        cf.isRunning ? 'ACTIVE' : 'DISABLED',
+                        style: TextStyle(color: cf.isRunning ? Colors.orange.shade800 : Colors.grey, fontWeight: FontWeight.bold, fontSize: 10),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Switch(
+                      value: cf.isRunning,
+                      onChanged: (val) => _confirmToggleProvider(
+                        context,
+                        ref,
+                        title: '${val ? "Enable" : "Disable"} Cloudflare Tunnel?',
+                        message: 'Are you sure you want to ${val ? "enable" : "disable"} the cloudflared zero-trust tunnel daemon on the router?',
+                        action: () async {
+                          final appState = ref.read(appStateProvider);
+                          await appState.toggleCloudflared(val);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            _buildDetailRow('Tunnel ID', cf.tunnelId),
+            _buildDetailRow('Edge Connections', '${cf.connectionsCount} Active Edge Hops'),
+            _buildDetailRow('Tunnel Status', cf.isRunning ? 'CONNECTED TO CLOUDFLARE EDGE' : 'INACTIVE'),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _confirmToggleProvider(
+                    context,
+                    ref,
+                    title: 'Restart Cloudflared Service?',
+                    message: 'Restarting Cloudflared will re-establish edge connection tunnels to Cloudflare Zero Trust.',
+                    action: () async {
+                      final appState = ref.read(appStateProvider);
+                      await appState.restartVpnService('cloudflared');
+                    },
+                  ),
+                  icon: const Icon(Icons.restart_alt, size: 16),
+                  label: const Text('Restart Tunnel'),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -377,6 +589,78 @@ class VpnConnectivityScreen extends ConsumerWidget {
     }
   }
 
+  Widget _buildUnconfiguredCard(
+    BuildContext context, {
+    required String title,
+    required String message,
+    required IconData icon,
+  }) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 1,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.12),
+          width: 1,
+        ),
+      ),
+      color: theme.colorScheme.surfaceContainerLowest.withValues(alpha: 0.5),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: theme.colorScheme.onSurface.withValues(alpha: 0.1),
+              child: Icon(icon, color: theme.colorScheme.onSurface.withValues(alpha: 0.4), size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    message,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'NOT CONFIGURED',
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDetailRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.0),
@@ -406,3 +690,4 @@ class VpnConnectivityScreen extends ConsumerWidget {
     return '${b.toStringAsFixed(0)} B';
   }
 }
+
