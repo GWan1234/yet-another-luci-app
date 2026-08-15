@@ -334,13 +334,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               children: [
                 _buildSpeedIndicator(
                   Icons.arrow_downward,
-                  const Color(0xFFF38020),
+                  theme.colorScheme.primary,
                   '',
                   isSwitchingRouter ? 0.0 : currentRxRate,
                 ),
                 _buildSpeedIndicator(
                   Icons.arrow_upward,
-                  const Color(0xFF8C54FF),
+                  theme.colorScheme.secondary,
                   '',
                   isSwitchingRouter ? 0.0 : currentTxRate,
                 ),
@@ -385,13 +385,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF38020).withValues(alpha: 0.15),
+                                  color: theme.colorScheme.primary.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   'RX: ${_formatSpeed(appState.currentRxRate)}',
-                                  style: const TextStyle(
-                                    color: Color(0xFFF38020),
+                                  style: TextStyle(
+                                    color: theme.colorScheme.primary,
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -401,13 +401,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF8C54FF).withValues(alpha: 0.15),
+                                  color: theme.colorScheme.secondary.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   'TX: ${_formatSpeed(appState.currentTxRate)}',
-                                  style: const TextStyle(
-                                    color: Color(0xFF8C54FF),
+                                  style: TextStyle(
+                                    color: theme.colorScheme.secondary,
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -509,16 +509,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                     _buildLineChartBarData(
                                       rxHistory,
                                       [
-                                        const Color(0xFFF38020),
-                                        const Color(0xFFF38020),
+                                        theme.colorScheme.primary,
+                                        theme.colorScheme.primary,
                                       ],
                                       isRx: true,
                                     ),
                                     _buildLineChartBarData(
                                       txHistory,
                                       [
-                                        const Color(0xFF8C54FF),
-                                        const Color(0xFF8C54FF),
+                                        theme.colorScheme.secondary,
+                                        theme.colorScheme.secondary,
                                       ],
                                       isRx: false,
                                     ),

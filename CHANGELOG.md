@@ -10,10 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2026-08-15
 
 ### Added
-- **Cloudflare-Style Real-Time Throughput Graph**:
-  - Upgraded dashboard and real-time metric charts to a merged continuous line chart inspired by Cloudflare Speed Test aesthetics.
+- **Clean Dual-Stream Real-Time Throughput Graph**:
+  - Upgraded dashboard and real-time metric charts to a merged continuous line chart for clear network traffic monitoring.
   - Replaced gradient area fills with clean, high-contrast stroke lines and step-responsive curve rendering (`curveSmoothness: 0.25`).
-  - Integrated high-contrast brand color distinction: Cloudflare Amber/Orange (`#F38020`) for Download (RX) and Cloudflare Purple (`#8C54FF`) for Upload (TX), synchronized across speed indicators, tags, and tooltips.
+  - Maintained app-wide brand consistency by pairing primary design system Orange (`theme.colorScheme.primary`) for Download (RX) with secondary complementary Cyan/Teal (`theme.colorScheme.secondary`) for Upload (TX).
 - **Cloudflare Tunnel Configuration Visibility**:
   - Improved Cloudflare Tunnel ID extraction in the VPN & Connectivity module by parsing tunnel attributes directly from router UCI configurations and encoded token sources.
 
