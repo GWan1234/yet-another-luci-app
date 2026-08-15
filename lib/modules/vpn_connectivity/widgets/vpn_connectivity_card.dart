@@ -106,7 +106,7 @@ class VpnConnectivityCard extends ConsumerWidget {
       );
     }
 
-    if (overview.nextdns.isConfigured && overview.nextdns.isEnabled) {
+    if (overview.nextdns.isConfigured && overview.nextdns.isEnabled && overview.nextdns.isRunning) {
       activeTiles.add(
         Expanded(
           child: _buildMetricTile(

@@ -285,23 +285,14 @@ class RealtimeLineChart extends StatelessWidget {
     return LineChartBarData(
       spots: spots,
       isCurved: spots.length > 1,
+      curveSmoothness: 0.25,
       preventCurveOverShooting: true,
       preventCurveOvershootingThreshold: 0.0,
       gradient: LinearGradient(colors: colors),
-      barWidth: barIndex == 0 ? 2.5 : 2.0,
+      barWidth: 2.8,
       isStrokeCapRound: true,
       dotData: const FlDotData(show: false),
-      belowBarData: BarAreaData(
-        show: true,
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            colors.first.withValues(alpha: barIndex == 0 ? 0.25 : 0.15),
-            colors.first.withValues(alpha: 0.0),
-          ],
-        ),
-      ),
+      belowBarData: BarAreaData(show: false),
     );
   }
 }

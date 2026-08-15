@@ -94,12 +94,12 @@ class ChartingScreen extends ConsumerWidget {
               series: [
                 ChartSeriesData(
                   spots: metricsData.rxHistory,
-                  gradientColors: [Colors.green.shade700, Colors.green.shade300],
+                  gradientColors: [const Color(0xFFF38020), const Color(0xFFF38020)],
                   label: 'RX (Download)',
                 ),
                 ChartSeriesData(
                   spots: metricsData.txHistory,
-                  gradientColors: [Colors.blue.shade700, Colors.blue.shade300],
+                  gradientColors: [const Color(0xFF8C54FF), const Color(0xFF8C54FF)],
                   label: 'TX (Upload)',
                 ),
               ],

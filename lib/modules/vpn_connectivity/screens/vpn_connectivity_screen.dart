@@ -423,12 +423,12 @@ class VpnConnectivityScreen extends ConsumerWidget {
                   ],
                 ),
                 Switch(
-                  value: ndns.isEnabled,
+                  value: ndns.isEnabled && ndns.isRunning,
                   onChanged: (val) => _confirmToggleProvider(
                     context,
                     ref,
-                    title: '${val ? "Enable" : "Disable"} NextDNS?',
-                    message: 'Are you sure you want to ${val ? "enable" : "disable"} encrypted NextDNS resolving on the router?',
+                    title: '${val ? "Activate" : "Deactivate"} NextDNS?',
+                    message: 'Are you sure you want to ${val ? "activate" : "deactivate"} encrypted NextDNS resolving on the router?',
                     action: () async {
                       final appState = ref.read(appStateProvider);
                       await appState.toggleNextDns(val);
@@ -439,7 +439,12 @@ class VpnConnectivityScreen extends ConsumerWidget {
             ),
             const Divider(height: 16),
             _buildDetailRow('Encrypted DNS Profile ID', ndns.profileId.isNotEmpty ? ndns.profileId : 'N/A'),
-            _buildDetailRow('NextDNS Daemon Status', ndns.isEnabled ? 'ACTIVE & ENCRYPTED' : 'DISABLED'),
+            _buildDetailRow(
+              'NextDNS Daemon Status',
+              ndns.isEnabled
+                  ? (ndns.isRunning ? 'ACTIVE & ENCRYPTED' : 'STOPPED / DEACTIVATED')
+                  : 'DISABLED',
+            ),
             _buildDetailRow('Report Client Info', ndns.reportClientInfo ? 'ENABLED' : 'DISABLED'),
             const SizedBox(height: 8),
             Row(

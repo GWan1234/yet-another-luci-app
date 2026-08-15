@@ -334,13 +334,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               children: [
                 _buildSpeedIndicator(
                   Icons.arrow_downward,
-                  theme.colorScheme.primary,
+                  const Color(0xFFF38020),
                   '',
                   isSwitchingRouter ? 0.0 : currentRxRate,
                 ),
                 _buildSpeedIndicator(
                   Icons.arrow_upward,
-                  theme.colorScheme.secondary,
+                  const Color(0xFF8C54FF),
                   '',
                   isSwitchingRouter ? 0.0 : currentTxRate,
                 ),
@@ -385,13 +385,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                                  color: const Color(0xFFF38020).withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   'RX: ${_formatSpeed(appState.currentRxRate)}',
-                                  style: TextStyle(
-                                    color: theme.colorScheme.primary,
+                                  style: const TextStyle(
+                                    color: Color(0xFFF38020),
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -401,13 +401,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: theme.colorScheme.secondary.withValues(alpha: 0.15),
+                                  color: const Color(0xFF8C54FF).withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   'TX: ${_formatSpeed(appState.currentTxRate)}',
-                                  style: TextStyle(
-                                    color: theme.colorScheme.secondary,
+                                  style: const TextStyle(
+                                    color: Color(0xFF8C54FF),
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -509,16 +509,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                     _buildLineChartBarData(
                                       rxHistory,
                                       [
-                                        theme.colorScheme.primary,
-                                        theme.colorScheme.primary.withValues(alpha: 0.6),
+                                        const Color(0xFFF38020),
+                                        const Color(0xFFF38020),
                                       ],
                                       isRx: true,
                                     ),
                                     _buildLineChartBarData(
                                       txHistory,
                                       [
-                                        theme.colorScheme.secondary,
-                                        theme.colorScheme.secondary.withValues(alpha: 0.6),
+                                        const Color(0xFF8C54FF),
+                                        const Color(0xFF8C54FF),
                                       ],
                                       isRx: false,
                                     ),
@@ -638,23 +638,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return LineChartBarData(
       spots: spots,
       isCurved: spots.length > 1,
+      curveSmoothness: 0.25,
       preventCurveOverShooting: true,
       preventCurveOvershootingThreshold: 0.0,
       gradient: LinearGradient(colors: gradientColors),
-      barWidth: isRx ? 2.5 : 2.0,
+      barWidth: 2.8,
       isStrokeCapRound: true,
       dotData: const FlDotData(show: false),
-      belowBarData: BarAreaData(
-        show: true,
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            gradientColors.first.withValues(alpha: isRx ? 0.25 : 0.15),
-            gradientColors.first.withValues(alpha: 0.0),
-          ],
-        ),
-      ),
+      belowBarData: BarAreaData(show: false),
     );
   }
 

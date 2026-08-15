@@ -83,19 +83,34 @@ void main() {
       expect(ts.backendState, equals('Running'));
     });
 
-    test('Parses NextDnsStatus correctly', () {
-      final ndnsJson = {
+    test('Parses NextDnsStatus correctly when active and stopped', () {
+      final ndnsJsonActive = {
         'configured': true,
         'enabled': '1',
+        'running': true,
         'profile': 'abcdef',
         'report_client_info': '1',
       };
 
-      final ndns = NextDnsStatus.fromJson(ndnsJson);
-      expect(ndns.isConfigured, isTrue);
-      expect(ndns.isEnabled, isTrue);
-      expect(ndns.profileId, equals('abcdef'));
-      expect(ndns.reportClientInfo, isTrue);
+      final ndnsActive = NextDnsStatus.fromJson(ndnsJsonActive);
+      expect(ndnsActive.isConfigured, isTrue);
+      expect(ndnsActive.isEnabled, isTrue);
+      expect(ndnsActive.isRunning, isTrue);
+      expect(ndnsActive.profileId, equals('abcdef'));
+      expect(ndnsActive.reportClientInfo, isTrue);
+
+      final ndnsJsonStopped = {
+        'configured': true,
+        'enabled': '1',
+        'running': false,
+        'profile': 'abcdef',
+        'report_client_info': '1',
+      };
+
+      final ndnsStopped = NextDnsStatus.fromJson(ndnsJsonStopped);
+      expect(ndnsStopped.isConfigured, isTrue);
+      expect(ndnsStopped.isEnabled, isTrue);
+      expect(ndnsStopped.isRunning, isFalse);
     });
 
     test('Parses CloudflaredStatus correctly', () {

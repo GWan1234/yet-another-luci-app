@@ -166,12 +166,14 @@ class TailscaleStatus {
 class NextDnsStatus {
   final bool isConfigured;
   final bool isEnabled;
+  final bool isRunning;
   final String profileId;
   final bool reportClientInfo;
 
   const NextDnsStatus({
     required this.isConfigured,
     required this.isEnabled,
+    required this.isRunning,
     required this.profileId,
     required this.reportClientInfo,
   });
@@ -181,15 +183,19 @@ class NextDnsStatus {
       return const NextDnsStatus(
         isConfigured: false,
         isEnabled: false,
+        isRunning: false,
         profileId: '',
         reportClientInfo: false,
       );
     }
     final profile = json['profile']?.toString() ?? '';
     final isConfig = json['configured'] == true || profile.isNotEmpty;
+    final isEnabled = json['enabled'] == '1' || json['enabled'] == true;
+    final isRunning = json['running'] == true || json['running'] == 1 || (json.containsKey('running') ? json['running'] == true : isEnabled);
     return NextDnsStatus(
       isConfigured: isConfig,
-      isEnabled: json['enabled'] == '1' || json['enabled'] == true,
+      isEnabled: isEnabled,
+      isRunning: isRunning,
       profileId: profile,
       reportClientInfo: json['report_client_info'] == '1' || json['report_client_info'] == true,
     );
@@ -447,6 +453,7 @@ class VpnConnectivityOverview {
               : const NextDnsStatus(
                   isConfigured: true,
                   isEnabled: true,
+                  isRunning: true,
                   profileId: 'abcdef',
                   reportClientInfo: true,
                 ))

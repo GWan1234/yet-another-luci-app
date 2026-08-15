@@ -1348,9 +1348,35 @@ class AppState extends ChangeNotifier {
             sec = values.values.firstWhere((v) => v is Map<String, dynamic>, orElse: () => null) as Map<String, dynamic>?;
           }
           if (sec != null) {
+            final isEnabled = sec['enabled'] == '1' || sec['enabled'] == true;
+            bool isRunning = isEnabled;
+
+            final parsedServices = servicesRaw != null ? getOptionalData(servicesRaw, 'service.list') : null;
+            final parsedInit = initScriptsRaw != null ? getOptionalData(initScriptsRaw, 'rc.list') : null;
+
+            if (parsedServices is Map<String, dynamic> && parsedServices.containsKey('nextdns')) {
+              final sObj = parsedServices['nextdns'];
+              if (sObj is Map && sObj['instances'] is Map) {
+                final instances = sObj['instances'] as Map;
+                if (instances.isNotEmpty) {
+                  isRunning = instances.values.any((i) => i is Map && (i['running'] == true || i['running'] == 1));
+                } else {
+                  isRunning = false;
+                }
+              } else if (sObj is Map && sObj.containsKey('running')) {
+                isRunning = sObj['running'] == true || sObj['running'] == 1;
+              }
+            } else if (parsedInit is Map<String, dynamic> && parsedInit.containsKey('nextdns')) {
+              final iObj = parsedInit['nextdns'];
+              if (iObj is Map && iObj.containsKey('running')) {
+                isRunning = iObj['running'] == true || iObj['running'] == 1;
+              }
+            }
+
             nextdnsData = {
               'configured': true,
-              'enabled': sec['enabled'] == '1' || sec['enabled'] == true,
+              'enabled': isEnabled,
+              'running': isRunning,
               'profile': sec['profile']?.toString() ?? sec['profile_id']?.toString() ?? '',
               'report_client_info': sec['report_client_info'] == '1' || sec['report_client_info'] == true,
             };
@@ -1396,14 +1422,37 @@ class AppState extends ChangeNotifier {
           }
 
           if (values.isNotEmpty) {
+            bool isRunning = isEnabled;
+            final parsedServices = servicesRaw != null ? getOptionalData(servicesRaw, 'service.list') : null;
+            final parsedInit = initScriptsRaw != null ? getOptionalData(initScriptsRaw, 'rc.list') : null;
+
+            if (parsedServices is Map<String, dynamic> && parsedServices.containsKey('cloudflared')) {
+              final sObj = parsedServices['cloudflared'];
+              if (sObj is Map && sObj['instances'] is Map) {
+                final instances = sObj['instances'] as Map;
+                if (instances.isNotEmpty) {
+                  isRunning = instances.values.any((i) => i is Map && (i['running'] == true || i['running'] == 1));
+                } else {
+                  isRunning = false;
+                }
+              } else if (sObj is Map && sObj.containsKey('running')) {
+                isRunning = sObj['running'] == true || sObj['running'] == 1;
+              }
+            } else if (parsedInit is Map<String, dynamic> && parsedInit.containsKey('cloudflared')) {
+              final iObj = parsedInit['cloudflared'];
+              if (iObj is Map && iObj.containsKey('running')) {
+                isRunning = iObj['running'] == true || iObj['running'] == 1;
+              }
+            }
+
             cloudflaredData = {
               'configured': true,
               'enabled': isEnabled,
-              'running': isEnabled,
+              'running': isRunning,
               'tunnel_id': foundTunnelId,
               'tunnel_name': foundTunnelName.isNotEmpty ? foundTunnelName : ((foundTunnelId.isNotEmpty && foundTunnelId != 'N/A') ? 'Cloudflare Tunnel' : ''),
               'token': foundToken,
-              'connections': isEnabled ? 4 : 0,
+              'connections': isRunning ? 4 : 0,
             };
           }
         }
@@ -4699,7 +4748,7 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// Toggle NextDNS encrypted DNS daemon enabled state
+  /// Toggle NextDNS encrypted DNS daemon state (activate/start vs deactivate/stop)
   Future<bool> toggleNextDns(bool enable) async {
     if (_reviewerModeEnabled) return true;
     final ip = _routerService?.selectedRouter?.ipAddress;
@@ -4708,6 +4757,7 @@ class AppState extends ChangeNotifier {
     if (ip == null || sysauth == null) return false;
 
     try {
+      // 1. Update UCI configuration
       await _apiService?.uciSet(
         ip, sysauth, useHttps,
         config: 'nextdns',
@@ -4715,11 +4765,34 @@ class AppState extends ChangeNotifier {
         values: {'enabled': enable ? '1' : '0'},
       );
       await _apiService?.uciCommit(ip, sysauth, useHttps, config: 'nextdns');
+
+      // 2. Manage procd init service action (start/enable vs stop/disable)
       await _apiService?.manageServiceAction(
         ip, sysauth, useHttps,
         serviceName: 'nextdns',
         action: enable ? 'start' : 'stop',
       );
+
+      // 3. Execute nextdns activate/deactivate CLI command if available on router
+      try {
+        final actionCmd = enable
+            ? 'nextdns activate || /etc/init.d/nextdns activate'
+            : 'nextdns deactivate || /etc/init.d/nextdns deactivate';
+        await _apiService?.call(
+          ip,
+          sysauth,
+          useHttps,
+          object: 'file',
+          method: 'exec',
+          params: {
+            'command': '/bin/sh',
+            'params': ['-c', actionCmd],
+          },
+        );
+      } catch (_) {
+        // Fallback gracefully if nextdns CLI binary is not available directly
+      }
+
       await fetchDashboardData();
       return true;
     } catch (e, stack) {
