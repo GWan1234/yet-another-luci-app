@@ -567,25 +567,26 @@ class StorageOverview {
   }
 
   /// Priority order for primary dashboard storage display:
-  /// 1. Root (/) [1st priority]
+  /// 1. Overlay (/overlay) [1st priority]
   /// 2. TempFS (/tmp) [2nd priority]
-  /// Fallback: If any one or both are not found, fill from other mounted partitions in order.
+  /// Fallback: If any one or both are not found, fill from other mounted partitions (e.g. Root /) in order.
+  /// Maximum of 2 storage items returned for dashboard card display.
   List<MountPointItem> get priorityDisplayMounts {
     if (mountPoints.isEmpty) return [];
 
     final selected = <MountPointItem>[];
 
-    // 1st priority: Root (/)
-    MountPointItem? rootItem;
+    // 1st priority: Overlay FS (/overlay)
+    MountPointItem? overlayItem;
     for (final m in mountPoints) {
-      if (m.mountPath == '/') {
-        rootItem = m;
+      if (m.mountPath == '/overlay' || m.isOverlay) {
+        overlayItem = m;
         break;
       }
     }
-    rootItem ??= rootFs;
-    if (rootItem != null && mountPoints.contains(rootItem)) {
-      selected.add(rootItem);
+    overlayItem ??= overlayFs;
+    if (overlayItem != null && mountPoints.contains(overlayItem)) {
+      selected.add(overlayItem);
     }
 
     // 2nd priority: TempFS (/tmp)
@@ -596,11 +597,12 @@ class StorageOverview {
         break;
       }
     }
-    if (tmpItem != null) {
+    tmpItem ??= tmpFs;
+    if (tmpItem != null && !selected.contains(tmpItem) && mountPoints.contains(tmpItem)) {
       selected.add(tmpItem);
     }
 
-    // Fallback: If we have fewer than 2 partitions, pick from any remaining mount points
+    // Fallback: If we have fewer than 2 partitions, pick from any remaining mount points (e.g. Root /)
     for (final m in mountPoints) {
       if (selected.length >= 2) break;
       if (!selected.contains(m)) {
@@ -608,7 +610,7 @@ class StorageOverview {
       }
     }
 
-    return selected;
+    return selected.take(2).toList();
   }
 
   List<MountPointItem> get mountedDevices {

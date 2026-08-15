@@ -4,6 +4,7 @@ import 'package:luci_mobile/main.dart';
 import '../../system_monitoring/models/system_metrics.dart';
 import '../services/metrics_chart_engine.dart';
 import '../widgets/realtime_line_chart.dart';
+import 'package:luci_mobile/design/luci_design_system.dart';
 
 class ChartingScreen extends ConsumerWidget {
   const ChartingScreen({super.key});
@@ -14,7 +15,18 @@ class ChartingScreen extends ConsumerWidget {
     final engine = ref.read(metricsChartEngineProvider.notifier);
 
     final appState = ref.watch(appStateProvider);
-    final sysInfo = appState.dashboardData?['sysInfo'] as Map<String, dynamic>?;
+
+    // Listen for periodic app state telemetry ticks to push samples safely without build-loop recursion
+    ref.listen(appStateProvider, (previous, next) {
+      final sysInfo = next.dashboardData?['sysInfo'] as Map<String, dynamic>?;
+      final systemMetrics = SystemMetrics.fromSysInfo(sysInfo);
+      engine.addSample(
+        cpuUsage: systemMetrics.cpuUsagePercent,
+        ramUsage: systemMetrics.memoryUsagePercent,
+        rxRate: next.currentRxRate,
+        txRate: next.currentTxRate,
+      );
+    });
 
     if (metricsData.pollingIntervalSeconds != appState.throughputIntervalSeconds) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -22,22 +34,21 @@ class ChartingScreen extends ConsumerWidget {
       });
     }
 
-    final systemMetrics = SystemMetrics.fromSysInfo(sysInfo);
-    final cpuVal = systemMetrics.cpuUsagePercent;
-    final ramVal = systemMetrics.memoryUsagePercent;
-
-    final rxVal = appState.currentRxRate;
-    final txVal = appState.currentTxRate;
-
-    // Schedule sample push post-frame if changed
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      engine.addSample(
-        cpuUsage: cpuVal,
-        ramUsage: ramVal,
-        rxRate: rxVal,
-        txRate: txVal,
-      );
-    });
+    // Seed initial sample if buffer is empty
+    if (metricsData.cpuHistory.isEmpty) {
+      final sysInfo = appState.dashboardData?['sysInfo'] as Map<String, dynamic>?;
+      final systemMetrics = SystemMetrics.fromSysInfo(sysInfo);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (metricsData.cpuHistory.isEmpty) {
+          engine.addSample(
+            cpuUsage: systemMetrics.cpuUsagePercent,
+            ramUsage: systemMetrics.memoryUsagePercent,
+            rxRate: appState.currentRxRate,
+            txRate: appState.currentTxRate,
+          );
+        }
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -46,7 +57,7 @@ class ChartingScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          _buildConfigCard(context, ref, engine, metricsData.pollingIntervalSeconds),
+          _buildConfigCard(context, ref, engine, metricsData),
           const SizedBox(height: 16),
           _buildChartCard(
             context,
@@ -54,7 +65,9 @@ class ChartingScreen extends ConsumerWidget {
             icon: Icons.memory,
             color: Colors.orange,
             chart: RealtimeLineChart(
+              minY: 0,
               maxY: 100,
+              maxPoints: metricsData.maxPoints,
               valueFormatter: (v) => '${v.toStringAsFixed(1)}%',
               series: [
                 ChartSeriesData(
@@ -72,7 +85,9 @@ class ChartingScreen extends ConsumerWidget {
             icon: Icons.pie_chart,
             color: Colors.blue,
             chart: RealtimeLineChart(
+              minY: 0,
               maxY: 100,
+              maxPoints: metricsData.maxPoints,
               valueFormatter: (v) => '${v.toStringAsFixed(1)}%',
               series: [
                 ChartSeriesData(
@@ -90,17 +105,18 @@ class ChartingScreen extends ConsumerWidget {
             icon: Icons.swap_vert,
             color: Colors.teal,
             chart: RealtimeLineChart(
+              maxPoints: metricsData.maxPoints,
               valueFormatter: _formatSpeed,
               series: [
                 ChartSeriesData(
-                  spots: metricsData.rxHistory,
-                  gradientColors: [Colors.orange.shade700, Colors.orange.shade400],
-                  label: 'RX (Download)',
+                  spots: metricsData.txHistory,
+                  gradientColors: [LuciColors.tx, LuciColors.txLight],
+                  label: 'TX (Upload)',
                 ),
                 ChartSeriesData(
-                  spots: metricsData.txHistory,
-                  gradientColors: [Colors.teal.shade600, Colors.teal.shade300],
-                  label: 'TX (Upload)',
+                  spots: metricsData.rxHistory,
+                  gradientColors: [LuciColors.rx, LuciColors.rxLight],
+                  label: 'RX (Download)',
                 ),
               ],
             ),
@@ -115,8 +131,14 @@ class ChartingScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     MetricsChartEngine engine,
-    int currentInterval,
+    RealtimeMetricsData metricsData,
   ) {
+    final theme = Theme.of(context);
+    final currentInterval = metricsData.pollingIntervalSeconds;
+    final currentWindow = metricsData.timeWindowSeconds;
+
+    final windowOptions = [30, 60, 120, 300];
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -142,6 +164,30 @@ class ChartingScreen extends ConsumerWidget {
                 final interval = val.toInt();
                 engine.updatePollingInterval(interval);
                 ref.read(appStateProvider).setThroughputInterval(interval);
+              },
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Rolling Chart Window', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('${currentWindow}s', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SegmentedButton<int>(
+              segments: windowOptions.map((opt) {
+                final label = opt >= 60 ? '${opt ~/ 60}m' : '${opt}s';
+                return ButtonSegment<int>(
+                  value: opt,
+                  label: Text(label, style: const TextStyle(fontSize: 12)),
+                );
+              }).toList(),
+              selected: {currentWindow},
+              onSelectionChanged: (Set<int> selected) {
+                if (selected.isNotEmpty) {
+                  engine.updateTimeWindow(selected.first);
+                }
               },
             ),
           ],

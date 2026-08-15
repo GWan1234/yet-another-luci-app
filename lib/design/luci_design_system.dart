@@ -1,5 +1,16 @@
 import 'package:flutter/material.dart';
 
+/// Standardized color tokens for throughput and data streams
+class LuciColors {
+  /// Download / Receive (RX) throughput color - nightcode Orange (#F97316)
+  static const Color rx = Color(0xFFF97316);
+  static const Color rxLight = Color(0xFFFB923C);
+
+  /// Upload / Transmit (TX) throughput color - Distinct Blue (#2563EB)
+  static const Color tx = Color(0xFF2563EB);
+  static const Color txLight = Color(0xFF3B82F6);
+}
+
 /// Standardized spacing constants for consistent layout
 class LuciSpacing {
   static const double xs = 4.0; // Micro spacing

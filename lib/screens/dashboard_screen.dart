@@ -10,6 +10,7 @@ import 'package:luci_mobile/models/router.dart' as model;
 import 'package:luci_mobile/modules/core/luci_module_registry.dart';
 import 'package:luci_mobile/modules/wireless_management/models/wireless_info.dart';
 import 'package:luci_mobile/utils/release_utils.dart';
+import 'package:luci_mobile/design/luci_design_system.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -280,8 +281,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       currentTxRate = appState.currentTxRate;
     }
 
-    final theme = Theme.of(context);
-
     double maxDataVal = 0.0;
     for (final val in rxHistory) {
       if (val > maxDataVal) maxDataVal = val;
@@ -334,13 +333,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               children: [
                 _buildSpeedIndicator(
                   Icons.arrow_downward,
-                  theme.colorScheme.primary,
+                  LuciColors.rx,
                   '',
                   isSwitchingRouter ? 0.0 : currentRxRate,
                 ),
                 _buildSpeedIndicator(
                   Icons.arrow_upward,
-                  theme.colorScheme.secondary,
+                  LuciColors.tx,
                   '',
                   isSwitchingRouter ? 0.0 : currentTxRate,
                 ),
@@ -377,45 +376,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 },
                 child: hasValidData && !isSwitchingRouter
                     ? Column(
+                        key: const ValueKey('throughput_chart_content'),
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primary.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'RX: ${_formatSpeed(appState.currentRxRate)}',
-                                  style: TextStyle(
-                                    color: theme.colorScheme.primary,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.secondary.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'TX: ${_formatSpeed(appState.currentTxRate)}',
-                                  style: TextStyle(
-                                    color: theme.colorScheme.secondary,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
                           Expanded(
                             child: Padding(
                               padding: const EdgeInsets.only(
@@ -509,23 +472,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                     _buildLineChartBarData(
                                       rxHistory,
                                       [
-                                        theme.colorScheme.primary,
-                                        theme.colorScheme.primary,
+                                        LuciColors.rx,
+                                        LuciColors.rx,
                                       ],
                                       isRx: true,
                                     ),
                                     _buildLineChartBarData(
                                       txHistory,
                                       [
-                                        theme.colorScheme.secondary,
-                                        theme.colorScheme.secondary,
+                                        LuciColors.tx,
+                                        LuciColors.tx,
                                       ],
                                       isRx: false,
                                     ),
                                   ],
                                 ),
-                                duration: const Duration(milliseconds: 800),
-                                curve: Curves.easeInOut,
+                                duration: Duration.zero,
                               ),
                             ),
                           ),

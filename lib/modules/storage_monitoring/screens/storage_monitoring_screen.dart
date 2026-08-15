@@ -91,25 +91,8 @@ class StorageMonitoringScreen extends ConsumerWidget {
                   const SizedBox(height: 16),
                   _buildSectionHeader(context, 'Mounted Storage Devices', Icons.storage_outlined),
                   const SizedBox(height: 8),
-                  Builder(
-                    builder: (context) {
-                      final sortedMounts = List<MountPointItem>.from(storage.mountPoints);
-                      sortedMounts.sort((a, b) {
-                        int rank(MountPointItem item) {
-                          if (item.mountPath == '/' || item.isRoot) return 1;
-                          if (item.mountPath == '/tmp' || item.isTmp) return 2;
-                          if (item.mountPath == '/overlay' || item.isOverlay) return 3;
-                          return 4;
-                        }
-                        final rA = rank(a);
-                        final rB = rank(b);
-                        if (rA != rB) return rA.compareTo(rB);
-                        return a.mountPath.compareTo(b.mountPath);
-                      });
-                      return Column(
-                        children: sortedMounts.map((mp) => _buildMountPointCard(context, mp)).toList(),
-                      );
-                    },
+                  Column(
+                    children: storage.mountPoints.map((mp) => _buildMountPointCard(context, mp)).toList(),
                   ),
                   const SizedBox(height: 32),
                 ],
@@ -253,6 +236,18 @@ class StorageMonitoringScreen extends ConsumerWidget {
   }
 
   Widget _buildMountPointCard(BuildContext context, MountPointItem item) {
+    final mountTarget = item.mountPath;
+    final blockDevice = item.device;
+
+    final String titleLabel;
+    if (blockDevice.isNotEmpty &&
+        blockDevice.toLowerCase() != 'unknown' &&
+        blockDevice != mountTarget) {
+      titleLabel = '$mountTarget ($blockDevice)';
+    } else {
+      titleLabel = mountTarget;
+    }
+
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       elevation: 1,
@@ -265,8 +260,8 @@ class StorageMonitoringScreen extends ConsumerWidget {
             color: Theme.of(context).colorScheme.onPrimaryContainer,
           ),
         ),
-        title: Text(item.mountPath, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('${item.device} • ${item.filesystemType}'),
+        title: Text(titleLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(item.filesystemType.isNotEmpty ? item.filesystemType.toLowerCase() : 'fs'),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,

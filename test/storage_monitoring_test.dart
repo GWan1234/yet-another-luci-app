@@ -134,8 +134,8 @@ tmpfs                123M  2.0M  121M   2% /tmp
       expect(overview.totalSizeBytes, greaterThan(0));
     });
 
-    test('priorityDisplayMounts selects Root 1st, TempFS 2nd, and fallback partitions when missing', () {
-      // 1. Standard case: Root and /tmp present
+    test('priorityDisplayMounts selects Overlay 1st, TempFS 2nd, and fallback partitions when missing', () {
+      // 1. Standard case: Overlay and /tmp present
       const dfOutput = '''
 Filesystem           1K-blocks      Used Available Use% Mounted on
 /dev/root                15360     15360         0 100% /rom
@@ -146,10 +146,10 @@ overlayfs:/overlay       28468      5124     21876  19% /
       final overview = StorageOverview.fromRpcData(dfOutput);
       final priority = overview.priorityDisplayMounts;
       expect(priority.length, equals(2));
-      expect(priority[0].mountPath, equals('/'));
+      expect(priority[0].mountPath, equals('/overlay'));
       expect(priority[1].mountPath, equals('/tmp'));
 
-      // 2. Missing /tmp case: Root present, /overlay present
+      // 2. Missing /tmp case: Overlay present, Root present
       const dfOutputNoTmp = '''
 Filesystem           1K-blocks      Used Available Use% Mounted on
 /dev/ubi0_1              28468      5124     21876  19% /overlay
@@ -158,20 +158,20 @@ overlayfs:/overlay       28468      5124     21876  19% /
       final overviewNoTmp = StorageOverview.fromRpcData(dfOutputNoTmp);
       final priorityNoTmp = overviewNoTmp.priorityDisplayMounts;
       expect(priorityNoTmp.length, equals(2));
-      expect(priorityNoTmp[0].mountPath, equals('/'));
-      expect(priorityNoTmp[1].mountPath, equals('/overlay'));
+      expect(priorityNoTmp[0].mountPath, equals('/overlay'));
+      expect(priorityNoTmp[1].mountPath, equals('/'));
 
-      // 3. Missing Root case: only /tmp and /mnt/usb
-      const dfOutputNoRoot = '''
+      // 3. Missing Overlay case: only /tmp and /mnt/usb
+      const dfOutputNoOverlay = '''
 Filesystem           1K-blocks      Used Available Use% Mounted on
 tmpfs                   124808       988    123820   1% /tmp
 /dev/sda1              1000000    100000    900000  10% /mnt/usb
 ''';
-      final overviewNoRoot = StorageOverview.fromRpcData(dfOutputNoRoot);
-      final priorityNoRoot = overviewNoRoot.priorityDisplayMounts;
-      expect(priorityNoRoot.length, equals(2));
-      expect(priorityNoRoot[0].mountPath, equals('/tmp'));
-      expect(priorityNoRoot[1].mountPath, equals('/mnt/usb'));
+      final overviewNoOverlay = StorageOverview.fromRpcData(dfOutputNoOverlay);
+      final priorityNoOverlay = overviewNoOverlay.priorityDisplayMounts;
+      expect(priorityNoOverlay.length, equals(2));
+      expect(priorityNoOverlay[0].mountPath, equals('/tmp'));
+      expect(priorityNoOverlay[1].mountPath, equals('/mnt/usb'));
     });
 
     test('Scales 1K-blocks from OpenWrt RPC getMountPoints correctly for 384 MB router', () {

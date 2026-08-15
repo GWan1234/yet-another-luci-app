@@ -4537,10 +4537,10 @@ class AppState extends ChangeNotifier {
         // Strictly assign ConnectionType.wireless ONLY if connected through a wireless radio
         final finalConnType = isWirelessActive ? ConnectionType.wireless : ConnectionType.wired;
 
-        final isLeaseExpired = c.leaseTime != null && c.leaseTime! < 0;
+        final hasActiveLease = c.leaseTime != null && c.leaseTime! > 0;
         final isStaticLease = hostHints[macN]?['isStaticLease'] == true || c.isStaticLease;
 
-        if (isConnected || !isLeaseExpired || isStaticLease) {
+        if (isConnected || hasActiveLease || isStaticLease) {
           processedClients.add(c.copyWith(
             ipAddress: resolvedIp,
             isConnected: isConnected,

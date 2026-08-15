@@ -116,9 +116,8 @@ class RealtimeLineChart extends StatelessWidget {
         // Live line legend text row
         Padding(
           padding: const EdgeInsets.only(bottom: 12.0),
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 6,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: series.map((s) {
               final latestVal = s.spots.isNotEmpty ? s.spots.last : 0.0;
               final formattedText = valueFormatter != null
@@ -126,43 +125,46 @@ class RealtimeLineChart extends StatelessWidget {
                   : latestVal.toStringAsFixed(1);
               final primaryColor = s.gradientColors.first;
 
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: primaryColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: primaryColor.withValues(alpha: 0.3),
-                    width: 1,
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6.0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: primaryColor.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
                   ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: primaryColor,
-                        shape: BoxShape.circle,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: primaryColor,
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${s.label}: ',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                    Text(
-                      formattedText,
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: primaryColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                  ],
+                      const SizedBox(width: 6),
+                      Text(
+                        '${s.label}: ',
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      Text(
+                        formattedText,
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                              color: primaryColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }).toList(),
@@ -199,7 +201,7 @@ class RealtimeLineChart extends StatelessWidget {
                       reservedSize: 64,
                       interval: interval > 0 ? interval : 1.0,
                       getTitlesWidget: (value, meta) {
-                        if (value < -0.001 || value >= effectiveMaxY * 0.95) {
+                        if (value < -0.001 || value > effectiveMaxY + 0.001) {
                           return const SizedBox.shrink();
                         }
                         final String text = valueFormatter != null
@@ -249,8 +251,7 @@ class RealtimeLineChart extends StatelessWidget {
                 ),
                 lineBarsData: series.asMap().entries.map((e) => _buildBarData(e.value, barIndex: e.key)).toList(),
               ),
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
+              duration: Duration.zero,
             ),
           ),
         ),

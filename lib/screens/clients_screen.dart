@@ -832,7 +832,9 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
             client.formattedLeaseTime,
             valueColor: client.formattedLeaseTime == 'Expired'
                 ? theme.colorScheme.error
-                : null,
+                : (client.formattedLeaseTime == 'No active lease'
+                    ? theme.colorScheme.onSurfaceVariant
+                    : null),
             semanticsLabel:
                 'Lease Time Remaining: ${client.formattedLeaseTime}',
           ),

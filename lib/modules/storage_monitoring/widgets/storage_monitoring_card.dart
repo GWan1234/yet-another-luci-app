@@ -76,15 +76,16 @@ class StorageMonitoringCard extends ConsumerWidget {
     required MountPointItem item,
     required int index,
   }) {
-    String label;
-    if (item.mountPath == '/' || item.isRoot) {
-      label = 'Root Filesystem (${item.mountPath})';
-    } else if (item.mountPath == '/tmp' || item.isTmp) {
-      label = 'TempFS (/tmp)';
-    } else if (item.mountPath == '/overlay' || item.isOverlay) {
-      label = 'Overlay FS (${item.mountPath})';
+    final mountTarget = item.mountPath;
+    final blockDevice = item.device;
+
+    final String label;
+    if (blockDevice.isNotEmpty &&
+        blockDevice.toLowerCase() != 'unknown' &&
+        blockDevice != mountTarget) {
+      label = '$mountTarget ($blockDevice)';
     } else {
-      label = '${item.filesystemType.isNotEmpty ? item.filesystemType.toUpperCase() : "FS"} (${item.mountPath})';
+      label = mountTarget;
     }
 
     final colors = [Colors.teal, Colors.indigo, Colors.amber.shade700, Colors.purple];

@@ -185,7 +185,8 @@ class Client {
 
   // Get formatted lease time (e.g., "2d 4h 30m")
   String get formattedLeaseTime {
-    if (leaseTime == null || leaseTime == 0) return 'Unlimited';
+    if (leaseTime == null) return 'No active lease';
+    if (leaseTime == 0) return 'Unlimited';
     if (leaseTime! < 0) return 'Expired';
     return Client.formatDuration(leaseTime!);
   }

@@ -17,6 +17,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cloudflare Tunnel Configuration Visibility**:
   - Improved Cloudflare Tunnel ID extraction in the VPN & Connectivity module by parsing tunnel attributes directly from router UCI configurations and encoded token sources.
 
+### Fixed
+- **Client Lease Time Formatting & Stale Device Pruning**:
+  - Corrected `leaseTime == null` formatting to return `"No active lease"` instead of conflating absent lease data with infinite static leases (`leaseTime == 0`, `"Unlimited"`).
+  - Updated offline client retention logic to exclude disconnected, non-static devices with no active DHCP lease (`leaseTime <= 0`), removing stale ghost host hints from the client list while maintaining active devices, dynamic leases, and UCI static IP reservations.
+
+---
+
+## [0.0.9] - 2026-08-14
+
+### Added
+- **Expanded VPN & Secure Tunnels Management**:
+  - Full configuration overview and state controls for OpenVPN, WireGuard, IPsec, and Cloudflare Tunnels (`cloudflared`).
+  - Added real-time tunnel status tracking, public key display, configuration detail parsing, and diagnostic connection tests.
+- **Cloudflare Tunnel Token & UCI Parsing**:
+  - Integrated automatic extraction of Cloudflare Tunnel attributes and credentials from router `/etc/config/cloudflared` UCI configs and encoded tokens.
+
+### Fixed
+- **Storage Metrics Precision**:
+  - Normalized statvfs block-size unit calculations to strictly match OpenWrt RPC specs across all storage mount points.
+
+---
+
+## [0.0.8] - 2026-08-13
+
+### Added
+- **Dynamic Real-Time Throughput Graph Scaling**:
+  - Improved real-time metrics chart autoscale and polling timer integration to eliminate rate spikes and visual rendering artifacts.
+  - Enhanced CPU/RAM load calculation and dynamic Y-axis bounds scaling for live bandwidth graphs.
+
+### Fixed
+- **Storage Unit Auto-Conversion**:
+  - Resolved 1K-blocks vs 512-byte block sizing discrepancies in system storage parsing.
+  - Enhanced wired-only router interface discovery and CPU load array normalization.
+
+---
+
+## [0.0.7] - 2026-08-13
+
+### Added
+- **Static Lease Management & UI Sync**:
+  - Added interactive dialog to add dynamic clients directly to static DHCP leases (`/etc/config/dhcp`) with custom hostname, IP, and lease duration settings.
+  - Added one-tap static lease removal with instant UI state synchronization and client list refresh.
+- **Firewall & Services Management Features**:
+  - Added custom firewall rule management (iptables/nftables) and system init script controls (start/stop/enable/disable/restart).
+- **Interface Control & Section Isolation**:
+  - Added interface restart, bring-up, and tear-down actions with safety prompts.
+
+---
+
+## [0.0.6] - 2026-08-12
+
+### Added
+- **Dynamic Package Manager Engine**:
+  - Support for package search, installation, upgrade, and removal across both modern OPKG and APK (OpenWrt 25.x+) package management systems.
+- **Internet Access Pause/Resume (Parental Control)**:
+  - Added one-tap client internet pause and resume functionality using router firewall rule insertion.
+- **Restricted Clients Management**:
+  - Introduced standalone Restricted Clients management screen for blocked or access-controlled devices.
+
+### Fixed & Removed
+- **Permission & Privacy Optimization**:
+  - Removed `AD_ID` permission from Android Manifest for privacy compliance.
+  - Enforced single active router session state to prevent multi-router state race conditions.
+
 ---
 
 ## [0.0.5] - 2026-08-11

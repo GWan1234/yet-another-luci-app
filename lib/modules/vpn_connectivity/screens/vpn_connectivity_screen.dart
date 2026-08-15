@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
-import 'package:luci_mobile/widgets/luci_app_bar.dart';
 import '../models/vpn_info.dart';
 
 class VpnConnectivityScreen extends ConsumerWidget {

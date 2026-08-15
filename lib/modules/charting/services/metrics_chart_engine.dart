@@ -8,6 +8,7 @@ class RealtimeMetricsData {
   final List<double> rxHistory;
   final List<double> txHistory;
   final int pollingIntervalSeconds;
+  final int timeWindowSeconds;
 
   const RealtimeMetricsData({
     required this.cpuHistory,
@@ -15,7 +16,12 @@ class RealtimeMetricsData {
     required this.rxHistory,
     required this.txHistory,
     required this.pollingIntervalSeconds,
+    this.timeWindowSeconds = 60,
   });
+
+  /// Maximum points in history buffer to cover timeWindowSeconds at pollingIntervalSeconds.
+  int get maxPoints =>
+      (timeWindowSeconds / pollingIntervalSeconds).round().clamp(6, 300);
 
   RealtimeMetricsData copyWith({
     List<double>? cpuHistory,
@@ -23,54 +29,83 @@ class RealtimeMetricsData {
     List<double>? rxHistory,
     List<double>? txHistory,
     int? pollingIntervalSeconds,
+    int? timeWindowSeconds,
   }) {
     return RealtimeMetricsData(
       cpuHistory: cpuHistory ?? this.cpuHistory,
       ramHistory: ramHistory ?? this.ramHistory,
       rxHistory: rxHistory ?? this.rxHistory,
       txHistory: txHistory ?? this.txHistory,
-      pollingIntervalSeconds: pollingIntervalSeconds ?? this.pollingIntervalSeconds,
+      pollingIntervalSeconds:
+          pollingIntervalSeconds ?? this.pollingIntervalSeconds,
+      timeWindowSeconds: timeWindowSeconds ?? this.timeWindowSeconds,
     );
   }
 }
 
-/// Dynamic polling engine with configurable polling interval (1s-10s) and fixed history buffer (last N points).
+/// Dynamic polling engine with decoupled rolling time window (e.g. 60s) and configurable polling interval (1s-10s).
 class MetricsChartEngine extends StateNotifier<RealtimeMetricsData> {
   Timer? _timer;
-  int _maxPoints;
 
-  MetricsChartEngine({int maxPoints = 30, int intervalSeconds = 2})
-      : _maxPoints = maxPoints,
-        super(RealtimeMetricsData(
+  MetricsChartEngine({int timeWindowSeconds = 60, int intervalSeconds = 2})
+      : super(RealtimeMetricsData(
           cpuHistory: [],
           ramHistory: [],
           rxHistory: [],
           txHistory: [],
           pollingIntervalSeconds: intervalSeconds.clamp(1, 10),
+          timeWindowSeconds: timeWindowSeconds.clamp(15, 600),
         ));
 
-  int get maxPoints => _maxPoints;
-  set maxPoints(int count) {
-    _maxPoints = count.clamp(10, 100);
-  }
+  int get maxPoints => state.maxPoints;
 
   void updatePollingInterval(int seconds) {
     final clamped = seconds.clamp(1, 10);
     if (state.pollingIntervalSeconds == clamped) return;
 
-    state = state.copyWith(pollingIntervalSeconds: clamped);
+    final newState = state.copyWith(pollingIntervalSeconds: clamped);
+    final limit = newState.maxPoints;
+
+    state = newState.copyWith(
+      cpuHistory: _trim(newState.cpuHistory, limit),
+      ramHistory: _trim(newState.ramHistory, limit),
+      rxHistory: _trim(newState.rxHistory, limit),
+      txHistory: _trim(newState.txHistory, limit),
+    );
   }
 
-  /// Appends a new metric sample point to history buffer, maintaining max history size.
+  void updateTimeWindow(int seconds) {
+    final clamped = seconds.clamp(15, 600);
+    if (state.timeWindowSeconds == clamped) return;
+
+    final newState = state.copyWith(timeWindowSeconds: clamped);
+    final limit = newState.maxPoints;
+
+    state = newState.copyWith(
+      cpuHistory: _trim(newState.cpuHistory, limit),
+      ramHistory: _trim(newState.ramHistory, limit),
+      rxHistory: _trim(newState.rxHistory, limit),
+      txHistory: _trim(newState.txHistory, limit),
+    );
+  }
+
+  List<double> _trim(List<double> list, int limit) {
+    if (list.length <= limit) return list;
+    return list.sublist(list.length - limit);
+  }
+
+  /// Appends a new metric sample point to history buffer, maintaining time window capacity.
   void addSample({
     required double cpuUsage,
     required double ramUsage,
     required double rxRate,
     required double txRate,
   }) {
+    final limit = maxPoints;
+
     List<double> append(List<double> list, double value) {
       final updated = List<double>.from(list)..add(value);
-      if (updated.length > _maxPoints) {
+      while (updated.length > limit) {
         updated.removeAt(0);
       }
       return updated;
