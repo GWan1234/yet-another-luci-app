@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
 import 'package:luci_mobile/config/app_config.dart';
+import 'package:luci_mobile/design/luci_design_system.dart';
 import 'package:luci_mobile/providers/entitlement_provider.dart';
 import 'package:luci_mobile/screens/paywall_screen.dart';
 import 'package:luci_mobile/widgets/banner_ad_widget.dart';
@@ -354,7 +355,7 @@ class SettingsScreen extends ConsumerWidget {
                             : Icons.warning_amber_rounded,
                         size: 20,
                         color: AppConfig.isOfficialBuild
-                            ? Colors.green.shade600
+                            ? LuciStatusColors.connected
                             : Colors.orange.shade700,
                       ),
                       onTap: () {
@@ -368,7 +369,7 @@ class SettingsScreen extends ConsumerWidget {
                                       ? Icons.verified_rounded
                                       : Icons.warning_amber_rounded,
                                   color: AppConfig.isOfficialBuild
-                                      ? Colors.green
+                                      ? LuciStatusColors.connected
                                       : Colors.orange,
                                 ),
                                 const SizedBox(width: 8),
@@ -394,7 +395,7 @@ class SettingsScreen extends ConsumerWidget {
                                       : '• Unofficial / Self-Compiled Build',
                                   style: TextStyle(
                                     color: AppConfig.isOfficialBuild
-                                        ? Colors.green.shade700
+                                        ? LuciStatusColors.connected
                                         : Colors.orange.shade800,
                                     fontWeight: FontWeight.w600,
                                   ),
