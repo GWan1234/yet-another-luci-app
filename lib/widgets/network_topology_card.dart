@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import 'package:flutter/material.dart';
 import '../models/network_topology.dart';
 import '../models/router_capabilities.dart';

@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -27,6 +30,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
   late AnimationController _controller;
   late TextEditingController _searchController;
   Timer? _searchDebounceTimer;
+  Timer? _autoRefreshTimer;
   bool _aggregateAllRouters = true;
   Future<List<Client>>? _clientsFuture;
   String? _lastSelectedRouterId;
@@ -47,6 +51,18 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
     _lastSelectedRouterId = initState.selectedRouter?.id;
     _lastDashboardUpdated = initState.dashboardData?['_lastUpdated'];
     _computeClientsFuture();
+    _startAutoRefreshTimer();
+  }
+
+  void _startAutoRefreshTimer() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (mounted) {
+        setState(() {
+          _computeClientsFuture();
+        });
+      }
+    });
   }
 
   void _onSearchChanged() {
@@ -69,6 +85,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
 
   @override
   void dispose() {
+    _autoRefreshTimer?.cancel();
     _searchDebounceTimer?.cancel();
     _controller.dispose();
     _searchController.dispose();
@@ -233,6 +250,8 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                             ),
                           ),
                         ),
+                        _buildClientSummaryRow(clients, colorScheme, theme.textTheme),
+                        const SizedBox(height: 4),
                         Expanded(
                           child: filteredClients.isEmpty
                               ? LuciEmptyState(
@@ -296,6 +315,91 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildClientSummaryRow(
+    List<Client> clients,
+    ColorScheme colorScheme,
+    TextTheme textTheme,
+  ) {
+    final connectedClients = clients.where((c) => c.isConnected).toList();
+    final wiredCount = connectedClients.where((c) => c.connectionType == ConnectionType.wired).length;
+    final wirelessCount = connectedClients.where((c) => c.connectionType == ConnectionType.wireless).length;
+    final totalCount = connectedClients.length;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildSummaryItem(
+              icon: Icons.devices_rounded,
+              label: 'Total',
+              count: totalCount,
+              color: colorScheme.primary,
+              colorScheme: colorScheme,
+            ),
+            Container(width: 1, height: 20, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+            _buildSummaryItem(
+              icon: Icons.lan_outlined,
+              label: 'Wired',
+              count: wiredCount,
+              color: colorScheme.secondary,
+              colorScheme: colorScheme,
+            ),
+            Container(width: 1, height: 20, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+            _buildSummaryItem(
+              icon: Icons.wifi_rounded,
+              label: 'Wireless',
+              count: wirelessCount,
+              color: colorScheme.tertiary,
+              colorScheme: colorScheme,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryItem({
+    required IconData icon,
+    required String label,
+    required int count,
+    required Color color,
+    required ColorScheme colorScheme,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Text(
+          '$label: ',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        Text(
+          '$count',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurface,
+          ),
+        ),
+      ],
     );
   }
 
@@ -409,26 +513,26 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Opacity(
-      opacity: _clientOpacity(widget.client),
-      child: Card(
-        elevation: widget.isExpanded ? 6 : 2,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18.0),
-          side: BorderSide(
-            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.10),
-            width: 1,
-          ),
+    return Card(
+      elevation: widget.isExpanded ? 6 : 2,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18.0),
+        side: BorderSide(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.10),
+          width: 1,
         ),
-        clipBehavior: Clip.antiAlias,
-        child: AnimatedScale(
-          scale: widget.isExpanded ? 1.02 : 1.0,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutBack,
-          child: Column(
-            children: [
-              InkWell(
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: AnimatedScale(
+        scale: widget.isExpanded ? 1.02 : 1.0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutBack,
+        child: Column(
+          children: [
+            Opacity(
+              opacity: _clientOpacity(widget.client),
+              child: InkWell(
                 onTap: widget.onTap,
                 borderRadius: BorderRadius.circular(18.0),
                 child: Padding(
@@ -546,15 +650,15 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                   ),
                 ),
               ),
-              if (widget.isExpanded)
-                Column(
-                  children: [
-                    const Divider(height: 1, indent: 16, endIndent: 16),
-                    _buildClientDetails(context, widget.client),
-                  ],
-                ),
-            ],
-          ),
+            ),
+            if (widget.isExpanded)
+              Column(
+                children: [
+                  const Divider(height: 1, indent: 16, endIndent: 16),
+                  _buildClientDetails(context, widget.client),
+                ],
+              ),
+          ],
         ),
       ),
     );
@@ -617,6 +721,19 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
           ),
         );
       }
+    } else if (client.isConnected && client.connectionType == ConnectionType.wired) {
+      final bgColor = colorScheme.secondaryContainer;
+      final fgColor = colorScheme.onSecondaryContainer;
+      badges.add(
+        Chip(
+          label: const Text('Wired'),
+          avatar: Icon(Icons.lan, size: 14, color: fgColor),
+          backgroundColor: bgColor,
+          labelStyle: theme.textTheme.labelSmall?.copyWith(color: fgColor, fontSize: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+      );
     }
 
     if (badges.isEmpty) return const SizedBox.shrink();
@@ -849,36 +966,38 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                   builder: (ctx, _) {
                     final appState = AppState.instance;
                     final isPaused = appState.isInternetPaused(client.macAddress);
+                    final canPause = client.isConnected || isPaused;
                     return Column(
                       children: [
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: () => _toggleInternetPause(context, client, !isPaused),
-                            icon: Icon(
-                              isPaused ? Icons.play_circle_outline_rounded : Icons.pause_circle_outline_rounded,
-                              color: isPaused ? Colors.green : Colors.orange,
-                              size: 20,
-                            ),
-                            label: Text(
-                              isPaused ? 'Resume Internet Access' : 'Pause Internet Access',
-                              style: TextStyle(
-                                color: isPaused ? Colors.green : Colors.orange.shade800,
-                                fontWeight: FontWeight.bold,
+                        if (canPause)
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () => _toggleInternetPause(context, client, !isPaused),
+                              icon: Icon(
+                                isPaused ? Icons.play_circle_outline_rounded : Icons.pause_circle_outline_rounded,
+                                color: isPaused ? Colors.green : Colors.orange,
+                                size: 20,
                               ),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(
-                                color: isPaused ? Colors.green : Colors.orange.shade600,
+                              label: Text(
+                                isPaused ? 'Resume Internet Access' : 'Pause Internet Access',
+                                style: TextStyle(
+                                  color: isPaused ? Colors.green : Colors.orange.shade800,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(
+                                  color: isPaused ? Colors.green : Colors.orange.shade600,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                               ),
                             ),
                           ),
-                        ),
                         if (!client.isStatic && !_isIpv6Only(client)) ...[
-                          const SizedBox(height: 8),
+                          if (canPause) const SizedBox(height: 8),
                           SizedBox(
                             width: double.infinity,
                             child: OutlinedButton.icon(
@@ -905,7 +1024,7 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                           ),
                         ],
                         if (client.isStatic) ...[
-                          const SizedBox(height: 8),
+                          if (canPause) const SizedBox(height: 8),
                           SizedBox(
                             width: double.infinity,
                             child: OutlinedButton.icon(

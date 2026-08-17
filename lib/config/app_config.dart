@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 /// Flavor types supported by the build pipeline
 enum AppFlavor {
   community,
@@ -13,6 +16,12 @@ class AppConfig {
   // GitHub issues URL
   static const String githubIssuesUrl = '$githubRepositoryUrl/issues';
 
+  // Maintainer & Contact Configuration
+  static const String appAuthor = 'Tuhin Garai';
+  static const String appAuthorGithub = '@nightcodex7';
+  static const String supportEmail = 'tuhingarai.dev+support@gmail.com';
+  static const String feedbackEmail = 'tuhingarai.dev+feedback@gmail.com';
+
   // Reviewer mode configuration
   static const String reviewerModeKey = 'reviewer_mode_enabled';
   static const String mockDataPath = 'assets/mock/';
@@ -25,6 +34,12 @@ class AppConfig {
     'FLAVOR',
     defaultValue: 'community',
   );
+
+  /// Whether this build is verified as an official release build.
+  /// Controlled via compile-time flag `--dart-define=OFFICIAL_BUILD=true`.
+  /// Defaults to `false` for local developer builds, debug builds, and unofficial forks.
+  static bool get isOfficialBuild =>
+      const bool.fromEnvironment('OFFICIAL_BUILD', defaultValue: false);
 
   /// Whether the ads SDK should be compiled, initialized, and rendered.
   /// Controlled via compile-time flag --dart-define=ENABLE_ADS=true. Defaults to false.

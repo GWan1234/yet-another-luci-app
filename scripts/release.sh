@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# LuCI Mobile Release Script (CI-driven)
+# Yet Another LuCI App Release Script (CI-driven)
 # Usage: ./scripts/release.sh [major|minor|patch]
 
 set -e
@@ -97,6 +97,10 @@ print_status "Updating pubspec.yaml to version: $NEW_VERSION+$NEW_BUILD"
 sed -i.bak "s/^version: .*/version: $NEW_VERSION+$NEW_BUILD/" pubspec.yaml
 rm pubspec.yaml.bak
 
+# Build and archive local official binaries into .private/releases/
+print_status "Generating official release binaries for all flavors..."
+"./scripts/build.sh" all --official
+
 # Commit changes
 print_status "Committing changes..."
 git add pubspec.yaml
@@ -109,4 +113,4 @@ print_status "Creating tag $TAG_VERSION..."
 git tag -a "$TAG_VERSION" -m "Release $TAG_VERSION"
 git push origin "$TAG_VERSION"
 
-print_status "Release $TAG_VERSION created and pushed! CI will handle the build and GitHub release." 
+print_status "Release $TAG_VERSION created and pushed! Local release packaged in .private/releases/ and CI pipeline triggered." 

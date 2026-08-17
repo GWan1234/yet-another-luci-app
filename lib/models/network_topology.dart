@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import 'router_capabilities.dart';
 
 /// Explicitly supported WAN protocols on OpenWrt interfaces

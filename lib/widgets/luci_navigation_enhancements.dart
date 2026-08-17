@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import 'package:flutter/material.dart';
 import '../design/luci_design_system.dart';
 import 'luci_animation_system.dart';

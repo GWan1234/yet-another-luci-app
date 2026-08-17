@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 enum ConnectionType { wired, wireless, unknown }
 
 /// Neighbor Unreachability Detection (NUD) state from the kernel's neighbor table.
@@ -73,8 +76,24 @@ class Client {
         hostname.contains('ipad') ||
         hostname.contains('galaxy') ||
         hostname.contains('android') ||
+        hostname.contains('pixel') ||
+        hostname.contains('phone') ||
+        hostname.contains('tab') ||
+        hostname.contains('mobile') ||
+        hostname.contains('macbook') ||
+        hostname.contains('firestick') ||
+        hostname.contains('chromecast') ||
+        hostname.contains('roku') ||
+        hostname.contains('echo') ||
+        hostname.contains('alexa') ||
         vendor.contains('apple') ||
-        vendor.contains('samsung')) {
+        vendor.contains('samsung') ||
+        vendor.contains('xiaomi') ||
+        vendor.contains('oneplus') ||
+        vendor.contains('oppo') ||
+        vendor.contains('vivo') ||
+        vendor.contains('realme') ||
+        vendor.contains('huawei')) {
       return ConnectionType.wireless;
     }
 
@@ -185,6 +204,7 @@ class Client {
 
   // Get formatted lease time (e.g., "2d 4h 30m")
   String get formattedLeaseTime {
+    if (isStatic) return 'Unlimited';
     if (leaseTime == null) return 'No active lease';
     if (leaseTime == 0) return 'Unlimited';
     if (leaseTime! < 0) return 'Expired';

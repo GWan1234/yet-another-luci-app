@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -299,6 +302,123 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                     ),
                   ],
+                  const Divider(height: 32),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    child: Text(
+                      'Build Verification & Privacy',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppConfig.isOfficialBuild
+                              ? Theme.of(context).colorScheme.tertiaryContainer
+                              : Theme.of(context).colorScheme.errorContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          AppConfig.isOfficialBuild
+                              ? Icons.verified_user_rounded
+                              : Icons.gpp_maybe_rounded,
+                          color: AppConfig.isOfficialBuild
+                              ? Theme.of(context).colorScheme.onTertiaryContainer
+                              : Theme.of(context).colorScheme.onErrorContainer,
+                          size: 24,
+                        ),
+                      ),
+                      title: Text(
+                        AppConfig.isOfficialBuild
+                            ? 'Official Build & Privacy Guarantee'
+                            : 'Unofficial / Self-Built Build',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        AppConfig.isOfficialBuild
+                            ? 'Flavor: ${AppConfig.flavorName} • Zero Analytics & Telemetry'
+                            : 'Flavor: ${AppConfig.flavorName} (Unverified) • Zero Analytics',
+                      ),
+                      trailing: Icon(
+                        AppConfig.isOfficialBuild
+                            ? Icons.check_circle
+                            : Icons.warning_amber_rounded,
+                        size: 20,
+                        color: AppConfig.isOfficialBuild
+                            ? Colors.green.shade600
+                            : Colors.orange.shade700,
+                      ),
+                      onTap: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: Row(
+                              children: [
+                                Icon(
+                                  AppConfig.isOfficialBuild
+                                      ? Icons.verified_rounded
+                                      : Icons.warning_amber_rounded,
+                                  color: AppConfig.isOfficialBuild
+                                      ? Colors.green
+                                      : Colors.orange,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  AppConfig.isOfficialBuild
+                                      ? 'Build Verification'
+                                      : 'Unofficial Build Notice',
+                                ),
+                              ],
+                            ),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Build Channel: ${AppConfig.flavorName} Edition ${AppConfig.isOfficialBuild ? "(Official)" : "(Unofficial / Local)"}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  AppConfig.isOfficialBuild
+                                      ? '• Verified Official Release Build'
+                                      : '• Unofficial / Self-Compiled Build',
+                                  style: TextStyle(
+                                    color: AppConfig.isOfficialBuild
+                                        ? Colors.green.shade700
+                                        : Colors.orange.shade800,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const Text('• 100% On-Device RPC Communication'),
+                                const Text('• Zero Analytics, Tracking, or Telemetry'),
+                                const SizedBox(height: 12),
+                                SelectableText(
+                                  'Repository: ${AppConfig.githubRepositoryUrl}',
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: const Text('OK'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                   if (appState.reviewerModeEnabled) ...[
                     const Divider(height: 32),
                     Padding(

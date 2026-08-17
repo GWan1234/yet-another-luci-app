@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -990,9 +993,37 @@ class MockApiService implements IApiService {
     required bool useHttps,
     BuildContext? context,
   }) async {
+    try {
+      final jsonString = await rootBundle.loadString(
+        '${AppConfig.mockDataPath}host_hints.json',
+      );
+      final jsonData = jsonDecode(jsonString);
+      if (jsonData is Map<String, dynamic>) {
+        final result = <String, Map<String, dynamic>>{};
+        jsonData.forEach((mac, value) {
+          if (value is Map<String, dynamic>) {
+            result[mac] = value;
+          }
+        });
+        return result;
+      }
+    } catch (_) {}
+
     return {
-      'AA:BB:CC:11:22:33': {'name': 'iPhone-John', 'ipaddrs': ['192.168.1.100']},
-      'AA:BB:CC:44:55:66': {'name': 'MacBook-Pro', 'ipaddrs': ['192.168.1.101']},
+      'AA:BB:CC:11:22:33': {
+        'name': 'Android-nightcodex7',
+        'staticLeaseName': 'Pixel-9-Pro',
+        'isStaticLease': true,
+        'vendor': 'Google LLC',
+        'ipaddrs': ['192.168.1.100'],
+        'ip6addrs': ['2409:4060:2e81:a102::100', 'fe80::aabb:ccff:fe11:2233']
+      },
+      'AA:BB:CC:44:55:66': {
+        'name': 'MacBook-Pro-16',
+        'vendor': 'Apple Inc.',
+        'ipaddrs': ['192.168.1.101'],
+        'ip6addrs': ['2409:4060:2e81:a102::101', 'fe80::aabb:ccff:fe44:5566']
+      },
     };
   }
 

@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import 'package:luci_mobile/models/interface.dart' as model;
 
 /// Aggregates network monitoring details: Interfaces list, RX/TX tabular metrics, IPv4/IPv6, and Gateway status.

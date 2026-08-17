@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 class DashboardPreferences {
   final Set<String> enabledWirelessInterfaces;
   final Set<String> enabledWiredInterfaces;

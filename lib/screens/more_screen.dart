@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -245,7 +248,9 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                 const SizedBox(height: 12),
                 const Text('A modern, high-performance OpenWrt router management mobile application.'),
                 const SizedBox(height: 12),
-                const Text('Author: Tuhin Garai (nightcodex7)', style: TextStyle(fontWeight: FontWeight.w600)),
+                const Text('Author: Tuhin Garai (@nightcodex7)', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                SelectableText('Support: ${AppConfig.supportEmail}', style: const TextStyle(fontSize: 12)),
                 const SizedBox(height: 12),
                 const Text('Open source & free for the OpenWrt community.'),
                 const SizedBox(height: 16),
@@ -276,6 +281,47 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                       Expanded(
                         child: Text(
                           'GitHub Repository',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: () async {
+                    final Uri mailUri = Uri(
+                      scheme: 'mailto',
+                      path: AppConfig.supportEmail,
+                      queryParameters: {'subject': 'Yet Another LuCI App Support Request'},
+                    );
+                    final success = await launchUrlString(
+                      mailUri.toString(),
+                      mode: LaunchMode.externalApplication,
+                    );
+                    if (!success && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Could not open email client'),
+                          backgroundColor: Theme.of(context).colorScheme.error,
+                        ),
+                      );
+                    }
+                  },
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.email_outlined,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Contact Support',
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.primary,
                             decoration: TextDecoration.none,

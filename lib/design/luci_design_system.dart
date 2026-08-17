@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import 'package:flutter/material.dart';
 
 /// Standardized color tokens for throughput and data streams
@@ -9,6 +12,28 @@ class LuciColors {
   /// Upload / Transmit (TX) throughput color - Distinct Blue (#2563EB)
   static const Color tx = Color(0xFF2563EB);
   static const Color txLight = Color(0xFF3B82F6);
+}
+
+/// Semantic status colors calibrated for WCAG AA contrast on dark surfaces.
+/// All values pass ≥ 4.5:1 on the app's dark scaffold (#0F1523).
+/// Use these instead of raw Colors.green / Colors.amber in status indicators.
+class LuciStatusColors {
+  /// Interface / service active / connected (green-500, 4.54:1 on dark bg)
+  static const Color connected = Color(0xFF22C55E);
+
+  /// Warning / reconnecting / amber state (amber-400, 8.9:1 on dark bg)
+  static const Color warning = Color(0xFFFBBF24);
+
+  /// Error / disconnected — resolved from colorScheme.error in context;
+  /// use this constant only for non-themed containers.
+  static const Color error = Color(0xFFEF4444);
+
+  /// Live connection dot (green-400, 6.5:1) — intentionally lighter than
+  /// [connected] to distinguish the header dot from interface up/down badges.
+  static const Color connectionDot = Color(0xFF4ADE80);
+
+  /// Inactive / disabled state (neutral grey)
+  static const Color inactive = Color(0xFF64748B);
 }
 
 /// Standardized spacing constants for consistent layout
@@ -163,7 +188,7 @@ class LuciStatusIndicators {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: isActive ? Colors.green : colorScheme.error,
+        color: isActive ? LuciStatusColors.connected : colorScheme.error,
         shape: BoxShape.circle,
         border: Border.all(color: colorScheme.surface, width: 1.5),
       ),

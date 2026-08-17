@@ -8,6 +8,7 @@ void main() {
       expect(AppConfig.flavor, equals(AppFlavor.community));
       expect(AppConfig.isMonetizationEnabled, isFalse);
       expect(AppConfig.flavorName, equals('Community'));
+      expect(AppConfig.isOfficialBuild, isFalse);
     });
 
     test('EntitlementNotifier in Community flavor defaults to Lifetime tier (Ad-Free, Unlimited Routers)', () {

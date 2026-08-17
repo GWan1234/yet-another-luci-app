@@ -6,6 +6,14 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
+      official_build:
+        description: 'Flag build as Verified Official Release (true/false)'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
       enable_support_dev:
         description: 'Enable Support the Developer UI in build (true/false)'
         required: false
@@ -95,7 +103,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.COMMUNITY_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.COMMUNITY_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.COMMUNITY_KEY_PASSWORD }}
-        run: flutter build apk --release --flavor community --dart-define=FLAVOR=community --dart-define=ENABLE_SUPPORT_DEV=${{ github.event.inputs.enable_support_dev || 'false' }}
+        run: flutter build apk --release --flavor community --dart-define=FLAVOR=community --dart-define=OFFICIAL_BUILD=${{ github.event.inputs.official_build || 'true' }} --dart-define=ENABLE_SUPPORT_DEV=${{ github.event.inputs.enable_support_dev || 'false' }}
 
       - name: Generate Community Release Notes
         run: |

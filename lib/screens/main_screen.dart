@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import 'package:flutter/material.dart';
 import 'package:luci_mobile/screens/dashboard_screen.dart';
 import 'package:luci_mobile/screens/clients_screen.dart';
@@ -208,8 +211,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                               color: (_selectedIndex == 0
                                       ? colorScheme.primary
                                       : Colors.black)
-                                  .withValues(alpha: _selectedIndex == 0 ? 0.4 : 0.15),
-                              blurRadius: _selectedIndex == 0 ? 12 : 6,
+                                  .withValues(alpha: _selectedIndex == 0 ? 0.20 : 0.15),
+                              blurRadius: _selectedIndex == 0 ? 6 : 6,
                               offset: const Offset(0, 4),
                             ),
                           ],

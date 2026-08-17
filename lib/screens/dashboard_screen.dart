@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +14,7 @@ import 'package:luci_mobile/modules/core/luci_module_registry.dart';
 import 'package:luci_mobile/modules/wireless_management/models/wireless_info.dart';
 import 'package:luci_mobile/utils/release_utils.dart';
 import 'package:luci_mobile/design/luci_design_system.dart';
+import 'package:luci_mobile/models/client.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -185,11 +189,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     switch (appState.connectionStatus) {
       case RouterConnectionStatus.connected:
-        statusColor = Colors.greenAccent.shade700;
+        statusColor = LuciStatusColors.connectionDot;
         tooltipMsg = 'Router Connected';
         break;
       case RouterConnectionStatus.reconnecting:
-        statusColor = Colors.amber.shade700;
+        statusColor = LuciStatusColors.warning;
         tooltipMsg = 'Reconnecting to Router...';
         break;
       case RouterConnectionStatus.disconnected:
@@ -212,9 +216,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: statusColor.withValues(alpha: 0.5),
-                  blurRadius: 6,
-                  spreadRadius: 1,
+                  color: statusColor.withValues(alpha: 0.25),
+                  blurRadius: 4,
+                  spreadRadius: 0,
                 ),
               ],
             ),
@@ -753,6 +757,141 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildClientsSummaryCard(AppState appState) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return FutureBuilder<List<Client>>(
+      future: appState.fetchClientsForSelectedRouter(),
+      builder: (context, snapshot) {
+        final clients = snapshot.data ?? [];
+        final connectedClients = clients.where((c) => c.isConnected).toList();
+        final wiredCount = connectedClients.where((c) => c.connectionType == ConnectionType.wired).length;
+        final wirelessCount = connectedClients.where((c) => c.connectionType == ConnectionType.wireless).length;
+        final isLoading = snapshot.connectionState == ConnectionState.waiting && clients.isEmpty;
+
+        Widget buildCountText(int count) {
+          if (isLoading) {
+            return Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colorScheme.primary,
+                ),
+              ),
+            );
+          }
+          return Text(
+            '$count Connected',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          );
+        }
+
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          margin: const EdgeInsets.symmetric(vertical: 4.0),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () {
+              appState.requestedTab = 2;
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 16.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: colorScheme.secondaryContainer.withValues(alpha: 0.7),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.lan,
+                            color: colorScheme.onSecondaryContainer,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Wired Clients',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              buildCountText(wiredCount),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    width: 1,
+                    height: 36,
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primaryContainer.withValues(alpha: 0.7),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.wifi,
+                            color: colorScheme.onPrimaryContainer,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Wireless Clients',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              buildCountText(wirelessCount),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1471,7 +1610,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final appState = ref.watch(appStateProvider);
-    final List<model.Router> routers = appState.routers;
     final model.Router? selected = appState.selectedRouter;
     final boardInfo =
         appState.dashboardData?['boardInfo'] as Map<String, dynamic>?;
@@ -1536,6 +1674,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               const SizedBox(height: 12),
               _buildSystemVitalsCard(appState),
               const SizedBox(height: 12),
+              _buildClientsSummaryCard(appState),
+              const SizedBox(height: 12),
               _buildWirelessNetworksCard(appState),
               const SizedBox(height: 12),
               _buildInterfaceStatusCards(appState),
@@ -1573,6 +1713,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                     _buildSectionHeader(context, 'System Vitals', Icons.monitor_heart),
                     _buildSystemVitalsCard(appState),
+                    _buildSectionHeader(context, 'Connected Clients Overview', Icons.devices),
+                    _buildClientsSummaryCard(appState),
                     _buildSectionHeader(context, 'Wireless Radios & SSIDs', Icons.wifi),
                     _buildWirelessNetworksCard(appState),
                     _buildSectionHeader(

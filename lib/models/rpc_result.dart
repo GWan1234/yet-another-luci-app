@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 /// Status enum for fine-grained RPC call error handling and capability tracking.
 enum RpcCallStatus {
   success,

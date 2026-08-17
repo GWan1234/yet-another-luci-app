@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 class UrlParser {
   static const int defaultHttpPort = 80;
   static const int defaultHttpsPort = 443;

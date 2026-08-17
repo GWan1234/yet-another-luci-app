@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 enum StorageDataSource {
   rpcJson,   // Natively in Bytes from OpenWrt RPC JSON (luci-rpc.getMountPoints, system.mounts, etc.)
   dfKBlocks, // 1K-blocks (KB) from plain df or df -k command output

@@ -2,6 +2,15 @@ name: Release Pipeline
 
 on:
   workflow_dispatch:
+    inputs:
+      official_build:
+        description: 'Flag builds as Verified Official Release (true/false)'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
 
 permissions:
   contents: write
@@ -73,7 +82,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.COMMUNITY_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.COMMUNITY_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.COMMUNITY_KEY_PASSWORD }}
-        run: flutter build apk --release --flavor community --dart-define=FLAVOR=community
+        run: flutter build apk --release --flavor community --dart-define=FLAVOR=community --dart-define=OFFICIAL_BUILD=${{ github.event.inputs.official_build || 'true' }}
 
       - name: Upload Community APK Artifact
         uses: actions/upload-artifact@v4
@@ -118,7 +127,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.COMMUNITY_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.COMMUNITY_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.COMMUNITY_KEY_PASSWORD }}
-        run: flutter build appbundle --release --flavor playstore --dart-define=FLAVOR=playstore
+        run: flutter build appbundle --release --flavor playstore --dart-define=FLAVOR=playstore --dart-define=OFFICIAL_BUILD=${{ github.event.inputs.official_build || 'true' }}
 
       - name: Upload Play Store AAB Artifact
         uses: actions/upload-artifact@v4

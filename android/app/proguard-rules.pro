@@ -7,8 +7,8 @@
 -dontwarn io.flutter.embedding.**
 -dontwarn io.flutter.plugins.**
 
-# App Main Activity & Generated Registrant
--keep class com.nightcode.luci.** { *; }
+# App Main Activity & Generated Registrant (Narrowed for R8 obfuscation)
+-keep class com.nightcode.luci.MainActivity { *; }
 -keep class io.flutter.plugins.GeneratedPluginRegistrant { *; }
 
 # Flutter Plugins

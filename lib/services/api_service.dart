@@ -1,4 +1,7 @@
 // ignore_for_file: use_build_context_synchronously
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 
 import 'dart:convert';
 import 'dart:io';
@@ -1864,16 +1867,22 @@ echo "\$ALL_BANNED"
         'banned': [],
       };
 
-      if (res is List && res.length > 1 && res[0] == 0) {
-        final resMap = res[1] as Map<String, dynamic>?;
-        final stdout = resMap?['stdout']?.toString() ?? '';
-
-        final hostHints = await fetchHostHintsWithContext(
+      Map<String, dynamic>? cachedHostHints;
+      Future<Map<String, dynamic>> getHostHints() async {
+        cachedHostHints ??= await fetchHostHintsWithContext(
           ipAddress: ipAddress,
           sysauth: sysauth,
           useHttps: useHttps,
           context: mountedContext(context),
         );
+        return cachedHostHints!;
+      }
+
+      if (res is List && res.length > 1 && res[0] == 0) {
+        final resMap = res[1] as Map<String, dynamic>?;
+        final stdout = resMap?['stdout']?.toString() ?? '';
+
+        final hostHints = await getHostHints();
 
         String currentSection = '';
         for (final line in stdout.split('\n')) {
@@ -1929,12 +1938,7 @@ echo "\$ALL_BANNED"
           if (wirelessRes is List && wirelessRes.length > 1 && wirelessRes[0] == 0) {
             final values = (wirelessRes[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>?;
             if (values != null) {
-              final hostHints = await fetchHostHintsWithContext(
-                ipAddress: ipAddress,
-                sysauth: sysauth,
-                useHttps: useHttps,
-                context: mountedContext(context),
-              );
+              final hostHints = await getHostHints();
               for (final sec in values.values) {
                 if (sec is Map<String, dynamic>) {
                   final macfilter = sec['macfilter']?.toString().toLowerCase();
@@ -1976,12 +1980,7 @@ echo "\$ALL_BANNED"
           if (firewallRes is List && firewallRes.length > 1 && firewallRes[0] == 0) {
             final values = (firewallRes[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>?;
             if (values != null) {
-              final hostHints = await fetchHostHintsWithContext(
-                ipAddress: ipAddress,
-                sysauth: sysauth,
-                useHttps: useHttps,
-                context: mountedContext(context),
-              );
+              final hostHints = await getHostHints();
               for (final sec in values.values) {
                 if (sec is Map<String, dynamic>) {
                   final target = sec['target']?.toString().toUpperCase();

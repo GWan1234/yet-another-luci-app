@@ -65,6 +65,17 @@ void main() {
       expect(client.isStatic, isTrue);
     });
 
+    test('static lease client with null leaseTime returns "Unlimited"', () {
+      final client = Client(
+        ipAddress: '10.0.0.60',
+        macAddress: 'AA:11:22:33:44:55',
+        hostname: 'Reserved-Device',
+        isStaticLease: true,
+        leaseTime: null,
+      );
+      expect(client.formattedLeaseTime, equals('Unlimited'));
+    });
+
     test('Option A retention rule excludes disconnected non-static devices with no active lease', () {
       bool shouldRetainClient({
         required bool isConnected,

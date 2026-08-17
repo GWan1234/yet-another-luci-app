@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -108,12 +111,12 @@ class LuCIApp extends ConsumerWidget {
           seedColor: orangePrimary,
           primary: orangePrimary,
           secondary: orangeSecondary,
-          surface: const Color(0xFF131B2E),
-          surfaceContainer: const Color(0xFF1B2640),
+          surface: const Color(0xFF151D30),
+          surfaceContainer: const Color(0xFF1C2840),
           surfaceContainerHighest: const Color(0xFF243356),
           brightness: Brightness.dark,
         ),
-        scaffoldBackgroundColor: const Color(0xFF0B0F17),
+        scaffoldBackgroundColor: const Color(0xFF0F1523),
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -130,7 +133,7 @@ class LuCIApp extends ConsumerWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
-          color: const Color(0xFF131B2E),
+          color: const Color(0xFF151D30),
         ),
       ),
       themeMode: appState.themeMode,

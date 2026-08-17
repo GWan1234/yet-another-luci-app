@@ -139,6 +139,7 @@ GoogleService-Info.plist
 ARCHITECTURE_EDITIONS.md
 .private/
 docs/internal/
+scripts/*.md
 android/build/
 lib/config/ad_config.dart
 android/app/src/playstore/

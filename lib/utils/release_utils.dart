@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 /// Shared release channel derivation utility.
 ///
 /// Inspects all string values in an OpenWrt `/etc/os-release` or `/etc/openwrt_release`

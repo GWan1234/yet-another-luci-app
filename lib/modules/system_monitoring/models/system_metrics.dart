@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 /// Model representing core system vitals: CPU usage, RAM memory, Load Average, and Uptime.
 class SystemMetrics {
   final int uptimeSeconds;

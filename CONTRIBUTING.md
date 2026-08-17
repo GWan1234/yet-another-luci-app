@@ -1,6 +1,6 @@
-# Contributing to LuCI Mobile
+# Contributing to Yet Another LuCI App
 
-Thank you for your interest in contributing to LuCI Mobile! This document provides guidelines and information for contributors.
+Thank you for your interest in contributing to Yet Another LuCI App! This document provides guidelines and information for contributors.
 
 ## Table of Contents
 
@@ -125,8 +125,11 @@ flutter analyze
 # Format code
 dart format .
 
-# Build Android APK
-flutter build apk
+# Build local unofficial Android APK (Default)
+./scripts/build.sh community --unofficial
+
+# Build local official Android APK (for Maintainer testing)
+./scripts/build.sh community --official
 ```
 
 ### 4. Commit Your Changes
@@ -389,4 +392,4 @@ Contributors will be recognized in:
 - Contributor hall of fame
 - GitHub contributors page
 
-Thank you for contributing to LuCI Mobile! Your contributions help make this project better for everyone. 
+Thank you for contributing to Yet Another LuCI App! Your contributions help make this project better for everyone.

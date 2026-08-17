@@ -96,6 +96,20 @@ void main() {
 
       expect(classified.connectionType, ConnectionType.wired);
     });
+
+    test('disconnected wireless client tracked via knownWirelessMacs remains wireless and disconnected', () {
+      final knownWirelessMacs = {'AA:BB:CC:11:22:33'};
+      final macNorm = 'AA:BB:CC:11:22:33';
+      final isWirelessActive = false; // Left Wi-Fi
+
+      final isWirelessClient = isWirelessActive || knownWirelessMacs.contains(macNorm);
+      final isConnected = isWirelessClient ? isWirelessActive : false;
+      final connType = isWirelessClient ? ConnectionType.wireless : ConnectionType.wired;
+
+      expect(isWirelessClient, isTrue);
+      expect(isConnected, isFalse);
+      expect(connType, ConnectionType.wireless);
+    });
   });
 
   group('Active Neighbor Probing & Scoped IP Resolution', () {

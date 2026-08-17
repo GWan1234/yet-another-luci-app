@@ -69,5 +69,6 @@ Yet Another LuCI App ("we", "our", or "us") is committed to protecting your priv
 
 ## 7. Contact Us
 
-If you have any questions or concerns about this Privacy Policy, please contact us at:  
-[https://github.com/nightcodex7/yet-another-luci-app/issues](https://github.com/nightcodex7/yet-another-luci-app/issues)
+If you have any questions, concerns, or requests regarding this Privacy Policy, please contact us at:  
+- **Email**: tuhingarai.dev+privacy@gmail.com  
+- **Support & Issues**: [https://github.com/nightcodex7/yet-another-luci-app/issues](https://github.com/nightcodex7/yet-another-luci-app/issues)
