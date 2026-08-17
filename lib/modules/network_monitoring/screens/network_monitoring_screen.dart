@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
+import 'package:luci_mobile/design/luci_design_system.dart';
 import 'package:luci_mobile/models/interface.dart' as model;
 import '../models/network_monitoring_info.dart';
 
@@ -81,7 +82,7 @@ class NetworkMonitoringScreen extends ConsumerWidget {
               children: [
                 Icon(
                   gw != null && gw.isUp ? Icons.check_circle_outline : Icons.error_outline,
-                  color: gw != null && gw.isUp ? Colors.green : Colors.red,
+                  color: gw != null && gw.isUp ? LuciStatusColors.connected : Colors.red,
                   size: 22,
                 ),
                 const SizedBox(width: 8),
@@ -168,13 +169,13 @@ class NetworkMonitoringScreen extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: iface.isUp ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
+                    color: iface.isUp ? LuciStatusColors.connected.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     iface.isUp ? 'UP' : 'DOWN',
                     style: TextStyle(
-                      color: iface.isUp ? Colors.green : Colors.red,
+                      color: iface.isUp ? LuciStatusColors.connected : Colors.red,
                       fontWeight: FontWeight.bold,
                       fontSize: 11,
                     ),
@@ -203,10 +204,10 @@ class NetworkMonitoringScreen extends ConsumerWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: iface.isUp ? Colors.green.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.2),
+          backgroundColor: iface.isUp ? LuciStatusColors.connected.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.2),
           child: Icon(
             iface.isUp ? Icons.lan : Icons.lan_outlined,
-            color: iface.isUp ? Colors.green : Colors.grey,
+            color: iface.isUp ? LuciStatusColors.connected : Colors.grey,
           ),
         ),
         title: Text(iface.name.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold)),

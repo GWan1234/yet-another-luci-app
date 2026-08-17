@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
+import 'package:luci_mobile/design/luci_design_system.dart';
 import '../models/services_system_info.dart';
 
 class ServicesSystemScreen extends ConsumerStatefulWidget {
@@ -299,10 +300,10 @@ class _ServicesSystemScreenState extends ConsumerState<ServicesSystemScreen> {
                   children: [
                     CircleAvatar(
                       radius: 16,
-                      backgroundColor: svc.isRunning ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
+                      backgroundColor: svc.isRunning ? LuciStatusColors.connected.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
                       child: Icon(
                         svc.isRunning ? Icons.play_arrow : Icons.stop,
-                        color: svc.isRunning ? Colors.green : Colors.red,
+                        color: svc.isRunning ? LuciStatusColors.connected : Colors.red,
                         size: 18,
                       ),
                     ),
@@ -319,13 +320,13 @@ class _ServicesSystemScreenState extends ConsumerState<ServicesSystemScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: svc.isRunning ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
+                    color: svc.isRunning ? LuciStatusColors.connected.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     svc.isRunning ? (svc.pid != null ? 'RUNNING (PID ${svc.pid})' : 'RUNNING') : 'STOPPED',
                     style: TextStyle(
-                      color: svc.isRunning ? Colors.green : Colors.red,
+                      color: svc.isRunning ? LuciStatusColors.connected : Colors.red,
                       fontWeight: FontWeight.bold,
                       fontSize: 10,
                     ),
@@ -468,14 +469,14 @@ class _ServicesSystemScreenState extends ConsumerState<ServicesSystemScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
                       color: currentEnabled
-                          ? Colors.green.withValues(alpha: 0.15)
+                          ? LuciStatusColors.connected.withValues(alpha: 0.15)
                           : Colors.grey.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       currentEnabled ? 'ENABLED' : 'DISABLED',
                       style: TextStyle(
-                        color: currentEnabled ? Colors.green : Colors.grey,
+                        color: currentEnabled ? LuciStatusColors.connected : Colors.grey,
                         fontWeight: FontWeight.bold,
                         fontSize: 10,
                       ),

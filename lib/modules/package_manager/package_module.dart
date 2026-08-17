@@ -4,7 +4,6 @@
 import 'package:flutter/material.dart';
 import '../core/luci_module.dart';
 import 'screens/package_manager_screen.dart';
-import 'widgets/package_manager_card.dart';
 
 class PackageManagerModule extends LuciModule {
   @override

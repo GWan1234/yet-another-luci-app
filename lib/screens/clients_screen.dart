@@ -483,13 +483,13 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
     if (!client.isConnected) return Colors.grey.shade400;
     switch (client.neighState) {
       case NeighborReachability.reachable:
-        return Colors.green;
+        return LuciStatusColors.connected;
       case NeighborReachability.stale:
-        return Colors.amber.shade600;
+        return LuciStatusColors.warning;
       case NeighborReachability.failed:
         return Colors.grey.shade400;
       case NeighborReachability.unknown:
-        return client.isConnected ? Colors.green : Colors.grey.shade400;
+        return client.isConnected ? LuciStatusColors.connected : Colors.grey.shade400;
     }
   }
 
@@ -976,19 +976,19 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                               onPressed: () => _toggleInternetPause(context, client, !isPaused),
                               icon: Icon(
                                 isPaused ? Icons.play_circle_outline_rounded : Icons.pause_circle_outline_rounded,
-                                color: isPaused ? Colors.green : Colors.orange,
+                                color: isPaused ? LuciStatusColors.connected : Colors.orange,
                                 size: 20,
                               ),
                               label: Text(
                                 isPaused ? 'Resume Internet Access' : 'Pause Internet Access',
                                 style: TextStyle(
-                                  color: isPaused ? Colors.green : Colors.orange.shade800,
+                                  color: isPaused ? LuciStatusColors.connected : Colors.orange.shade800,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                               style: OutlinedButton.styleFrom(
                                 side: BorderSide(
-                                  color: isPaused ? Colors.green : Colors.orange.shade600,
+                                  color: isPaused ? LuciStatusColors.connected : Colors.orange.shade600,
                                 ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),

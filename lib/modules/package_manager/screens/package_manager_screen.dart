@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
+import 'package:luci_mobile/design/luci_design_system.dart';
 import 'package:luci_mobile/models/router_capabilities.dart';
 import 'package:luci_mobile/models/rpc_result.dart';
 import 'package:luci_mobile/widgets/rpc_result_dialog.dart';
@@ -308,10 +309,10 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: Colors.green.withValues(alpha: 0.15),
+          backgroundColor: LuciStatusColors.connected.withValues(alpha: 0.15),
           child: Icon(
             Icons.inventory_2_outlined,
-            color: Colors.green.shade700,
+            color: LuciStatusColors.connected,
             size: 18,
           ),
         ),

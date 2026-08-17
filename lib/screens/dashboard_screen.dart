@@ -1136,7 +1136,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                     st.formattedSignal,
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: st.signalDbm != null && st.signalDbm! > -65 ? Colors.green : Colors.orange,
+                                      color: st.signalDbm != null && st.signalDbm! > -65 ? LuciStatusColors.connected : Colors.orange,
                                       fontSize: 12,
                                     ),
                                   ),
@@ -1180,7 +1180,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                         children: [
                                           Icon(
                                             isPaused ? Icons.play_circle_outline : Icons.pause_circle_outline,
-                                            color: isPaused ? Colors.green : Colors.orange,
+                                            color: isPaused ? LuciStatusColors.connected : Colors.orange,
                                             size: 18,
                                           ),
                                           const SizedBox(width: 8),
@@ -1263,13 +1263,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: isEnabled ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
+                                  color: isEnabled ? LuciStatusColors.connected.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
                                   isEnabled ? 'ENABLED' : 'DISABLED',
                                   style: TextStyle(
-                                    color: isEnabled ? Colors.green.shade800 : Colors.red.shade800,
+                                    color: isEnabled ? LuciStatusColors.connected : Colors.red.shade800,
                                     fontSize: 9,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -1501,7 +1501,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
                           color: isUp
-                              ? Colors.green.withValues(alpha: 0.18)
+                              ? LuciStatusColors.connected.withValues(alpha: 0.18)
                               : Colors.red.withValues(alpha: 0.18),
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -1513,7 +1513,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               height: 6,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: isUp ? Colors.green.shade600 : Colors.red.shade600,
+                                color: isUp ? LuciStatusColors.connected : Colors.red.shade600,
                               ),
                             ),
                             const SizedBox(width: 4),
@@ -1521,7 +1521,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               isUp ? 'UP' : 'DOWN',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: isUp ? Colors.green.shade800 : Colors.red.shade800,
+                                color: isUp ? LuciStatusColors.connected : Colors.red.shade800,
                                 fontSize: 10,
                               ),
                             ),

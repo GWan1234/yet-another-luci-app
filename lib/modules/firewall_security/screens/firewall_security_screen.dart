@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
+import 'package:luci_mobile/design/luci_design_system.dart';
 import 'package:luci_mobile/models/router_capabilities.dart';
 import '../models/firewall_info.dart';
 
@@ -502,7 +503,7 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
             child: ListTile(
               leading: Icon(
                 currentEnabled ? Icons.check_circle : Icons.pause_circle_filled,
-                color: currentEnabled ? Colors.green : Colors.grey,
+                color: currentEnabled ? LuciStatusColors.connected : Colors.grey,
               ),
               title: Row(
                 children: [
@@ -624,7 +625,7 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
     switch (policy.toUpperCase()) {
       case 'ACCEPT':
       case 'ENABLED':
-        return Colors.green;
+        return LuciStatusColors.connected;
       case 'REJECT':
         return Colors.orange;
       case 'DROP':

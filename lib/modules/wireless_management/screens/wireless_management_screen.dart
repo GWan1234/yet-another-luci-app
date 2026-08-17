@@ -7,6 +7,7 @@ import 'package:luci_mobile/main.dart';
 import 'package:luci_mobile/state/app_state.dart';
 import 'package:luci_mobile/modules/dhcp_dns/models/dhcp_dns_info.dart';
 import 'package:luci_mobile/widgets/luci_app_bar.dart';
+import 'package:luci_mobile/design/luci_design_system.dart';
 import '../models/wireless_info.dart';
 import 'wifi_access_control_screen.dart';
 
@@ -121,13 +122,13 @@ class WirelessManagementScreen extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: radio.isUp ? Colors.green.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
+                    color: radio.isUp ? LuciStatusColors.connected.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     radio.isUp ? 'ACTIVE' : 'DISABLED',
                     style: TextStyle(
-                      color: radio.isUp ? Colors.green : Colors.red,
+                      color: radio.isUp ? LuciStatusColors.connected : Colors.red,
                       fontWeight: FontWeight.bold,
                       fontSize: 11,
                     ),
@@ -160,7 +161,7 @@ class WirelessManagementScreen extends ConsumerWidget {
                                 iface.isEnabled ? '(Enabled)' : '(Disabled)',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: iface.isEnabled ? Colors.green : Colors.red,
+                                  color: iface.isEnabled ? LuciStatusColors.connected : Colors.red,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -459,7 +460,7 @@ class WirelessManagementScreen extends ConsumerWidget {
                           children: [
                             Icon(
                               isPaused ? Icons.play_circle_outline : Icons.pause_circle_outline,
-                              color: isPaused ? Colors.green : Colors.orange,
+                              color: isPaused ? LuciStatusColors.connected : Colors.orange,
                               size: 18,
                             ),
                             const SizedBox(width: 8),
