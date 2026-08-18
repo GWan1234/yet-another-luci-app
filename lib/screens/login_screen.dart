@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -206,6 +207,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               const SizedBox(height: 8),
               TextField(
                 controller: _confirmationController,
+                textCapitalization: TextCapitalization.characters,
+                inputFormatters: [
+                  TextInputFormatter.withFunction(
+                    (oldValue, newValue) => TextEditingValue(
+                      text: newValue.text.toUpperCase(),
+                      selection: newValue.selection,
+                    ),
+                  ),
+                ],
                 decoration: const InputDecoration(
                   hintText: 'Type REVIEWER',
                   border: OutlineInputBorder(),
@@ -220,7 +230,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: _confirmationController.text == 'REVIEWER'
+              onPressed: _confirmationController.text.trim().toUpperCase() == 'REVIEWER'
                   ? () {
                       Navigator.of(context).pop();
                       _activateReviewerMode();
@@ -237,6 +247,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Future<void> _activateReviewerMode() async {
     final appState = ref.read(appStateProvider);
     await appState.setReviewerMode(true);
+    await appState.fetchDashboardData();
 
     if (mounted) {
       unawaited(Navigator.of(context).pushReplacementNamed('/'));
@@ -514,8 +525,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               color: colorScheme.surface.withValues(
                                 alpha: 0.85,
                               ),
-                              shadowColor: colorScheme.primary.withValues(
-                                alpha: 0.10,
+                              shadowColor: Colors.black.withValues(
+                                alpha: 0.08,
                               ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(20),

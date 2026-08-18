@@ -80,12 +80,13 @@ class UpdateCheckerService {
           final releaseNotes =
               latestRelease['body'] as String? ?? 'No release notes available.';
 
-          final bool isUpdateAvailable =
-              _isVersionNewer(currentVersionStr, latestVersionStr);
+          final int comparison =
+              _compareVersions(currentVersionStr, latestVersionStr);
 
           if (!context.mounted) return;
 
-          if (isUpdateAvailable) {
+          if (comparison < 0) {
+            // Latest on GitHub is newer than current app version
             _showUpdateAvailableDialog(
               context,
               currentVersion: currentVersionStr,
@@ -93,7 +94,15 @@ class UpdateCheckerService {
               releaseNotes: releaseNotes,
               downloadUrl: htmlUrl,
             );
+          } else if (comparison > 0) {
+            // Current local build is newer than latest GitHub release (unreleased/dev build)
+            _showAheadOfReleaseDialog(
+              context,
+              currentVersion: currentVersionStr,
+              latestGithubVersion: latestVersionStr,
+            );
           } else {
+            // Versions match exactly
             _showUpToDateDialog(context, currentVersion: currentVersionStr);
           }
         } else {
@@ -115,14 +124,18 @@ class UpdateCheckerService {
     }
   }
 
-  static bool _isVersionNewer(String current, String latest) {
-    if (current == latest) return false;
+  /// Compares two semver strings (current vs latest).
+  /// Returns:
+  /// - Negative integer if current < latest (update available)
+  /// - 0 if current == latest (up to date)
+  /// - Positive integer if current > latest (ahead of GitHub release / local dev build)
+  static int _compareVersions(String current, String latest) {
+    if (current == latest) return 0;
 
-    // Strip build numbers (+1) and prerelease suffixes (-beta) for semantic comparison
     final currentClean = current.split('+').first.split('-').first.trim();
     final latestClean = latest.split('+').first.split('-').first.trim();
 
-    if (currentClean == latestClean) return false;
+    if (currentClean == latestClean) return 0;
 
     final currentParts = currentClean
         .split('.')
@@ -133,12 +146,17 @@ class UpdateCheckerService {
         .map((e) => int.tryParse(e.replaceAll(RegExp(r'\D'), '')) ?? 0)
         .toList();
 
-    for (int i = 0; i < latestParts.length; i++) {
-      final currentPart = i < currentParts.length ? currentParts[i] : 0;
-      if (latestParts[i] > currentPart) return true;
-      if (latestParts[i] < currentPart) return false;
+    final maxLength = currentParts.length > latestParts.length
+        ? currentParts.length
+        : latestParts.length;
+
+    for (int i = 0; i < maxLength; i++) {
+      final cPart = i < currentParts.length ? currentParts[i] : 0;
+      final lPart = i < latestParts.length ? latestParts[i] : 0;
+      if (cPart < lPart) return -1;
+      if (cPart > lPart) return 1;
     }
-    return false;
+    return 0;
   }
 
   static void _showUpdateAvailableDialog(
@@ -233,6 +251,48 @@ class UpdateCheckerService {
         ),
         content: Text(
           'You are running the latest version of Yet Another LuCI App (v$currentVersion).',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static void _showAheadOfReleaseDialog(
+    BuildContext context, {
+    required String currentVersion,
+    required String latestGithubVersion,
+  }) {
+    final theme = Theme.of(context);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.verified_rounded, color: theme.colorScheme.primary),
+            const SizedBox(width: 12),
+            const Text('Pre-Release Build'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'You are running an unreleased / local build (v$currentVersion).',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'The latest public release on GitHub is v$latestGithubVersion. No update is required.',
+              style: theme.textTheme.bodyMedium,
+            ),
+          ],
         ),
         actions: [
           TextButton(

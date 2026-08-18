@@ -247,12 +247,13 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
 
       String? savePath;
       try {
-        savePath = await FilePicker.saveFile(
+        final result = await FilePicker.saveFile(
           dialogTitle: 'Save Backup Archive',
           fileName: 'backup-${DateTime.now().millisecondsSinceEpoch ~/ 1000}.tar.gz',
           type: FileType.any,
           bytes: bytes,
         );
+        savePath = result?.path;
       } catch (_) {
         final dir = await getApplicationDocumentsDirectory();
         final file = File('${dir.path}/backup-${DateTime.now().millisecondsSinceEpoch ~/ 1000}.tar.gz');
@@ -291,19 +292,17 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
 
   Future<void> _handleUploadArchive() async {
     try {
-      final pickerResult = await FilePicker.pickFiles(
+      final pickedFiles = await FilePicker.pickFiles(
         type: FileType.any,
-        allowMultiple: false,
-        withData: true,
       );
 
-      if (pickerResult == null || pickerResult.files.isEmpty) {
+      if (pickedFiles.isEmpty) {
         return;
       }
 
-      final pickedFile = pickerResult.files.first;
-      Uint8List? fileBytes = pickedFile.bytes;
-      if (fileBytes == null && pickedFile.path != null) {
+      final pickedFile = pickedFiles.first;
+      Uint8List? fileBytes;
+      if (pickedFile.path != null) {
         fileBytes = await File(pickedFile.path!).readAsBytes();
       }
 
@@ -434,12 +433,13 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
 
       String? savePath;
       try {
-        savePath = await FilePicker.saveFile(
+        final result = await FilePicker.saveFile(
           dialogTitle: 'Save mtdblock file',
           fileName: '$filename.bin',
           type: FileType.any,
           bytes: bytes,
         );
+        savePath = result?.path;
       } catch (_) {
         final dir = await getApplicationDocumentsDirectory();
         final file = File('${dir.path}/$filename.bin');

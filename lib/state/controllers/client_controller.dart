@@ -23,6 +23,7 @@ class ClientController {
     required IAuthService? Function() authServiceRef,
     required RouterService? Function() routerServiceRef,
     required bool Function() reviewerModeRef,
+    Map<String, dynamic>? Function()? dashboardDataRef,
     required Future<String?> Function(String command, List<String> args)
         executeRouterCommandOutput,
     required Map<String, dynamic> Function(Map<String, dynamic> rawDhcpData)
@@ -31,6 +32,7 @@ class ClientController {
         _authServiceRef = authServiceRef,
         _routerServiceRef = routerServiceRef,
         _reviewerModeRef = reviewerModeRef,
+        _dashboardDataRef = dashboardDataRef,
         _executeRouterCommandOutput = executeRouterCommandOutput,
         _processDhcpLeases = processDhcpLeases;
 
@@ -38,6 +40,7 @@ class ClientController {
   final IAuthService? Function() _authServiceRef;
   final RouterService? Function() _routerServiceRef;
   final bool Function() _reviewerModeRef;
+  final Map<String, dynamic>? Function()? _dashboardDataRef;
   final Future<String?> Function(String command, List<String> args)
       _executeRouterCommandOutput;
   final Map<String, dynamic> Function(Map<String, dynamic> rawDhcpData)
@@ -536,6 +539,37 @@ class ClientController {
         }
       });
 
+      final staticUciMacs = <String>{};
+      final staticUciNames = <String, String>{};
+      final dashboardData = _dashboardDataRef?.call();
+      if (dashboardData != null) {
+        final rawUci = dashboardData['uciDhcpConfig'] ?? dashboardData['dhcp'];
+        if (rawUci is Map) {
+          final values = rawUci['values'] ?? rawUci;
+          if (values is Map) {
+            values.forEach((_, sec) {
+              if (sec is Map && sec['.type'] == 'host') {
+                final rawMac = sec['mac'];
+                final sName = sec['name']?.toString() ?? sec['hostname']?.toString() ?? '';
+                final macList = <String>[];
+                if (rawMac is List) {
+                  macList.addAll(rawMac.map((e) => e.toString()));
+                } else if (rawMac != null) {
+                  macList.addAll(rawMac.toString().split(RegExp(r'\s+')));
+                }
+                for (final m in macList) {
+                  final nM = normMac(m);
+                  if (nM.isNotEmpty) {
+                    staticUciMacs.add(nM);
+                    if (sName.isNotEmpty) staticUciNames[nM] = sName;
+                  }
+                }
+              }
+            });
+          }
+        }
+      }
+
       final clientMap = <String, Client>{};
 
       // A. Process IPv4 DHCP leases
@@ -555,8 +589,8 @@ class ClientController {
           }
         }
 
-        final staticName = hostHints[macN]?['staticLeaseName']?.toString();
-        final isStaticEntry = hostHints[macN]?['isStaticLease'] == true;
+        final staticName = hostHints[macN]?['staticLeaseName']?.toString() ?? staticUciNames[macN];
+        final isStaticEntry = hostHints[macN]?['isStaticLease'] == true || staticUciMacs.contains(macN);
         final isWireless = normalizedWireless.contains(macN);
         final foundSsid = macToSsidMap[macN];
         final foundIface = macToIfaceMap[macN];

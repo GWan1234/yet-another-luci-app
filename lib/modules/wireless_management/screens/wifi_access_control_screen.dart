@@ -2,11 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
 import 'package:luci_mobile/models/client.dart';
 import 'package:luci_mobile/state/app_state.dart';
 import 'package:luci_mobile/widgets/luci_app_bar.dart';
+import 'package:luci_mobile/design/luci_design_system.dart';
+import 'package:luci_mobile/modules/dhcp_dns/models/dhcp_dns_info.dart';
+import 'package:luci_mobile/widgets/add_static_lease_dialog.dart';
 import '../models/wireless_info.dart';
 
 class WifiAccessControlScreen extends ConsumerStatefulWidget {
@@ -18,12 +22,16 @@ class WifiAccessControlScreen extends ConsumerStatefulWidget {
 
 class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScreen> {
   final TextEditingController _macController = TextEditingController();
+  Client? _selectedClient;
   String _selectedMac = '';
   List<Client> _availableClients = [];
   bool _isLoadingClients = true;
 
   // Selected per-interface settings: ifaceSection -> isAllowed
   final Map<String, bool> _selectedIfaceAllows = {};
+
+  // Snapshot of initial per-interface settings from router: ifaceSection -> isAllowed
+  final Map<String, bool> _initialIfaceAllows = {};
 
   // Current session phone MAC detection
   String? _phoneMac;
@@ -48,28 +56,58 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
       setState(() {
         _availableClients = clients;
         _isLoadingClients = false;
-        // Attempt to auto-select phone MAC if connected
+        // Attempt to auto-detect phone MAC if connected
         for (final c in clients) {
           if (c.isConnected && c.connectionType == ConnectionType.wireless) {
             _phoneMac ??= _normalizeMac(c.macAddress);
           }
         }
-        if (_selectedMac.isEmpty && _availableClients.isNotEmpty) {
-          final first = _availableClients.first;
-          _selectedMac = _normalizeMac(first.macAddress);
-          _macController.text = _selectedMac;
-        }
+        // Do NOT auto-select the first MAC address; leave unselected by default
       });
-      if (_isValidMac(_selectedMac)) {
-        _populateCurrentIfaceStates(_selectedMac);
-      }
     } catch (_) {
       if (!mounted) return;
       setState(() { _isLoadingClients = false; });
     }
   }
 
+  String? _parseFlexibleMac(String input) {
+    final trimmed = input.trim();
+    final pairReg = RegExp(r'(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}');
+    final matchPair = pairReg.firstMatch(trimmed);
+    if (matchPair != null) {
+      return matchPair.group(0)!.toUpperCase().replaceAll('-', ':');
+    }
+
+    final ciscoReg = RegExp(r'[0-9a-fA-F]{4}\.[0-9a-fA-F]{4}\.[0-9a-fA-F]{4}');
+    final matchCisco = ciscoReg.firstMatch(trimmed);
+    if (matchCisco != null) {
+      final cleaned = matchCisco.group(0)!.replaceAll('.', '');
+      final sb = StringBuffer();
+      for (int i = 0; i < 12; i += 2) {
+        if (i > 0) sb.write(':');
+        sb.write(cleaned.substring(i, i + 2).toUpperCase());
+      }
+      return sb.toString();
+    }
+
+    final raw12Reg = RegExp(r'\b[0-9a-fA-F]{12}\b');
+    final match12 = raw12Reg.firstMatch(trimmed);
+    if (match12 != null) {
+      final cleaned = match12.group(0)!;
+      final sb = StringBuffer();
+      for (int i = 0; i < 12; i += 2) {
+        if (i > 0) sb.write(':');
+        sb.write(cleaned.substring(i, i + 2).toUpperCase());
+      }
+      return sb.toString();
+    }
+
+    return null;
+  }
+
   String _normalizeMac(String mac) {
+    final parsed = _parseFlexibleMac(mac);
+    if (parsed != null) return parsed;
     return mac.trim().toUpperCase().replaceAll('-', ':');
   }
 
@@ -82,6 +120,7 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
     if (client == null) return;
     final norm = _normalizeMac(client.macAddress);
     setState(() {
+      _selectedClient = client;
       _selectedMac = norm;
       _macController.text = norm;
     });
@@ -90,11 +129,24 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
 
   void _onManualMacChanged(String val) {
     final norm = _normalizeMac(val);
+    Client? match;
+    for (final c in _availableClients) {
+      if (_normalizeMac(c.macAddress) == norm) {
+        match = c;
+        break;
+      }
+    }
     setState(() {
+      _selectedClient = match;
       _selectedMac = norm;
     });
     if (_isValidMac(norm)) {
       _populateCurrentIfaceStates(norm);
+    } else {
+      setState(() {
+        _initialIfaceAllows.clear();
+        _selectedIfaceAllows.clear();
+      });
     }
   }
 
@@ -170,9 +222,33 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
     }
 
     setState(() {
+      _initialIfaceAllows.clear();
+      _initialIfaceAllows.addAll(newAllows);
       _selectedIfaceAllows.clear();
       _selectedIfaceAllows.addAll(newAllows);
     });
+  }
+
+  bool get _hasChanges {
+    if (!_isValidMac(_selectedMac)) return false;
+    for (final entry in _selectedIfaceAllows.entries) {
+      final initial = _initialIfaceAllows[entry.key] ?? false;
+      if (entry.value != initial) return true;
+    }
+    return false;
+  }
+
+  int get _stagedChangesCount {
+    int count = 0;
+    for (final entry in _selectedIfaceAllows.entries) {
+      final initial = _initialIfaceAllows[entry.key] ?? false;
+      if (entry.value != initial) count++;
+    }
+    return count;
+  }
+
+  bool get _isNewClientRule {
+    return !_initialIfaceAllows.values.any((v) => v);
   }
 
   @override
@@ -201,6 +277,7 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
                   _buildDeviceSelectionCard(context),
                   const SizedBox(height: 16),
                   if (_isValidMac(_selectedMac)) ...[
+                    _buildStaticLeaseOptionCard(context, appState),
                     _buildAccessControlMatrix(context, overview, appState),
                     const SizedBox(height: 24),
                     _buildApplyButton(context, overview, appState),
@@ -214,7 +291,7 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
                               Icon(Icons.touch_app_rounded, size: 48, color: theme.colorScheme.primary.withValues(alpha: 0.4)),
                               const SizedBox(height: 12),
                               Text(
-                                'Select a device or enter a valid MAC address above to configure Wi-Fi access rules.',
+                                'Select a device from the dropdown above or enter a valid MAC address to configure Wi-Fi access rules.',
                                 textAlign: TextAlign.center,
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
@@ -308,7 +385,7 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
                   Text('MAC Access Control (LuCI Filter)', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Text(
-                    'Configure per-SSID MAC allow lists. Only devices present on an SSID\'s allow-list will be permitted to connect.',
+                    'Configure per-SSID MAC allow lists. Devices on an SSID\'s allow-list will be explicitly permitted to connect.',
                     style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   ),
                 ],
@@ -336,6 +413,8 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
               const Center(child: CircularProgressIndicator())
             else
               DropdownButtonFormField<Client>(
+                initialValue: _selectedClient,
+                hint: const Text('Select a connected client device...'),
                 decoration: InputDecoration(
                   labelText: 'Connected Clients',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -368,6 +447,15 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
             TextField(
               controller: _macController,
               onChanged: _onManualMacChanged,
+              textCapitalization: TextCapitalization.characters,
+              inputFormatters: [
+                TextInputFormatter.withFunction(
+                  (oldValue, newValue) => TextEditingValue(
+                    text: newValue.text.toUpperCase(),
+                    selection: newValue.selection,
+                  ),
+                ),
+              ],
               decoration: InputDecoration(
                 labelText: 'MAC Address (XX:XX:XX:XX:XX:XX)',
                 hintText: 'AA:BB:CC:11:22:33',
@@ -380,6 +468,162 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildStaticLeaseOptionCard(BuildContext context, AppState appState) {
+    final theme = Theme.of(context);
+    final normMac = _normalizeMac(_selectedMac);
+
+    final dhcpOverview = DhcpDnsOverview.fromDashboardData(
+      appState.dashboardData,
+      isReviewerMode: appState.reviewerModeEnabled,
+    );
+
+    DhcpStaticMapping? existingMapping;
+    for (final s in dhcpOverview.staticMappings) {
+      if (_normalizeMac(s.macAddress) == normMac) {
+        existingMapping = s;
+        break;
+      }
+    }
+
+    if (existingMapping != null) {
+      return Card(
+        color: LuciStatusColors.connected.withValues(alpha: 0.1),
+        margin: const EdgeInsets.only(bottom: 16),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: LuciStatusColors.connected.withValues(alpha: 0.3)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              Icon(Icons.push_pin, color: LuciStatusColors.connected, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Static Lease Active',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: LuciStatusColors.connected),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: LuciStatusColors.connected.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            existingMapping.ipAddress,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Custom DHCP Lease Name: ${existingMapping.hostname}',
+                      style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: () => _showAddStaticLeaseDialog(
+                  context,
+                  normMac,
+                  appState,
+                  existingMapping: existingMapping,
+                ),
+                icon: const Icon(Icons.edit_rounded, size: 14),
+                label: const Text('Edit Lease', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: LuciStatusColors.connected,
+                  side: BorderSide(color: LuciStatusColors.connected),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.25),
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: theme.colorScheme.tertiary.withValues(alpha: 0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
+          children: [
+            Icon(Icons.push_pin_outlined, color: theme.colorScheme.tertiary, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'No Static DHCP Reservation',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: theme.colorScheme.onTertiaryContainer),
+                  ),
+                  Text(
+                    'Optionally assign a custom DHCP lease name & fixed IP for $normMac.',
+                    style: TextStyle(fontSize: 11, color: theme.colorScheme.onTertiaryContainer.withValues(alpha: 0.8)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              onPressed: () => _showAddStaticLeaseDialog(context, normMac, appState),
+              icon: const Icon(Icons.add, size: 14),
+              label: const Text('Add Static Lease', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: theme.colorScheme.tertiary,
+                side: BorderSide(color: theme.colorScheme.tertiary),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddStaticLeaseDialog(
+    BuildContext context,
+    String mac,
+    AppState appState, {
+    DhcpStaticMapping? existingMapping,
+  }) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AddStaticLeaseDialog(
+        macAddress: mac,
+        existingMapping: existingMapping,
+        client: _selectedClient,
+        allClients: _availableClients,
+        onSaved: () {
+          if (mounted) {
+            setState(() {});
+          }
+        },
       ),
     );
   }
@@ -426,7 +670,9 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
                   const SizedBox(height: 8),
                   ...radio.interfaces.map((iface) {
                     final secName = iface.sectionName;
-                    final isAllowed = _selectedIfaceAllows[secName] ?? false;
+                    final isStagedAllowed = _selectedIfaceAllows[secName] ?? false;
+                    final isInitialAllowed = _initialIfaceAllows[secName] ?? false;
+                    final isStagedChanged = isStagedAllowed != isInitialAllowed;
 
                     final rawUci = appState.dashboardData?['uciWirelessConfig'] ?? appState.dashboardData?['wireless'];
                     final secMap = _findSecMap(rawUci, secName);
@@ -438,32 +684,127 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
                     } else if (rawList is String) {
                       currentMacList = rawList.split(RegExp(r'\s+')).map((e) => _normalizeMac(e)).toList();
                     }
-                    final isDeniedHere = (currentFilterMode == 'deny') && currentMacList.contains(_normalizeMac(_selectedMac));
 
-                    String modeSubtitle;
-                    if (isAllowed) {
-                      modeSubtitle = 'Filter mode: Allow (Permitted)';
-                    } else if (isDeniedHere) {
-                      modeSubtitle = 'Filter mode: Deny (Blocked on this SSID)';
+                    final normMac = _normalizeMac(_selectedMac);
+                    final isCurrentlyInAllowList = (currentFilterMode == 'allow') && currentMacList.contains(normMac);
+                    final isCurrentlyInDenyList = (currentFilterMode == 'deny') && currentMacList.contains(normMac);
+
+                    // Real Current Status Badge (Accurate router policy)
+                    Widget currentStatusChip;
+                    if (isCurrentlyInAllowList) {
+                      currentStatusChip = Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: LuciStatusColors.connected.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Current: Allowed',
+                          style: TextStyle(color: LuciStatusColors.connected, fontWeight: FontWeight.bold, fontSize: 10),
+                        ),
+                      );
+                    } else if (isCurrentlyInDenyList) {
+                      currentStatusChip = Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'Current: Blocked',
+                          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 10),
+                        ),
+                      );
                     } else if (currentFilterMode == 'allow') {
-                      modeSubtitle = 'Filter mode: Allow (Not in allow list)';
+                      currentStatusChip = Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'Current: Restricted (Not in allow list)',
+                          style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 10),
+                        ),
+                      );
                     } else if (currentFilterMode == 'deny') {
-                      modeSubtitle = 'Filter mode: Deny (Not in deny list)';
+                      currentStatusChip = Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'Current: Permitted (Not in deny list)',
+                          style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 10),
+                        ),
+                      );
                     } else {
-                      modeSubtitle = 'Filter mode: Disabled/Open';
+                      currentStatusChip = Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Current: Open (Filter disabled)',
+                          style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10),
+                        ),
+                      );
+                    }
+
+                    // Staged Change Indicator Chip (if user toggled checkbox)
+                    Widget? stagedChip;
+                    if (isStagedChanged) {
+                      stagedChip = Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: (isStagedAllowed ? Colors.teal : Colors.deepOrange).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isStagedAllowed ? Colors.teal : Colors.deepOrange,
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          isStagedAllowed ? 'STAGED: Will Allow' : 'STAGED: Will Remove',
+                          style: TextStyle(
+                            color: isStagedAllowed ? Colors.teal.shade300 : Colors.deepOrange.shade300,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
+                        ),
+                      );
                     }
 
                     return CheckboxListTile(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      title: Text(
-                        iface.ssid,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              iface.ssid,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                          ),
+                          currentStatusChip,
+                        ],
                       ),
-                      subtitle: Text(
-                        'Interface: ${iface.ifName} ($secName) • $modeSubtitle',
-                        style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 2),
+                          Text(
+                            'Interface: ${iface.ifName} ($secName)',
+                            style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                          ),
+                          if (stagedChip != null) ...[
+                            const SizedBox(height: 4),
+                            stagedChip,
+                          ],
+                        ],
                       ),
-                      value: isAllowed,
+                      value: isStagedAllowed,
                       onChanged: (val) {
                         setState(() {
                           _selectedIfaceAllows[secName] = val ?? false;
@@ -482,16 +823,47 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
   }
 
   Widget _buildApplyButton(BuildContext context, WirelessOverview overview, AppState appState) {
+    final hasChanges = _hasChanges;
+    final isNewRule = _isNewClientRule;
+
+    String buttonLabel;
+    IconData buttonIcon;
+
+    if (isNewRule) {
+      if (!hasChanges) {
+        buttonLabel = 'Select SSIDs to Add Access Rules';
+        buttonIcon = Icons.add_moderator_outlined;
+      } else {
+        buttonLabel = 'Add Client Access Rules ($_stagedChangesCount SSIDs)';
+        buttonIcon = Icons.add_moderator_rounded;
+      }
+    } else {
+      if (!hasChanges) {
+        buttonLabel = 'Apply Access Control Rules';
+        buttonIcon = Icons.shield_outlined;
+      } else {
+        buttonLabel = 'Apply Access Control Rules ($_stagedChangesCount changes)';
+        buttonIcon = Icons.shield_rounded;
+      }
+    }
+
+    final theme = Theme.of(context);
+
     return SizedBox(
       width: double.infinity,
       child: FilledButton.icon(
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: hasChanges ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHighest,
+          foregroundColor: hasChanges ? theme.colorScheme.onPrimary : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
         ),
-        onPressed: () => _handleApplyChanges(context, overview, appState),
-        icon: const Icon(Icons.shield_outlined),
-        label: const Text('Apply Access Control Rules', style: TextStyle(fontWeight: FontWeight.bold)),
+        onPressed: hasChanges ? () => _handleApplyChanges(context, overview, appState) : null,
+        icon: Icon(buttonIcon),
+        label: Text(
+          buttonLabel,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }
@@ -550,7 +922,6 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
         } else {
           updatedMaclist.remove(targetMac);
           newMaclistByIface[secName] = updatedMaclist;
-          // If no MACs left in list, set filter back to disable
           if (updatedMaclist.isEmpty) {
             newMacfilterByIface[secName] = 'disable';
           } else {
@@ -641,7 +1012,7 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Access Control applied. Revert timer started (25s).'),
-            backgroundColor: Colors.green,
+            backgroundColor: LuciStatusColors.connected,
           ),
         );
       } else {
@@ -653,5 +1024,5 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
         );
       }
     }
-  }
+    }
 }

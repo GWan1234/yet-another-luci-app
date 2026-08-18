@@ -147,7 +147,7 @@ Future<void> main() async {
   final base = Uri.parse('$scheme://$ip');
 
   final client = HttpClient()
-    ..badCertificateCallback = (_, __, ___) => true;
+    ..badCertificateCallback = (_, _, _) => true;
 
   stdout.writeln('=== Router API Probe: $ip ($scheme) ===');
 

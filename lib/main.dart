@@ -103,6 +103,14 @@ class LuCIApp extends ConsumerWidget {
           ),
           color: const Color(0xFFFFFFFF),
         ),
+        dialogTheme: DialogThemeData(
+          backgroundColor: const Color(0xFFFFFFFF),
+          surfaceTintColor: Colors.transparent,
+          elevation: 6,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+        ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
@@ -134,6 +142,14 @@ class LuCIApp extends ConsumerWidget {
             borderRadius: BorderRadius.circular(20),
           ),
           color: const Color(0xFF151D30),
+        ),
+        dialogTheme: DialogThemeData(
+          backgroundColor: const Color(0xFF151D30),
+          surfaceTintColor: Colors.transparent,
+          elevation: 8,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
         ),
       ),
       themeMode: appState.themeMode,

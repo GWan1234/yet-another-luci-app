@@ -51,17 +51,39 @@ void main() {
       expect(deriveReleaseChannel(release), 'beta');
     });
 
-    test('detects rc channel', () {
-      final release = {
-        'distribution': 'OpenWrt',
-        'version': '24.10.0-rc1',
-        'description': 'OpenWrt 24.10.0-rc1',
-      };
-      expect(deriveReleaseChannel(release), 'rc');
+    test('detects rc channel for lower and uppercase formats', () {
+      expect(
+        deriveReleaseChannel({
+          'distribution': 'OpenWrt',
+          'version': '24.10.0-rc1',
+        }),
+        'rc',
+      );
+      expect(
+        deriveReleaseChannel({
+          'distribution': 'OpenWrt',
+          'version': '23.05.0-RC3',
+        }),
+        'rc',
+      );
+      expect(
+        deriveReleaseChannel({
+          'distribution': 'OpenWrt',
+          'version': '24.10-rc.2',
+        }),
+        'rc',
+      );
+    });
+
+    test('detects release channel directly from string version input', () {
+      expect(deriveReleaseChannel('24.10.0-rc1'), 'rc');
+      expect(deriveReleaseChannel('23.05.0-RC2'), 'rc');
+      expect(deriveReleaseChannel('24.10-SNAPSHOT'), 'snapshot');
+      expect(deriveReleaseChannel('23.05.3'), 'stable');
+      expect(deriveReleaseChannel('24.10.0-beta2'), 'beta');
     });
 
     test('rc check does not false-positive on common words', () {
-      // "source" contains 'rc' — should NOT match
       final release = {
         'distribution': 'OpenWrt',
         'version': '23.05.0',
@@ -79,13 +101,67 @@ void main() {
     });
 
     test('checks all fields including non-standard ones', () {
-      // Some custom builds might put snapshot info in non-standard fields
       final release = {
         'distribution': 'OpenWrt',
         'version': '24.10.0',
         'custom_field': 'snapshot-build',
       };
       expect(deriveReleaseChannel(release), 'snapshot');
+    });
+  });
+
+  group('Distribution detection & parsing', () {
+    test('detects ImmortalWrt distribution', () {
+      final info = deriveDistributionInfo({
+        'distribution': 'ImmortalWrt',
+        'version': '23.05.3',
+        'description': 'ImmortalWrt 23.05.3 r23801-23c6637af9',
+      });
+      expect(info.distribution, RouterDistribution.immortalWrt);
+      expect(info.distributionName, 'ImmortalWrt');
+      expect(info.displayName, 'ImmortalWrt 23.05.3');
+      expect(info.channel, 'stable');
+    });
+
+    test('detects GL.iNet distribution and extracts base OpenWrt version', () {
+      final info = deriveDistributionInfo(
+        {
+          'distribution': 'GL.iNet',
+          'version': '4.6.2',
+          'description': 'GL.iNet v4.6.2 (OpenWrt 23.05.3)',
+        },
+        model: 'GL-MT6000',
+      );
+      expect(info.distribution, RouterDistribution.glInet);
+      expect(info.distributionName, 'GL.iNet');
+      expect(info.displayName, 'GL.iNet 4.6.2');
+      expect(info.baseOpenWrtVersion, 'OpenWrt 23.05.3');
+    });
+
+    test('detects iStoreOS distribution', () {
+      final info = deriveDistributionInfo({
+        'distribution': 'iStoreOS',
+        'version': '22.03.7',
+        'description': 'iStoreOS 22.03.7 2024051010',
+      });
+      expect(info.distribution, RouterDistribution.iStoreOS);
+      expect(info.distributionName, 'iStoreOS');
+      expect(info.displayName, 'iStoreOS 22.03.7');
+    });
+
+    test('detects X-WRT, DD-WRT, FreshTomato distributions', () {
+      expect(
+        deriveDistributionInfo({'distribution': 'X-WRT', 'version': '24.01'}).distribution,
+        RouterDistribution.xWrt,
+      );
+      expect(
+        deriveDistributionInfo({'distribution': 'DD-WRT', 'version': 'v3.0'}).distribution,
+        RouterDistribution.ddWrt,
+      );
+      expect(
+        deriveDistributionInfo({'distribution': 'FreshTomato', 'version': '2024.1'}).distribution,
+        RouterDistribution.tomato,
+      );
     });
   });
 }

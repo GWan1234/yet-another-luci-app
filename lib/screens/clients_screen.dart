@@ -14,7 +14,12 @@ import 'package:luci_mobile/design/luci_design_system.dart';
 import 'package:luci_mobile/widgets/luci_loading_states.dart';
 import 'package:luci_mobile/widgets/luci_refresh_components.dart';
 
+import 'package:luci_mobile/utils/self_device_guard.dart';
+import 'package:luci_mobile/widgets/add_static_lease_dialog.dart';
 import 'restricted_clients_screen.dart';
+import 'package:luci_mobile/modules/dhcp_dns/models/dhcp_dns_info.dart';
+
+enum ClientCategoryFilter { all, wired, wireless }
 
 class ClientsScreen extends ConsumerStatefulWidget {
   const ClientsScreen({super.key});
@@ -35,6 +40,8 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
   Future<List<Client>>? _clientsFuture;
   String? _lastSelectedRouterId;
   dynamic _lastDashboardUpdated;
+  bool _showOnlyActiveConnected = false;
+  ClientCategoryFilter _categoryFilter = ClientCategoryFilter.all;
 
   @override
   void initState() {
@@ -195,6 +202,17 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
 
                     final clients = aggregatedClients;
                     final filteredClients = clients.where((client) {
+                      if (_showOnlyActiveConnected && !client.isConnected) {
+                        return false;
+                      }
+                      if (_categoryFilter == ClientCategoryFilter.wired &&
+                          (!client.isConnected || client.connectionType != ConnectionType.wired)) {
+                        return false;
+                      }
+                      if (_categoryFilter == ClientCategoryFilter.wireless &&
+                          (!client.isConnected || client.connectionType != ConnectionType.wireless)) {
+                        return false;
+                      }
                       final query = _searchQuery.toLowerCase();
                       return client.displayName.toLowerCase().contains(query) ||
                           client.hostname.toLowerCase().contains(query) ||
@@ -248,6 +266,50 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                                 ),
                               ),
                             ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    _showOnlyActiveConnected
+                                        ? Icons.wifi_tethering
+                                        : Icons.devices_other,
+                                    size: 15,
+                                    color: _showOnlyActiveConnected
+                                        ? colorScheme.primary
+                                        : colorScheme.onSurfaceVariant,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Active Connected Only',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: _showOnlyActiveConnected ? FontWeight.bold : FontWeight.w500,
+                                      color: _showOnlyActiveConnected
+                                          ? colorScheme.primary
+                                          : colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Transform.scale(
+                                scale: 0.75,
+                                child: Switch(
+                                  value: _showOnlyActiveConnected,
+                                  activeThumbColor: colorScheme.primary,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _showOnlyActiveConnected = val;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         _buildClientSummaryRow(clients, colorScheme, theme.textTheme),
@@ -323,15 +385,17 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
     ColorScheme colorScheme,
     TextTheme textTheme,
   ) {
-    final connectedClients = clients.where((c) => c.isConnected).toList();
-    final wiredCount = connectedClients.where((c) => c.connectionType == ConnectionType.wired).length;
-    final wirelessCount = connectedClients.where((c) => c.connectionType == ConnectionType.wireless).length;
-    final totalCount = connectedClients.length;
+    final totalCount = _showOnlyActiveConnected
+        ? clients.where((c) => c.isConnected).length
+        : clients.length;
+
+    final wiredCount = clients.where((c) => c.isConnected && c.connectionType == ConnectionType.wired).length;
+    final wirelessCount = clients.where((c) => c.isConnected && c.connectionType == ConnectionType.wireless).length;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(16),
@@ -347,6 +411,12 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
               label: 'Total',
               count: totalCount,
               color: colorScheme.primary,
+              isSelected: _categoryFilter == ClientCategoryFilter.all,
+              onTap: () {
+                setState(() {
+                  _categoryFilter = ClientCategoryFilter.all;
+                });
+              },
               colorScheme: colorScheme,
             ),
             Container(width: 1, height: 20, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
@@ -355,6 +425,12 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
               label: 'Wired',
               count: wiredCount,
               color: colorScheme.secondary,
+              isSelected: _categoryFilter == ClientCategoryFilter.wired,
+              onTap: () {
+                setState(() {
+                  _categoryFilter = ClientCategoryFilter.wired;
+                });
+              },
               colorScheme: colorScheme,
             ),
             Container(width: 1, height: 20, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
@@ -363,6 +439,12 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
               label: 'Wireless',
               count: wirelessCount,
               color: colorScheme.tertiary,
+              isSelected: _categoryFilter == ClientCategoryFilter.wireless,
+              onTap: () {
+                setState(() {
+                  _categoryFilter = ClientCategoryFilter.wireless;
+                });
+              },
               colorScheme: colorScheme,
             ),
           ],
@@ -376,30 +458,44 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
     required String label,
     required int count,
     required Color color,
+    required bool isSelected,
+    required VoidCallback onTap,
     required ColorScheme colorScheme,
   }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 6),
-        Text(
-          '$label: ',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: colorScheme.onSurfaceVariant,
+    final activeColor = isSelected ? color : colorScheme.onSurfaceVariant;
+    return Material(
+      color: isSelected ? color.withValues(alpha: 0.15) : Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: activeColor),
+              const SizedBox(width: 5),
+              Text(
+                '$label: ',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: activeColor,
+                ),
+              ),
+              Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? color : colorScheme.onSurface,
+                ),
+              ),
+            ],
           ),
         ),
-        Text(
-          '$count',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: colorScheme.onSurface,
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -1028,6 +1124,31 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                           SizedBox(
                             width: double.infinity,
                             child: OutlinedButton.icon(
+                              onPressed: () => _showAddStaticLeaseDialog(context, client),
+                              icon: const Icon(
+                                Icons.edit_outlined,
+                                color: Colors.teal,
+                                size: 20,
+                              ),
+                              label: Text(
+                                'Edit Static Lease',
+                                style: TextStyle(
+                                  color: Colors.teal.shade800,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: Colors.teal.shade600),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
                               onPressed: () => _confirmRemoveStaticLease(context, client),
                               icon: const Icon(
                                 Icons.delete_outline,
@@ -1075,12 +1196,27 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
   }
 
   void _showAddStaticLeaseDialog(BuildContext context, Client client) {
+    final appState = AppState.instance;
+    final dhcpOverview = DhcpDnsOverview.fromDashboardData(
+      appState.dashboardData,
+      isReviewerMode: appState.reviewerModeEnabled,
+    );
+    DhcpStaticMapping? existingMapping;
+    final normMac = client.macAddress.toUpperCase().replaceAll('-', ':');
+    for (final s in dhcpOverview.staticMappings) {
+      if (s.macAddress.toUpperCase().replaceAll('-', ':') == normMac) {
+        existingMapping = s;
+        break;
+      }
+    }
+
     showDialog(
       context: context,
-      builder: (dialogCtx) => _AddStaticLeaseDialog(
+      builder: (dialogCtx) => AddStaticLeaseDialog(
         client: client,
         allClients: widget.allClients,
-        onAdded: widget.onRefreshNeeded,
+        existingMapping: existingMapping,
+        onSaved: widget.onRefreshNeeded,
       ),
     );
   }
@@ -1164,6 +1300,18 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
   }
 
   Future<void> _toggleInternetPause(BuildContext context, Client client, bool pause) async {
+    if (pause) {
+      final safe = await SelfDeviceGuard.checkSelfActionGuardrail(
+        context,
+        actionName: 'Pause Internet Access',
+        targetMac: client.macAddress,
+        targetIp: client.ipAddress,
+        targetHostname: client.displayName,
+      );
+      if (!safe) return;
+      if (!context.mounted) return;
+    }
+
     final appState = AppState.instance;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -1221,379 +1369,3 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
   }
 }
 
-class _AddStaticLeaseDialog extends StatefulWidget {
-  final Client client;
-  final List<Client> allClients;
-  final VoidCallback onAdded;
-
-  const _AddStaticLeaseDialog({
-    required this.client,
-    required this.allClients,
-    required this.onAdded,
-  });
-
-  @override
-  State<_AddStaticLeaseDialog> createState() => _AddStaticLeaseDialogState();
-}
-
-class _AddStaticLeaseDialogState extends State<_AddStaticLeaseDialog> {
-  late TextEditingController _nameController;
-  late TextEditingController _ipController;
-  late TextEditingController _customLeaseController;
-
-  String _selectedLeasePreset = '12h';
-  bool _isSubmitting = false;
-  String? _nameError;
-  String? _ipError;
-  String? _leaseTimeError;
-
-  final List<Map<String, String>> _leasePresets = [
-    {'label': '12 Hours (Default)', 'value': '12h'},
-    {'label': '24 Hours (1 Day)', 'value': '24h'},
-    {'label': '7 Days (1 Week)', 'value': '7d'},
-    {'label': 'Infinite (Permanent)', 'value': 'infinite'},
-    {'label': 'Custom Duration...', 'value': 'custom'},
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    final initialName = (widget.client.displayName.isNotEmpty &&
-            widget.client.displayName != widget.client.macAddress &&
-            widget.client.displayName != 'Unknown')
-        ? widget.client.displayName
-        : (widget.client.hostname != 'Unknown' ? widget.client.hostname : '');
-    _nameController = TextEditingController(text: initialName);
-
-    final initialIp = _isValidIPv4(widget.client.ipAddress) ? widget.client.ipAddress : '';
-    _ipController = TextEditingController(text: initialIp);
-    _customLeaseController = TextEditingController(text: '12h');
-
-    _nameController.addListener(_validateInputs);
-    _ipController.addListener(_validateInputs);
-    _customLeaseController.addListener(_validateInputs);
-
-    WidgetsBinding.instance.addPostFrameCallback((_) => _validateInputs());
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _ipController.dispose();
-    _customLeaseController.dispose();
-    super.dispose();
-  }
-
-  bool _isValidIPv4(String ip) {
-    if (ip == 'N/A' || ip.trim().isEmpty) return false;
-    final reg = RegExp(r'^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.){3}(25[0-5]|(2[0-4]|1\d|[1-9]|)\d)$');
-    return reg.hasMatch(ip.trim());
-  }
-
-  String _normMac(String mac) => mac.toUpperCase().replaceAll('-', ':');
-
-  void _validateInputs() {
-    final name = _nameController.text.trim();
-    final ip = _ipController.text.trim();
-    final customLease = _customLeaseController.text.trim();
-
-    String? nameErr;
-    String? ipErr;
-    String? leaseErr;
-
-    // 1. Hostname validation
-    if (name.isEmpty) {
-      nameErr = 'Hostname cannot be empty';
-    } else if (RegExp(r'\s').hasMatch(name)) {
-      nameErr = 'Hostname cannot contain spaces';
-    } else if (!RegExp(r'^[a-zA-Z0-9_.-]+$').hasMatch(name)) {
-      nameErr = 'Use only letters, numbers, hyphens, and dots';
-    }
-
-    // 2. IPv4 validation & conflict guardrails
-    if (ip.isEmpty) {
-      ipErr = 'IPv4 address cannot be empty';
-    } else if (!_isValidIPv4(ip)) {
-      ipErr = 'Enter a valid IPv4 address (e.g. 192.168.1.150)';
-    } else {
-      final appState = AppState.instance;
-      final selectedRouter = appState.selectedRouter;
-      final currentMacNorm = _normMac(widget.client.macAddress);
-
-      // Guardrail A: Check router gateway IP
-      if (selectedRouter != null && selectedRouter.ipAddress.trim() == ip) {
-        ipErr = 'Conflict: $ip is the router\'s gateway address';
-      }
-
-      // Guardrail B: Check active clients in current client list
-      if (ipErr == null) {
-        for (final other in widget.allClients) {
-          if (_normMac(other.macAddress) != currentMacNorm && other.ipAddress.trim() == ip) {
-            ipErr = 'Conflict: $ip is used by "${other.displayName}" (${other.macAddress})';
-            break;
-          }
-        }
-      }
-
-      // Guardrail C: Check host hints / static leases in router configuration
-      if (ipErr == null) {
-        final hostHints = appState.dashboardData?['hostHints'] as Map<String, dynamic>? ?? {};
-        hostHints.forEach((hMac, info) {
-          if (ipErr != null) return;
-          if (_normMac(hMac) != currentMacNorm) {
-            final staticIp = info['staticLeaseIp']?.toString();
-            final ipaddrs = info['ipaddrs'] as List?;
-            final hintName = info['name']?.toString() ?? info['staticLeaseName']?.toString() ?? hMac;
-            if (staticIp == ip || (ipaddrs != null && ipaddrs.contains(ip))) {
-              ipErr = 'Conflict: $ip is reserved for static lease "$hintName" ($hMac)';
-            }
-          }
-        });
-      }
-    }
-
-    // 3. Lease time validation
-    if (_selectedLeasePreset == 'custom') {
-      if (customLease.isEmpty) {
-        leaseErr = 'Specify custom lease duration (e.g. 2h, 30m, 3d)';
-      } else if (customLease.toLowerCase() != 'infinite' &&
-          !RegExp(r'^\d+[smhdw]$', caseSensitive: false).hasMatch(customLease)) {
-        leaseErr = 'Invalid format (use e.g. 30m, 2h, 12h, 1d, 7w, or infinite)';
-      }
-    }
-
-    if (mounted) {
-      setState(() {
-        _nameError = nameErr;
-        _ipError = ipErr;
-        _leaseTimeError = leaseErr;
-      });
-    }
-  }
-
-  Future<void> _submit() async {
-    _validateInputs();
-    if (_nameError != null || _ipError != null || _leaseTimeError != null) {
-      return;
-    }
-
-    setState(() {
-      _isSubmitting = true;
-    });
-
-    final hostname = _nameController.text.trim();
-    final targetIp = _ipController.text.trim();
-    final leaseTime = _selectedLeasePreset == 'custom'
-        ? _customLeaseController.text.trim()
-        : _selectedLeasePreset;
-
-    final appState = AppState.instance;
-    final success = await appState.addStaticLease(
-      macAddress: widget.client.macAddress,
-      targetIp: targetIp,
-      hostname: hostname,
-      leaseTime: leaseTime,
-      context: context,
-    );
-
-    if (!mounted) return;
-
-    if (success) {
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Static lease reserved: $hostname ($targetIp)'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      widget.onAdded();
-    } else {
-      setState(() {
-        _isSubmitting = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to add static lease for ${widget.client.displayName}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final canSave = _nameError == null && _ipError == null && _leaseTimeError == null && !_isSubmitting;
-
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.teal.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.push_pin, color: Colors.teal, size: 24),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              'Add Static Lease',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-      content: SingleChildScrollView(
-        child: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Client MAC Banner
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'MAC Address',
-                      style: theme.textTheme.labelSmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: 2),
-                    SelectableText(
-                      widget.client.macAddress,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'monospace', fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Hostname Field
-              Text(
-                'Custom Hostname',
-                style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 6),
-              TextField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  hintText: 'e.g. MyLaptop',
-                  prefixIcon: const Icon(Icons.badge_outlined, size: 20),
-                  errorText: _nameError,
-                  filled: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // IPv4 Address Field
-              Text(
-                'Reserved IPv4 Address',
-                style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 6),
-              TextField(
-                controller: _ipController,
-                keyboardType: TextInputType.datetime,
-                decoration: InputDecoration(
-                  hintText: 'e.g. 192.168.1.150',
-                  prefixIcon: const Icon(Icons.lan_outlined, size: 20),
-                  errorText: _ipError,
-                  errorMaxLines: 3,
-                  filled: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Lease Time Preset Dropdown
-              Text(
-                'Lease Time Duration',
-                style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 6),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedLeasePreset,
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.timer_outlined, size: 20),
-                  filled: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                items: _leasePresets.map((preset) {
-                  return DropdownMenuItem<String>(
-                    value: preset['value'],
-                    child: Text(preset['label']!, style: const TextStyle(fontSize: 13)),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) {
-                    setState(() {
-                      _selectedLeasePreset = val;
-                    });
-                    _validateInputs();
-                  }
-                },
-              ),
-
-              // Custom Lease Time Input if 'custom' preset is selected
-              if (_selectedLeasePreset == 'custom') ...[
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _customLeaseController,
-                  decoration: InputDecoration(
-                    labelText: 'Custom Lease Duration',
-                    hintText: 'e.g., 2h, 30m, 3d, 12h, infinite',
-                    prefixIcon: const Icon(Icons.edit_calendar_outlined, size: 20),
-                    errorText: _leaseTimeError,
-                    filled: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton.icon(
-          onPressed: canSave ? _submit : null,
-          icon: _isSubmitting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                )
-              : const Icon(Icons.check, size: 18),
-          label: const Text('Save Reservation'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.teal,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-      ],
-    );
-  }
-}

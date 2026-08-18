@@ -132,6 +132,10 @@ class TailscaleStatus {
   final String nodeName;
   final String tailscaleIp;
   final String backendState;
+  final String tailnet;
+  final String magicDns;
+  final int peersCount;
+  final bool isExitNode;
 
   const TailscaleStatus({
     required this.isConfigured,
@@ -139,6 +143,10 @@ class TailscaleStatus {
     required this.nodeName,
     required this.tailscaleIp,
     required this.backendState,
+    this.tailnet = '',
+    this.magicDns = '',
+    this.peersCount = 0,
+    this.isExitNode = false,
   });
 
   factory TailscaleStatus.fromJson(Map<String, dynamic>? json) {
@@ -161,6 +169,10 @@ class TailscaleStatus {
       nodeName: nodeName.isNotEmpty ? nodeName : 'OpenWrt-Node',
       tailscaleIp: ip,
       backendState: state,
+      tailnet: json['tailnet']?.toString() ?? '',
+      magicDns: json['magic_dns']?.toString() ?? '',
+      peersCount: (json['peers_count'] as num?)?.toInt() ?? 0,
+      isExitNode: json['is_exit_node'] == true || json['is_exit_node'] == '1',
     );
   }
 }

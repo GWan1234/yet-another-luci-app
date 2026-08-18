@@ -114,18 +114,17 @@ class _MainScreenState extends ConsumerState<MainScreen> {
             clipBehavior: Clip.none,
             alignment: Alignment.bottomCenter,
             children: [
-              // Flat Bottom Bar Container
+              // Flat Matt Bottom Bar Container
               Container(
                 height: 60,
                 decoration: BoxDecoration(
                   color: colorScheme.surfaceContainer,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 10,
-                      offset: const Offset(0, -2),
+                  border: Border(
+                    top: BorderSide(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.2),
+                      width: 1,
                     ),
-                  ],
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -179,7 +178,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                 ),
               ),
 
-              // Elevated Circular Center Dashboard Badge Button (Index 0)
+              // Solid Flat Matt Circular Center Dashboard Badge Button (Index 0)
               Positioned(
                 top: -12,
                 child: GestureDetector(
@@ -196,26 +195,9 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                         height: 52,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: _selectedIndex == 0
-                                ? [colorScheme.primary, colorScheme.secondary]
-                                : [
-                                    colorScheme.surfaceContainerHigh,
-                                    colorScheme.surfaceContainerHighest,
-                                  ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: (_selectedIndex == 0
-                                      ? colorScheme.primary
-                                      : Colors.black)
-                                  .withValues(alpha: _selectedIndex == 0 ? 0.20 : 0.15),
-                              blurRadius: _selectedIndex == 0 ? 6 : 6,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                          color: _selectedIndex == 0
+                              ? colorScheme.primary
+                              : colorScheme.surfaceContainerHigh,
                           border: Border.all(
                             color: colorScheme.surface,
                             width: 3,

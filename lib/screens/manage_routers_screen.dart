@@ -237,9 +237,8 @@ class _ManageRoutersScreenState extends ConsumerState<ManageRoutersScreen> {
                                                 .surface
                                                 .withValues(alpha: 0.95),
                                             shadowColor: Theme.of(context)
-                                                .colorScheme
-                                                .primary
-                                                .withValues(alpha: 0.10),
+                                                .shadowColor
+                                                .withValues(alpha: 0.08),
                                             insetPadding:
                                                 const EdgeInsets.symmetric(
                                                   horizontal: 16,

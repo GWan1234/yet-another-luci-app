@@ -127,17 +127,15 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
             TextButton(
               child: const Text('Logout'),
               onPressed: () async {
-                appState.logout();
+                await appState.logout();
                 // Clear all accepted certificates on logout
                 await HttpClientManager().clearAcceptedCertificates();
                 if (context.mounted) {
-                  unawaited(
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                        builder: (context) => const LoginScreen(),
-                      ),
-                      (Route<dynamic> route) => false,
+                  await Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (context) => const LoginScreen(),
                     ),
+                    (Route<dynamic> route) => false,
                   );
                 }
               },
@@ -227,109 +225,93 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
   Future<void> _showAboutDialog(BuildContext context) async {
     final info = await PackageInfo.fromPlatform();
     if (!context.mounted) return;
+    final theme = Theme.of(context);
 
     unawaited(
       showDialog(
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             title: Row(
               children: [
-                const ThemeRouterLogo(width: 32, height: 32, showShadow: true),
+                const ThemeRouterLogo(width: 28, height: 28, showShadow: false),
                 const SizedBox(width: 12),
-                const Text('Yet Another LuCI App'),
+                const Expanded(
+                  child: Text(
+                    'Yet Another LuCI App',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                ),
               ],
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Version ${info.version}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                const Text('A modern, high-performance OpenWrt router management mobile application.'),
-                const SizedBox(height: 12),
-                const Text('Author: Tuhin Garai (@nightcodex7)', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 6),
-                SelectableText('Support: ${AppConfig.supportEmail}', style: const TextStyle(fontSize: 12)),
-                const SizedBox(height: 12),
-                const Text('Open source & free for the OpenWrt community.'),
-                const SizedBox(height: 16),
-                InkWell(
-                  onTap: () async {
-                    final url = AppConfig.githubRepositoryUrl;
-                    final success = await launchUrlString(
-                      url,
-                      mode: LaunchMode.externalApplication,
-                    );
-                    if (!success && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('Could not open repository'),
-                          backgroundColor: Theme.of(context).colorScheme.error,
-                        ),
-                      );
-                    }
-                  },
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.link,
-                        size: 16,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'GitHub Repository',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            decoration: TextDecoration.none,
-                          ),
-                        ),
-                      ),
-                    ],
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Version ${info.version}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                InkWell(
-                  onTap: () async {
-                    final Uri mailUri = Uri(
-                      scheme: 'mailto',
-                      path: AppConfig.supportEmail,
-                      queryParameters: {'subject': 'Yet Another LuCI App Support Request'},
-                    );
-                    final success = await launchUrlString(
-                      mailUri.toString(),
-                      mode: LaunchMode.externalApplication,
-                    );
-                    if (!success && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('Could not open email client'),
-                          backgroundColor: Theme.of(context).colorScheme.error,
-                        ),
-                      );
-                    }
-                  },
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.email_outlined,
-                        size: 16,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Contact Support',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            decoration: TextDecoration.none,
-                          ),
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 12),
+                Text(
+                  'A modern, high-performance OpenWrt router management mobile application.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        await launchUrlString(
+                          AppConfig.githubRepositoryUrl,
+                          mode: LaunchMode.externalApplication,
+                        );
+                      },
+                      icon: const Icon(Icons.code_rounded, size: 16),
+                      label: const Text('GitHub'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final Uri mailUri = Uri(
+                          scheme: 'mailto',
+                          path: AppConfig.supportEmail,
+                          queryParameters: {'subject': 'Yet Another LuCI App Support Request'},
+                        );
+                        await launchUrlString(
+                          mailUri.toString(),
+                          mode: LaunchMode.externalApplication,
+                        );
+                      },
+                      icon: const Icon(Icons.email_outlined, size: 16),
+                      label: const Text('Support'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

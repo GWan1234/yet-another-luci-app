@@ -6,7 +6,7 @@ Future<String?> login() async {
   final user = Platform.environment['ROUTER_USER'] ?? 'root';
   final pass = Platform.environment['ROUTER_PASS'] ?? '';
   final base = Uri.parse('http://$ip');
-  final c = HttpClient()..badCertificateCallback = (_, __, ___) => true;
+  final c = HttpClient()..badCertificateCallback = (_, _, _) => true;
 
   final req = await c.postUrl(base.replace(path: '/cgi-bin/luci/'));
   req.headers.set('Content-Type', 'application/x-www-form-urlencoded');
@@ -43,7 +43,7 @@ Future<String?> login() async {
 }
 
 Future<void> ubusCall(String token, String object, String method, Map params, String label) async {
-  final c = HttpClient()..badCertificateCallback = (_, __, ___) => true;
+  final c = HttpClient()..badCertificateCallback = (_, _, _) => true;
   final req = await c.postUrl(Uri.parse('http://${Platform.environment['ROUTER_IP'] ?? '192.168.1.1'}/ubus'));
   req.headers.set('Content-Type', 'application/json');
   req.cookies.add(Cookie('sysauth', token));

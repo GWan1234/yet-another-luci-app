@@ -1,20 +1,20 @@
 {
   "AA:BB:CC:11:22:33": {
-    "name": "Android-nightcodex7",
-    "staticLeaseName": "Pixel-9-Pro",
+    "name": "Pixel-9-Pro",
+    "staticLeaseName": "Pixel-9-Pro-Static",
     "isStaticLease": true,
     "vendor": "Google LLC",
     "ipaddrs": ["192.168.1.100"],
     "ip6addrs": ["2409:4060:2e81:a102::100", "fd00:192:168:1::100", "fe80::aabb:ccff:fe11:2233"]
   },
   "AA:BB:CC:44:55:66": {
-    "name": "MacBook-Pro-16",
+    "name": "MacBook-Pro-16-M3",
     "vendor": "Apple Inc.",
     "ipaddrs": ["192.168.1.101"],
     "ip6addrs": ["2409:4060:2e81:a102::101", "fd00:192:168:1::101", "fe80::aabb:ccff:fe44:5566"]
   },
   "AA:BB:CC:77:88:99": {
-    "name": "Smart-TV-Living-Room",
+    "name": "Sony-Bravia-4K-TV",
     "staticLeaseName": "Media-Room-TV",
     "isStaticLease": true,
     "vendor": "Sony Corporation",
@@ -22,81 +22,129 @@
     "ip6addrs": ["fe80::aabb:ccff:fe77:8899"]
   },
   "AA:BB:CC:AA:BB:CC": {
-    "name": "Gaming-PC",
-    "staticLeaseName": "Gaming-PC-Static",
+    "name": "ASUS-ROG-Gaming-PC",
+    "staticLeaseName": "Gaming-Rig-Ethernet",
     "isStaticLease": true,
     "vendor": "ASUSTeK Computer Inc.",
     "ipaddrs": ["192.168.1.103"],
     "ip6addrs": ["2409:4060:2e81:a102::103", "fe80::aabb:ccff:feaa:bbcc"]
   },
   "AA:BB:CC:DD:EE:FF": {
-    "name": "Nest-Thermostat",
+    "name": "Google-Nest-Thermostat",
     "vendor": "Google LLC",
     "ipaddrs": ["192.168.1.104"],
     "ip6addrs": ["fe80::aabb:ccff:fedd:eeff"]
   },
   "AA:BB:CC:12:34:56": {
-    "name": "iPad-Sarah",
+    "name": "iPad-Air-M2",
     "vendor": "Apple Inc.",
     "ipaddrs": ["192.168.1.105"],
     "ip6addrs": ["2409:4060:2e81:a102::105", "fe80::aabb:ccff:fe12:3456"]
   },
   "AA:BB:CC:65:43:21": {
-    "name": "Amazon-Echo-Dot",
+    "name": "Amazon-Echo-Show-10",
     "vendor": "Amazon.com Services LLC",
     "ipaddrs": ["192.168.1.106"],
     "ip6addrs": ["fe80::aabb:ccff:fe65:4321"]
   },
   "AA:BB:CC:98:76:54": {
-    "name": "Printer-HP-Office",
-    "staticLeaseName": "Office-Printer",
+    "name": "HP-Color-LaserJet-Pro",
+    "staticLeaseName": "Office-Printer-LAN",
     "isStaticLease": true,
     "vendor": "HP Inc.",
     "ipaddrs": ["192.168.1.107"],
     "ip6addrs": ["fe80::aabb:ccff:fe98:7654"]
   },
   "BB:CC:DD:11:22:33": {
-    "name": "Samsung-Galaxy-S24",
+    "name": "Samsung-Galaxy-S24-Ultra",
     "vendor": "Samsung Electronics",
     "ipaddrs": ["192.168.1.108"],
     "ip6addrs": ["2409:4060:2e81:a102::108", "fe80::bbcc:ddff:fe11:2233"]
   },
   "BB:CC:DD:44:55:66": {
-    "name": "Dell-Laptop-Work",
+    "name": "Dell-XPS-15-Workstation",
     "vendor": "Dell Inc.",
     "ipaddrs": ["192.168.1.109"],
     "ip6addrs": ["2409:4060:2e81:a102::109", "fe80::bbcc:ddff:fe44:5566"]
   },
   "BB:CC:DD:77:88:99": {
-    "name": "Ring-Doorbell",
+    "name": "Ring-Video-Doorbell-Pro",
     "vendor": "Ring LLC",
     "ipaddrs": ["192.168.1.110"],
     "ip6addrs": ["fe80::bbcc:ddff:fe77:8899"]
   },
   "BB:CC:DD:AA:BB:CC": {
-    "name": "PlayStation-5",
+    "name": "PlayStation-5-Console",
     "vendor": "Sony Interactive Entertainment",
     "ipaddrs": ["192.168.1.111"],
     "ip6addrs": ["2409:4060:2e81:a102::111", "fe80::bbcc:ddff:feaa:bbcc"]
   },
   "BB:CC:DD:DD:EE:FF": {
-    "name": "Philips-Hue-Bridge",
+    "name": "Philips-Hue-Bridge-V2",
     "vendor": "Signify Netherlands B.V.",
     "ipaddrs": ["192.168.1.112"],
     "ip6addrs": ["fe80::bbcc:ddff:fedd:eeff"]
   },
+  "BB:CC:DD:12:34:56": {
+    "name": "Nintendo-Switch-OLED",
+    "vendor": "Nintendo Co., Ltd.",
+    "ipaddrs": ["192.168.1.113"],
+    "ip6addrs": ["2409:4060:2e81:a102::113", "fe80::bbcc:ddff:fe12:3456"]
+  },
+  "BB:CC:DD:65:43:21": {
+    "name": "Sonos-Era-100-Speaker",
+    "vendor": "Sonos Inc.",
+    "ipaddrs": ["192.168.1.114"],
+    "ip6addrs": ["fe80::bbcc:ddff:fe65:4321"]
+  },
   "CC:DD:EE:11:22:33": {
-    "name": "Tesla-Model-3",
+    "name": "Tesla-Model-3-EV",
     "vendor": "Tesla Inc.",
     "ipaddrs": ["192.168.1.116"],
     "ip6addrs": ["fe80::ccdd:eeff:fe11:2233"]
   },
+  "CC:DD:EE:44:55:66": {
+    "name": "LG-C3-OLED-TV",
+    "vendor": "LG Electronics",
+    "ipaddrs": ["192.168.1.117"],
+    "ip6addrs": ["fe80::ccdd:eeff:fe44:5566"]
+  },
+  "CC:DD:EE:77:88:99": {
+    "name": "Steam-Deck-OLED",
+    "vendor": "Valve Corporation",
+    "ipaddrs": ["192.168.1.118"],
+    "ip6addrs": ["2409:4060:2e81:a102::118", "fe80::ccdd:eeff:fe77:8899"]
+  },
+  "CC:DD:EE:AA:BB:CC": {
+    "name": "Eufy-Security-Camera",
+    "vendor": "Anker Innovations",
+    "ipaddrs": ["192.168.1.119"],
+    "ip6addrs": ["fe80::ccdd:eeff:feaa:bbcc"]
+  },
   "CC:DD:EE:DD:EE:FF": {
-    "name": "Raspberry-Pi-NAS",
+    "name": "Raspberry-Pi-5-HomeAssistant",
     "staticLeaseName": "Home-Vault-NAS",
     "isStaticLease": true,
     "vendor": "Raspberry Pi Foundation",
     "ipaddrs": ["192.168.1.120"],
     "ip6addrs": ["2409:4060:2e81:a102::120", "fd00:192:168:1::120", "fe80::ccdd:eeff:fedd:eeff"]
+  },
+  "CC:DD:EE:12:34:56": {
+    "name": "Apple-Watch-Ultra-2",
+    "vendor": "Apple Inc.",
+    "ipaddrs": ["192.168.1.121"],
+    "ip6addrs": ["fe80::ccdd:eeff:fe12:3456"]
+  },
+  "CC:DD:EE:65:43:21": {
+    "name": "Chromecast-with-Google-TV",
+    "vendor": "Google LLC",
+    "ipaddrs": ["192.168.1.122"],
+    "ip6addrs": ["fe80::ccdd:eeff:fe65:4321"]
+  },
+  "CC:DD:EE:98:76:54": {
+    "name": "ThinkPad-X1-Carbon",
+    "vendor": "Lenovo Group Ltd.",
+    "ipaddrs": ["192.168.1.123"],
+    "ip6addrs": ["2409:4060:2e81:a102::123", "fe80::ccdd:eeff:fe98:7654"]
   }
 }

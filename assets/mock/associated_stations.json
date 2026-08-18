@@ -1,16 +1,24 @@
 {
-  "wlan0|Office-WiFi": [
-    "aa:bb:cc:11:22:33",
-    "aa:bb:cc:77:88:99",
-    "aa:bb:cc:dd:ee:ff",
-    "aa:bb:cc:65:43:21",
-    "bb:cc:dd:77:88:99",
-    "cc:dd:ee:11:22:33"
+  "wlan0": [
+    "AA:BB:CC:11:22:33",
+    "AA:BB:CC:44:55:66",
+    "AA:BB:CC:77:88:99",
+    "BB:CC:DD:11:22:33",
+    "BB:CC:DD:44:55:66",
+    "BB:CC:DD:77:88:99",
+    "BB:CC:DD:12:34:56",
+    "CC:DD:EE:77:88:99",
+    "CC:DD:EE:12:34:56"
   ],
-  "wlan1|Office-WiFi-5G": [
-    "aa:bb:cc:44:55:66",
-    "aa:bb:cc:12:34:56",
-    "bb:cc:dd:11:22:33",
-    "bb:cc:dd:44:55:66"
+  "wlan1": [
+    "AA:BB:CC:AA:BB:CC",
+    "AA:BB:CC:DD:EE:FF",
+    "AA:BB:CC:12:34:56",
+    "BB:CC:DD:AA:BB:CC",
+    "BB:CC:DD:DD:EE:FF",
+    "AA:BB:CC:65:43:21",
+    "CC:DD:EE:44:55:66",
+    "CC:DD:EE:65:43:21",
+    "CC:DD:EE:98:76:54"
   ]
 }

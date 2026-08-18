@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import 'package:luci_mobile/models/client.dart';
 import 'package:luci_mobile/services/interfaces/api_service_interface.dart';
 import 'package:luci_mobile/services/interfaces/auth_service_interface.dart';
 import 'package:luci_mobile/services/router_service.dart';
@@ -127,22 +128,41 @@ class NetworkActionsController {
     if (ip == null || sysauth == null || _apiService == null) return false;
 
     try {
-      final setRes = await _apiService!.uciSet(
-        ip, sysauth, _useHttps,
-        config: 'tailscale',
-        section: 'settings',
-        values: {'enabled': enable ? '1' : '0'},
-      );
-      if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) return false;
-      final commitRes =
-          await _apiService!.uciCommit(ip, sysauth, _useHttps, config: 'tailscale');
-      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0) return false;
+      try {
+        await _apiService!.uciSet(
+          ip,
+          sysauth,
+          _useHttps,
+          config: 'tailscale',
+          section: 'settings',
+          values: {'enabled': enable ? '1' : '0'},
+        );
+        await _apiService!
+            .uciCommit(ip, sysauth, _useHttps, config: 'tailscale');
+      } catch (_) {}
 
       await _apiService!.manageServiceAction(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         serviceName: 'tailscale',
         action: enable ? 'start' : 'stop',
       );
+
+      try {
+        await _apiService!.call(
+          ip,
+          sysauth,
+          _useHttps,
+          object: 'file',
+          method: 'exec',
+          params: {
+            'command': 'tailscale',
+            'params': [enable ? 'up' : 'down'],
+          },
+        );
+      } catch (_) {}
+
       await _refreshDashboard();
       return true;
     } catch (e, stack) {
@@ -151,50 +171,185 @@ class NetworkActionsController {
     }
   }
 
-  /// Toggle NextDNS encrypted DNS daemon state
+  /// Toggle NextDNS encrypted DNS daemon state with multi-daemon (dnsmasq, unbound, kresd, smartdns, odhcpd) self-healing guardrails
   Future<bool> toggleNextDns(bool enable) async {
     if (_isReviewerMode) return true;
     final ip = _ip;
     final sysauth = _sysauth;
     if (ip == null || sysauth == null || _apiService == null) return false;
 
+    // Multi-daemon DNS restorer helper function for OpenWrt
+    const restartDnsHelper = '''
+restart_dns() {
+  if [ -x /etc/init.d/dnsmasq ] && /etc/init.d/dnsmasq enabled 2>/dev/null; then
+    uci commit dhcp 2>/dev/null || true
+    /etc/init.d/dnsmasq restart 2>/dev/null || true
+  elif [ -x /etc/init.d/unbound ] && /etc/init.d/unbound enabled 2>/dev/null; then
+    /etc/init.d/unbound restart 2>/dev/null || true
+  elif [ -x /etc/init.d/kresd ] && /etc/init.d/kresd enabled 2>/dev/null; then
+    /etc/init.d/kresd restart 2>/dev/null || true
+  elif [ -x /etc/init.d/smartdns ] && /etc/init.d/smartdns enabled 2>/dev/null; then
+    /etc/init.d/smartdns restart 2>/dev/null || true
+  elif [ -x /etc/init.d/odhcpd ] && /etc/init.d/odhcpd enabled 2>/dev/null; then
+    /etc/init.d/odhcpd restart 2>/dev/null || true
+  else
+    ubus call network reload 2>/dev/null || /etc/init.d/network reload 2>/dev/null || true
+  fi
+}
+''';
+
+    const healDnsHelper = '''
+heal_dns() {
+  if [ -x /etc/init.d/dnsmasq ] && /etc/init.d/dnsmasq enabled 2>/dev/null; then
+    pgrep dnsmasq >/dev/null || /etc/init.d/dnsmasq restart 2>/dev/null || true
+  elif [ -x /etc/init.d/unbound ] && /etc/init.d/unbound enabled 2>/dev/null; then
+    pgrep unbound >/dev/null || /etc/init.d/unbound restart 2>/dev/null || true
+  elif [ -x /etc/init.d/kresd ] && /etc/init.d/kresd enabled 2>/dev/null; then
+    pgrep kresd >/dev/null || /etc/init.d/kresd restart 2>/dev/null || true
+  elif [ -x /etc/init.d/smartdns ] && /etc/init.d/smartdns enabled 2>/dev/null; then
+    pgrep smartdns >/dev/null || /etc/init.d/smartdns restart 2>/dev/null || true
+  elif [ -x /etc/init.d/odhcpd ] && /etc/init.d/odhcpd enabled 2>/dev/null; then
+    pgrep odhcpd >/dev/null || /etc/init.d/odhcpd restart 2>/dev/null || true
+  fi
+}
+''';
+
     try {
-      final setRes = await _apiService!.uciSet(
-        ip, sysauth, _useHttps,
-        config: 'nextdns',
-        section: 'main',
-        values: {'enabled': enable ? '1' : '0'},
-      );
-      if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) return false;
-      final commitRes =
-          await _apiService!.uciCommit(ip, sysauth, _useHttps, config: 'nextdns');
-      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0) return false;
+      if (enable) {
+        // 1. Configure NextDNS listening port to 5342 to prevent port 53 collision
+        await _apiService!.uciSet(
+          ip, sysauth, _useHttps,
+          config: 'nextdns',
+          section: 'main',
+          values: {
+            'enabled': '1',
+            'setup_router': '1',
+            'listen': '127.0.0.1:5342',
+          },
+        );
+        await _apiService!.uciCommit(ip, sysauth, _useHttps, config: 'nextdns');
 
-      await _apiService!.manageServiceAction(
-        ip, sysauth, _useHttps,
-        serviceName: 'nextdns',
-        action: enable ? 'start' : 'stop',
-      );
+        // 2. Start nextdns service
+        await _apiService!.manageServiceAction(
+          ip, sysauth, _useHttps,
+          serviceName: 'nextdns',
+          action: 'start',
+        );
 
-      try {
-        final actionCmd = enable
-            ? 'nextdns activate || /etc/init.d/nextdns activate'
-            : 'nextdns deactivate || /etc/init.d/nextdns deactivate';
+        // 3. Activate NextDNS, ensure process is running on port 5342 & restart active DNS daemon
+        final activateCmd = '$restartDnsHelper\n'
+            '(nextdns activate || /etc/init.d/nextdns activate 2>/dev/null || true) && '
+            '(pgrep nextdns >/dev/null || nextdns run -config-file /etc/config/nextdns -listen 127.0.0.1:5342 &) && '
+            'restart_dns';
         await _apiService!.call(
           ip, sysauth, _useHttps,
           object: 'file',
           method: 'exec',
           params: {
             'command': '/bin/sh',
-            'params': ['-c', actionCmd],
+            'params': ['-c', activateCmd],
           },
         );
-      } catch (_) {}
+      } else {
+        // 1. Deactivate NextDNS
+        const deactivateCmd =
+            '(nextdns deactivate || /etc/init.d/nextdns deactivate 2>/dev/null || true)';
+        await _apiService!.call(
+          ip, sysauth, _useHttps,
+          object: 'file',
+          method: 'exec',
+          params: {
+            'command': '/bin/sh',
+            'params': ['-c', deactivateCmd],
+          },
+        );
+
+        // 2. Stop nextdns service & kill process if needed
+        await _apiService!.manageServiceAction(
+          ip, sysauth, _useHttps,
+          serviceName: 'nextdns',
+          action: 'stop',
+        );
+        const killCmd = 'killall nextdns 2>/dev/null || true';
+        await _apiService!.call(
+          ip, sysauth, _useHttps,
+          object: 'file',
+          method: 'exec',
+          params: {
+            'command': '/bin/sh',
+            'params': ['-c', killCmd],
+          },
+        );
+
+        // 3. Disable nextdns in UCI
+        await _apiService!.uciSet(
+          ip, sysauth, _useHttps,
+          config: 'nextdns',
+          section: 'main',
+          values: {'enabled': '0'},
+        );
+        await _apiService!.uciCommit(ip, sysauth, _useHttps, config: 'nextdns');
+
+        // 4. Purge orphaned drop-in configs and restore active DNS daemon
+        final purgeCmd = '$restartDnsHelper\n'
+            'rm -f /tmp/dnsmasq.d/nextdns.conf /var/etc/dnsmasq.d/nextdns.conf 2>/dev/null && '
+            'uci del dhcp.@dnsmasq[0].noresolv 2>/dev/null || true && '
+            'restart_dns';
+        await _apiService!.call(
+          ip, sysauth, _useHttps,
+          object: 'file',
+          method: 'exec',
+          params: {
+            'command': '/bin/sh',
+            'params': ['-c', purgeCmd],
+          },
+        );
+      }
+
+      // 5. DHCP & DNS Self-Healing Guardrail: ensure active DNS daemon is running
+      final healCmd = '$healDnsHelper\n'
+          'sleep 1 && heal_dns';
+      await _apiService!.call(
+        ip, sysauth, _useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': '/bin/sh',
+          'params': ['-c', healCmd],
+        },
+      );
 
       await _refreshDashboard();
       return true;
     } catch (e, stack) {
       Logger.exception('Failed to toggle NextDNS', e, stack);
+      try {
+        final emergencyCmd = '$restartDnsHelper\n'
+            'rm -f /tmp/dnsmasq.d/nextdns.conf 2>/dev/null && '
+            'uci del dhcp.@dnsmasq[0].noresolv 2>/dev/null || true && '
+            'restart_dns';
+        await _apiService!.call(
+          ip, sysauth, _useHttps,
+          object: 'file',
+          method: 'exec',
+          params: {
+            'command': '/bin/sh',
+            'params': ['-c', emergencyCmd],
+          },
+        );
+      } catch (_) {
+        // Pure ubus RPC fallback if file.exec is unavailable
+        await _apiService!.manageServiceAction(
+          ip, sysauth, _useHttps,
+          serviceName: 'nextdns',
+          action: enable ? 'start' : 'stop',
+        );
+        await _apiService!.manageServiceAction(
+          ip, sysauth, _useHttps,
+          serviceName: 'dnsmasq',
+          action: 'restart',
+        );
+      }
       return false;
     }
   }
@@ -651,6 +806,8 @@ class NetworkActionsController {
     required String macAddress,
     required String targetIp,
     required String hostname,
+    String? targetIp6,
+    String? duid,
     String? leaseTime,
     BuildContext? context,
   }) async {
@@ -662,10 +819,54 @@ class NetworkActionsController {
         hints[macUpper] = {
           'name': hostname,
           'staticLeaseName': hostname,
-          'ipaddrs': [targetIp],
+          'ipaddrs': [if (targetIp.isNotEmpty) targetIp],
           'staticLeaseIp': targetIp,
           'isStaticLease': true,
+          if (targetIp6 != null && targetIp6.isNotEmpty) 'ip6addr': targetIp6,
+          if (duid != null && duid.isNotEmpty) 'duid': duid,
+          if (leaseTime != null && leaseTime.isNotEmpty) 'leasetime': leaseTime,
         };
+
+        final rawUciDhcp = dashboardData['uciDhcpConfig'] ?? dashboardData['dhcp'];
+        if (rawUciDhcp is Map) {
+          final values = rawUciDhcp['values'] ?? rawUciDhcp;
+          if (values is Map) {
+            bool updated = false;
+            values.forEach((k, v) {
+              if (v is Map && v['.type'] == 'host') {
+                final mac = v['mac']?.toString().toUpperCase().replaceAll('-', ':');
+                if (mac == macUpper) {
+                  v['name'] = hostname;
+                  v['ip'] = targetIp;
+                  if (targetIp6 != null && targetIp6.isNotEmpty) v['ip6addr'] = targetIp6;
+                  if (duid != null && duid.isNotEmpty) v['duid'] = duid;
+                  if (leaseTime != null && leaseTime.isNotEmpty) {
+                    v['leasetime'] = leaseTime;
+                  } else {
+                    v.remove('leasetime');
+                  }
+                  updated = true;
+                }
+              }
+            });
+            if (!updated) {
+              final newSecKey = 'host_${macUpper.replaceAll(':', '')}';
+              final newSec = <String, dynamic>{
+                '.type': 'host',
+                '.name': newSecKey,
+                'name': hostname,
+                'mac': macUpper,
+                'ip': targetIp,
+                if (targetIp6 != null && targetIp6.isNotEmpty) 'ip6addr': targetIp6,
+                if (duid != null && duid.isNotEmpty) 'duid': duid,
+              };
+              if (leaseTime != null && leaseTime.isNotEmpty) {
+                newSec['leasetime'] = leaseTime;
+              }
+              values[newSecKey] = newSec;
+            }
+          }
+        }
       }
       _notifyListeners();
       await _refreshDashboard();
@@ -680,10 +881,41 @@ class NetworkActionsController {
       macAddress: macAddress,
       targetIp: targetIp,
       hostname: hostname,
+      targetIp6: targetIp6,
+      duid: duid,
       leaseTime: leaseTime,
       context: context,
     );
     if (res) {
+      final dashboardData = _dashboardDataRef();
+      if (dashboardData != null) {
+        if (dashboardData['hostHints'] is Map) {
+          final hints = dashboardData['hostHints'] as Map;
+          hints[macUpper] = {
+            'name': hostname,
+            'staticLeaseName': hostname,
+            'ipaddrs': [if (targetIp.isNotEmpty) targetIp],
+            'staticLeaseIp': targetIp,
+            'isStaticLease': true,
+            if (targetIp6 != null && targetIp6.isNotEmpty) 'ip6addr': targetIp6,
+            if (duid != null && duid.isNotEmpty) 'duid': duid,
+            if (leaseTime != null && leaseTime.isNotEmpty) 'leasetime': leaseTime,
+          };
+        }
+        final rawUciDhcp = dashboardData['uciDhcpConfig'] ?? dashboardData['dhcp'];
+        if (rawUciDhcp is Map) {
+          final values = rawUciDhcp['values'] ?? rawUciDhcp;
+          if (values is Map) {
+            values['sec_${macUpper.replaceAll(":", "")}'] = {
+              '.type': 'host',
+              'name': hostname,
+              'mac': macUpper,
+              'ip': targetIp,
+              if (leaseTime != null && leaseTime.isNotEmpty) 'leasetime': leaseTime,
+            };
+          }
+        }
+      }
       await _refreshDashboard();
       _notifyListeners();
     }
@@ -700,6 +932,23 @@ class NetworkActionsController {
       if (dashboardData != null) {
         final hints = dashboardData['hostHints'] as Map<String, dynamic>? ?? {};
         hints.removeWhere((key, val) => key.toUpperCase().replaceAll('-', ':') == macUpper);
+
+        final rawUciDhcp = dashboardData['uciDhcpConfig'] ?? dashboardData['dhcp'];
+        if (rawUciDhcp is Map) {
+          final values = rawUciDhcp['values'] ?? rawUciDhcp;
+          if (values is Map) {
+            values.removeWhere((k, v) {
+              if (v is Map && v['.type'] == 'host') {
+                final mac = v['mac'];
+                if (mac is List) {
+                  return mac.map((e) => e.toString().toUpperCase().replaceAll('-', ':')).contains(macUpper);
+                }
+                return mac?.toString().toUpperCase().replaceAll('-', ':') == macUpper;
+              }
+              return false;
+            });
+          }
+        }
       }
       _notifyListeners();
       await _refreshDashboard();
@@ -715,10 +964,135 @@ class NetworkActionsController {
       context: context,
     );
     if (res) {
+      final dashboardData = _dashboardDataRef();
+      if (dashboardData != null) {
+        if (dashboardData['hostHints'] is Map) {
+          final hints = dashboardData['hostHints'] as Map;
+          hints.removeWhere((key, val) => key.toString().toUpperCase().replaceAll('-', ':') == macUpper);
+        }
+        final rawUciDhcp = dashboardData['uciDhcpConfig'] ?? dashboardData['dhcp'];
+        if (rawUciDhcp is Map) {
+          final values = rawUciDhcp['values'] ?? rawUciDhcp;
+          if (values is Map) {
+            values.removeWhere((k, v) {
+              if (v is Map && v['.type'] == 'host') {
+                final mac = v['mac'];
+                if (mac is List) {
+                  return mac.map((e) => e.toString().toUpperCase().replaceAll('-', ':')).contains(macUpper);
+                }
+                return mac?.toString().toUpperCase().replaceAll('-', ':') == macUpper;
+              }
+              return false;
+            });
+          }
+        }
+      }
       await _refreshDashboard();
       _notifyListeners();
     }
     return res;
+  }
+
+  Future<bool> refreshClientConnection({
+    required String macAddress,
+    BuildContext? context,
+  }) async {
+    final macUpper = macAddress.toUpperCase().replaceAll('-', ':');
+    if (_isReviewerMode) {
+      await _refreshDashboard();
+      _notifyListeners();
+      return true;
+    }
+    final ip = _ip;
+    final sysauth = _sysauth;
+    if (ip == null || sysauth == null || _apiService == null) return false;
+
+    final res = await _apiService!.refreshClientConnection(
+      ip, sysauth, _useHttps,
+      macAddress: macUpper,
+      context: context,
+    );
+    if (res) {
+      await _refreshDashboard();
+      _notifyListeners();
+    }
+    return res;
+  }
+
+  Future<int> flushUnusedDhcpLeases({
+    List<Client>? clients,
+    List<String>? macsToFlush,
+    BuildContext? context,
+  }) async {
+    final List<String> targetMacs = macsToFlush ??
+        (clients ?? [])
+            .where((c) => !c.isConnected && !c.isStatic)
+            .map((c) => c.macAddress.toUpperCase().replaceAll('-', ':'))
+            .toList();
+
+    if (targetMacs.isEmpty) return 0;
+
+    if (_isReviewerMode) {
+      final dashData = _dashboardDataRef();
+      if (dashData != null) {
+        final targetUpper = targetMacs.map((m) => m.toUpperCase().replaceAll('-', ':')).toSet();
+
+        String extractMac(dynamic item) {
+          if (item is Map) {
+            return (item['macaddr'] ?? item['mac'] ?? item['macAddress'] ?? '').toString().toUpperCase().replaceAll('-', ':');
+          }
+          try {
+            final dynamic m = (item as dynamic).macAddress;
+            if (m != null) return m.toString().toUpperCase().replaceAll('-', ':');
+          } catch (_) {}
+          return '';
+        }
+
+        bool shouldKeep(dynamic item) {
+          final mac = extractMac(item);
+          if (mac.isEmpty) return true;
+          return !targetUpper.contains(mac);
+        }
+
+        final dhcpLeases = dashData['dhcpLeases'];
+        if (dhcpLeases is List) {
+          dashData['dhcpLeases'] = dhcpLeases.where(shouldKeep).toList();
+        } else if (dhcpLeases is Map) {
+          final innerList = dhcpLeases['dhcpLeases'] ?? dhcpLeases['leases'];
+          if (innerList is List) {
+            dhcpLeases['dhcpLeases'] = innerList.where(shouldKeep).toList();
+          }
+        }
+
+        final dhcp6Leases = dashData['dhcp6Leases'] ?? dashData['dhcp6_leases'];
+        if (dhcp6Leases is List) {
+          dashData['dhcp6Leases'] = dhcp6Leases.where(shouldKeep).toList();
+        } else if (dhcp6Leases is Map) {
+          final inner6List = dhcp6Leases['dhcp6Leases'] ?? dhcp6Leases['leases'];
+          if (inner6List is List) {
+            dhcp6Leases['dhcp6Leases'] = inner6List.where(shouldKeep).toList();
+          }
+        }
+      }
+      await _refreshDashboard();
+      _notifyListeners();
+      return targetMacs.length;
+    }
+
+    final ip = _ip;
+    final sysauth = _sysauth;
+    if (ip == null || sysauth == null || _apiService == null) return 0;
+
+    final count = await _apiService!.deleteUnusedDhcpLeases(
+      ip, sysauth, _useHttps,
+      macsToFlush: targetMacs,
+      context: context,
+    );
+    if (count > 0) {
+      await _refreshDashboard();
+      _notifyListeners();
+    }
+    return count;
   }
 
   Future<bool> banWirelessClient(
@@ -767,6 +1141,30 @@ class NetworkActionsController {
     );
     if (res) {
       await _refreshDashboard();
+    }
+    return res;
+  }
+
+  Future<bool> forceRefreshDhcpLeases({
+    BuildContext? context,
+  }) async {
+    if (_isReviewerMode) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      await _refreshDashboard();
+      _notifyListeners();
+      return true;
+    }
+    final ip = _ip;
+    final sysauth = _sysauth;
+    if (ip == null || sysauth == null || _apiService == null) return false;
+
+    final res = await _apiService!.forceRefreshDhcpLeases(
+      ip, sysauth, _useHttps,
+      context: context,
+    );
+    if (res) {
+      await _refreshDashboard();
+      _notifyListeners();
     }
     return res;
   }

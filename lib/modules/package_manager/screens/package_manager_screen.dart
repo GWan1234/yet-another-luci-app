@@ -120,7 +120,7 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
                       const SnackBar(content: Text('Re-probing router capabilities...')),
                     );
                     await ref.read(appStateProvider).redetectCapabilities();
-                    _loadPackages();
+                    await _loadPackages();
                   },
                   icon: const Icon(Icons.refresh),
                   label: const Text('Re-detect Router Capabilities'),
@@ -245,13 +245,13 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
                                   icon: const Icon(Icons.refresh),
                                   label: const Text('Retry'),
                                 ),
-                                OutlinedButton.icon(
+                                 OutlinedButton.icon(
                                   onPressed: () async {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(content: Text('Re-probing router capabilities...')),
                                     );
                                     await ref.read(appStateProvider).redetectCapabilities();
-                                    _loadPackages();
+                                    await _loadPackages();
                                   },
                                   icon: const Icon(Icons.search),
                                   label: const Text('Re-detect Capabilities'),
@@ -379,7 +379,7 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
             if (context.mounted) {
               _handleRpcResult(result, 'Removal of ${pkg.name}');
               if (result.isSuccess) {
-                _loadPackages();
+                await _loadPackages();
               }
             }
           },

@@ -135,6 +135,11 @@ abstract class IApiService {
     bool useHttps, {
     BuildContext? context,
   });
+  Future<bool> ensureSilentPermissions(
+    String ipAddress,
+    String sysauth,
+    bool useHttps,
+  );
   Future<bool> manageServiceAction(
     String ipAddress,
     String sysauth,
@@ -179,6 +184,8 @@ abstract class IApiService {
     required String macAddress,
     required String targetIp,
     required String hostname,
+    String? targetIp6,
+    String? duid,
     String? leaseTime,
     BuildContext? context,
   });
@@ -189,7 +196,27 @@ abstract class IApiService {
     required String macAddress,
     BuildContext? context,
   });
+  Future<bool> refreshClientConnection(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String macAddress,
+    BuildContext? context,
+  });
+  Future<int> deleteUnusedDhcpLeases(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required List<String> macsToFlush,
+    BuildContext? context,
+  });
   Future<Map<String, String?>> fetchPublicIps(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  });
+  Future<bool> forceRefreshDhcpLeases(
     String ipAddress,
     String sysauth,
     bool useHttps, {

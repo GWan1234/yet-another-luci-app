@@ -202,9 +202,14 @@ class Client {
     );
   }
 
-  // Get formatted lease time (e.g., "2d 4h 30m")
+  // Get formatted lease time (e.g., "2d 4h 30m" or "Static (Unlimited)")
   String get formattedLeaseTime {
-    if (isStatic) return 'Unlimited';
+    if (isStatic) {
+      if (leaseTime != null && leaseTime! > 0 && leaseTime! < 86400 * 365) {
+        return 'Static (${Client.formatDuration(leaseTime!)})';
+      }
+      return 'Static (Unlimited)';
+    }
     if (leaseTime == null) return 'No active lease';
     if (leaseTime == 0) return 'Unlimited';
     if (leaseTime! < 0) return 'Expired';

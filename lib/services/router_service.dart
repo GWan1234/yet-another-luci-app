@@ -5,13 +5,27 @@ import 'package:luci_mobile/models/router.dart' as model;
 import 'package:luci_mobile/services/secure_storage_service.dart';
 
 class RouterService {
+  RouterService({this.isReviewerMode = false});
+
+  final bool isReviewerMode;
   final SecureStorageService _secureStorageService = SecureStorageService();
 
   List<model.Router> _routers = [];
   model.Router? _selectedRouter;
 
-  List<model.Router> get routers => _routers;
-  model.Router? get selectedRouter => _selectedRouter;
+  static final model.Router mockRouter = model.Router(
+    id: 'http://192.168.1.1-root',
+    ipAddress: '192.168.1.1',
+    username: 'root',
+    password: '',
+    useHttps: false,
+    lastKnownHostname: 'OpenWrt-Reviewer',
+  );
+
+  List<model.Router> get routers =>
+      _routers.isEmpty && isReviewerMode ? [mockRouter] : _routers;
+  model.Router? get selectedRouter =>
+      _selectedRouter ?? (isReviewerMode ? mockRouter : null);
 
   static String generateId(String ip, String user, bool useHttps) {
     final scheme = useHttps ? 'https' : 'http';

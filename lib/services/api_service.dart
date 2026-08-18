@@ -1241,6 +1241,8 @@ class RealApiService implements IApiService {
           'command': '/bin/sh',
           'params': [
             '-c',
+            'mkdir -p /usr/share/rpcd/acl.d/ && '
+            'printf \'{\\n  "luci-app-tailscale": {\\n    "description": "Tailscale VPN ACL Permissions",\\n    "read": {\\n      "file": {\\n        "/usr/sbin/tailscale": [ "exec" ],\\n        "/usr/bin/tailscale": [ "exec" ],\\n        "/usr/bin/nextdns": [ "exec" ],\\n        "/usr/bin/cloudflared": [ "exec" ]\\n      }\\n    },\\n    "write": {\\n      "file": {\\n        "/usr/sbin/tailscale": [ "exec" ],\\n        "/usr/bin/tailscale": [ "exec" ],\\n        "/usr/bin/nextdns": [ "exec" ],\\n        "/usr/bin/cloudflared": [ "exec" ]\\n      }\\n    }\\n  }\\n}\\n\' > /usr/share/rpcd/acl.d/luci-app-tailscale.json && '
             'if command -v apk >/dev/null 2>&1; then '
             'apk update && apk add luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status; '
             'else '
@@ -1264,6 +1266,8 @@ class RealApiService implements IApiService {
           'command': '/bin/sh',
           'args': [
             '-c',
+            'mkdir -p /usr/share/rpcd/acl.d/ && '
+            'printf \'{\\n  "luci-app-tailscale": {\\n    "description": "Tailscale VPN ACL Permissions",\\n    "read": {\\n      "file": {\\n        "/usr/sbin/tailscale": [ "exec" ],\\n        "/usr/bin/tailscale": [ "exec" ],\\n        "/usr/bin/nextdns": [ "exec" ],\\n        "/usr/bin/cloudflared": [ "exec" ]\\n      }\\n    },\\n    "write": {\\n      "file": {\\n        "/usr/sbin/tailscale": [ "exec" ],\\n        "/usr/bin/tailscale": [ "exec" ],\\n        "/usr/bin/nextdns": [ "exec" ],\\n        "/usr/bin/cloudflared": [ "exec" ]\\n      }\\n    }\\n  }\\n}\\n\' > /usr/share/rpcd/acl.d/luci-app-tailscale.json && '
             'if command -v apk >/dev/null 2>&1; then '
             'apk update && apk add luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status; '
             'else '
@@ -1276,6 +1280,38 @@ class RealApiService implements IApiService {
       return _execSucceeded(fallbackRes);
     } catch (e, stack) {
       Logger.exception('autoFixPermissions failed', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> ensureSilentPermissions(
+    String ipAddress,
+    String sysauth,
+    bool useHttps,
+  ) async {
+    try {
+      const aclScript =
+          'if [ ! -f /usr/share/rpcd/acl.d/yet-another-luci-app.json ]; then '
+          'mkdir -p /usr/share/rpcd/acl.d/ && '
+          'printf \'{\\n  "yet-another-luci-app": {\\n    "description": "Yet Another LuCI App Silent RPC Permissions",\\n    "read": {\\n      "file": {\\n        "/usr/sbin/tailscale": [ "exec" ],\\n        "/usr/bin/tailscale": [ "exec" ],\\n        "/usr/bin/nextdns": [ "exec" ],\\n        "/usr/bin/cloudflared": [ "exec" ]\\n      },\\n      "ubus": {\\n        "iwinfo": [ "*" ],\\n        "rc": [ "*" ],\\n        "file": [ "*" ],\\n        "luci-rpc": [ "*" ]\\n      }\\n    },\\n    "write": {\\n      "file": {\\n        "/usr/sbin/tailscale": [ "exec" ],\\n        "/usr/bin/tailscale": [ "exec" ],\\n        "/usr/bin/nextdns": [ "exec" ],\\n        "/usr/bin/cloudflared": [ "exec" ]\\n      },\\n      "ubus": {\\n        "iwinfo": [ "*" ],\\n        "rc": [ "*" ],\\n        "file": [ "*" ],\\n        "luci-rpc": [ "*" ]\\n      }\\n    }\\n  }\\n}\\n\' > /usr/share/rpcd/acl.d/yet-another-luci-app.json && '
+          '(/etc/init.d/rpcd reload 2>/dev/null || /etc/init.d/rpcd restart 2>/dev/null || true); '
+          'fi';
+
+      await call(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': '/bin/sh',
+          'params': ['-c', aclScript],
+        },
+      );
+      return true;
+    } catch (e) {
+      Logger.warning('Silent background permission setup skipped/failed: $e');
       return false;
     }
   }
@@ -2022,6 +2058,34 @@ echo "\$ALL_BANNED"
     }
   }
 
+  static String? _sanitizeOpenWrtLeaseTime(String? lt) {
+    if (lt == null) return null;
+    final trimmed = lt.trim().toLowerCase();
+    if (trimmed.isEmpty) return null;
+    if (trimmed == 'infinite') return 'infinite';
+
+    if (trimmed.endsWith('w')) {
+      final weeks = int.tryParse(trimmed.substring(0, trimmed.length - 1));
+      if (weeks != null && weeks > 0) return '${weeks * 7}d';
+    }
+    if (trimmed.endsWith('s')) {
+      final secs = int.tryParse(trimmed.substring(0, trimmed.length - 1));
+      if (secs != null && secs > 0) {
+        final mins = (secs / 60).ceil();
+        return '${mins < 2 ? 2 : mins}m';
+      }
+    }
+    if (RegExp(r'^\d+[mhd]$').hasMatch(trimmed)) {
+      return trimmed;
+    }
+    final plainNumber = int.tryParse(trimmed);
+    if (plainNumber != null && plainNumber > 0) {
+      final mins = (plainNumber / 60).ceil();
+      return '${mins < 2 ? 2 : mins}m';
+    }
+    return '12h';
+  }
+
   @override
   Future<bool> addStaticLease(
     String ipAddress,
@@ -2030,47 +2094,152 @@ echo "\$ALL_BANNED"
     required String macAddress,
     required String targetIp,
     required String hostname,
+    String? targetIp6,
+    String? duid,
     String? leaseTime,
     BuildContext? context,
   }) async {
     try {
       final macUpper = macAddress.toUpperCase().replaceAll('-', ':');
+      final cleanTargetIp = targetIp.trim();
+      final sanitizedLt = _sanitizeOpenWrtLeaseTime(leaseTime);
+
       final values = <String, String>{
         'name': hostname.trim(),
-        'mac': macUpper,
-        'ip': targetIp.trim(),
       };
-      if (leaseTime != null && leaseTime.trim().isNotEmpty) {
-        values['leasetime'] = leaseTime.trim();
+
+      if (macUpper.isNotEmpty && macUpper != 'N/A' && !macUpper.startsWith('DUID:')) {
+        values['mac'] = macUpper;
+      }
+      if (cleanTargetIp.isNotEmpty && cleanTargetIp != 'N/A') {
+        values['ip'] = cleanTargetIp;
+      }
+      if (targetIp6 != null && targetIp6.trim().isNotEmpty && targetIp6.trim() != 'N/A') {
+        values['ip6addr'] = targetIp6.trim();
+      }
+      if (duid != null && duid.trim().isNotEmpty && duid.trim() != 'N/A') {
+        values['duid'] = duid.trim().toUpperCase();
+      }
+      if (sanitizedLt != null && sanitizedLt.isNotEmpty) {
+        values['leasetime'] = sanitizedLt;
       }
 
-      // 1. Try ubus uci.add call
-      final addRes = await callWithContext(
-        ipAddress,
-        sysauth,
-        useHttps,
-        object: 'uci',
-        method: 'add',
-        params: {
-          'config': 'dhcp',
-          'type': 'host',
-          'values': values,
-        },
-        context: mountedContext(context),
-      );
+      // 1. Find all existing host sections matching MAC or IP to prevent duplicate dhcp-host entries
+      final matchingSections = <String>[];
+      try {
+        final getRes = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'get',
+          params: {'config': 'dhcp'},
+          context: mountedContext(context),
+        );
+        if (getRes is List && getRes.length > 1 && getRes[0] == 0) {
+          final uciData = getRes[1];
+          final valuesMap = (uciData is Map && uciData['values'] is Map)
+              ? uciData['values'] as Map
+              : (uciData is Map ? uciData : {});
+          valuesMap.forEach((key, val) {
+            if (val is Map && val['.type'] == 'host') {
+              final macVal = val['mac'];
+              final ipVal = val['ip']?.toString().trim();
+              bool isMatch = false;
 
-      bool addSuccess = addRes is List && addRes.isNotEmpty && addRes[0] == 0;
+              if (ipVal == cleanTargetIp) {
+                isMatch = true;
+              } else if (macVal is String && macVal.toUpperCase().replaceAll('-', ':') == macUpper) {
+                isMatch = true;
+              } else if (macVal is List) {
+                for (final item in macVal) {
+                  if (item.toString().toUpperCase().replaceAll('-', ':') == macUpper) {
+                    isMatch = true;
+                    break;
+                  }
+                }
+              }
+
+              if (isMatch) {
+                matchingSections.add(key.toString());
+              }
+            }
+          });
+        }
+      } catch (e) {
+        Logger.warning('uci dhcp lookup encountered issue during addStaticLease: $e');
+      }
+
+      bool addSuccess = false;
+
+      // Delete any duplicate matching sections beyond the first one
+      if (matchingSections.length > 1) {
+        for (int i = 1; i < matchingSections.length; i++) {
+          try {
+            await callWithContext(
+              ipAddress,
+              sysauth,
+              useHttps,
+              object: 'uci',
+              method: 'delete',
+              params: {'config': 'dhcp', 'section': matchingSections[i]},
+              context: mountedContext(context),
+            );
+          } catch (_) {}
+        }
+      }
+
+      if (matchingSections.isNotEmpty) {
+        // Update existing primary section in place
+        final setRes = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'set',
+          params: {
+            'config': 'dhcp',
+            'section': matchingSections.first,
+            'values': values,
+          },
+          context: mountedContext(context),
+        );
+        addSuccess = setRes is List && setRes.isNotEmpty && setRes[0] == 0;
+        if (addSuccess) {
+          await uciCommit(ipAddress, sysauth, useHttps, config: 'dhcp', context: mountedContext(context));
+        }
+      } else {
+        // Create new host section via uci.add
+        final addRes = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'add',
+          params: {
+            'config': 'dhcp',
+            'type': 'host',
+            'values': values,
+          },
+          context: mountedContext(context),
+        );
+        addSuccess = addRes is List && addRes.isNotEmpty && addRes[0] == 0;
+        if (addSuccess) {
+          await uciCommit(ipAddress, sysauth, useHttps, config: 'dhcp', context: mountedContext(context));
+        }
+      }
 
       if (!addSuccess) {
-        // Fallback: Shell execution via /bin/sh
+        // Fallback: Shell execution via /bin/sh - ensures duplicates are deleted and dnsmasq restarted
         final cmdList = [
+          'for sec in \$(uci show dhcp 2>/dev/null | grep -iE "$macUpper|$cleanTargetIp" | cut -d. -f2 | sort -u); do uci delete dhcp.\$sec 2>/dev/null || true; done',
           'SECNAME=\$(uci add dhcp host)',
           'uci set dhcp.\$SECNAME.name="${hostname.trim()}"',
           'uci set dhcp.\$SECNAME.mac="$macUpper"',
-          'uci set dhcp.\$SECNAME.ip="${targetIp.trim()}"',
+          'uci set dhcp.\$SECNAME.ip="$cleanTargetIp"',
         ];
-        if (leaseTime != null && leaseTime.trim().isNotEmpty) {
-          cmdList.add('uci set dhcp.\$SECNAME.leasetime="${leaseTime.trim()}"');
+        if (sanitizedLt != null && sanitizedLt.isNotEmpty) {
+          cmdList.add('uci set dhcp.\$SECNAME.leasetime="$sanitizedLt"');
         }
         cmdList.add('uci commit dhcp');
 
@@ -2087,17 +2256,15 @@ echo "\$ALL_BANNED"
           context: mountedContext(context),
         );
         addSuccess = _execSucceeded(shellRes);
-      } else {
-        await uciCommit(ipAddress, sysauth, useHttps, config: 'dhcp', context: mountedContext(context));
       }
 
-      // Reload dnsmasq service to apply static lease
+      // Restart dnsmasq service to ensure clean recovery & application of static lease
       await manageServiceAction(
         ipAddress,
         sysauth,
         useHttps,
         serviceName: 'dnsmasq',
-        action: 'reload',
+        action: 'restart',
         context: mountedContext(context),
       );
 
@@ -2118,9 +2285,9 @@ echo "\$ALL_BANNED"
   }) async {
     try {
       final cleanMac = macAddress.trim().toLowerCase();
-      String? sectionToDelete;
+      final sectionsToDelete = <String>[];
 
-      // 1. Attempt to find section via UCI ubus call
+      // 1. Attempt to find all matching sections via UCI ubus call
       try {
         final getRes = await callWithContext(
           ipAddress,
@@ -2138,17 +2305,16 @@ echo "\$ALL_BANNED"
               ? uciData['values'] as Map
               : (uciData is Map ? uciData : {});
           valuesMap.forEach((key, val) {
-            if (sectionToDelete != null) return;
             if (val is Map && val['.type'] == 'host') {
               final macVal = val['mac'];
               if (macVal is String) {
                 if (macVal.toLowerCase().contains(cleanMac)) {
-                  sectionToDelete = key.toString();
+                  sectionsToDelete.add(key.toString());
                 }
               } else if (macVal is List) {
                 for (final item in macVal) {
                   if (item.toString().toLowerCase().contains(cleanMac)) {
-                    sectionToDelete = key.toString();
+                    sectionsToDelete.add(key.toString());
                     break;
                   }
                 }
@@ -2162,27 +2328,30 @@ echo "\$ALL_BANNED"
 
       bool deleteSuccess = false;
 
-      if (sectionToDelete != null) {
-        // Delete identified section via ubus
-        final delRes = await callWithContext(
-          ipAddress,
-          sysauth,
-          useHttps,
-          object: 'uci',
-          method: 'delete',
-          params: {
-            'config': 'dhcp',
-            'section': sectionToDelete,
-          },
-          context: mountedContext(context),
-        );
-        deleteSuccess = delRes is List && delRes.isNotEmpty && delRes[0] == 0;
+      if (sectionsToDelete.isNotEmpty) {
+        for (final sec in sectionsToDelete) {
+          final delRes = await callWithContext(
+            ipAddress,
+            sysauth,
+            useHttps,
+            object: 'uci',
+            method: 'delete',
+            params: {
+              'config': 'dhcp',
+              'section': sec,
+            },
+            context: mountedContext(context),
+          );
+          if (delRes is List && delRes.isNotEmpty && delRes[0] == 0) {
+            deleteSuccess = true;
+          }
+        }
         if (deleteSuccess) {
           await uciCommit(ipAddress, sysauth, useHttps, config: 'dhcp', context: mountedContext(context));
         }
       }
 
-      // 2. Fallback to shell execution if ubus delete failed or section wasn't matched via ubus
+      // 2. Fallback to shell execution if ubus delete failed or sections were not matched via ubus
       if (!deleteSuccess) {
         final shellRes = await callWithContext(
           ipAddress,
@@ -2192,19 +2361,19 @@ echo "\$ALL_BANNED"
           method: 'exec',
           params: {
             'command': '/bin/sh',
-            'params': ['-c', "sec=\$(uci show dhcp | grep -i '$cleanMac' | head -n1 | cut -d. -f2); if [ -n \"\$sec\" ]; then uci delete dhcp.\$sec && uci commit dhcp && /etc/init.d/dnsmasq reload; fi"],
+            'params': ['-c', "for sec in \$(uci show dhcp 2>/dev/null | grep -i '$cleanMac' | cut -d. -f2 | sort -u); do uci delete dhcp.\$sec 2>/dev/null || true; done; uci commit dhcp && /etc/init.d/dnsmasq restart"],
           },
           context: mountedContext(context),
         );
         deleteSuccess = _execSucceeded(shellRes);
       } else {
-        // Reload dnsmasq service to apply change
+        // Restart dnsmasq service to apply change
         await manageServiceAction(
           ipAddress,
           sysauth,
           useHttps,
           serviceName: 'dnsmasq',
-          action: 'reload',
+          action: 'restart',
           context: mountedContext(context),
         );
       }
@@ -2213,6 +2382,146 @@ echo "\$ALL_BANNED"
     } catch (e, stack) {
       Logger.exception('deleteStaticLease failed for $macAddress', e, stack);
       return false;
+    }
+  }
+
+  @override
+  Future<bool> refreshClientConnection(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String macAddress,
+    BuildContext? context,
+  }) async {
+    try {
+      final macUpper = macAddress.toUpperCase().replaceAll('-', ':');
+      final macLower = macAddress.toLowerCase().replaceAll('-', ':');
+
+      final script = '''
+MAC_U="$macUpper"
+MAC_L="$macLower"
+
+if [ -f /tmp/dhcp.leases ]; then
+  sed -i "/\$MAC_U/d; /\$MAC_L/d" /tmp/dhcp.leases 2>/dev/null || true
+fi
+
+for obj in \$(ubus list 'hostapd.*' 2>/dev/null); do
+  ubus call "\$obj" del_client '{"addr":"'"\$MAC_U"'","reason":1,"deauth":true}' 2>/dev/null || true
+  ubus call "\$obj" del_client '{"addr":"'"\$MAC_L"'","reason":1,"deauth":true}' 2>/dev/null || true
+done
+for dev in \$(iw dev 2>/dev/null | awk '\$1=="Interface"{print \$2}'); do
+  iw dev "\$dev" station del "\$MAC_L" 2>/dev/null || true
+  iw dev "\$dev" station del "\$MAC_U" 2>/dev/null || true
+done
+
+/etc/init.d/dnsmasq reload 2>/dev/null || true
+exit 0
+''';
+
+      await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: fileExecParams('/bin/sh', ['-c', script]),
+        context: mountedContext(context),
+      );
+
+      return true;
+    } catch (e, stack) {
+      Logger.exception('refreshClientConnection failed for $macAddress', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<int> deleteUnusedDhcpLeases(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required List<String> macsToFlush,
+    BuildContext? context,
+  }) async {
+    if (macsToFlush.isEmpty) return 0;
+    try {
+      // 1. Fetch running processes to find PIDs of dnsmasq and odhcpd
+      try {
+        final procRes = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'luci',
+          method: 'getProcessList',
+          params: {},
+          context: mountedContext(context),
+        );
+        if (procRes is Map && procRes['result'] is List) {
+          final pList = procRes['result'] as List;
+          for (final proc in pList) {
+            if (proc is Map) {
+              final cmd = (proc['COMMAND'] ?? '').toString();
+              final pid = (proc['PID'] ?? '').toString();
+              if (pid.isNotEmpty && (cmd.contains('dnsmasq') || cmd.contains('odhcpd'))) {
+                try {
+                  // Send SIGHUP (-1) via /bin/kill which is allowed by ubus ACLs
+                  await callWithContext(
+                    ipAddress,
+                    sysauth,
+                    useHttps,
+                    object: 'file',
+                    method: 'exec',
+                    params: fileExecParams('/bin/kill', ['-1', pid]),
+                    context: mountedContext(context),
+                  );
+                } catch (_) {}
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      // 2. Commit uci dhcp configuration to sync OpenWrt DHCP subsystem
+      try {
+        await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'commit',
+          params: {'config': 'dhcp'},
+          context: mountedContext(context),
+        );
+      } catch (_) {}
+
+      // 3. Fallback: attempt /bin/sh shell script if router allows full shell exec
+      try {
+        final macUpper = macsToFlush.map((m) => m.toUpperCase().replaceAll('-', ':')).join('|');
+        final macLower = macsToFlush.map((m) => m.toLowerCase().replaceAll('-', ':')).join('|');
+        final macPattern = '$macUpper|$macLower';
+        final script = '''
+for f in /tmp/dhcp.leases /var/dhcp.leases /tmp/dnsmasq.leases /var/run/odhcpd.leases /tmp/odhcpd.leases /tmp/hosts/odhcpd; do
+  if [ -f "\$f" ]; then
+    grep -vE "$macPattern" "\$f" > "\$f.tmp" 2>/dev/null && mv "\$f.tmp" "\$f" 2>/dev/null || true
+  fi
+done
+exit 0
+''';
+        await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'file',
+          method: 'exec',
+          params: fileExecParams('/bin/sh', ['-c', script]),
+          context: mountedContext(context),
+        );
+      } catch (_) {}
+
+      return macsToFlush.length;
+    } catch (e, stack) {
+      Logger.exception('deleteUnusedDhcpLeases failed', e, stack);
+      return 0;
     }
   }
 
@@ -2301,5 +2610,179 @@ echo "\$ALL_BANNED"
   static bool _isValidIpv4Candidate(String ip) {
     final reg = RegExp(r'^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.){3}(25[0-5]|(2[0-4]|1\d|[1-9]|)\d)$');
     return reg.hasMatch(ip);
+  }
+
+  @override
+  Future<bool> forceRefreshDhcpLeases(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  }) async {
+    try {
+      // 1. Resolve lease file location from UCI dhcp config
+      String leasePath = '/tmp/dhcp.leases';
+      try {
+        final uciRes = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'get',
+          params: {'config': 'dhcp'},
+          context: mountedContext(context),
+        );
+        if (execSucceeded(uciRes) && uciRes is List && uciRes.length > 1 && uciRes[1] is Map) {
+          final values = uciRes[1]['values'] ?? uciRes[1];
+          if (values is Map) {
+            values.forEach((k, v) {
+              if (v is Map && (v['.type'] == 'dnsmasq' || k.toString().contains('dnsmasq'))) {
+                if (v['leasefile'] != null && v['leasefile'].toString().isNotEmpty) {
+                  leasePath = v['leasefile'].toString();
+                }
+              }
+            });
+          }
+        }
+      } catch (_) {}
+
+      bool executedAny = false;
+
+      // 2. Stop dnsmasq and odhcpd via rc.init
+      try {
+        final stopDns = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'rc',
+          method: 'init',
+          params: {'name': 'dnsmasq', 'action': 'stop'},
+          context: mountedContext(context),
+        );
+        if (execSucceeded(stopDns)) executedAny = true;
+      } catch (_) {}
+
+      try {
+        await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'rc',
+          method: 'init',
+          params: {'name': 'odhcpd', 'action': 'stop'},
+          context: mountedContext(context),
+        );
+      } catch (_) {}
+
+      // 3. Send SIGHUP (-1) and SIGTERM (-15) via /bin/kill (allowed by rpcd ACLs) to dnsmasq and odhcpd
+      try {
+        final procRes = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'luci',
+          method: 'getProcessList',
+          params: {},
+          context: mountedContext(context),
+        );
+        if (procRes is Map && procRes['result'] is List) {
+          final pList = procRes['result'] as List;
+          for (final proc in pList) {
+            if (proc is Map) {
+              final cmd = (proc['COMMAND'] ?? '').toString();
+              final pid = (proc['PID'] ?? '').toString();
+              if (pid.isNotEmpty && (cmd.contains('dnsmasq') || cmd.contains('odhcpd'))) {
+                try {
+                  await callWithContext(
+                    ipAddress,
+                    sysauth,
+                    useHttps,
+                    object: 'file',
+                    method: 'exec',
+                    params: fileExecParams('/bin/kill', ['-1', pid]),
+                    context: mountedContext(context),
+                  );
+                  executedAny = true;
+                } catch (_) {}
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      // 4. Shell purge fallback script if shell exec is permitted
+      final purgeScript = '''
+rm -f "$leasePath" /tmp/dhcp.leases /var/dhcp.leases /tmp/dnsmasq.leases /var/lib/misc/dnsmasq.leases /var/run/odhcpd.leases 2>/dev/null || > "$leasePath" 2>/dev/null || true
+''';
+      try {
+        final shRes = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'file',
+          method: 'exec',
+          params: fileExecParams('/bin/sh', ['-c', purgeScript]),
+          context: mountedContext(context),
+        );
+        if (execSucceeded(shRes)) executedAny = true;
+      } catch (_) {}
+
+      // 5. Commit UCI dhcp configuration
+      try {
+        await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'commit',
+          params: {'config': 'dhcp'},
+          context: mountedContext(context),
+        );
+        executedAny = true;
+      } catch (_) {}
+
+      // 6. Restart/Start dnsmasq and odhcpd via rc.init & luci-rpc
+      try {
+        final startDns = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'rc',
+          method: 'init',
+          params: {'name': 'dnsmasq', 'action': 'restart'},
+          context: mountedContext(context),
+        );
+        if (execSucceeded(startDns)) executedAny = true;
+      } catch (_) {}
+
+      try {
+        await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'rc',
+          method: 'init',
+          params: {'name': 'odhcpd', 'action': 'restart'},
+          context: mountedContext(context),
+        );
+      } catch (_) {}
+
+      try {
+        await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'luci-rpc',
+          method: 'setInitAction',
+          params: {'name': 'dnsmasq', 'action': 'restart'},
+          context: mountedContext(context),
+        );
+      } catch (_) {}
+
+      return executedAny;
+    } catch (e, stack) {
+      Logger.exception('forceRefreshDhcpLeases failed', e, stack);
+      return false;
+    }
   }
 }

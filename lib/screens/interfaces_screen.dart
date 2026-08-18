@@ -501,13 +501,12 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
+        border: Border(
+          top: BorderSide(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
+            width: 1,
           ),
-        ],
+        ),
       ),
       child: SafeArea(
         child: Row(

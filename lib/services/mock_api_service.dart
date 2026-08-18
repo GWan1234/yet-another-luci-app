@@ -53,16 +53,28 @@ class MockApiService implements IApiService {
     final endpointKey = '$object.$method';
 
     try {
-      if (object == 'uci' && method == 'get' && params?['config'] == 'network') {
-        final netFile = mockNetworkModel == NetworkModel.swconfig
-            ? 'uci_network_swconfig.json'
-            : 'uci_network_dsa.json';
-        try {
-          final jsonString = await rootBundle.loadString(
-            '${AppConfig.mockDataPath}$netFile',
-          );
-          return [0, jsonDecode(jsonString)];
-        } catch (_) {}
+      if (object == 'uci' && method == 'get') {
+        final cfg = params?['config']?.toString();
+        String? targetFile;
+        if (cfg == 'network') {
+          targetFile = mockNetworkModel == NetworkModel.swconfig
+              ? 'uci_network_swconfig.json'
+              : 'uci_network_dsa.json';
+        } else if (cfg == 'wireless') {
+          targetFile = 'uci_wireless.json';
+        } else if (cfg == 'dhcp') {
+          targetFile = 'uci_dhcp.json';
+        } else if (cfg == 'firewall') {
+          targetFile = 'uci_firewall_fw4.json';
+        }
+        if (targetFile != null) {
+          try {
+            final jsonString = await rootBundle.loadString(
+              '${AppConfig.mockDataPath}$targetFile',
+            );
+            return [0, jsonDecode(jsonString)];
+          } catch (_) {}
+        }
       }
 
       // Return appropriate mock data based on object and method
@@ -147,6 +159,30 @@ class MockApiService implements IApiService {
           } else {
             return [0, {'code': 127, 'stdout': '', 'stderr': 'apk: not found'}];
           }
+        }
+      }
+
+      if (object == 'uci' && method == 'get') {
+        final cfg = params['config']?.toString();
+        String? targetFile;
+        if (cfg == 'network') {
+          targetFile = mockNetworkModel == NetworkModel.swconfig
+              ? 'uci_network_swconfig.json'
+              : 'uci_network_dsa.json';
+        } else if (cfg == 'wireless') {
+          targetFile = 'uci_wireless.json';
+        } else if (cfg == 'dhcp') {
+          targetFile = 'uci_dhcp.json';
+        } else if (cfg == 'firewall') {
+          targetFile = 'uci_firewall_fw4.json';
+        }
+        if (targetFile != null) {
+          try {
+            final jsonString = await rootBundle.loadString(
+              '${AppConfig.mockDataPath}$targetFile',
+            );
+            return [0, jsonDecode(jsonString)];
+          } catch (_) {}
         }
       }
 
@@ -305,8 +341,7 @@ class MockApiService implements IApiService {
       'network.interface': 'interface_dump.json',
       'network.interface.dump': 'interface_dump.json',
       'wireless.devices': 'wireless_devices.json',
-      'file.exec': 'dhcp_leases.json', // For DHCP leases command
-      'uci.get': 'uci_wireless.json', // For wireless config
+      'file.exec': 'dhcp_leases.json',
       'luci.wireguard.getWgInstances': 'wireguard_peers.json',
       'iwinfo.assoclist': 'associated_stations.json',
       'luci-rpc.getNetworkDevices': 'network_devices.json',
@@ -698,8 +733,47 @@ class MockApiService implements IApiService {
           },
         ];
 
+      case 'service.list':
+        return [
+          0,
+          {
+            'dnsmasq': {'running': true, 'enabled': true, 'pid': 1240},
+            'firewall': {'running': true, 'enabled': true, 'pid': 890},
+            'dropbear': {'running': true, 'enabled': true, 'pid': 1532},
+            'uhttpd': {'running': true, 'enabled': true, 'pid': 1620},
+            'odhcpd': {'running': true, 'enabled': true, 'pid': 1310},
+            'tailscale': {'running': true, 'enabled': true, 'pid': 2045},
+            'wireguard': {'running': true, 'enabled': true},
+            'nextdns': {'running': true, 'enabled': true, 'pid': 2110},
+            'cron': {'running': true, 'enabled': true, 'pid': 780},
+          }
+        ];
+
+      case 'rc.list':
+        return [
+          0,
+          {
+            'boot': {'enabled': true, 'running': false, 'index': 10},
+            'network': {'enabled': true, 'running': true, 'index': 20},
+            'firewall': {'enabled': true, 'running': true, 'index': 19},
+            'dropbear': {'enabled': true, 'running': true, 'index': 50},
+            'dnsmasq': {'enabled': true, 'running': true, 'index': 60},
+            'odhcpd': {'enabled': true, 'running': true, 'index': 65},
+            'uhttpd': {'enabled': true, 'running': true, 'index': 80},
+            'tailscale': {'enabled': true, 'running': true, 'index': 90},
+            'cron': {'enabled': true, 'running': true, 'index': 95},
+          }
+        ];
+
+      case 'file.read':
+        return [
+          0,
+          {
+            'data': '0 4 * * * /sbin/reboot\n*/15 * * * * /usr/bin/ping-check.sh\n'
+          }
+        ];
+
       case 'uci.get':
-        // UCI configuration data (generic response for various configs)
         return [
           0,
           {
@@ -722,6 +796,42 @@ class MockApiService implements IApiService {
                 'encryption': 'psk2',
                 'key': 'mock_password',
               },
+            },
+            'custom_client': {
+              '.type': 'openvpn',
+              'enabled': '1',
+              'running': true,
+              'proto': 'udp',
+              'port': '1194',
+              'dev': 'tun0',
+            },
+            'settings': {
+              '.type': 'tailscale',
+              'enabled': '1',
+              'running': true,
+              'node_name': 'OpenWrt-Router',
+              'ip': '100.64.0.15',
+              'state': 'Running',
+              'tailnet': 'my-tailnet.ts.net',
+              'magic_dns': '1',
+              'peers_count': 5,
+              'is_exit_node': false,
+            },
+            'main': {
+              '.type': 'nextdns',
+              'enabled': '1',
+              'running': true,
+              'profile': 'abcdef',
+              'report_client_info': '1',
+            },
+            'config': {
+              '.type': 'cloudflared',
+              'enabled': '1',
+              'running': true,
+              'tunnel_id': '8f92a10b-4c3d-2e1f-0a9b-8c7d6e5f4a3b',
+              'tunnel_name': 'home-router-tunnel',
+              'token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+              'connections': 4,
             },
           },
         ];
@@ -860,18 +970,29 @@ class MockApiService implements IApiService {
   static String _getVariedDhcpLeases() {
     final now = _getVariedTimestamp();
     final devices = [
-      'iPhone-John',
-      'MacBook-Pro',
-      'Smart-TV-Living-Room',
-      'Gaming-PC',
-      'Nest-Thermostat',
-      'iPad-Sarah',
-      'Amazon-Echo',
-      'Samsung-Galaxy-S23',
-      'Dell-Laptop-Work',
-      'Ring-Doorbell',
-      'Nintendo-Switch',
-      'Philips-Hue-Bridge',
+      'Pixel-9-Pro',
+      'MacBook-Pro-16-M3',
+      'Sony-Bravia-4K-TV',
+      'ASUS-ROG-Gaming-PC',
+      'Google-Nest-Thermostat',
+      'iPad-Air-M2',
+      'Amazon-Echo-Show-10',
+      'HP-Color-LaserJet-Pro',
+      'Samsung-Galaxy-S24-Ultra',
+      'Dell-XPS-15-Workstation',
+      'Ring-Video-Doorbell-Pro',
+      'PlayStation-5-Console',
+      'Philips-Hue-Bridge-V2',
+      'Nintendo-Switch-OLED',
+      'Sonos-Era-100-Speaker',
+      'Tesla-Model-3-EV',
+      'LG-C3-OLED-TV',
+      'Steam-Deck-OLED',
+      'Eufy-Security-Camera',
+      'Raspberry-Pi-5-HomeAssistant',
+      'Apple-Watch-Ultra-2',
+      'Chromecast-with-Google-TV',
+      'ThinkPad-X1-Carbon',
     ];
     final macAddresses = [
       'aa:bb:cc:11:22:33',
@@ -881,11 +1002,22 @@ class MockApiService implements IApiService {
       'aa:bb:cc:dd:ee:ff',
       'aa:bb:cc:12:34:56',
       'aa:bb:cc:65:43:21',
+      'aa:bb:cc:98:76:54',
       'bb:cc:dd:11:22:33',
       'bb:cc:dd:44:55:66',
       'bb:cc:dd:77:88:99',
       'bb:cc:dd:aa:bb:cc',
       'bb:cc:dd:dd:ee:ff',
+      'bb:cc:dd:12:34:56',
+      'bb:cc:dd:65:43:21',
+      'cc:dd:ee:11:22:33',
+      'cc:dd:ee:44:55:66',
+      'cc:dd:ee:77:88:99',
+      'cc:dd:ee:aa:bb:cc',
+      'cc:dd:ee:dd:ee:ff',
+      'cc:dd:ee:12:34:56',
+      'cc:dd:ee:65:43:21',
+      'cc:dd:ee:98:76:54',
     ];
     final ipAddresses = [
       '192.168.1.100',
@@ -895,17 +1027,28 @@ class MockApiService implements IApiService {
       '192.168.1.104',
       '192.168.1.105',
       '192.168.1.106',
+      '192.168.1.107',
       '192.168.1.108',
       '192.168.1.109',
       '192.168.1.110',
       '192.168.1.111',
       '192.168.1.112',
+      '192.168.1.113',
+      '192.168.1.114',
+      '192.168.1.116',
+      '192.168.1.117',
+      '192.168.1.118',
+      '192.168.1.119',
+      '192.168.1.120',
+      '192.168.1.121',
+      '192.168.1.122',
+      '192.168.1.123',
     ];
 
     String leases = '';
     for (int i = 0; i < devices.length; i++) {
       // Vary lease time slightly
-      final leaseTime = now + _random.nextInt(3600); // +0 to 1 hour variation
+      final leaseTime = now + 1800 + _random.nextInt(43200);
       leases +=
           '$leaseTime ${macAddresses[i]} ${ipAddresses[i]} ${devices[i]} 01:${macAddresses[i]}\n';
     }
@@ -1102,6 +1245,15 @@ class MockApiService implements IApiService {
   }
 
   @override
+  Future<bool> ensureSilentPermissions(
+    String ipAddress,
+    String sysauth,
+    bool useHttps,
+  ) async {
+    return true;
+  }
+
+  @override
   Future<bool> manageServiceAction(
     String ipAddress,
     String sysauth,
@@ -1188,6 +1340,8 @@ class MockApiService implements IApiService {
     required String macAddress,
     required String targetIp,
     required String hostname,
+    String? targetIp6,
+    String? duid,
     String? leaseTime,
     BuildContext? context,
   }) async {
@@ -1208,6 +1362,30 @@ class MockApiService implements IApiService {
   }
 
   @override
+  Future<bool> refreshClientConnection(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String macAddress,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return true;
+  }
+
+  @override
+  Future<int> deleteUnusedDhcpLeases(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required List<String> macsToFlush,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return macsToFlush.length;
+  }
+
+  @override
   Future<Map<String, String?>> fetchPublicIps(
     String ipAddress,
     String sysauth,
@@ -1219,5 +1397,16 @@ class MockApiService implements IApiService {
       'ipv4': '203.0.113.195',
       'ipv6': '2001:db8:85a3::8a2e:0370:7334',
     };
+  }
+
+  @override
+  Future<bool> forceRefreshDhcpLeases(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return true;
   }
 }

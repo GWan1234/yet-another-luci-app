@@ -23,6 +23,7 @@ import 'package:luci_mobile/utils/logger.dart';
 /// Extracted from [AppState] to enforce single-responsibility.
 class SessionController {
   SessionController({
+    bool initialReviewerMode = false,
     required IApiService? Function() apiServiceRef,
     required IAuthService? Function() authServiceRef,
     required RouterService? Function() routerServiceRef,
@@ -36,7 +37,8 @@ class SessionController {
     required void Function(bool isLoading) setLoadingState,
     required void Function(String? error) setErrorState,
     required VoidCallback notifyListeners,
-  })  : _apiServiceRef = apiServiceRef,
+  })  : _reviewerModeEnabled = initialReviewerMode,
+        _apiServiceRef = apiServiceRef,
         _authServiceRef = authServiceRef,
         _routerServiceRef = routerServiceRef,
         _secureStorageServiceRef = secureStorageServiceRef,
@@ -318,8 +320,6 @@ class SessionController {
 
     _cancelThroughputTimer();
 
-    final safeContext = context?.mounted == true ? context : null;
-
     await loadDashboardPreferences();
 
     _notifyListeners();
@@ -329,7 +329,7 @@ class SessionController {
       found.password,
       found.useHttps,
       fromRouter: true,
-      context: safeContext,
+      context: (context != null && context.mounted) ? context : null,
     );
     if (loginSuccess) {
       await _fetchDashboardData();

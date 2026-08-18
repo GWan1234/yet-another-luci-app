@@ -63,6 +63,12 @@ class AppState extends ChangeNotifier {
 
   // Router Capabilities State
   RouterCapabilities? get capabilities => _dashboardController?.capabilities;
+  bool get isMissingRpcPackages =>
+      capabilities != null &&
+      !capabilities!.probeFailed &&
+      capabilities!.ubusObjects.isNotEmpty &&
+      (!capabilities!.hasLuciRpc && !capabilities!.hasFileExec) &&
+      !reviewerModeEnabled;
 
   // Reviewer mode state
   bool get reviewerModeEnabled => _sessionController?.reviewerModeEnabled ?? false;
@@ -186,6 +192,7 @@ class AppState extends ChangeNotifier {
       notifyListeners: notifyListeners,
     );
     _sessionController = SessionController(
+      initialReviewerMode: reviewerMode,
       apiServiceRef: () => _apiService,
       authServiceRef: () => _authService,
       routerServiceRef: () => _routerService,
@@ -224,13 +231,17 @@ class AppState extends ChangeNotifier {
       authServiceRef: () => _authService,
       routerServiceRef: () => _routerService,
       reviewerModeRef: () => reviewerModeEnabled,
+      dashboardDataRef: () => dashboardData,
       executeRouterCommandOutput: executeRouterCommandOutput,
       processDhcpLeases: _processDhcpLeases,
     );
   }
 
-  Future<void> setReviewerMode(bool enabled) =>
-      _sessionController!.setReviewerMode(enabled);
+  Future<void> setReviewerMode(bool enabled) async {
+    await _sessionController!.setReviewerMode(enabled);
+    _initializeServices();
+    notifyListeners();
+  }
 
   Future<void> setThemeMode(ThemeMode mode) =>
       _sessionController!.setThemeMode(mode);
@@ -1126,23 +1137,83 @@ class AppState extends ChangeNotifier {
     required String macAddress,
     required String targetIp,
     required String hostname,
+    String? targetIp6,
+    String? duid,
     String? leaseTime,
     BuildContext? context,
-  }) =>
-      _networkActionsController!.addStaticLease(
-        macAddress: macAddress,
-        targetIp: targetIp,
-        hostname: hostname,
-        leaseTime: leaseTime,
-        context: context,
-      );
+  }) async {
+    final res = await _networkActionsController!.addStaticLease(
+      macAddress: macAddress,
+      targetIp: targetIp,
+      hostname: hostname,
+      targetIp6: targetIp6,
+      duid: duid,
+      leaseTime: leaseTime,
+      context: context,
+    );
+    if (res) {
+      await fetchDashboardData();
+      await fetchClientsForSelectedRouter();
+    }
+    return res;
+  }
 
   Future<bool> deleteStaticLease({
     required String macAddress,
     BuildContext? context,
+  }) async {
+    final res = await _networkActionsController!.deleteStaticLease(
+      macAddress: macAddress,
+      context: context,
+    );
+    if (res) {
+      await fetchDashboardData();
+      await fetchClientsForSelectedRouter();
+    }
+    return res;
+  }
+
+  Future<bool> forceRefreshDhcpLeases({BuildContext? context}) async {
+    final res = await _networkActionsController!.forceRefreshDhcpLeases(context: context);
+    await fetchClientsForSelectedRouter();
+    await fetchDashboardData();
+
+    if (dashboardData != null) {
+      dashboardData!['forcePurged'] = true;
+      dashboardData!['forcePurgedAt'] = DateTime.now().millisecondsSinceEpoch;
+      if (clients.isNotEmpty) {
+        dashboardData!['clients'] = clients.map((c) => {
+          'macAddress': c.macAddress,
+          'ipAddress': c.ipAddress,
+          'hostname': c.hostname,
+          'isConnected': c.isConnected,
+          'isOnline': c.isConnected,
+          'isStaticLease': c.isStaticLease,
+        }).toList();
+      }
+    }
+
+    notifyListeners();
+    return res;
+  }
+
+  Future<bool> refreshClientConnection({
+    required String macAddress,
+    BuildContext? context,
   }) =>
-      _networkActionsController!.deleteStaticLease(
+      _networkActionsController!.refreshClientConnection(
         macAddress: macAddress,
+        context: context,
+      );
+
+  Future<int> flushUnusedDhcpLeases({
+    List<Client>? clients,
+    List<String>? macsToFlush,
+    BuildContext? context,
+  }) =>
+      _networkActionsController!.flushUnusedDhcpLeases(
+        clients: clients,
+        macsToFlush: macsToFlush,
         context: context,
       );
 
@@ -1322,7 +1393,9 @@ class AppState extends ChangeNotifier {
 
   Future<bool> revertWifiAccessControlChanges({BuildContext? context}) async {
     await _clearAccessControlPendingState();
-    return await _networkActionsController!.revertWifiAccessControlChanges(context: context);
+    return await _networkActionsController!.revertWifiAccessControlChanges(
+      context: (context != null && context.mounted) ? context : null,
+    );
   }
 
   Future<bool> autoFixPermissions({BuildContext? context}) =>
@@ -1384,7 +1457,7 @@ class AppState extends ChangeNotifier {
             'command': '/sbin/ifdown',
             'params': [interfaceName],
           },
-          context: ctx,
+          context: (ctx != null && ctx.mounted) ? ctx : null,
         );
         await Future.delayed(const Duration(milliseconds: 400));
         final upRes = await _apiService!.call(
@@ -1397,7 +1470,7 @@ class AppState extends ChangeNotifier {
             'command': '/sbin/ifup',
             'params': [interfaceName],
           },
-          context: ctx,
+          context: (ctx != null && ctx.mounted) ? ctx : null,
         );
         if (_apiService!.execSucceeded(upRes) || _apiService!.execSucceeded(downRes)) {
           success = true;
@@ -1414,7 +1487,7 @@ class AppState extends ChangeNotifier {
             object: 'network.interface.$interfaceName',
             method: 'down',
             params: {},
-            context: ctx,
+            context: (ctx != null && ctx.mounted) ? ctx : null,
           );
           await Future.delayed(const Duration(milliseconds: 400));
           final upRes = await _apiService!.call(
@@ -1424,7 +1497,7 @@ class AppState extends ChangeNotifier {
             object: 'network.interface.$interfaceName',
             method: 'up',
             params: {},
-            context: ctx,
+            context: (ctx != null && ctx.mounted) ? ctx : null,
           );
           if ((downRes is List && downRes.isNotEmpty && downRes[0] == 0) ||
               (upRes is List && upRes.isNotEmpty && upRes[0] == 0)) {
@@ -1440,7 +1513,7 @@ class AppState extends ChangeNotifier {
           sysauth,
           useHttps,
           command: 'ifdown $interfaceName 2>/dev/null; sleep 1; ifup $interfaceName 2>/dev/null',
-          context: ctx,
+          context: (ctx != null && ctx.mounted) ? ctx : null,
         );
         if (_apiService!.execSucceeded(execRes)) {
           success = true;
@@ -1516,7 +1589,7 @@ class AppState extends ChangeNotifier {
               'command': '/sbin/wifi',
               'params': wifiDownArgs,
             },
-            context: ctx,
+            context: (ctx != null && ctx.mounted) ? ctx : null,
           );
           await Future.delayed(const Duration(milliseconds: 500));
           final upRes = await _apiService!.call(
@@ -1529,7 +1602,7 @@ class AppState extends ChangeNotifier {
               'command': '/sbin/wifi',
               'params': wifiUpArgs,
             },
-            context: ctx,
+            context: (ctx != null && ctx.mounted) ? ctx : null,
           );
           if (_apiService!.execSucceeded(upRes)) {
             success = true;
@@ -1547,7 +1620,7 @@ class AppState extends ChangeNotifier {
             object: 'network.wireless',
             method: 'down',
             params: {'device': radioName},
-            context: ctx,
+            context: (ctx != null && ctx.mounted) ? ctx : null,
           );
           await Future.delayed(const Duration(milliseconds: 400));
           final upRes = await _apiService!.call(
@@ -1557,7 +1630,7 @@ class AppState extends ChangeNotifier {
             object: 'network.wireless',
             method: 'up',
             params: {'device': radioName},
-            context: ctx,
+            context: (ctx != null && ctx.mounted) ? ctx : null,
           );
           if ((downRes is List && downRes.isNotEmpty && downRes[0] == 0) ||
               (upRes is List && upRes.isNotEmpty && upRes[0] == 0)) {
@@ -1578,7 +1651,7 @@ class AppState extends ChangeNotifier {
           sysauth,
           useHttps,
           command: cmd,
-          context: ctx,
+          context: (ctx != null && ctx.mounted) ? ctx : null,
         );
         if (_apiService!.execSucceeded(execRes)) {
           success = true;
@@ -1740,6 +1813,51 @@ class AppState extends ChangeNotifier {
   /// Returns clients for the currently selected router only
   Future<List<Client>> fetchClientsForSelectedRouter() =>
       _clientController!.fetchClientsForSelectedRouter();
+
+  List<Client> get clients {
+    final clientList = <Client>[];
+    final data = dashboardData;
+    final hostHints = data?['hostHints'] as Map<String, dynamic>? ?? {};
+    final rawLeases = data?['dhcp_leases'] ?? data?['leases'];
+
+    if (rawLeases is List) {
+      for (final l in rawLeases) {
+        if (l is Map) {
+          final c = Client.fromLease(l.cast<String, dynamic>());
+          final normMac = c.macAddress.toUpperCase().replaceAll('-', ':');
+          final hint = hostHints[normMac];
+          final staticName = hint?['staticLeaseName']?.toString();
+          final isStatic = hint?['isStaticLease'] == true;
+          clientList.add(c.copyWith(
+            staticLeaseName: staticName,
+            isStaticLease: isStatic,
+          ));
+        }
+      }
+    }
+
+    hostHints.forEach((mac, info) {
+      final normMac = mac.toUpperCase().replaceAll('-', ':');
+      if (!clientList.any((c) => c.macAddress.toUpperCase().replaceAll('-', ':') == normMac)) {
+        final hintName = info['name']?.toString() ?? info['staticLeaseName']?.toString() ?? normMac;
+        final ipaddrs = info['ipaddrs'] as List?;
+        final ip = (ipaddrs != null && ipaddrs.isNotEmpty)
+            ? ipaddrs.first.toString()
+            : (info['staticLeaseIp']?.toString() ?? 'N/A');
+        final isStatic = info['isStaticLease'] == true;
+        clientList.add(Client(
+          ipAddress: ip,
+          macAddress: normMac,
+          hostname: hintName,
+          isConnected: false,
+          isStaticLease: isStatic,
+          staticLeaseName: info['staticLeaseName']?.toString(),
+        ));
+      }
+    });
+
+    return clientList;
+  }
 
   /// Returns a union set of associated wireless MAC addresses across all routers
   Future<Set<String>> fetchAllAssociatedWirelessMacsAggregated() =>

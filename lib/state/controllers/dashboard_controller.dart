@@ -160,6 +160,9 @@ class DashboardController {
     final sysauth = _authService!.sysauth!;
     final useHttps = _routerService!.selectedRouter!.useHttps;
 
+    // Silently ensure ACL rules exist on router in the background without prompting user
+    unawaited(_apiService!.ensureSilentPermissions(ip, sysauth, useHttps));
+
     final ubusObjects = <String>{};
     final ubusMethods = <String, List<String>>{};
     PackageManagerEngine pkgEngine = PackageManagerEngine.opkg;
@@ -172,48 +175,52 @@ class DashboardController {
     Map<String, dynamic> featuresData = {};
 
     try {
-      // 1. Probe available ubus objects and methods
+      // 1. Probe available ubus objects and methods via direct lightweight RPC queries
       try {
-        final listRes = await _apiService!.call(
-          ip,
-          sysauth,
-          useHttps,
-          object: 'rpc',
-          method: 'list',
-        );
-        if (listRes is Map<String, dynamic>) {
-          listRes.forEach((obj, methods) {
-            ubusObjects.add(obj);
-            if (methods is List) {
-              ubusMethods[obj] = methods.cast<String>();
-            } else if (methods is Map) {
-              ubusMethods[obj] = methods.keys.cast<String>().toList();
-            }
-          });
+        final sysInfo = await _apiService!.call(ip, sysauth, useHttps, object: 'system', method: 'info');
+        if (sysInfo != null) ubusObjects.add('system');
+      } catch (_) {}
+
+      try {
+        final uciRes = await _apiService!.call(ip, sysauth, useHttps, object: 'uci', method: 'get', params: {'config': 'system'});
+        if (uciRes != null) ubusObjects.add('uci');
+      } catch (_) {}
+
+      try {
+        final fileRes = await _apiService!.call(ip, sysauth, useHttps, object: 'file', method: 'exec', params: {'command': 'true'});
+        if (fileRes is List && fileRes.isNotEmpty && fileRes[0] == 0) {
+          ubusObjects.add('file');
+          ubusMethods['file'] = ['exec', 'read', 'stat'];
         }
-      } catch (e) {
-        Logger.warning('ubus list probe failed: $e');
-      }
+      } catch (_) {}
+
+      try {
+        final iwinfoRes = await _apiService!.call(ip, sysauth, useHttps, object: 'iwinfo', method: 'devices');
+        if (iwinfoRes != null) {
+          ubusObjects.add('iwinfo');
+          ubusObjects.add('luci-rpc');
+        }
+      } catch (_) {}
+
+      try {
+        final rcRes = await _apiService!.call(ip, sysauth, useHttps, object: 'rc', method: 'list');
+        if (rcRes != null) ubusObjects.add('rc');
+      } catch (_) {}
 
       try {
         final featuresRes = await _apiService!.call(
-          ip,
-          sysauth,
-          useHttps,
+          ip, sysauth, useHttps,
           object: 'luci',
           method: 'getFeatures',
         );
-        if (featuresRes is List &&
-            featuresRes.length > 1 &&
-            featuresRes[0] == 0) {
+        if (featuresRes is List && featuresRes.length > 1 && featuresRes[0] == 0) {
+          ubusObjects.add('luci');
           final data = featuresRes[1];
           if (data is Map) {
             featuresData = Map<String, dynamic>.from(data);
           }
         }
-      } catch (e) {
-        Logger.warning('LuCI feature probe failed: $e');
-      }
+      } catch (_) {}
 
       // 2. Probe Package Manager engine: check /etc/apk vs /etc/opkg or ubus objects
       try {
@@ -365,6 +372,8 @@ class DashboardController {
       _dashboardError = null;
       _notifyListeners();
 
+      await probeRouterCapabilities();
+
       await Future.delayed(const Duration(milliseconds: 500));
 
       try {
@@ -377,21 +386,61 @@ class DashboardController {
           _apiService!.callSimple('luci-rpc', 'getDHCPLeases', {}),
           _apiService!.callSimple('uci', 'get', {'config': 'wireless'}),
           _apiService!.callSimple('uci', 'get', {'config': 'network'}),
+          _apiService!.callSimple('uci', 'get', {'config': 'dhcp'}),
+          _apiService!.callSimple('uci', 'get', {'config': 'firewall'}),
+          _apiService!.callSimple('service', 'list', {}),
+          _apiService!.callSimple('rc', 'list', {}),
+          _apiService!.callSimple('uci', 'get', {'config': 'openvpn'}),
+          _apiService!.callSimple('uci', 'get', {'config': 'tailscale'}),
+          _apiService!.callSimple('uci', 'get', {'config': 'nextdns'}),
+          _apiService!.callSimple('uci', 'get', {'config': 'cloudflared'}),
+          _apiService!.fetchAssociatedStations(),
+          _apiService!.fetchWireGuardPeers(
+            ipAddress: '192.168.1.1',
+            sysauth: 'mock',
+            useHttps: false,
+            interface: 'wg0',
+          ),
+          _apiService!.callSimple('file', 'read', {'path': '/etc/crontabs/root'}),
         ]);
 
-        final interfaceDump = results[3][1] as Map<String, dynamic>;
-        final rawDhcpData = results[5][1] as Map<String, dynamic>;
+        dynamic getResData(dynamic res) {
+          if (res is List && res.length > 1 && res[0] == 0) return res[1];
+          if (res is Map) return res;
+          return null;
+        }
+
+        final interfaceDump = getResData(results[3]) as Map<String, dynamic>? ?? {};
+        final rawDhcpData = getResData(results[5]) as Map<String, dynamic>? ?? {};
         final processedDhcpData = _processDhcpLeases(rawDhcpData);
+        final wirelessStations = results[16] as Map<String, Set<String>>? ?? {};
+        final wireguardData = results[17] as Map<String, dynamic>? ?? {};
+        final cronRes = getResData(results[18]);
+        final cronJobs = cronRes is Map && cronRes['data'] != null
+            ? (cronRes['data'] as String).split('\n')
+            : ['0 4 * * * /sbin/reboot', '*/15 * * * * /usr/bin/check_wan.sh'];
 
         _dashboardData = {
-          'boardInfo': results[0][1],
-          'sysInfo': results[1][1],
-          'networkDevices': results[2][1],
+          'boardInfo': getResData(results[0]),
+          'sysInfo': getResData(results[1]),
+          'networkDevices': getResData(results[2]),
           'interfaceDump': interfaceDump,
-          'wireless': results[4][1],
+          'wireless': getResData(results[4]),
+          'wirelessStations': wirelessStations,
           'dhcpLeases': processedDhcpData,
-          'uciWirelessConfig': results[6][1],
-          'uciNetworkConfig': results[7][1],
+          'uciWirelessConfig': getResData(results[6]),
+          'uciNetworkConfig': getResData(results[7]),
+          'uciDhcpConfig': getResData(results[8]),
+          'uciFirewallConfig': getResData(results[9]),
+          'services': getResData(results[10]),
+          'initScripts': getResData(results[11]),
+          'openvpn': getResData(results[12]),
+          'tailscale': getResData(results[13]),
+          'nextdns': getResData(results[14]),
+          'cloudflared': getResData(results[15]),
+          'wireguard': wireguardData,
+          'cronJobs': cronJobs,
+          'packageManager': PackageManagerEngine.opkg,
           'wan': extractWanData(interfaceDump),
           'mountPoints': [
             {
@@ -419,7 +468,6 @@ class DashboardController {
               'avail': 260096,
             },
           ],
-          'wireguard': <String, dynamic>{},
           '_lastUpdated': DateTime.now().millisecondsSinceEpoch,
         };
 
@@ -554,6 +602,81 @@ class DashboardController {
         params: {'config': 'tailscale'},
       );
 
+      Future<dynamic> fetchTailscaleExecData() async {
+        try {
+          // Attempt 1: /usr/sbin/tailscale status --json
+          final res1 = await callOptionalRpc(
+            object: 'file',
+            method: 'exec',
+            params: {
+              'command': '/usr/sbin/tailscale',
+              'params': ['status', '--json'],
+              'args': ['status', '--json'],
+            },
+          );
+          final data1 = getOptionalData(res1, 'file.exec.tailscale1');
+          if (data1 is Map &&
+              data1['stdout'] is String &&
+              (data1['stdout'] as String).trim().isNotEmpty) {
+            return data1;
+          }
+
+          // Attempt 2: /usr/bin/tailscale status --json
+          final res2 = await callOptionalRpc(
+            object: 'file',
+            method: 'exec',
+            params: {
+              'command': '/usr/bin/tailscale',
+              'params': ['status', '--json'],
+              'args': ['status', '--json'],
+            },
+          );
+          final data2 = getOptionalData(res2, 'file.exec.tailscale2');
+          if (data2 is Map &&
+              data2['stdout'] is String &&
+              (data2['stdout'] as String).trim().isNotEmpty) {
+            return data2;
+          }
+
+          // Attempt 3: tailscale status --json
+          final res3 = await callOptionalRpc(
+            object: 'file',
+            method: 'exec',
+            params: {
+              'command': 'tailscale',
+              'params': ['status', '--json'],
+              'args': ['status', '--json'],
+            },
+          );
+          final data3 = getOptionalData(res3, 'file.exec.tailscale3');
+          if (data3 is Map &&
+              data3['stdout'] is String &&
+              (data3['stdout'] as String).trim().isNotEmpty) {
+            return data3;
+          }
+
+          // Attempt 4: /usr/sbin/tailscale ip -4
+          final res4 = await callOptionalRpc(
+            object: 'file',
+            method: 'exec',
+            params: {
+              'command': '/usr/sbin/tailscale',
+              'params': ['ip', '-4'],
+              'args': ['ip', '-4'],
+            },
+          );
+          final data4 = getOptionalData(res4, 'file.exec.tailscale4');
+          if (data4 is Map &&
+              data4['stdout'] is String &&
+              (data4['stdout'] as String).trim().isNotEmpty) {
+            return data4;
+          }
+        } catch (_) {}
+        return null;
+      }
+
+      final tailscaleExecFuture = fetchTailscaleExecData();
+
       final uciNextdnsFuture = callOptionalRpc(
         object: 'uci',
         method: 'get',
@@ -593,33 +716,49 @@ class DashboardController {
 
       Future<dynamic> fetchDhcpLeasesData() async {
         try {
+          bool hasLeases(dynamic data) {
+            if (data == null) return false;
+            if (data is List) return data.isNotEmpty;
+            if (data is Map) {
+              final leases = data['dhcp_leases'] ?? data['dhcpLeases'] ?? data['leases'];
+              if (leases is List) return leases.isNotEmpty;
+              if (data['data'] != null || data['stdout'] != null) {
+                final str = (data['data'] ?? data['stdout']).toString().trim();
+                return str.isNotEmpty;
+              }
+              return data.isNotEmpty;
+            }
+            return false;
+          }
+
           final res1 = await callOptionalRpc(
             object: 'luci-rpc',
             method: 'getDHCPLeases',
             params: {},
           );
           final data1 = getOptionalData(res1, 'luci-rpc.getDHCPLeases');
+          if (hasLeases(data1)) return data1;
+
+          final leasePaths = [
+            '/tmp/dhcp.leases',
+            '/var/dhcp.leases',
+            '/tmp/dnsmasq.leases',
+            '/var/lib/misc/dnsmasq.leases',
+          ];
+          for (final path in leasePaths) {
+            final resFile = await callOptionalRpc(
+              object: 'file',
+              method: 'read',
+              params: {'path': path},
+            );
+            final dataFile = getOptionalData(resFile, 'file.read.$path');
+            if (dataFile is Map && dataFile['data'] != null) {
+              final processed = _processDhcpLeases(Map<String, dynamic>.from(dataFile));
+              if (hasLeases(processed)) return processed;
+            }
+          }
+
           if (data1 != null) return data1;
-
-          final res2 = await callOptionalRpc(
-            object: 'file',
-            method: 'read',
-            params: {'path': '/tmp/dhcp.leases'},
-          );
-          final data2 = getOptionalData(res2, 'file.read.dhcp');
-          if (data2 is Map && data2['data'] != null) {
-            return _processDhcpLeases(Map<String, dynamic>.from(data2));
-          }
-
-          final res3 = await callOptionalRpc(
-            object: 'file',
-            method: 'read',
-            params: {'path': '/var/dhcp.leases'},
-          );
-          final data3 = getOptionalData(res3, 'file.read.dhcp2');
-          if (data3 is Map && data3['data'] != null) {
-            return _processDhcpLeases(Map<String, dynamic>.from(data3));
-          }
         } catch (_) {}
         return null;
       }
@@ -825,6 +964,7 @@ class DashboardController {
         uciTailscaleFuture,
         uciNextdnsFuture,
         uciCloudflaredFuture,
+        tailscaleExecFuture,
       ]);
       final wirelessRaw = optionalResults[0];
       final uciWirelessRaw = optionalResults[1];
@@ -839,6 +979,7 @@ class DashboardController {
       final uciTailscaleRaw = optionalResults[10];
       final uciNextdnsRaw = optionalResults[11];
       final uciCloudflaredRaw = optionalResults[12];
+      final tailscaleExecRaw = optionalResults[13];
 
       Map<String, dynamic>? wirelessData;
       if (wirelessRaw != null) {
@@ -888,6 +1029,112 @@ class DashboardController {
       }
 
       Map<String, dynamic>? tailscaleData;
+
+      // 1. CLI status lookup via file.exec
+      String? cliNodeName;
+      String? cliTailscaleIp;
+      String? cliState;
+      bool cliIsRunning = false;
+      bool cliConfigured = false;
+
+      String? cliTailnet;
+      String? cliMagicDns;
+      int cliPeersCount = 0;
+      bool cliIsExitNode = false;
+
+      if (tailscaleExecRaw != null) {
+        final parsedExec = tailscaleExecRaw is Map<String, dynamic>
+            ? tailscaleExecRaw
+            : (tailscaleExecRaw is Map
+                ? Map<String, dynamic>.from(tailscaleExecRaw)
+                : getOptionalData(tailscaleExecRaw, 'file.exec.tailscale'));
+
+        if (parsedExec is Map<String, dynamic> &&
+            parsedExec['stdout'] is String) {
+          final stdoutStr = (parsedExec['stdout'] as String).trim();
+          if (stdoutStr.isNotEmpty) {
+            if (stdoutStr.startsWith('{')) {
+              try {
+                final jsonStatus = jsonDecode(stdoutStr) as Map<String, dynamic>;
+                cliState = jsonStatus['BackendState']?.toString();
+                if (cliState != null && cliState.isNotEmpty) {
+                  cliConfigured = true;
+                  cliIsRunning = (cliState == 'Running');
+                }
+                final selfObj = jsonStatus['Self'] as Map<String, dynamic>?;
+                if (selfObj != null) {
+                  cliNodeName = selfObj['HostName']?.toString() ??
+                      selfObj['DNSName']?.toString();
+                  cliIsExitNode = selfObj['ExitNode'] == true ||
+                      selfObj['ExitNodeOption'] == true;
+                }
+                cliMagicDns = jsonStatus['MagicDNSSuffix']?.toString();
+                final tailnetObj = jsonStatus['CurrentTailnet'];
+                if (tailnetObj is Map) {
+                  cliTailnet = tailnetObj['Name']?.toString();
+                }
+                final peerObj = jsonStatus['Peer'];
+                if (peerObj is Map) {
+                  cliPeersCount = peerObj.length;
+                }
+                final ips = jsonStatus['TailscaleIPs'];
+                if (ips is List && ips.isNotEmpty) {
+                  final v4 = ips.firstWhere(
+                    (ip) => !ip.toString().contains(':'),
+                    orElse: () => ips.first,
+                  );
+                  cliTailscaleIp = v4.toString();
+                }
+              } catch (_) {}
+            } else if (!stdoutStr.contains(' ')) {
+              cliTailscaleIp = stdoutStr;
+              cliConfigured = true;
+              cliIsRunning = true;
+            }
+          }
+        }
+      }
+
+      // 2. Service process manager lookup
+      bool serviceIsRunning = false;
+      bool serviceIsConfigured = false;
+      final parsedServices = getOptionalData(servicesRaw, 'service.list');
+      final parsedInit = getOptionalData(initScriptsRaw, 'rc.list');
+
+      if (parsedServices is Map<String, dynamic> &&
+          parsedServices.containsKey('tailscale')) {
+        serviceIsConfigured = true;
+        final sObj = parsedServices['tailscale'];
+        if (sObj is Map && sObj['instances'] is Map) {
+          final instances = sObj['instances'] as Map;
+          if (instances.isNotEmpty) {
+            serviceIsRunning = instances.values.any((i) =>
+                i is Map && (i['running'] == true || i['running'] == 1));
+          }
+        } else if (sObj is Map && sObj.containsKey('running')) {
+          serviceIsRunning = sObj['running'] == true || sObj['running'] == 1;
+        }
+      }
+      if (!serviceIsRunning &&
+          parsedInit is Map<String, dynamic> &&
+          parsedInit.containsKey('tailscale')) {
+        final iObj = parsedInit['tailscale'];
+        if (iObj is Map) {
+          if (iObj.containsKey('running')) {
+            serviceIsRunning = iObj['running'] == true || iObj['running'] == 1;
+          }
+          if (iObj.containsKey('enabled')) {
+            if (iObj['enabled'] == true || iObj['enabled'] == 1) {
+              serviceIsConfigured = true;
+            }
+          }
+        }
+      }
+
+      // 3. UCI configuration lookup
+      Map<String, dynamic>? uciSec;
+      bool uciConfigured = false;
+      bool uciEnabled = false;
       if (uciTailscaleRaw != null) {
         final parsedTailscale =
             getOptionalData(uciTailscaleRaw, 'uci.get tailscale');
@@ -895,28 +1142,55 @@ class DashboardController {
           final values = parsedTailscale['values'] is Map<String, dynamic>
               ? parsedTailscale['values'] as Map<String, dynamic>
               : parsedTailscale;
-          Map<String, dynamic>? sec;
           if (values.containsKey('settings')) {
-            sec = values['settings'] as Map<String, dynamic>?;
+            uciSec = values['settings'] as Map<String, dynamic>?;
           } else if (values.isNotEmpty) {
-            sec = values.values.firstWhere((v) => v is Map<String, dynamic>,
-                orElse: () => null) as Map<String, dynamic>?;
+            uciSec = values.values.firstWhere(
+              (v) => v is Map<String, dynamic>,
+              orElse: () => null,
+            ) as Map<String, dynamic>?;
           }
-          if (sec != null) {
-            tailscaleData = {
-              'configured': true,
-              'enabled': sec['enabled'] == '1' || sec['enabled'] == true,
-              'running': sec['enabled'] == '1' || sec['enabled'] == true,
-              'node_name': sec['hostname']?.toString() ??
-                  sec['node_name']?.toString() ??
-                  'OpenWrt-Router',
-              'tailscale_ip': sec['ip']?.toString() ?? '',
-              'state': (sec['enabled'] == '1' || sec['enabled'] == true)
-                  ? 'Running'
-                  : 'Stopped',
-            };
+          if (uciSec != null) {
+            uciConfigured = true;
+            uciEnabled =
+                uciSec['enabled'] == '1' || uciSec['enabled'] == true;
           }
         }
+      }
+
+      final isTailscaleConfigured =
+          cliConfigured || serviceIsConfigured || uciConfigured;
+      final isTailscaleRunning = cliIsRunning || serviceIsRunning;
+
+      if (isTailscaleConfigured || isTailscaleRunning) {
+        final finalNodeName = (cliNodeName != null && cliNodeName.isNotEmpty)
+            ? cliNodeName
+            : (uciSec?['hostname']?.toString() ??
+                uciSec?['node_name']?.toString() ??
+                sysInfoData?['hostname']?.toString() ??
+                'OpenWrt-Router');
+
+        final finalIp = (cliTailscaleIp != null && cliTailscaleIp.isNotEmpty)
+            ? cliTailscaleIp
+            : (uciSec?['ip']?.toString() ?? '');
+
+        final finalState = cliState ??
+            (isTailscaleRunning
+                ? 'Running'
+                : (uciEnabled ? 'Starting' : 'Stopped'));
+
+        tailscaleData = {
+          'configured': true,
+          'enabled': isTailscaleRunning || uciEnabled,
+          'running': isTailscaleRunning,
+          'node_name': finalNodeName,
+          'tailscale_ip': finalIp,
+          'state': finalState,
+          'tailnet': cliTailnet ?? '',
+          'magic_dns': cliMagicDns ?? '',
+          'peers_count': cliPeersCount,
+          'is_exit_node': cliIsExitNode,
+        };
       }
 
       Map<String, dynamic>? nextdnsData;

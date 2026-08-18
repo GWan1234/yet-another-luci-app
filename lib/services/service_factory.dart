@@ -47,7 +47,7 @@ class ReviewerModeServiceFactory implements ServiceFactory {
   SecureStorageService createSecureStorageService() => SecureStorageService();
 
   @override
-  RouterService createRouterService() => RouterService();
+  RouterService createRouterService() => RouterService(isReviewerMode: true);
 
   @override
   ThroughputService createThroughputService() => ThroughputService();

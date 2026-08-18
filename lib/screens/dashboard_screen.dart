@@ -25,6 +25,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   final ScrollController _wanScrollController = ScrollController();
+  bool _dismissedRpcWarning = false;
 
   @override
   void initState() {
@@ -59,9 +60,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return '${percent.toStringAsFixed(0)}%';
   }
 
-  String _deriveReleaseChannel(Map<String, dynamic>? release) {
-    return deriveReleaseChannel(release);
-  }
+
 
   ({Color background, Color foreground}) _channelColors(String channel) {
     switch (channel) {
@@ -96,12 +95,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget _buildDeviceInfoCard(AppState appState) {
     final boardInfo =
         appState.dashboardData?['boardInfo'] as Map<String, dynamic>?;
-    final model = boardInfo?['model'] ?? 'N/A';
+    final model = boardInfo?['model']?.toString() ??
+        (appState.capabilities?.boardName.isNotEmpty == true
+            ? appState.capabilities!.boardName
+            : 'N/A');
     final release = boardInfo?['release'] as Map<String, dynamic>?;
-    final version = release?['version'] ?? 'N/A';
-    final channel = _deriveReleaseChannel(release);
-    final channelLabel = channel.toUpperCase();
-    final channelColors = _channelColors(channel);
+
+    final releaseInfo = deriveDistributionInfo(
+      release ?? appState.capabilities?.releaseVersion,
+      model: model,
+    );
+
+    final versionDisplay = releaseInfo.version != 'N/A'
+        ? releaseInfo.version
+        : (release?['version']?.toString() ?? 'N/A');
+    final channelLabel = releaseInfo.channel.toUpperCase();
+    final channelColors = _channelColors(releaseInfo.channel);
 
     final labelStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
       color: Theme.of(context).colorScheme.onSurface,
@@ -137,7 +146,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Version', style: labelStyle),
+                  Text(releaseInfo.distributionName, style: labelStyle),
                   const SizedBox(height: 4),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -145,7 +154,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     children: [
                       Flexible(
                         child: Text(
-                          version,
+                          versionDisplay,
                           style: valueStyle,
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.center,
@@ -214,13 +223,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             decoration: BoxDecoration(
               color: statusColor,
               shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: statusColor.withValues(alpha: 0.25),
-                  blurRadius: 4,
-                  spreadRadius: 0,
-                ),
-              ],
             ),
           ),
         ),
@@ -1607,6 +1609,96 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
+  Widget _buildReviewerModeBanner(BuildContext context, WidgetRef ref) {
+    return Container(
+      width: double.infinity,
+      color: Colors.amber.shade900.withValues(alpha: 0.95),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.rate_review_rounded, color: Colors.white, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                Text(
+                  'REVIEWER MODE ACTIVE',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                Text(
+                  'Using simulated router environment with full mock data',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.amber.shade900,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
+            onPressed: () => _showExitReviewerModeDialog(context, ref),
+            icon: const Icon(Icons.exit_to_app_rounded, size: 14),
+            label: const Text(
+              'Exit Mode',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showExitReviewerModeDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Exit Reviewer Mode?'),
+        content: const Text(
+          'This will disable reviewer mode and redirect to the login screen so you can connect to a live router.',
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+            ),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              final appState = ref.read(appStateProvider);
+              await appState.setReviewerMode(false);
+              await appState.logout();
+              if (context.mounted) {
+                await Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+              }
+            },
+            icon: const Icon(Icons.logout_rounded, size: 16),
+            label: const Text('Exit Reviewer Mode'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final appState = ref.watch(appStateProvider);
@@ -1616,14 +1708,34 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final hostname = boardInfo?['hostname']?.toString();
     final headerText = (hostname != null && hostname.isNotEmpty)
         ? hostname
-        : (selected?.ipAddress ?? 'Loading...');
+        : (appState.reviewerModeEnabled
+            ? 'OpenWrt-Demo'
+            : (selected?.ipAddress ?? 'Loading...'));
     return Scaffold(
       appBar: LuciAppBar(
         centerTitle: true,
         title: null, // Always use titleWidget now
         titleWidget: _buildTitleWithTimestamp(headerText, appState),
+        actions: [
+          if (appState.reviewerModeEnabled)
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: ActionChip(
+                avatar: const Icon(Icons.rate_review, size: 14, color: Colors.white),
+                label: const Text('REVIEWER', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                backgroundColor: Colors.amber.shade900,
+                side: BorderSide.none,
+                onPressed: () => _showExitReviewerModeDialog(context, ref),
+              ),
+            ),
+        ],
       ),
-      body: Stack(children: [_buildBody(appState)]),
+      body: Column(
+        children: [
+          if (appState.reviewerModeEnabled) _buildReviewerModeBanner(context, ref),
+          Expanded(child: Stack(children: [_buildBody(appState)])),
+        ],
+      ),
     );
   }
 
@@ -1666,6 +1778,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             final landscapeContent = [
               const SizedBox(height: 16),
               _buildDeviceInfoCard(appState),
+              if (appState.isMissingRpcPackages && !_dismissedRpcWarning)
+                _buildRpcWarningCard(context, appState),
               const SizedBox(height: 12),
               SizedBox(
                 height: 240,
@@ -1706,6 +1820,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   children: [
                     const SizedBox(height: 12),
                     _buildDeviceInfoCard(appState),
+                    if (appState.isMissingRpcPackages && !_dismissedRpcWarning)
+                      _buildRpcWarningCard(context, appState),
                     _buildSectionHeader(context, 'Real-time Network Traffic', Icons.swap_vert),
                     SizedBox(
                       height: 220,
@@ -1753,6 +1869,142 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             );
           }
         },
+      ),
+    );
+  }
+
+  Widget _buildRpcWarningCard(BuildContext context, AppState appState) {
+    return Card(
+      color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.85),
+      elevation: 2,
+      margin: const EdgeInsets.only(top: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(14.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                  size: 24,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'LuCI RPC Package Required',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onErrorContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(
+                    Icons.close,
+                    color: Theme.of(context).colorScheme.onErrorContainer,
+                    size: 18,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _dismissedRpcWarning = true;
+                    });
+                  },
+                  tooltip: 'Dismiss',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Your router is missing `luci-mod-rpc` or backend execution permissions. Some real-time wireless, package, and system control features require RPC support.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onErrorContainer.withValues(alpha: 0.9),
+                  ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final success = await appState.autoFixPermissions(context: context);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              success
+                                  ? 'RPC packages and permissions installed successfully!'
+                                  : 'Auto-install failed. Tap "Manual Info" for shell commands.',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.build_circle_outlined, size: 18),
+                    label: const Text('Auto-Install RPC'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: () => _showManualRpcInstallDialog(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.onErrorContainer.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  child: const Text('Manual Info'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showManualRpcInstallDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.terminal, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('Manual RPC Installation'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text(
+              'Connect to your router via SSH and run the following command to enable full RPC functionality:\n',
+            ),
+            SelectableText(
+              '# OpenWrt (opkg):\n'
+              'opkg update && opkg install luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status && /etc/init.d/rpcd restart\n\n'
+              '# OpenWrt 25.12+ (apk):\n'
+              'apk update && apk add luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status && /etc/init.d/rpcd restart',
+              style: TextStyle(fontFamily: 'monospace', fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }

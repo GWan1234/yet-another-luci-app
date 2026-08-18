@@ -1,8 +1,6 @@
 // Copyright 2026 Tuhin Garai. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:luci_mobile/main.dart';
@@ -37,13 +35,11 @@ class SettingsScreen extends ConsumerWidget {
             onPressed: () async {
               Navigator.of(context).pop();
               await appState.setReviewerMode(false);
-              appState.logout();
+              await appState.logout();
               if (context.mounted) {
-                unawaited(
-                  Navigator.of(
-                    context,
-                  ).pushNamedAndRemoveUntil('/login', (route) => false),
-                );
+                await Navigator.of(
+                  context,
+                ).pushNamedAndRemoveUntil('/login', (route) => false);
               }
             },
             child: const Text('Exit'),

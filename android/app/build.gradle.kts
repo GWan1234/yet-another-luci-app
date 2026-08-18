@@ -16,7 +16,7 @@ plugins {
 
 android {
     namespace = "com.nightcode.luci"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

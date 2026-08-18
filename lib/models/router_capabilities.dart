@@ -101,17 +101,34 @@ class RouterCapabilities {
 
   /// Helper to check if a specific ubus object is available
   bool hasObject(String objectName) {
-    if (probeFailed && ubusObjects.isEmpty) return true; // conservative attempt
+    if (probeFailed || ubusObjects.isEmpty) return true; // conservative attempt
     return ubusObjects.contains(objectName);
   }
 
   /// Helper to check if a specific ubus method is available
   bool hasMethod(String objectName, String methodName) {
-    if (probeFailed) return true;
+    if (probeFailed || ubusObjects.isEmpty) return true;
     final methods = ubusMethods[objectName];
     if (methods == null) return ubusObjects.contains(objectName);
     return methods.contains(methodName);
   }
+
+  /// Helper to check if luci-rpc or equivalent wireless/RPC ubus objects are available
+  bool get hasLuciRpc =>
+      ubusObjects.isEmpty ||
+      hasObject('luci-rpc') ||
+      hasObject('iwinfo') ||
+      hasObject('luci');
+
+  /// Helper to check if file.exec or backend execution capability is allowed
+  bool get hasFileExec =>
+      ubusObjects.isEmpty ||
+      hasMethod('file', 'exec') ||
+      hasObject('file') ||
+      hasObject('rc');
+
+  /// Helper to check if both RPC modules and execution permissions are available
+  bool get isRpcComplete => hasLuciRpc && hasFileExec;
 
   /// Serialize for secure storage cache
   Map<String, dynamic> toJson() {

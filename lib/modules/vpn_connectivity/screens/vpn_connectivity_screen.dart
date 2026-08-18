@@ -372,6 +372,10 @@ class VpnConnectivityScreen extends ConsumerWidget {
             ),
             const Divider(height: 20),
             _buildDetailRow('Tailscale IP', ts.tailscaleIp.isNotEmpty ? ts.tailscaleIp : 'N/A'),
+            if (ts.tailnet.isNotEmpty) _buildDetailRow('Tailnet Account', ts.tailnet),
+            if (ts.magicDns.isNotEmpty) _buildDetailRow('MagicDNS Domain', ts.magicDns),
+            if (ts.peersCount > 0) _buildDetailRow('Mesh Peers', '${ts.peersCount} Connected Peers'),
+            if (ts.isExitNode) _buildDetailRow('Exit Node Capability', 'ENABLED (Offers Exit Node)'),
             _buildDetailRow('Backend Daemon State', ts.backendState),
             const SizedBox(height: 8),
             Row(

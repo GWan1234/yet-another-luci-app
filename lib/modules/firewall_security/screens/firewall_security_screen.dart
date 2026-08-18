@@ -147,7 +147,7 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
       );
       return true;
     } else {
-      showDialog(
+      await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Firewall Rule Save Warning'),
@@ -222,9 +222,10 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
       canPop: !_hasUnsavedChanges && !_isSaving,
       onPopInvokedWithResult: (bool didPop, dynamic result) async {
         if (didPop) return;
+        final navigator = Navigator.of(context);
         final shouldLeave = await _showUnsavedChangesDialog();
         if (shouldLeave == true && mounted) {
-          Navigator.of(context).pop();
+          navigator.pop();
         }
       },
       child: Scaffold(
@@ -643,13 +644,12 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.15),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
+        border: Border(
+          top: BorderSide(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
+            width: 1,
           ),
-        ],
+        ),
       ),
       child: SafeArea(
         child: Row(
