@@ -5,6 +5,11 @@ import 'package:flutter/material.dart';
 
 /// Standardized color tokens for throughput and data streams
 class LuciColors {
+  /// Primary theme color
+  static const Color primary = Color(0xFF2563EB);
+  static const Color success = Color(0xFF22C55E);
+  static const Color error = Color(0xFFEF4444);
+
   /// Download / Receive (RX) throughput color - nightcode Orange (#F97316)
   static const Color rx = Color(0xFFF97316);
   static const Color rxLight = Color(0xFFFB923C);
@@ -34,6 +39,29 @@ class LuciStatusColors {
 
   /// Inactive / disabled state (neutral grey)
   static const Color inactive = Color(0xFF64748B);
+
+  /// Info status color
+  static const Color info = Color(0xFF3B82F6);
+
+  static Color successBg(BuildContext context) => const Color(0xFF22C55E).withValues(alpha: 0.15);
+  static Color successBorder(BuildContext context) => const Color(0xFF22C55E).withValues(alpha: 0.4);
+  static Color successText(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? const Color(0xFF4ADE80) : const Color(0xFF15803D);
+
+  static Color errorBg(BuildContext context) => const Color(0xFFEF4444).withValues(alpha: 0.15);
+  static Color errorBorder(BuildContext context) => const Color(0xFFEF4444).withValues(alpha: 0.4);
+  static Color errorText(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? const Color(0xFFF87171) : const Color(0xFFDC2626);
+
+  static Color warningBg(BuildContext context) => const Color(0xFFFBBF24).withValues(alpha: 0.15);
+  static Color warningBorder(BuildContext context) => const Color(0xFFFBBF24).withValues(alpha: 0.4);
+  static Color warningText(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? const Color(0xFFFCD34D) : const Color(0xFFB45309);
+
+  static Color infoBg(BuildContext context) => const Color(0xFF3B82F6).withValues(alpha: 0.15);
+  static Color infoBorder(BuildContext context) => const Color(0xFF3B82F6).withValues(alpha: 0.4);
+  static Color infoText(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark ? const Color(0xFF60A5FA) : const Color(0xFF1D4ED8);
 }
 
 /// Standardized spacing constants for consistent layout
@@ -109,7 +137,7 @@ class LuciAnimations {
   // Standard curves
   static const Curve easeOut = Curves.easeOutCubic;
   static const Curve easeInOut = Curves.easeInOutCubic;
-  static const Curve elastic = Curves.elasticOut;
+  static const Curve elastic = Curves.easeOutCubic;
 }
 
 /// Standardized card design system

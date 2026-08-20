@@ -3,9 +3,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/main.dart';
-import 'package:luci_mobile/design/luci_design_system.dart';
-import 'package:luci_mobile/models/router_capabilities.dart';
+import 'package:yet_another_luci_app/main.dart';
+import 'package:yet_another_luci_app/design/luci_design_system.dart';
+import 'package:yet_another_luci_app/models/router_capabilities.dart';
+import 'package:yet_another_luci_app/widgets/luci_collapsible_card.dart';
+import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 import '../models/firewall_info.dart';
 
 class FirewallSecurityScreen extends ConsumerStatefulWidget {
@@ -38,16 +40,11 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
       _stagedCustomRuleStates.clear();
     });
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Discarded all unsaved firewall custom rule changes.'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      context.showToastInfo('Changes Discarded', subtitle: 'Discarded all unsaved firewall custom rule changes.');
     }
   }
 
-  Future<void> _confirmAndDiscardChanges() async {
+  Future<bool> _showConfirmAndDiscardDialog() async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -70,8 +67,12 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
         ],
       ),
     );
+    return confirm ?? false;
+  }
 
-    if (confirm == true) {
+  Future<void> _confirmAndDiscardChanges() async {
+    final confirm = await _showConfirmAndDiscardDialog();
+    if (confirm) {
       _discardChanges();
     }
   }
@@ -88,22 +89,12 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
     final succeededRules = <String>[];
     final failedRules = <String>[];
 
+    const actionKey = 'save_firewall_rules';
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-              ),
-              const SizedBox(width: 12),
-              Text('Saving ${modifiedEntries.length} firewall custom rule change(s)...'),
-            ],
-          ),
-          duration: const Duration(seconds: 10),
-        ),
+      context.showToastLoading(
+        'Saving Changes',
+        subtitle: 'Saving ${modifiedEntries.length} firewall custom rule change(s)...',
+        actionKey: actionKey,
       );
     }
 
@@ -135,15 +126,11 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
 
     if (!mounted) return failedRules.isEmpty;
 
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
     if (failedRules.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Successfully updated ${succeededRules.length} firewall custom rule(s).'),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 3),
-        ),
+      context.showToastSuccess(
+        'Firewall Saved',
+        subtitle: 'Successfully updated ${succeededRules.length} firewall custom rule(s).',
+        actionKey: actionKey,
       );
       return true;
     } else {
@@ -263,17 +250,32 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
                     const SizedBox(height: 8),
                     ...overview.zones.map((zone) => _buildZoneCard(context, zone)),
                     const SizedBox(height: 16),
-                    _buildSectionHeader(context, 'Inter-Zone Forwarding Rules', Icons.alt_route_outlined),
-                    const SizedBox(height: 8),
-                    _buildForwardingsCard(context, overview.forwardings),
+                    LuciCollapsibleCard(
+                      title: 'Inter-Zone Forwarding Rules',
+                      count: overview.forwardings.length,
+                      subtitle: '${overview.forwardings.length} inter-zone policies • Tap to expand',
+                      icon: Icons.alt_route_outlined,
+                      iconColor: Colors.blue,
+                      child: _buildForwardingsCard(context, overview.forwardings),
+                    ),
                     const SizedBox(height: 16),
-                    _buildSectionHeader(context, 'Port Forwarding (Redirects)', Icons.import_export_outlined),
-                    const SizedBox(height: 8),
-                    _buildPortForwardingsList(context, overview.portForwards),
+                    LuciCollapsibleCard(
+                      title: 'Port Forwarding / Redirects',
+                      count: overview.portForwards.length,
+                      subtitle: '${overview.portForwards.length} port forward rules • Tap to expand',
+                      icon: Icons.import_export_outlined,
+                      iconColor: Colors.orange,
+                      child: _buildPortForwardingsList(context, overview.portForwards),
+                    ),
                     const SizedBox(height: 16),
-                    _buildSectionHeader(context, 'Custom Security Rules', Icons.rule_outlined),
-                    const SizedBox(height: 8),
-                    _buildCustomRulesList(context, overview.customRules),
+                    LuciCollapsibleCard(
+                      title: 'Custom Security Rules',
+                      count: overview.customRules.length,
+                      subtitle: '${overview.customRules.length} custom rules • Tap to expand',
+                      icon: Icons.rule_outlined,
+                      iconColor: Colors.teal,
+                      child: _buildCustomRulesList(context, overview.customRules),
+                    ),
                     const SizedBox(height: 80),
                   ],
                 ),

@@ -3,7 +3,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/main.dart';
+import 'package:yet_another_luci_app/main.dart';
+import 'package:yet_another_luci_app/models/client.dart';
 import '../models/wireless_info.dart';
 
 class WirelessManagementCard extends ConsumerWidget {
@@ -26,26 +27,42 @@ class WirelessManagementCard extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.wifi_outlined,
-                      size: 20,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Wireless Radios & SSIDs',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.wifi_outlined,
+                        size: 20,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Wireless Radios & SSIDs',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () {
+                    appState.requestTab(2, clientCategoryFilter: ClientCategoryFilter.wireless);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
+                    child: Text(
+                      '${overview.totalConnectedStations} Wi-Fi Clients',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ],
-                ),
-                Text(
-                  '${overview.totalConnectedStations} Wi-Fi Clients',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
               ],
@@ -67,10 +84,14 @@ class WirelessManagementCard extends ConsumerWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              radio.name.toUpperCase(),
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                            Expanded(
+                              child: Text(
+                                radio.name.toUpperCase(),
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
+                            const SizedBox(width: 4),
                             Text(
                               radio.bandLabel,
                               style: TextStyle(

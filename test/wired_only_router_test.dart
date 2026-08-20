@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:luci_mobile/models/interface.dart';
-import 'package:luci_mobile/modules/system_monitoring/models/system_metrics.dart';
+import 'package:yet_another_luci_app/models/interface.dart';
+import 'package:yet_another_luci_app/modules/system_monitoring/models/system_metrics.dart';
 
 /// Tests for wired-only router support (GitHub issues #46, #24, #6).
 ///
@@ -225,6 +225,32 @@ void main() {
 
       final metrics = SystemMetrics.fromSysInfo(sysInfo);
       expect(metrics.cpuUsagePercent, equals(18.5));
+    });
+
+    test('normalizes 1.0+ load average on multi-core router instead of false 100%', () {
+      final sysInfo = {
+        'uptime': 3600,
+        'load': [68812, 40000, 20000], // 1.05 1m load average in 16-bit integer format
+      };
+      final boardInfo = {
+        'model': 'MediaTek MT7621',
+      };
+
+      final metrics = SystemMetrics.fromSysInfo(sysInfo, boardInfo: boardInfo);
+      expect(metrics.load1m, closeTo(1.05, 0.01));
+      // 1.05 load average on 4-thread MT7621 should yield ~28% CPU load, NOT 100%
+      expect(metrics.cpuUsagePercent, lessThan(50.0));
+      expect(metrics.cpuUsagePercent, greaterThan(15.0));
+    });
+
+    test('parses map format for cpu usage correctly', () {
+      final sysInfo = {
+        'uptime': 3600,
+        'cpu': {'usage': 14.2},
+      };
+
+      final metrics = SystemMetrics.fromSysInfo(sysInfo);
+      expect(metrics.cpuUsagePercent, equals(14.2));
     });
   });
 }

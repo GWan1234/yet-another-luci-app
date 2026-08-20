@@ -3,7 +3,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/main.dart';
+import 'package:yet_another_luci_app/main.dart';
+import 'package:yet_another_luci_app/widgets/luci_toast.dart';
+import 'package:yet_another_luci_app/widgets/luci_collapsible_card.dart';
 import '../models/vpn_info.dart';
 
 class VpnConnectivityScreen extends ConsumerWidget {
@@ -25,13 +27,22 @@ class VpnConnectivityScreen extends ConsumerWidget {
 
     final children = <Widget>[];
     final unconfiguredCards = <Widget>[];
+    final configuredSections = <_ConfiguredVpnSection>[];
 
-    // Configured Services (Top of page)
+    // WireGuard
     if (hasWg) {
-      children.add(_buildSectionHeader(context, 'WireGuard VPN Interfaces & Peers', Icons.shield_outlined));
-      children.add(const SizedBox(height: 8));
-      children.addAll(overview.wireguardInterfaces.map((wg) => _buildWireguardCard(context, ref, wg)));
-      children.add(const SizedBox(height: 16));
+      final sortedWg = List<WireguardInterface>.from(overview.wireguardInterfaces)
+        ..sort((a, b) {
+          if (a.isUp != b.isUp) return a.isUp ? -1 : 1;
+          return a.name.compareTo(b.name);
+        });
+
+      configuredSections.add(_ConfiguredVpnSection(
+        defaultPriority: 0,
+        isActive: sortedWg.any((w) => w.isUp),
+        header: _buildSectionHeader(context, 'WireGuard VPN Interfaces & Peers', Icons.shield_outlined),
+        cards: sortedWg.map((wg) => _buildWireguardCard(context, ref, wg)).toList(),
+      ));
     } else {
       unconfiguredCards.add(_buildUnconfiguredCard(
         context,
@@ -41,11 +52,20 @@ class VpnConnectivityScreen extends ConsumerWidget {
       ));
     }
 
+    // OpenVPN
     if (hasOvpn) {
-      children.add(_buildSectionHeader(context, 'OpenVPN Tunnels', Icons.lock_outline));
-      children.add(const SizedBox(height: 8));
-      children.add(_buildOpenVpnCard(context, ref, overview.openvpnInstances));
-      children.add(const SizedBox(height: 16));
+      final sortedOvpn = List<OpenVpnInstance>.from(overview.openvpnInstances)
+        ..sort((a, b) {
+          if (a.isRunning != b.isRunning) return a.isRunning ? -1 : 1;
+          return a.name.compareTo(b.name);
+        });
+
+      configuredSections.add(_ConfiguredVpnSection(
+        defaultPriority: 1,
+        isActive: sortedOvpn.any((o) => o.isRunning),
+        header: _buildSectionHeader(context, 'OpenVPN Tunnels', Icons.lock_outline),
+        cards: [_buildOpenVpnCard(context, ref, sortedOvpn)],
+      ));
     } else {
       unconfiguredCards.add(_buildUnconfiguredCard(
         context,
@@ -55,11 +75,14 @@ class VpnConnectivityScreen extends ConsumerWidget {
       ));
     }
 
+    // Tailscale
     if (hasTs) {
-      children.add(_buildSectionHeader(context, 'Tailscale Mesh VPN', Icons.hub_outlined));
-      children.add(const SizedBox(height: 8));
-      children.add(_buildTailscaleCard(context, ref, overview.tailscale));
-      children.add(const SizedBox(height: 16));
+      configuredSections.add(_ConfiguredVpnSection(
+        defaultPriority: 2,
+        isActive: overview.tailscale.isRunning,
+        header: _buildSectionHeader(context, 'Tailscale Mesh VPN', Icons.hub_outlined),
+        cards: [_buildTailscaleCard(context, ref, overview.tailscale)],
+      ));
     } else {
       unconfiguredCards.add(_buildUnconfiguredCard(
         context,
@@ -69,11 +92,14 @@ class VpnConnectivityScreen extends ConsumerWidget {
       ));
     }
 
+    // NextDNS
     if (hasNextDns) {
-      children.add(_buildSectionHeader(context, 'NextDNS Encrypted Resolver', Icons.security_outlined));
-      children.add(const SizedBox(height: 8));
-      children.add(_buildNextDnsCard(context, ref, overview.nextdns));
-      children.add(const SizedBox(height: 16));
+      configuredSections.add(_ConfiguredVpnSection(
+        defaultPriority: 3,
+        isActive: overview.nextdns.isRunning || overview.nextdns.isEnabled,
+        header: _buildSectionHeader(context, 'NextDNS Encrypted Resolver', Icons.security_outlined),
+        cards: [_buildNextDnsCard(context, ref, overview.nextdns)],
+      ));
     } else {
       unconfiguredCards.add(_buildUnconfiguredCard(
         context,
@@ -83,11 +109,14 @@ class VpnConnectivityScreen extends ConsumerWidget {
       ));
     }
 
+    // Cloudflared
     if (hasCf) {
-      children.add(_buildSectionHeader(context, 'Cloudflare Tunnels (cloudflared)', Icons.cloud_done_outlined));
-      children.add(const SizedBox(height: 8));
-      children.add(_buildCloudflaredCard(context, ref, overview.cloudflared));
-      children.add(const SizedBox(height: 16));
+      configuredSections.add(_ConfiguredVpnSection(
+        defaultPriority: 4,
+        isActive: overview.cloudflared.isRunning,
+        header: _buildSectionHeader(context, 'Cloudflare Tunnels (cloudflared)', Icons.cloud_done_outlined),
+        cards: [_buildCloudflaredCard(context, ref, overview.cloudflared)],
+      ));
     } else {
       unconfiguredCards.add(_buildUnconfiguredCard(
         context,
@@ -97,14 +126,40 @@ class VpnConnectivityScreen extends ConsumerWidget {
       ));
     }
 
-    // Unconfigured Services (Bottom of page)
+    // Sort configured sections: Active / Running / Up services FIRST at top priority!
+    configuredSections.sort((a, b) {
+      if (a.isActive != b.isActive) {
+        return a.isActive ? -1 : 1;
+      }
+      return a.defaultPriority.compareTo(b.defaultPriority);
+    });
+
+    for (final sec in configuredSections) {
+      children.add(sec.header);
+      children.add(const SizedBox(height: 8));
+      for (final card in sec.cards) {
+        children.add(card);
+      }
+      children.add(const SizedBox(height: 16));
+    }
+
+    // Unconfigured Services (Bottom of page - Collapsible by default)
     if (unconfiguredCards.isNotEmpty) {
       if (children.isNotEmpty) {
         children.add(const Divider(height: 32, thickness: 1));
       }
-      children.add(_buildSectionHeader(context, 'Unconfigured Tunnels & Services', Icons.do_not_disturb_on_outlined));
-      children.add(const SizedBox(height: 8));
-      children.addAll(unconfiguredCards);
+      children.add(
+        LuciCollapsibleCard(
+          title: 'Unconfigured Tunnels & Services',
+          count: unconfiguredCards.length,
+          subtitle: '${unconfiguredCards.length} inactive tunnel profiles • Tap to view',
+          icon: Icons.do_not_disturb_on_outlined,
+          iconColor: Colors.grey,
+          child: Column(
+            children: unconfiguredCards,
+          ),
+        ),
+      );
     }
 
     children.add(const SizedBox(height: 32));
@@ -140,10 +195,13 @@ class VpnConnectivityScreen extends ConsumerWidget {
       children: [
         Icon(icon, size: 20, color: theme.colorScheme.primary),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
+        Expanded(
+          child: Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -328,17 +386,26 @@ class VpnConnectivityScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    const CircleAvatar(
-                      radius: 16,
-                      backgroundColor: Colors.teal,
-                      child: Icon(Icons.hub, color: Colors.white, size: 18),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(ts.nodeName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  ],
+                Expanded(
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 16,
+                        backgroundColor: Colors.teal,
+                        child: Icon(Icons.hub, color: Colors.white, size: 18),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          ts.nodeName,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Row(
                   children: [
                     Container(
@@ -414,20 +481,26 @@ class VpnConnectivityScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    const CircleAvatar(
-                      radius: 16,
-                      backgroundColor: Colors.indigo,
-                      child: Icon(Icons.security, color: Colors.white, size: 18),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      ndns.profileId.isNotEmpty ? 'Profile: ${ndns.profileId}' : 'NextDNS',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                    ),
-                  ],
+                Expanded(
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 16,
+                        backgroundColor: Colors.indigo,
+                        child: Icon(Icons.security, color: Colors.white, size: 18),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          ndns.profileId.isNotEmpty ? 'Profile: ${ndns.profileId}' : 'NextDNS',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Switch(
                   value: ndns.isEnabled && ndns.isRunning,
                   onChanged: (val) => _confirmToggleProvider(
@@ -591,12 +664,21 @@ class VpnConnectivityScreen extends ConsumerWidget {
     );
 
     if (confirmed == true && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Applying configuration change...')),
-      );
+      if (ActionRateLimiter.isRateLimited(title, cooldown: const Duration(seconds: 2))) {
+        final remaining = ActionRateLimiter.getRemainingCooldown(title, cooldown: const Duration(seconds: 2));
+        context.showToastRateLimited(title, remaining);
+        return;
+      }
+
+      final actionKey = 'vpn_action_${title.hashCode}';
+      context.showToastLoading('Applying configuration change...', subtitle: title, actionKey: actionKey);
       await action();
       final appState = ref.read(appStateProvider);
       await appState.fetchDashboardData();
+
+      if (context.mounted) {
+        context.showToastSuccess('Tunnel Configuration Updated', subtitle: 'State change applied successfully.', actionKey: actionKey);
+      }
     }
   }
 
@@ -676,15 +758,18 @@ class VpnConnectivityScreen extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          SizedBox(
+            width: 130,
+            child: Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          ),
+          const SizedBox(width: 8),
           Expanded(
-            child: Text(
+            child: SelectableText(
               value,
               textAlign: TextAlign.right,
               style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -700,5 +785,19 @@ class VpnConnectivityScreen extends ConsumerWidget {
     if (b >= 1024) return '${(b / 1024).toStringAsFixed(0)} KB';
     return '${b.toStringAsFixed(0)} B';
   }
+}
+
+class _ConfiguredVpnSection {
+  final int defaultPriority;
+  final bool isActive;
+  final Widget header;
+  final List<Widget> cards;
+
+  _ConfiguredVpnSection({
+    required this.defaultPriority,
+    required this.isActive,
+    required this.header,
+    required this.cards,
+  });
 }
 

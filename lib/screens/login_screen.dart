@@ -7,13 +7,15 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/main.dart';
+import 'package:yet_another_luci_app/main.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher_string.dart';
-import 'package:luci_mobile/config/app_config.dart';
-import 'package:luci_mobile/services/secure_storage_service.dart';
-import 'package:luci_mobile/utils/url_parser.dart';
-import 'package:luci_mobile/widgets/theme_router_logo.dart';
+import 'package:yet_another_luci_app/config/app_config.dart';
+import 'package:yet_another_luci_app/services/secure_storage_service.dart';
+import 'package:yet_another_luci_app/utils/url_parser.dart';
+import 'package:yet_another_luci_app/widgets/luci_toast.dart';
+import 'package:yet_another_luci_app/widgets/theme_router_logo.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -41,11 +43,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   late AnimationController _progressAnimController;
   bool _isActivatingReviewerMode = false;
 
-  Future<void> _detectGatewayIp() async {
+  bool _showAutoFillHint = false;
+  bool _hasDismissedAutoFillHint = false;
+  String? _autoFilledIp;
+  Timer? _autoFillHintTimer;
+
+  Future<void> _checkAutoFillHintDismissed() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final dismissed = prefs.getBool('hint_dismissed_login_autofill_ip') ?? false;
+      if (mounted) {
+        setState(() {
+          _hasDismissedAutoFillHint = dismissed;
+        });
+      }
+    } catch (_) {
+      // Guardrail: ignore storage failure
+    }
+  }
+
+  Future<void> _dismissAutoFillHint() async {
+    _autoFillHintTimer?.cancel();
+    _autoFillHintTimer = null;
+    if (mounted) {
+      setState(() {
+        _showAutoFillHint = false;
+        _hasDismissedAutoFillHint = true;
+      });
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('hint_dismissed_login_autofill_ip', true);
+    } catch (_) {
+      // Guardrail: ignore storage failure
+    }
+  }
+
+  Future<void> _detectGatewayIp({bool isOnInit = false}) async {
     if (_detectingGatewayIp) return;
     setState(() {
       _detectingGatewayIp = true;
     });
+
+    String? foundGateway;
+    bool isMobileData = false;
 
     try {
       final interfaces = await NetworkInterface.list(
@@ -53,73 +94,89 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         includeLinkLocal: false,
       );
 
-      NetworkInterface? targetInterface;
+      NetworkInterface? wifiOrEthInterface;
 
-      // 1. First priority: Wi-Fi or Ethernet interfaces (e.g. wlan0, wifi0, eth0, en0, wlx)
+      // 1. Check for active Wi-Fi or Ethernet interfaces (wlan, wifi, wl, eth, en, lan)
       for (final interface in interfaces) {
         final name = interface.name.toLowerCase();
-        if (name.contains('wlan') ||
+        final isWifiOrEth = name.contains('wlan') ||
             name.contains('wifi') ||
             name.contains('wl') ||
-            name.contains('en') ||
-            name.contains('eth')) {
-          targetInterface = interface;
+            name.contains('eth') ||
+            (name.contains('en') && !name.contains('entry')) ||
+            name.contains('lan');
+
+        if (isWifiOrEth && interface.addresses.any((a) => !a.isLoopback && a.type == InternetAddressType.IPv4)) {
+          wifiOrEthInterface = interface;
           break;
         }
       }
 
-      // 2. Second priority: Fallback to any active non-loopback interface (excluding virtual tun/tap/docker/rmnet)
-      if (targetInterface == null) {
-        for (final interface in interfaces) {
+      // 2. Check if mobile data / cellular interface is active and NO Wi-Fi/Ethernet interface is found
+      if (wifiOrEthInterface == null) {
+        final hasMobileInterface = interfaces.any((interface) {
           final name = interface.name.toLowerCase();
-          final isVirtual = name.startsWith('rmnet') ||
-              name.startsWith('tun') ||
-              name.startsWith('tap') ||
-              name.startsWith('docker') ||
-              name.startsWith('veth') ||
-              name.startsWith('dummy');
-          if (!isVirtual && interface.addresses.any((a) => !a.isLoopback)) {
-            targetInterface = interface;
-            break;
-          }
+          return name.startsWith('rmnet') ||
+              name.startsWith('ccmni') ||
+              name.startsWith('pdp') ||
+              name.startsWith('wwan') ||
+              name.startsWith('cellular') ||
+              name.startsWith('mobile') ||
+              name.startsWith('gprs') ||
+              name.startsWith('3g') ||
+              name.startsWith('4g') ||
+              name.startsWith('5g') ||
+              name.startsWith('lte') ||
+              name.startsWith('ppp');
+        });
+
+        if (hasMobileInterface) {
+          isMobileData = true;
         }
       }
 
-      if (targetInterface != null) {
-        for (final addr in targetInterface.addresses) {
+      if (wifiOrEthInterface != null) {
+        for (final addr in wifiOrEthInterface.addresses) {
           if (!addr.isLoopback && addr.type == InternetAddressType.IPv4) {
             final parts = addr.address.split('.');
             if (parts.length == 4) {
-              final detectedIp = addr.address;
-              final gateway = '${parts[0]}.${parts[1]}.${parts[2]}.1';
-              // If user already typed a specific non-empty IP (e.g. 10.0.0.125), show feedback without forcibly overriding
-              if (_ipController.text.trim().isNotEmpty && _ipController.text.trim() != gateway && _ipController.text.trim() != '192.168.1.1') {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Subnet detected ($detectedIp). Keeping user IP: ${_ipController.text.trim()}'),
-                      duration: const Duration(seconds: 3),
-                    ),
-                  );
-                }
-              } else {
-                _ipController.text = gateway;
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Auto-detected Gateway IP: $gateway'),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                }
-              }
+              foundGateway = '${parts[0]}.${parts[1]}.${parts[2]}.1';
               break;
             }
           }
         }
       }
+
+      if (mounted) {
+        setState(() {
+          if (isMobileData) {
+            _showAutoFillHint = false;
+            if (!isOnInit) {
+              context.showToastInfo('Mobile Data Active', subtitle: 'Router IP prefill skipped on cellular connection.', showProgressBar: false);
+            }
+          } else if (foundGateway != null) {
+            _ipController.text = foundGateway;
+            _autoFilledIp = foundGateway;
+            if (!_hasDismissedAutoFillHint) {
+              _showAutoFillHint = true;
+              _autoFillHintTimer?.cancel();
+              _autoFillHintTimer = null;
+            } else {
+              _showAutoFillHint = false;
+            }
+            if (!isOnInit) {
+              context.showToastSuccess('Gateway IP Detected', subtitle: foundGateway, showProgressBar: false);
+            }
+          } else {
+            _showAutoFillHint = false;
+            if (!isOnInit) {
+              context.showToastInfo('No Local Gateway Detected', subtitle: 'Please check your Wi-Fi or Ethernet connection.', showProgressBar: false);
+            }
+          }
+        });
+      }
     } catch (_) {
-      // Fail silently without clearing or locking inputs
+      // Fail silently without clearing inputs
     } finally {
       if (mounted) {
         setState(() {
@@ -128,9 +185,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       }
     }
   }
+
+  void _onOtherFieldActivity() {
+    if (_showAutoFillHint && _autoFillHintTimer == null) {
+      _startHintTimeout();
+    }
+  }
+
+  void _startHintTimeout() {
+    _autoFillHintTimer?.cancel();
+    _autoFillHintTimer = Timer(const Duration(seconds: 4), () {
+      _dismissAutoFillHint();
+    });
+  }
+
   @override
   void initState() {
     super.initState();
+    _ipController.addListener(_onIpChanged);
+    _usernameFocusNode.addListener(_onOtherFieldActivity);
+    _passwordFocusNode.addListener(_onOtherFieldActivity);
+    _usernameController.addListener(_onOtherFieldActivity);
+    _passwordController.addListener(_onOtherFieldActivity);
+    _checkAutoFillHintDismissed().then((_) {
+      _detectGatewayIp(isOnInit: true);
+    });
     _checkReviewerModeAndAutoLogin();
     _logoAnimController = AnimationController(
       vsync: this,
@@ -141,6 +220,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       duration: AppConfig.reviewerModeActivationDuration,
     );
     _logoAnimController.forward();
+  }
+
+  void _onIpChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  List<String> _getRouterAddressAutofillHints() {
+    return [
+      AutofillHints.url,
+    ];
   }
 
   Future<void> _checkReviewerModeAndAutoLogin() async {
@@ -256,6 +347,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   @override
   void dispose() {
+    _autoFillHintTimer?.cancel();
+    _usernameFocusNode.removeListener(_onOtherFieldActivity);
+    _passwordFocusNode.removeListener(_onOtherFieldActivity);
+    _usernameController.removeListener(_onOtherFieldActivity);
+    _passwordController.removeListener(_onOtherFieldActivity);
+    _ipController.removeListener(_onIpChanged);
     _ipController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
@@ -299,39 +396,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
       FocusScope.of(context).unfocus();
 
+      const actionKey = 'login_connecting';
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Attempting connection to ${parsedUrl.displayUrl}...'),
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        context.showToastLoading('Connecting', subtitle: 'Attempting connection to ${parsedUrl.displayUrl}...', actionKey: actionKey);
       }
 
-      // Execute login request across HTTP / HTTPS protocols
-      final success = await appState.login(
-        parsedUrl.hostWithPort,
-        user,
-        pass,
-        parsedUrl.useHttps,
-        fromRouter: false,
-        context: context,
-      );
-
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        unawaited(Navigator.of(context).pushReplacementNamed('/'));
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        final errorMsg = appState.errorMessage ??
-            'Connection failed to ${parsedUrl.displayUrl}. Please check host reachability, username, and password.';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMsg),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            duration: const Duration(seconds: 6),
-          ),
+      try {
+        final success = await appState.login(
+          parsedUrl.hostWithPort,
+          user,
+          pass,
+          parsedUrl.useHttps,
+          fromRouter: false,
+          context: context,
         );
+
+        if (success && mounted) {
+          LuciToastManager.dismissAllLoading();
+          TextInput.finishAutofillContext(shouldSave: true);
+          unawaited(Navigator.of(context).pushReplacementNamed('/'));
+        } else if (mounted) {
+          LuciToastManager.dismissAllLoading();
+          final errorMsg = appState.errorMessage ??
+              'Connection failed to ${parsedUrl.displayUrl}. Please check host reachability, username, and password.';
+          context.showToastError('Connection Failed', subtitle: errorMsg);
+        }
+      } catch (err) {
+        if (mounted) {
+          LuciToastManager.dismissAllLoading();
+          context.showToastError('Connection Error', subtitle: err.toString());
+        }
+      } finally {
+        // Guarantee loading toast cleanup even if context was unmounted during route push
+        LuciToastManager.dismissAllLoading();
       }
     }
   }
@@ -343,12 +440,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       mode: LaunchMode.externalApplication,
     );
     if (!success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Could not open GitHub issues'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
+      context.showToastError('GitHub Error', subtitle: 'Could not open GitHub issues link.');
     }
   }
 
@@ -541,7 +633,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                   horizontal: 18.0,
                                   vertical: 16.0,
                                 ),
-                                child: Form(
+                                child: AutofillGroup(
+                                  child: Form(
                                   key: _formKey,
                                   child: Column(
                                         crossAxisAlignment:
@@ -555,9 +648,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                               key: const ValueKey('login_ip_field'),
                                               controller: _ipController,
                                               focusNode: _ipFocusNode,
-                                              autofillHints: const [
-                                                AutofillHints.url,
-                                              ],
+                                              keyboardType: TextInputType.url,
+                                              autofillHints: _getRouterAddressAutofillHints(),
                                               decoration: InputDecoration(
                                                 labelText: 'Router Address',
                                                 border: const OutlineInputBorder(),
@@ -601,6 +693,72 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                               },
                                             ),
                                           ),
+                                          AnimatedSwitcher(
+                                            duration: const Duration(milliseconds: 250),
+                                            transitionBuilder: (child, animation) => SizeTransition(
+                                              sizeFactor: animation,
+                                              child: FadeTransition(opacity: animation, child: child),
+                                            ),
+                                            child: (_showAutoFillHint && _autoFilledIp != null)
+                                                ? Container(
+                                                    key: const ValueKey('autofill_floating_hint'),
+                                                    margin: const EdgeInsets.only(top: 4, bottom: 6),
+                                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                    decoration: BoxDecoration(
+                                                      color: colorScheme.primaryContainer.withValues(alpha: 0.95),
+                                                      borderRadius: BorderRadius.circular(10),
+                                                      border: Border.all(
+                                                        color: colorScheme.primary.withValues(alpha: 0.4),
+                                                        width: 1.0,
+                                                      ),
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color: Colors.black.withValues(alpha: 0.08),
+                                                          blurRadius: 6,
+                                                          offset: const Offset(0, 2),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    child: Row(
+                                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                                      children: [
+                                                        Icon(
+                                                          Icons.arrow_upward_rounded,
+                                                          size: 14,
+                                                          color: colorScheme.primary,
+                                                        ),
+                                                        const SizedBox(width: 6),
+                                                        Expanded(
+                                                          child: Text(
+                                                            'Router IP auto-filled ($_autoFilledIp) as detected from network',
+                                                            style: TextStyle(
+                                                              fontSize: 11,
+                                                              fontWeight: FontWeight.w600,
+                                                              color: colorScheme.onPrimaryContainer,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                        InkWell(
+                                                          onTap: _dismissAutoFillHint,
+                                                          borderRadius: BorderRadius.circular(12),
+                                                          child: Padding(
+                                                            padding: const EdgeInsets.all(2.0),
+                                                            child: Icon(
+                                                              Icons.close_rounded,
+                                                              size: 14,
+                                                              color: colorScheme.onPrimaryContainer.withValues(alpha: 0.7),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  )
+                                                : const SizedBox(
+                                                    key: ValueKey('no_autofill_hint'),
+                                                    height: 6,
+                                                  ),
+                                          ),
                                           const SizedBox(height: 10),
                                           Tooltip(
                                             message:
@@ -609,7 +767,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                               key: const ValueKey('login_user_field'),
                                               controller: _usernameController,
                                               focusNode: _usernameFocusNode,
+                                              keyboardType: TextInputType.text,
                                               autofillHints: const [
+                                                AutofillHints.username,
+                                                AutofillHints.email,
                                               ],
                                               decoration: const InputDecoration(
                                                 labelText: 'Username',
@@ -640,6 +801,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                               controller: _passwordController,
                                               focusNode: _passwordFocusNode,
                                               obscureText: !_passwordVisible,
+                                              keyboardType: TextInputType.visiblePassword,
                                               autofillHints: const [
                                                 AutofillHints.password,
                                               ],
@@ -859,8 +1021,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 ),
                               ),
                             ),
+                            ),
                           ),
                         ),
+
                         const SizedBox(height: 16),
                         Tooltip(
                           message: 'Open GitHub issues for support',

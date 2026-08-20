@@ -5,9 +5,10 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:luci_mobile/services/interfaces/api_service_interface.dart';
-import 'package:luci_mobile/config/app_config.dart';
-import 'package:luci_mobile/models/router_capabilities.dart';
+import 'package:yet_another_luci_app/modules/services_system/models/ddns_info.dart';
+import 'package:yet_another_luci_app/services/interfaces/api_service_interface.dart';
+import 'package:yet_another_luci_app/config/app_config.dart';
+import 'package:yet_another_luci_app/models/router_capabilities.dart';
 
 class MockApiService implements IApiService {
   static final Random _random = Random();
@@ -1404,6 +1405,74 @@ class MockApiService implements IApiService {
     String ipAddress,
     String sysauth,
     bool useHttps, {
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return true;
+  }
+
+  @override
+  Future<bool> saveCronJobs(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required List<String> cronLines,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return true;
+  }
+
+  @override
+  Future<bool> saveDdnsInstance(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required DdnsInstance instance,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return true;
+  }
+
+  @override
+  Future<bool> deleteDdnsInstance(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String instanceName,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return true;
+  }
+
+  @override
+  Future<DdnsValidationResult> testDdnsConfiguration(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required DdnsInstance instance,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 400));
+    if (instance.lookupHost.contains('error') || instance.domain.contains('invalid')) {
+      return DdnsValidationResult.failure(
+        'Host lookup failed for ${instance.lookupHost}. Host unreachable or unregistered.',
+        testOutput: 'nslookup: cant resolve ${instance.lookupHost}',
+      );
+    }
+    return DdnsValidationResult.success(
+      testOutput: 'DNS Lookup Output:\nName: ${instance.lookupHost.isEmpty ? instance.domain : instance.lookupHost}\nAddress: 198.51.100.24 (Public Router IP)',
+    );
+  }
+
+  @override
+  Future<bool> toggleGlobalDdns(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required bool enable,
     BuildContext? context,
   }) async {
     await Future.delayed(const Duration(milliseconds: 300));

@@ -3,9 +3,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/main.dart';
-import 'package:luci_mobile/design/luci_design_system.dart';
-import 'package:luci_mobile/models/interface.dart' as model;
+import 'package:yet_another_luci_app/main.dart';
+import 'package:yet_another_luci_app/design/luci_design_system.dart';
+import 'package:yet_another_luci_app/models/interface.dart' as model;
 import '../models/network_monitoring_info.dart';
 
 class NetworkMonitoringScreen extends ConsumerWidget {
@@ -56,10 +56,13 @@ class NetworkMonitoringScreen extends ConsumerWidget {
       children: [
         Icon(icon, size: 20, color: theme.colorScheme.primary),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
+        Expanded(
+          child: Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -86,9 +89,12 @@ class NetworkMonitoringScreen extends ConsumerWidget {
                   size: 22,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  gw != null ? 'Default Gateway (${gw.name.toUpperCase()})' : 'No Gateway Connected',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                Expanded(
+                  child: Text(
+                    gw != null ? 'Default Gateway (${gw.name.toUpperCase()})' : 'No Gateway Connected',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
@@ -202,29 +208,79 @@ class NetworkMonitoringScreen extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: iface.isUp ? LuciStatusColors.connected.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.2),
-          child: Icon(
-            iface.isUp ? Icons.lan : Icons.lan_outlined,
-            color: iface.isUp ? LuciStatusColors.connected : Colors.grey,
-          ),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: iface.isUp ? LuciStatusColors.connected.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.2),
+              child: Icon(
+                iface.isUp ? Icons.lan : Icons.lan_outlined,
+                color: iface.isUp ? LuciStatusColors.connected : Colors.grey,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          iface.name.toUpperCase(),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Uptime: ${iface.formattedUptime}',
+                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      Text('Device: ${iface.device}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      const Text('•', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      Text('Proto: ${iface.protocol}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-        title: Text(iface.name.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('Device: ${iface.device} • Proto: ${iface.protocol}'),
-        trailing: Text('Uptime: ${iface.formattedUptime}', style: const TextStyle(fontSize: 11)),
       ),
     );
   }
 
   Widget _buildDetailRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      padding: const EdgeInsets.symmetric(vertical: 3.0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SelectableText(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+            ),
+          ),
         ],
       ),
     );

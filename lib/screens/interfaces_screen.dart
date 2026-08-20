@@ -3,17 +3,18 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/main.dart';
+import 'package:yet_another_luci_app/main.dart';
 import 'package:flutter/services.dart';
-import 'package:luci_mobile/models/interface.dart';
-import 'package:luci_mobile/models/router_capabilities.dart';
-import 'package:luci_mobile/models/network_topology.dart';
-import 'package:luci_mobile/widgets/network_topology_card.dart';
+import 'package:yet_another_luci_app/models/interface.dart';
+import 'package:yet_another_luci_app/models/router_capabilities.dart';
+import 'package:yet_another_luci_app/models/network_topology.dart';
+import 'package:yet_another_luci_app/widgets/network_topology_card.dart';
 import 'dart:math';
-import 'package:luci_mobile/widgets/luci_app_bar.dart';
-import 'package:luci_mobile/design/luci_design_system.dart';
-import 'package:luci_mobile/widgets/luci_loading_states.dart';
-import 'package:luci_mobile/widgets/luci_refresh_components.dart';
+import 'package:yet_another_luci_app/widgets/luci_app_bar.dart';
+import 'package:yet_another_luci_app/design/luci_design_system.dart';
+import 'package:yet_another_luci_app/widgets/luci_loading_states.dart';
+import 'package:yet_another_luci_app/widgets/luci_refresh_components.dart';
+import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 
 class InterfacesScreen extends ConsumerStatefulWidget {
   final String? scrollToInterface;
@@ -279,45 +280,30 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-            ),
-            const SizedBox(width: 12),
-            Text('Restarting interface "${iface.name}"...'),
-          ],
-        ),
-        duration: const Duration(seconds: 8),
-      ),
+    final actionKey = 'restart_iface_${iface.name}';
+    context.showToastLoading(
+      'Restarting Interface',
+      subtitle: 'Restarting interface "${iface.name}"...',
+      actionKey: actionKey,
     );
 
     final appState = ref.read(appStateProvider);
     final success = await appState.restartWiredInterface(iface.name, context: context);
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Interface "${iface.name}" restarted successfully.'),
-          backgroundColor: Colors.green.shade800,
-          duration: const Duration(seconds: 3),
-        ),
+      context.showToastSuccess(
+        'Interface Restarted',
+        subtitle: 'Interface "${iface.name}" restarted successfully.',
+        actionKey: actionKey,
       );
       await appState.fetchDashboardData();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to restart interface "${iface.name}".'),
-          backgroundColor: Colors.red.shade800,
-          duration: const Duration(seconds: 4),
-        ),
+      context.showToastError(
+        'Restart Failed',
+        subtitle: 'Failed to restart interface "${iface.name}".',
+        actionKey: actionKey,
       );
     }
   }
@@ -342,21 +328,11 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-            ),
-            const SizedBox(width: 12),
-            Text('Restarting wireless interface "$displayName"...'),
-          ],
-        ),
-        duration: const Duration(seconds: 8),
-      ),
+    final actionKey = 'restart_wifi_$sectionKey';
+    context.showToastLoading(
+      'Restarting Wireless',
+      subtitle: 'Restarting wireless interface "$displayName"...',
+      actionKey: actionKey,
     );
 
     final appState = ref.read(appStateProvider);
@@ -367,24 +343,19 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
     );
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Wireless interface "$displayName" restarted successfully.'),
-          backgroundColor: Colors.green.shade800,
-          duration: const Duration(seconds: 3),
-        ),
+      context.showToastSuccess(
+        'Wireless Restarted',
+        subtitle: 'Wireless interface "$displayName" restarted successfully.',
+        actionKey: actionKey,
       );
       await appState.fetchDashboardData();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to restart wireless interface "$displayName".'),
-          backgroundColor: Colors.red.shade800,
-          duration: const Duration(seconds: 4),
-        ),
+      context.showToastError(
+        'Restart Failed',
+        subtitle: 'Failed to restart wireless interface "$displayName".',
+        actionKey: actionKey,
       );
     }
   }
@@ -467,22 +438,10 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
     });
 
     if (overallSuccess) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Interface state changes applied successfully.'),
-          backgroundColor: Colors.green.shade800,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      context.showToastSuccess('Changes Applied', subtitle: 'Interface state changes applied successfully.');
       await appState.fetchDashboardData();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Some interface state changes failed to apply.'),
-          backgroundColor: Colors.red.shade800,
-          duration: const Duration(seconds: 4),
-        ),
-      );
+      context.showToastError('Apply Failed', subtitle: 'Some interface state changes failed to apply.');
     }
   }
 
@@ -590,8 +549,8 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
       if (interfaceName.isNotEmpty && interfaceName != radio) {
         return '${ssidTrimmed.toLowerCase()}__${interfaceName.toLowerCase()}';
       }
-      // If all names are the same, add a unique suffix
-      return '${ssidTrimmed.toLowerCase()}__${radio.toLowerCase()}_${DateTime.now().millisecondsSinceEpoch}';
+      // If all names are the same, use deterministic radio fallback
+      return '${ssidTrimmed.toLowerCase()}__${radio.toLowerCase()}_fallback';
     }
 
     // If SSID is not empty, use SSID + radio
@@ -1014,6 +973,20 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
 
     final routerIp = appState.currentRouterIp;
 
+    interfacesList.sort((a, b) {
+      final aUp = _stagedWiredInterfaceStates[a.name] ?? a.isUp;
+      final bUp = _stagedWiredInterfaceStates[b.name] ?? b.isUp;
+      if (aUp != bUp) {
+        return aUp ? -1 : 1;
+      }
+      final aAccess = _isWiredAccessInterface(a, routerIp);
+      final bAccess = _isWiredAccessInterface(b, routerIp);
+      if (aAccess != bAccess) {
+        return aAccess ? -1 : 1;
+      }
+      return a.name.compareTo(b.name);
+    });
+
     final interfaces = interfacesList;
     if (interfaces.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
@@ -1166,6 +1139,22 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
     });
 
     final routerIp = appState.currentRouterIp;
+
+    interfacesList.sort((a, b) {
+      final sectionA = a['section'] as String?;
+      final sectionB = b['section'] as String?;
+      final aEnabled = (sectionA != null && _stagedWirelessInterfaceStates.containsKey(sectionA))
+          ? _stagedWirelessInterfaceStates[sectionA]!
+          : (a['isEnabled'] == true);
+      final bEnabled = (sectionB != null && _stagedWirelessInterfaceStates.containsKey(sectionB))
+          ? _stagedWirelessInterfaceStates[sectionB]!
+          : (b['isEnabled'] == true);
+      if (aEnabled != bEnabled) {
+        return aEnabled ? -1 : 1;
+      }
+      return (a['name'] as String? ?? '').compareTo(b['name'] as String? ?? '');
+    });
+
     final interfaces = interfacesList;
     if (interfaces.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
@@ -1518,38 +1507,46 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurface,
+            SizedBox(
+              width: 120,
+              child: Text(
+                title,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurface,
+                ),
               ),
             ),
-            Row(
-              children: [
-                Text(
-                  value,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: colorScheme.onSurface,
-                  ),
-                  textAlign: TextAlign.end,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (onTap != null)
-                  GestureDetector(
-                    onTap: onTap,
-                    child: const Padding(
-                      padding: EdgeInsets.only(left: 8.0),
-                      child: Icon(
-                        Icons.copy_all_outlined,
-                        size: 16,
-                        semanticLabel: 'Copy',
+            const SizedBox(width: 8),
+            Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: SelectableText(
+                      value,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                        color: colorScheme.onSurface,
                       ),
+                      textAlign: TextAlign.end,
                     ),
                   ),
-              ],
+                  if (onTap != null)
+                    GestureDetector(
+                      onTap: onTap,
+                      child: const Padding(
+                        padding: EdgeInsets.only(left: 8.0),
+                        child: Icon(
+                          Icons.copy_all_outlined,
+                          size: 16,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ],
         ),
@@ -1559,12 +1556,7 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
 
   void _copyToClipboard(BuildContext context, String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$label copied to clipboard'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    context.showToastSuccess('$label copied', subtitle: 'Copied to clipboard.');
   }
 
   bool _isPublicIp(String ipText) {
@@ -1831,9 +1823,9 @@ class _UnifiedNetworkCardState extends State<_UnifiedNetworkCard>
       ),
       clipBehavior: Clip.antiAlias,
       child: AnimatedScale(
-        scale: widget.initiallyExpanded && _isExpanded ? 1.02 : 1.0,
-        duration: LuciAnimations.standard,
-        curve: Curves.easeOutBack,
+        scale: widget.initiallyExpanded && _isExpanded ? 1.01 : 1.0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
         child: Column(
           children: [
             InkWell(
@@ -1859,10 +1851,10 @@ class _UnifiedNetworkCardState extends State<_UnifiedNetworkCard>
                           ),
                           child: AnimatedScale(
                             scale: widget.initiallyExpanded && _isExpanded
-                                ? 1.1
+                                ? 1.05
                                 : 1.0,
-                            duration: const Duration(milliseconds: 500),
-                            curve: Curves.elasticOut,
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOutCubic,
                             child: Icon(
                               widget.icon,
                               color: effectiveEnabled
@@ -1873,9 +1865,8 @@ class _UnifiedNetworkCardState extends State<_UnifiedNetworkCard>
                             ),
                           ),
                         ),
-                        Positioned(
-                          right: 0,
-                          top: 0,
+                        Align(
+                          alignment: Alignment.topRight,
                           child: Tooltip(
                             message: effectiveEnabled
                                 ? 'Interface is up'

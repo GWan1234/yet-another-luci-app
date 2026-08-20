@@ -4,8 +4,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:luci_mobile/models/dashboard_preferences.dart';
-import 'package:luci_mobile/services/throughput_service.dart';
+import 'package:yet_another_luci_app/models/dashboard_preferences.dart';
+import 'package:yet_another_luci_app/services/throughput_service.dart';
 
 /// Encapsulates throughput polling, timer lifecycle, and interface-specific
 /// rate history. Extracted from AppState to enforce single-responsibility
@@ -22,7 +22,7 @@ class ThroughputController {
   final ThroughputService _throughputService;
 
   Timer? _throughputTimer;
-  int _throughputIntervalSeconds = 2;
+  int _throughputIntervalSeconds = 4;
 
   int get throughputIntervalSeconds => _throughputIntervalSeconds;
 

@@ -3,15 +3,16 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/main.dart';
-import 'package:luci_mobile/config/app_config.dart';
-import 'package:luci_mobile/design/luci_design_system.dart';
-import 'package:luci_mobile/providers/entitlement_provider.dart';
-import 'package:luci_mobile/screens/paywall_screen.dart';
-import 'package:luci_mobile/widgets/banner_ad_widget.dart';
-import 'package:luci_mobile/widgets/luci_app_bar.dart';
-import 'package:luci_mobile/screens/dashboard_settings_list_screen.dart';
-import 'package:luci_mobile/services/update_checker_service.dart';
+import 'package:yet_another_luci_app/main.dart';
+import 'package:yet_another_luci_app/config/app_config.dart';
+import 'package:yet_another_luci_app/design/luci_design_system.dart';
+import 'package:yet_another_luci_app/providers/entitlement_provider.dart';
+import 'package:yet_another_luci_app/screens/paywall_screen.dart';
+import 'package:yet_another_luci_app/widgets/banner_ad_widget.dart';
+import 'package:yet_another_luci_app/widgets/luci_app_bar.dart';
+import 'package:yet_another_luci_app/widgets/luci_toast.dart';
+import 'package:yet_another_luci_app/screens/dashboard_settings_list_screen.dart';
+import 'package:yet_another_luci_app/services/update_checker_service.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -188,12 +189,7 @@ class SettingsScreen extends ConsumerWidget {
                       onTap: () async {
                         await appState.redetectCapabilities();
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Router capabilities re-detected & cached successfully!'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
+                          context.showToastSuccess('Capabilities Detected', subtitle: 'Router capabilities re-detected & cached successfully!');
                         }
                       },
                     ),

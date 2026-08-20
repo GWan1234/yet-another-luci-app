@@ -3,11 +3,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/main.dart';
+import 'package:yet_another_luci_app/main.dart';
 import '../../system_monitoring/models/system_metrics.dart';
 import '../services/metrics_chart_engine.dart';
 import '../widgets/realtime_line_chart.dart';
-import 'package:luci_mobile/design/luci_design_system.dart';
+import 'package:yet_another_luci_app/design/luci_design_system.dart';
 
 class ChartingScreen extends ConsumerWidget {
   const ChartingScreen({super.key});
@@ -22,7 +22,8 @@ class ChartingScreen extends ConsumerWidget {
     // Listen for periodic app state telemetry ticks to push samples safely without build-loop recursion
     ref.listen(appStateProvider, (previous, next) {
       final sysInfo = next.dashboardData?['sysInfo'] as Map<String, dynamic>?;
-      final systemMetrics = SystemMetrics.fromSysInfo(sysInfo);
+      final boardInfo = next.dashboardData?['boardInfo'] as Map<String, dynamic>?;
+      final systemMetrics = SystemMetrics.fromSysInfo(sysInfo, boardInfo: boardInfo);
       engine.addSample(
         cpuUsage: systemMetrics.cpuUsagePercent,
         ramUsage: systemMetrics.memoryUsagePercent,
@@ -40,7 +41,8 @@ class ChartingScreen extends ConsumerWidget {
     // Seed initial sample if buffer is empty
     if (metricsData.cpuHistory.isEmpty) {
       final sysInfo = appState.dashboardData?['sysInfo'] as Map<String, dynamic>?;
-      final systemMetrics = SystemMetrics.fromSysInfo(sysInfo);
+      final boardInfo = appState.dashboardData?['boardInfo'] as Map<String, dynamic>?;
+      final systemMetrics = SystemMetrics.fromSysInfo(sysInfo, boardInfo: boardInfo);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (metricsData.cpuHistory.isEmpty) {
           engine.addSample(

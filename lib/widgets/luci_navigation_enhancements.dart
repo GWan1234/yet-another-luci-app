@@ -12,8 +12,8 @@ class LuciTabTransition extends StatefulWidget {
     super.key,
     required this.child,
     required this.transitionKey,
-    this.duration = const Duration(milliseconds: 350),
-    this.curve = Curves.easeInOutCubic,
+    this.duration = const Duration(milliseconds: 250),
+    this.curve = Curves.fastOutSlowIn,
   });
 
   final Widget child;
@@ -121,7 +121,7 @@ class _LuciEnhancedFABState extends State<LuciEnhancedFAB>
     _scaleAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
     _rotationAnimation = Tween<double>(
       begin: 0.0,
@@ -356,9 +356,9 @@ class _LuciAnimatedCardState extends State<LuciAnimatedCard>
     );
 
     _scaleAnimation = Tween<double>(
-      begin: 0.8,
+      begin: 0.96,
       end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(

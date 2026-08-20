@@ -1,8 +1,8 @@
 // Copyright 2026 Tuhin Garai. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import 'package:luci_mobile/models/router.dart' as model;
-import 'package:luci_mobile/services/secure_storage_service.dart';
+import 'package:yet_another_luci_app/models/router.dart' as model;
+import 'package:yet_another_luci_app/services/secure_storage_service.dart';
 
 class RouterService {
   RouterService({this.isReviewerMode = false});

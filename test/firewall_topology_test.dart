@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:luci_mobile/models/router_capabilities.dart';
-import 'package:luci_mobile/models/rpc_result.dart';
-import 'package:luci_mobile/modules/firewall_security/models/firewall_info.dart';
+import 'package:yet_another_luci_app/models/router_capabilities.dart';
+import 'package:yet_another_luci_app/models/rpc_result.dart';
+import 'package:yet_another_luci_app/modules/firewall_security/models/firewall_info.dart';
 
 void main() {
   group('Firewall Module Capability & Topology Unit Tests', () {

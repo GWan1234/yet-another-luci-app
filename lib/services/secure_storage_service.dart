@@ -3,9 +3,9 @@
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
-import 'package:luci_mobile/models/router.dart';
+import 'package:yet_another_luci_app/models/router.dart';
 import '../utils/logger.dart';
-import 'package:luci_mobile/config/app_config.dart';
+import 'package:yet_another_luci_app/config/app_config.dart';
 
 class SecureStorageService {
   final _storage = const FlutterSecureStorage();

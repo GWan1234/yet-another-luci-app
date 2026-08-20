@@ -8,7 +8,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_platform_interface/in_app_purchase_platform_interface.dart';
 
-import 'package:luci_mobile/config/app_config.dart';
+import 'package:yet_another_luci_app/config/app_config.dart';
 
 /// Available subscription / purchase tiers.
 enum EntitlementTier {
@@ -114,8 +114,12 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
   Future<void> _init() async {
     if (!AppConfig.isMonetizationEnabled) return;
     await loadCachedEntitlement();
-    _listenToPurchaseUpdates();
-    await fetchBillingProducts();
+    try {
+      _listenToPurchaseUpdates();
+      await fetchBillingProducts();
+    } catch (e) {
+      debugPrint('Play Billing init guard on Custom ROM / microG: $e');
+    }
   }
 
   /// Loads cached entitlement tier from local secure storage.

@@ -8,29 +8,30 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
-import 'package:luci_mobile/services/secure_storage_service.dart';
-import 'package:luci_mobile/services/router_service.dart';
-import 'package:luci_mobile/services/throughput_service.dart';
-import 'package:luci_mobile/state/controllers/throughput_controller.dart';
-import 'package:luci_mobile/state/controllers/dashboard_controller.dart';
-import 'package:luci_mobile/state/controllers/package_controller.dart';
-import 'package:luci_mobile/state/controllers/network_actions_controller.dart';
-import 'package:luci_mobile/state/controllers/client_controller.dart';
-import 'package:luci_mobile/state/controllers/session_controller.dart';
-import 'package:luci_mobile/models/client.dart';
-import 'package:luci_mobile/models/router.dart' as model;
-import 'package:luci_mobile/models/dashboard_preferences.dart';
-import 'package:luci_mobile/services/interfaces/auth_service_interface.dart';
-import 'package:luci_mobile/services/interfaces/api_service_interface.dart';
-import 'package:luci_mobile/services/service_factory.dart';
-import 'package:luci_mobile/utils/http_client_manager.dart';
-import 'package:luci_mobile/utils/logger.dart';
-import 'package:luci_mobile/modules/package_manager/models/package_info.dart';
-import 'package:luci_mobile/models/router_capabilities.dart';
-import 'package:luci_mobile/models/rpc_result.dart';
-import 'package:luci_mobile/models/network_topology.dart';
-import 'package:luci_mobile/modules/firewall_security/models/firewall_info.dart';
-import 'package:luci_mobile/modules/wireless_management/models/wireless_info.dart';
+import 'package:yet_another_luci_app/services/secure_storage_service.dart';
+import 'package:yet_another_luci_app/services/router_service.dart';
+import 'package:yet_another_luci_app/services/throughput_service.dart';
+import 'package:yet_another_luci_app/state/controllers/throughput_controller.dart';
+import 'package:yet_another_luci_app/state/controllers/dashboard_controller.dart';
+import 'package:yet_another_luci_app/state/controllers/package_controller.dart';
+import 'package:yet_another_luci_app/state/controllers/network_actions_controller.dart';
+import 'package:yet_another_luci_app/state/controllers/client_controller.dart';
+import 'package:yet_another_luci_app/state/controllers/session_controller.dart';
+import 'package:yet_another_luci_app/models/client.dart';
+import 'package:yet_another_luci_app/models/router.dart' as model;
+import 'package:yet_another_luci_app/models/dashboard_preferences.dart';
+import 'package:yet_another_luci_app/services/interfaces/auth_service_interface.dart';
+import 'package:yet_another_luci_app/services/interfaces/api_service_interface.dart';
+import 'package:yet_another_luci_app/services/service_factory.dart';
+import 'package:yet_another_luci_app/utils/http_client_manager.dart';
+import 'package:yet_another_luci_app/utils/logger.dart';
+import 'package:yet_another_luci_app/modules/package_manager/models/package_info.dart';
+import 'package:yet_another_luci_app/models/router_capabilities.dart';
+import 'package:yet_another_luci_app/models/rpc_result.dart';
+import 'package:yet_another_luci_app/models/network_topology.dart';
+import 'package:yet_another_luci_app/modules/firewall_security/models/firewall_info.dart';
+import 'package:yet_another_luci_app/modules/services_system/models/ddns_info.dart';
+import 'package:yet_another_luci_app/modules/wireless_management/models/wireless_info.dart';
 
 enum RouterConnectionStatus {
   connected,
@@ -115,10 +116,12 @@ class AppState extends ChangeNotifier {
   // Add requestedTab for programmatic tab switching
   int? requestedTab;
   String? requestedInterfaceToScroll;
+  ClientCategoryFilter? requestedClientCategoryFilter;
 
-  void requestTab(int index, {String? interfaceToScroll}) {
+  void requestTab(int index, {String? interfaceToScroll, ClientCategoryFilter? clientCategoryFilter}) {
     requestedTab = index;
     requestedInterfaceToScroll = interfaceToScroll;
+    requestedClientCategoryFilter = clientCategoryFilter;
     notifyListeners();
   }
 
@@ -237,8 +240,8 @@ class AppState extends ChangeNotifier {
     );
   }
 
-  Future<void> setReviewerMode(bool enabled) async {
-    await _sessionController!.setReviewerMode(enabled);
+  Future<void> setReviewerMode(bool enabled, {BuildContext? context}) async {
+    await _sessionController!.setReviewerMode(enabled, context: context);
     _initializeServices();
     notifyListeners();
   }
@@ -348,6 +351,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> fetchDashboardData() async {
     await _dashboardController?.fetchDashboardData();
+    await fetchClientsForSelectedRouter();
   }
 
 
@@ -517,6 +521,20 @@ class AppState extends ChangeNotifier {
       _packageController!.fetchUpgradablePackages();
 
   /// Execute generic router shell command via file.exec RPC
+  Future<dynamic> callRpc(String object, String method, [Map<String, dynamic>? params]) async {
+    if (reviewerModeEnabled || _apiService == null || selectedRouter == null || _authService?.sysauth == null) {
+      return null;
+    }
+    return await _apiService!.call(
+      selectedRouter!.ipAddress,
+      _authService!.sysauth!,
+      selectedRouter!.useHttps,
+      object: object,
+      method: method,
+      params: params,
+    );
+  }
+
   Future<bool> executeRouterCommand(String command, List<String> args) async {
     final ip = _routerService?.selectedRouter?.ipAddress;
     if (ip == null || _authService?.sysauth == null) return false;
@@ -525,7 +543,8 @@ class AppState extends ChangeNotifier {
     final normalized = _normalizeRouterCommand(command, args);
     final execCommand = normalized.command;
     final execArgs = normalized.args;
-    final cmdStr = execCommand == 'sh' && execArgs.length >= 2 && execArgs[0] == '-c'
+    final isShellCmd = execCommand == 'sh' || execCommand == '/bin/sh' || execCommand == 'ash' || execCommand == '/bin/ash';
+    final cmdStr = isShellCmd && execArgs.length >= 2 && execArgs[0] == '-c'
         ? execArgs[1]
         : ([execCommand, ...execArgs]).join(' ');
 
@@ -536,36 +555,42 @@ class AppState extends ChangeNotifier {
         useHttps,
         object: 'file',
         method: 'exec',
-        params: {'command': execCommand, 'params': execArgs},
+        params: {'command': execCommand, 'params': execArgs, 'args': execArgs},
       );
       if (_isSuccessResponse(res)) return true;
     } catch (_) {}
 
-    if (execCommand != '/bin/sh' && execCommand != 'sh') {
-      try {
-        final res = await _apiService!.call(
-          ip,
-          _authService!.sysauth!,
-          useHttps,
-          object: 'file',
-          method: 'exec',
-          params: {'command': '/bin/sh', 'params': ['-c', cmdStr]},
-        );
-        if (_isSuccessResponse(res)) return true;
-      } catch (_) {}
+    try {
+      final res = await _apiService!.call(
+        ip,
+        _authService!.sysauth!,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': '/bin/sh',
+          'params': ['-c', cmdStr],
+          'args': ['-c', cmdStr],
+        },
+      );
+      if (_isSuccessResponse(res)) return true;
+    } catch (_) {}
 
-      try {
-        final res = await _apiService!.call(
-          ip,
-          _authService!.sysauth!,
-          useHttps,
-          object: 'file',
-          method: 'exec',
-          params: {'command': 'sh', 'params': ['-c', cmdStr]},
-        );
-        if (_isSuccessResponse(res)) return true;
-      } catch (_) {}
-    }
+    try {
+      final res = await _apiService!.call(
+        ip,
+        _authService!.sysauth!,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': 'sh',
+          'params': ['-c', cmdStr],
+          'args': ['-c', cmdStr],
+        },
+      );
+      if (_isSuccessResponse(res)) return true;
+    } catch (_) {}
 
     return false;
   }
@@ -618,7 +643,8 @@ class AppState extends ChangeNotifier {
     final normalized = _normalizeRouterCommand(command, args);
     final execCommand = normalized.command;
     final execArgs = normalized.args;
-    final cmdStr = execCommand == 'sh' && execArgs.length >= 2 && execArgs[0] == '-c'
+    final isShellCmd = execCommand == 'sh' || execCommand == '/bin/sh' || execCommand == 'ash' || execCommand == '/bin/ash';
+    final cmdStr = isShellCmd && execArgs.length >= 2 && execArgs[0] == '-c'
         ? execArgs[1]
         : ([execCommand, ...execArgs]).join(' ');
 
@@ -646,43 +672,49 @@ class AppState extends ChangeNotifier {
         useHttps,
         object: 'file',
         method: 'exec',
-        params: {'command': execCommand, 'params': execArgs},
+        params: {'command': execCommand, 'params': execArgs, 'args': execArgs},
       );
       final out = _extractStdout(res);
       if (out != null && out.trim().isNotEmpty) return out;
     } catch (_) {}
 
     // 2. Shell exec fallbacks
-    if (execCommand != '/bin/sh' && execCommand != 'sh') {
-      try {
-        final res = await _apiService!.call(
-          ip,
-          _authService!.sysauth!,
-          useHttps,
-          object: 'file',
-          method: 'exec',
-          params: {'command': '/bin/sh', 'params': ['-c', cmdStr]},
-        );
-        final out = _extractStdout(res);
-        if (out != null && out.trim().isNotEmpty) return out;
-      } catch (_) {}
+    try {
+      final res = await _apiService!.call(
+        ip,
+        _authService!.sysauth!,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': '/bin/sh',
+          'params': ['-c', cmdStr],
+          'args': ['-c', cmdStr],
+        },
+      );
+      final out = _extractStdout(res);
+      if (out != null && out.trim().isNotEmpty) return out;
+    } catch (_) {}
 
-      try {
-        final res = await _apiService!.call(
-          ip,
-          _authService!.sysauth!,
-          useHttps,
-          object: 'file',
-          method: 'exec',
-          params: {'command': 'sh', 'params': ['-c', cmdStr]},
-        );
-        final out = _extractStdout(res);
-        if (out != null && out.trim().isNotEmpty) return out;
-      } catch (_) {}
-    }
+    try {
+      final res = await _apiService!.call(
+        ip,
+        _authService!.sysauth!,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': 'sh',
+          'params': ['-c', cmdStr],
+          'args': ['-c', cmdStr],
+        },
+      );
+      final out = _extractStdout(res);
+      if (out != null && out.trim().isNotEmpty) return out;
+    } catch (_) {}
 
     // 3. File read fallback
-    if ((execCommand == 'cat' || execCommand == 'base64') && execArgs.isNotEmpty) {
+    if (execCommand == 'cat' && execArgs.isNotEmpty) {
       try {
         final readRes = await _apiService!.call(
           ip,
@@ -701,6 +733,12 @@ class AppState extends ChangeNotifier {
   }
 
   _RouterCommand _normalizeRouterCommand(String command, List<String> args) {
+    if (command == 'sh' || command == 'ash' || command == 'bash') {
+      return _RouterCommand('/bin/sh', args);
+    }
+    if (command == 'cat') {
+      return _RouterCommand('/bin/cat', args);
+    }
     if (command == 'ip' || command == '/sbin/ip') {
       if (args.contains('-4') || args.contains('-6')) {
         return _RouterCommand('/sbin/ip', args);
@@ -732,7 +770,7 @@ class AppState extends ChangeNotifier {
 
   String? _readPathForCommand(String command, List<String> args) {
     if (args.isEmpty) return null;
-    if (command == 'cat' || command == '/bin/cat' || command == 'base64') {
+    if (command == 'cat' || command == '/bin/cat') {
       return args.last;
     }
     return null;
@@ -787,10 +825,47 @@ class AppState extends ChangeNotifier {
     );
   }
 
+  bool _isUserScrolling = false;
+  bool _pendingNotificationWhileScrolling = false;
+
+  /// Returns true if the user is actively scrolling a view in the app.
+  bool get isUserScrolling => _isUserScrolling;
+
+  /// Updates current user scroll state to pause/resume background UI updates during active gesture scrolling.
+  void setScrollState(bool isScrolling) {
+    if (_isUserScrolling == isScrolling) return;
+    _isUserScrolling = isScrolling;
+    if (!isScrolling && _pendingNotificationWhileScrolling) {
+      _pendingNotificationWhileScrolling = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_isUserScrolling) {
+          notifyListeners();
+        }
+      });
+    }
+  }
+
+  /// Deferrable listener notification: avoids triggering frame rebuilds mid-scrolling to eliminate jitters
+  /// and suppresses background throughput rebuilds when not viewing the Dashboard tab.
+  void notifyListenersDeferrable() {
+    if (_isUserScrolling) {
+      _pendingNotificationWhileScrolling = true;
+    } else if ((requestedTab ?? 0) == 0) {
+      _pendingNotificationWhileScrolling = false;
+      notifyListeners();
+    }
+  }
+
+  bool _isHeavyTaskRunning = false;
+  bool get isHeavyTaskRunning => _isHeavyTaskRunning;
+  void setHeavyTaskRunning(bool running) {
+    _isHeavyTaskRunning = running;
+  }
+
   /// Updates only throughput data without refetching the entire dashboard
   Future<void> _updateThroughputOnly() async {
-    // Don't try to update throughput during reboot
-    if (_isRebooting) {
+    // Don't try to update throughput during reboot or heavy RPC binary transfers
+    if (_isRebooting || _isHeavyTaskRunning) {
       return;
     }
 
@@ -817,7 +892,7 @@ class AppState extends ChangeNotifier {
           wanDeviceNames,
           specificInterface: specificInterface,
         );
-        notifyListeners();
+        notifyListenersDeferrable();
       } catch (e) {
         // Don't log throughput update errors as they're non-critical
       }
@@ -895,7 +970,7 @@ class AppState extends ChangeNotifier {
           wanDeviceNames,
           specificInterface: specificInterface,
         );
-        notifyListeners();
+        notifyListenersDeferrable();
       }
     } catch (e) {
       // Don't log throughput update errors as they're non-critical
@@ -1193,7 +1268,7 @@ class AppState extends ChangeNotifier {
       }
     }
 
-    notifyListeners();
+    notifyListenersDeferrable();
     return res;
   }
 
@@ -1403,6 +1478,153 @@ class AppState extends ChangeNotifier {
 
   Future<bool> manageServiceAction(String serviceName, String action, {BuildContext? context}) =>
       _networkActionsController!.manageServiceAction(serviceName, action, context: context);
+
+  Future<bool> saveCronJobs(List<String> cronLines, {BuildContext? context}) async {
+    if (reviewerModeEnabled) {
+      if (dashboardData != null) {
+        dashboardData!['cronJobs'] = List<String>.from(cronLines);
+      }
+      notifyListeners();
+      return true;
+    }
+
+    final ip = selectedRouter?.ipAddress;
+    if (ip == null || sysauth == null) return false;
+    final useHttps = selectedRouter?.useHttps ?? false;
+
+    final success = await _apiService!.saveCronJobs(
+      ip,
+      sysauth!,
+      useHttps,
+      cronLines: cronLines,
+      context: context,
+    );
+
+    if (success) {
+      if (dashboardData != null) {
+        dashboardData!['cronJobs'] = List<String>.from(cronLines);
+      }
+      notifyListeners();
+    }
+
+    return success;
+  }
+
+  Future<bool> saveDdnsInstance(DdnsInstance instance, {BuildContext? context}) async {
+    if (reviewerModeEnabled) {
+      if (dashboardData != null) {
+        final overview = DdnsOverview.fromDashboardData(dashboardData, isReviewerMode: true);
+        final list = List<DdnsInstance>.from(overview.instances);
+        final existingIdx = list.indexWhere((i) => i.name == instance.name);
+        if (existingIdx >= 0) {
+          list[existingIdx] = instance;
+        } else {
+          list.add(instance);
+        }
+        dashboardData!['ddns'] = {
+          'global': {'is_enabled': '1'},
+          for (final item in list) item.name: item.toUciParams()..['.type'] = 'service',
+        };
+      }
+      notifyListeners();
+      return true;
+    }
+
+    final ip = selectedRouter?.ipAddress;
+    if (ip == null || sysauth == null) return false;
+    final useHttps = selectedRouter?.useHttps ?? false;
+
+    final success = await _apiService!.saveDdnsInstance(
+      ip,
+      sysauth!,
+      useHttps,
+      instance: instance,
+      context: context,
+    );
+
+    if (success) {
+      await fetchDashboardData();
+    }
+
+    return success;
+  }
+
+  Future<bool> deleteDdnsInstance(String instanceName, {BuildContext? context}) async {
+    if (reviewerModeEnabled) {
+      if (dashboardData != null && dashboardData!['ddns'] is Map) {
+        (dashboardData!['ddns'] as Map).remove(instanceName);
+      }
+      notifyListeners();
+      return true;
+    }
+
+    final ip = selectedRouter?.ipAddress;
+    if (ip == null || sysauth == null) return false;
+    final useHttps = selectedRouter?.useHttps ?? false;
+
+    final success = await _apiService!.deleteDdnsInstance(
+      ip,
+      sysauth!,
+      useHttps,
+      instanceName: instanceName,
+      context: context,
+    );
+
+    if (success) {
+      await fetchDashboardData();
+    }
+
+    return success;
+  }
+
+  Future<DdnsValidationResult> testDdnsConfiguration(DdnsInstance instance, {BuildContext? context}) async {
+    if (reviewerModeEnabled) {
+      return _apiService!.testDdnsConfiguration('', '', false, instance: instance, context: context);
+    }
+
+    final ip = selectedRouter?.ipAddress;
+    if (ip == null || sysauth == null) {
+      return const DdnsValidationResult(isValid: false, errorMessage: 'No active router session');
+    }
+    final useHttps = selectedRouter?.useHttps ?? false;
+
+    return _apiService!.testDdnsConfiguration(
+      ip,
+      sysauth!,
+      useHttps,
+      instance: instance,
+      context: context,
+    );
+  }
+
+  Future<bool> toggleGlobalDdns(bool enable, {BuildContext? context}) async {
+    if (reviewerModeEnabled) {
+      if (dashboardData != null) {
+        dashboardData!['ddns'] ??= {};
+        dashboardData!['ddns']['global'] = {'is_enabled': enable ? '1' : '0'};
+      }
+      notifyListeners();
+      return true;
+    }
+
+    final ip = selectedRouter?.ipAddress;
+    if (ip == null || sysauth == null) return false;
+    final useHttps = selectedRouter?.useHttps ?? false;
+
+    final success = await _apiService!.toggleGlobalDdns(
+      ip,
+      sysauth!,
+      useHttps,
+      enable: enable,
+      context: context,
+    );
+
+    if (success) {
+      await fetchDashboardData();
+    }
+
+    return success;
+  }
 
   Future<bool> updateFirewallCustomRuleStatus(
     String sectionKey,
@@ -1810,25 +2032,61 @@ class AppState extends ChangeNotifier {
   Future<List<Client>> fetchAggregatedClients() =>
       _clientController!.fetchAggregatedClients();
 
+  bool get isClientsLoading => _clientController?.isFetchingClients ?? false;
+  bool get hasFetchedClients => _clientController?.hasFetchedClients ?? false;
+
   /// Returns clients for the currently selected router only
   Future<List<Client>> fetchClientsForSelectedRouter() =>
       _clientController!.fetchClientsForSelectedRouter();
 
   List<Client> get clients {
+    if (_clientController?.lastFetchedClients != null &&
+        _clientController!.lastFetchedClients!.isNotEmpty) {
+      return _clientController!.lastFetchedClients!;
+    }
+
     final clientList = <Client>[];
     final data = dashboardData;
     final hostHints = data?['hostHints'] as Map<String, dynamic>? ?? {};
-    final rawLeases = data?['dhcp_leases'] ?? data?['leases'];
+
+    // Extract raw leases supporting dhcpLeases (camelCase), dhcp_leases (snake_case), and leases
+    dynamic rawLeases = data?['dhcpLeases'] ?? data?['dhcp_leases'] ?? data?['leases'];
+    if (rawLeases is Map && rawLeases['dhcp_leases'] is List) {
+      rawLeases = rawLeases['dhcp_leases'];
+    }
+
+    // Extract wireless MACs from wirelessStations map or knownWirelessMacs
+    final wirelessStations = data?['wirelessStations'] as Map<String, dynamic>? ?? {};
+    final wirelessMacs = <String>{...(_clientController?.knownWirelessMacs ?? {})};
+    wirelessStations.forEach((iface, list) {
+      if (list is List) {
+        for (final item in list) {
+          if (item is Map && item['mac'] != null) {
+            wirelessMacs.add(item['mac'].toString().toUpperCase().replaceAll('-', ':'));
+          } else if (item is String) {
+            wirelessMacs.add(item.toUpperCase().replaceAll('-', ':'));
+          }
+        }
+      }
+    });
 
     if (rawLeases is List) {
       for (final l in rawLeases) {
         if (l is Map) {
           final c = Client.fromLease(l.cast<String, dynamic>());
           final normMac = c.macAddress.toUpperCase().replaceAll('-', ':');
+          final isWireless = wirelessMacs.contains(normMac);
           final hint = hostHints[normMac];
           final staticName = hint?['staticLeaseName']?.toString();
           final isStatic = hint?['isStaticLease'] == true;
+
           clientList.add(c.copyWith(
+            connectionType: isWireless
+                ? ConnectionType.wireless
+                : (c.connectionType == ConnectionType.unknown
+                    ? ConnectionType.wired
+                    : c.connectionType),
+            isConnected: true,
             staticLeaseName: staticName,
             isStaticLease: isStatic,
           ));
@@ -1845,11 +2103,13 @@ class AppState extends ChangeNotifier {
             ? ipaddrs.first.toString()
             : (info['staticLeaseIp']?.toString() ?? 'N/A');
         final isStatic = info['isStaticLease'] == true;
+        final isWireless = wirelessMacs.contains(normMac);
         clientList.add(Client(
           ipAddress: ip,
           macAddress: normMac,
           hostname: hintName,
-          isConnected: false,
+          isConnected: isWireless,
+          connectionType: isWireless ? ConnectionType.wireless : ConnectionType.unknown,
           isStaticLease: isStatic,
           staticLeaseName: info['staticLeaseName']?.toString(),
         ));

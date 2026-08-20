@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'package:flutter/material.dart';
+import 'package:yet_another_luci_app/modules/services_system/models/ddns_info.dart';
 
 /// API service interface for LuCI RPC communication.
 ///
@@ -220,6 +221,41 @@ abstract class IApiService {
     String ipAddress,
     String sysauth,
     bool useHttps, {
+    BuildContext? context,
+  });
+  Future<bool> saveCronJobs(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required List<String> cronLines,
+    BuildContext? context,
+  });
+  Future<bool> saveDdnsInstance(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required DdnsInstance instance,
+    BuildContext? context,
+  });
+  Future<bool> deleteDdnsInstance(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String instanceName,
+    BuildContext? context,
+  });
+  Future<DdnsValidationResult> testDdnsConfiguration(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required DdnsInstance instance,
+    BuildContext? context,
+  });
+  Future<bool> toggleGlobalDdns(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required bool enable,
     BuildContext? context,
   });
 }

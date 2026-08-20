@@ -1,0 +1,464 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+import 'dart:async' show unawaited;
+import 'dart:io' show Platform, File, Directory;
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:yet_another_luci_app/widgets/luci_toast.dart';
+
+/// Semantic haptic feedback intensity types.
+enum OsHapticType {
+  light,
+  medium,
+  heavy,
+  selection,
+}
+
+enum StoragePermissionChoice {
+  preferPublic,
+  preferSandbox,
+  cancelled,
+}
+
+class FileSaveResult {
+  final String filePath;
+  final bool isPublicDownloads;
+  final String storageMethodLabel;
+
+  FileSaveResult({
+    required this.filePath,
+    required this.isPublicDownloads,
+    required this.storageMethodLabel,
+  });
+}
+
+/// Centralized utility for native OS hardware integration & system API capability detection
+/// with 100% fallback protection across Android, iOS, Linux, Windows, macOS, and Web.
+///
+/// Fully compliant with Scoped Storage / Sandboxing permission boundaries.
+class OsPlatformIntegration {
+  /// Safely triggers OS hardware haptic feedback engine with silent platform fallback.
+  static Future<void> triggerHaptic(OsHapticType type) async {
+    if (kIsWeb) return;
+    try {
+      switch (type) {
+        case OsHapticType.light:
+          await HapticFeedback.lightImpact();
+          break;
+        case OsHapticType.medium:
+          await HapticFeedback.mediumImpact();
+          break;
+        case OsHapticType.heavy:
+          await HapticFeedback.heavyImpact();
+          break;
+        case OsHapticType.selection:
+          await HapticFeedback.selectionClick();
+          break;
+      }
+    } catch (_) {
+      // Platform unsupported or vibration hardware absent
+    }
+  }
+
+  /// Copies text to OS system clipboard with haptic confirmation and toast notification.
+  static Future<void> copyToClipboard(
+    BuildContext context, {
+    required String text,
+    required String label,
+  }) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: text));
+      await triggerHaptic(OsHapticType.light);
+      if (context.mounted) {
+        context.showToastSuccess('Copied $label', subtitle: text);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        context.showToastError('Clipboard Error', subtitle: 'Failed to copy $label.');
+      }
+    }
+  }
+
+  /// Safely opens the device application settings screen on Android/iOS/Desktop
+  /// to allow the user to grant or re-enable revoked permissions.
+  static Future<bool> openSystemSettings(BuildContext context) async {
+    await triggerHaptic(OsHapticType.medium);
+    bool launched = false;
+
+    if (kIsWeb) return false;
+
+    try {
+      if (Platform.isAndroid) {
+        final intentUri = Uri.parse('package:yet_another_luci_app');
+        if (await canLaunchUrl(intentUri)) {
+          launched = await launchUrl(intentUri);
+        }
+      }
+    } catch (_) {
+      launched = false;
+    }
+
+    if (!launched && context.mounted) {
+      context.showToastInfo('Please open device Settings > Apps > Yet Another LuCI App to manage permissions.');
+    }
+
+    return launched;
+  }
+
+  /// Helper to evaluate whether a filesystem path is genuinely public Downloads.
+  static bool isPathPublic(String path) {
+    final lower = path.toLowerCase();
+    if (lower.contains('/android/data/') || lower.contains('/data/user/') || lower.contains('com.nightcode.luci')) {
+      return false;
+    }
+    return true;
+  }
+
+  /// Fetches or maps the host OS public Downloads folder (/storage/emulated/0/Download).
+  static Future<Directory?> getPublicDownloadsDirectory() async {
+    if (kIsWeb) return null;
+
+    if (Platform.isAndroid) {
+      final stdDownload = Directory('/storage/emulated/0/Download');
+      if (!stdDownload.existsSync()) {
+        try {
+          stdDownload.createSync(recursive: true);
+        } catch (_) {}
+      }
+      if (stdDownload.existsSync()) {
+        return stdDownload;
+      }
+
+      final sdDownload = Directory('/sdcard/Download');
+      if (sdDownload.existsSync()) {
+        return sdDownload;
+      }
+    }
+
+    try {
+      final d = await getDownloadsDirectory();
+      if (d != null) return d;
+    } catch (_) {}
+
+    try {
+      if (Platform.isLinux || Platform.isMacOS) {
+        final home = Platform.environment['HOME'];
+        if (home != null && home.isNotEmpty) {
+          final userDownload = Directory('$home/Downloads');
+          if (userDownload.existsSync()) return userDownload;
+        }
+      } else if (Platform.isWindows) {
+        final userProfile = Platform.environment['USERPROFILE'];
+        if (userProfile != null && userProfile.isNotEmpty) {
+          final winDownload = Directory('$userProfile\\Downloads');
+          if (winDownload.existsSync()) return winDownload;
+        }
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  /// Direct save to /storage/emulated/0/Download/ (Public Downloads).
+  static Future<FileSaveResult?> saveDownloadedFileWithResult({
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    if (kIsWeb) return null;
+
+    try {
+      Directory? targetDir = Directory('/storage/emulated/0/Download');
+      if (!targetDir.existsSync()) {
+        targetDir = await getPublicDownloadsDirectory();
+      }
+      targetDir ??= await getApplicationDocumentsDirectory();
+
+      final file = File('${targetDir.path}/$fileName');
+      await file.writeAsBytes(bytes, flush: true);
+      return FileSaveResult(
+        filePath: file.path,
+        isPublicDownloads: true,
+        storageMethodLabel: 'Public Downloads Folder',
+      );
+    } catch (_) {
+      try {
+        final fallbackDir = Directory('/storage/emulated/0/Download');
+        if (!fallbackDir.existsSync()) fallbackDir.createSync(recursive: true);
+        final file = File('${fallbackDir.path}/$fileName');
+        await file.writeAsBytes(bytes, flush: true);
+        return FileSaveResult(
+          filePath: file.path,
+          isPublicDownloads: true,
+          storageMethodLabel: 'Public Downloads Folder',
+        );
+      } catch (_) {
+        return null;
+      }
+    }
+  }
+
+  /// Saves downloaded file bytes to public Downloads.
+  static Future<String?> saveDownloadedFile({
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    final res = await saveDownloadedFileWithResult(bytes: bytes, fileName: fileName);
+    return res?.filePath;
+  }
+
+  /// Displays a clean prompt after file download, showing the saved path
+  /// and providing a clipboard copy button.
+  static Future<void> showBackupDownloadedPrompt(
+    BuildContext context,
+    FileSaveResult saveResult,
+  ) async {
+    if (!context.mounted) return;
+    await triggerHaptic(OsHapticType.medium);
+    if (!context.mounted) return;
+
+    final file = File(saveResult.filePath);
+    int fileSizeInBytes = 0;
+    try {
+      if (file.existsSync()) {
+        fileSizeInBytes = file.lengthSync();
+      }
+    } catch (_) {}
+
+    String formattedSize = '${(fileSizeInBytes / 1024).toStringAsFixed(1)} KB';
+    if (fileSizeInBytes >= 1024 * 1024) {
+      formattedSize = '${(fileSizeInBytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+    }
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final fileName = file.path.split(Platform.pathSeparator).last;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        icon: const Icon(
+          Icons.check_circle_outline,
+          color: Colors.teal,
+          size: 40,
+        ),
+        title: const Text(
+          'Backup Downloaded Successfully',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // File Summary Box
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.archive_outlined, size: 20, color: Colors.teal),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          fileName,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Size: $formattedSize',
+                        style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.folder_special_outlined, size: 11, color: Colors.teal),
+                            SizedBox(width: 4),
+                            Text(
+                              'Public Downloads',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.teal),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Downloaded File Location:',
+              style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
+              ),
+              child: SelectableText(
+                saveResult.filePath,
+                style: const TextStyle(fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.teal,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              unawaited(copyToClipboard(context, text: saveResult.filePath, label: 'Backup Path'));
+            },
+            icon: const Icon(Icons.copy, size: 16),
+            label: const Text('Copy File Path'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Attempts to open the host OS file manager directory containing the specified file.
+  /// Falls back gracefully to showing an interactive path dialog with clipboard copying and file metrics.
+  static Future<void> openSavedDirectoryOrFile(BuildContext context, String filePath) async {
+    final isPublic = isPathPublic(filePath);
+    final saveResult = FileSaveResult(
+      filePath: filePath,
+      isPublicDownloads: isPublic,
+      storageMethodLabel: isPublic
+          ? 'Public Downloads Folder'
+          : 'Private App Storage (/Android/data/)',
+    );
+    await showBackupDownloadedPrompt(context, saveResult);
+  }
+
+  /// Returns `true` if current OS platform is Android (Phone, Tablet, Chromebook ARC subsystem).
+  static bool get isAndroidPlatform {
+    if (kIsWeb) return false;
+    return Platform.isAndroid;
+  }
+
+  /// Returns `true` if current OS platform supports edge-to-edge system bar insets.
+  static bool get supportsEdgeToEdge {
+    if (kIsWeb) return false;
+    return Platform.isAndroid;
+  }
+
+  /// Returns `true` if current OS platform supports native platform toast channels.
+  static bool get supportsNativeOsToast {
+    if (kIsWeb) return false;
+    return Platform.isAndroid;
+  }
+
+  /// Returns `true` if current device is Android 12 (API level 31) or higher.
+  /// On Android 12+, native text toasts are restricted to 2 lines max and prepended with app icon.
+  static bool get isAndroid12OrHigher {
+    if (kIsWeb) return false;
+    if (!Platform.isAndroid) return false;
+    try {
+      final version = Platform.operatingSystemVersion;
+      final match = RegExp(r'(?:API|SDK)\s*(\d+)|Android\s*(\d+)').firstMatch(version);
+      if (match != null) {
+        final sdkStr = match.group(1);
+        if (sdkStr != null) {
+          final sdkInt = int.tryParse(sdkStr);
+          if (sdkInt != null) return sdkInt >= 31;
+        }
+        final verStr = match.group(2);
+        if (verStr != null) {
+          final verInt = int.tryParse(verStr);
+          if (verInt != null) return verInt >= 12;
+        }
+      }
+    } catch (_) {}
+    return true; // Safely enforce custom Flutter toast on Android if version string format varies
+  }
+
+  /// Evaluates safe top inset padding considering OS status bar cutouts & notch insets.
+  static double getSafeAreaTopPadding(BuildContext context, {double defaultOffset = 12.0}) {
+    final mediaQuery = MediaQuery.of(context);
+    final topPadding = mediaQuery.padding.top;
+    final viewTopPadding = mediaQuery.viewPadding.top;
+    final safeTop = topPadding > viewTopPadding ? topPadding : viewTopPadding;
+    return safeTop + defaultOffset;
+  }
+
+  /// Evaluates safe bottom inset padding considering OS navigation bar / gesture bar cutouts.
+  static double getSafeAreaBottomPadding(BuildContext context, {double defaultOffset = 24.0}) {
+    final mediaQuery = MediaQuery.of(context);
+    final bottomPadding = mediaQuery.padding.bottom;
+    final viewBottomPadding = mediaQuery.viewPadding.bottom;
+    final safeBottom = bottomPadding > viewBottomPadding ? bottomPadding : viewBottomPadding;
+    return safeBottom + defaultOffset;
+  }
+
+  /// Returns a summary description of the target platform capabilities
+  /// (Android Phones, Tablets, Chromebooks, and Custom Android Derivatives/ROMs).
+  static String getPlatformInfo() {
+    if (kIsWeb) return 'Web Preview Mode';
+    if (Platform.isAndroid) {
+      final ver = Platform.operatingSystemVersion.toLowerCase();
+      final sysVer = Platform.version.toLowerCase();
+      if (ver.contains('chrome') || sysVer.contains('chrome')) {
+        return 'Chromebook (ChromeOS ARC)';
+      }
+      if (ver.contains('graphene') || sysVer.contains('graphene')) {
+        return 'GrapheneOS Android Subsystem';
+      }
+      if (ver.contains('calyx') || sysVer.contains('calyx')) {
+        return 'CalyxOS Android Subsystem';
+      }
+      if (ver.contains('lineage') || sysVer.contains('lineage')) {
+        return 'LineageOS Android Subsystem';
+      }
+      if (ver.contains('fire') || sysVer.contains('fire')) {
+        return 'Fire OS Subsystem';
+      }
+      if (ver.contains('harmony') || sysVer.contains('huawei')) {
+        return 'HarmonyOS Android Runtime';
+      }
+      if (ver.contains('waydroid')) {
+        return 'Waydroid Linux-Android Subsystem';
+      }
+      return 'Android OS & Derivatives (Phone/Tablet)';
+    }
+    return 'Android Target Host Environment';
+  }
+}

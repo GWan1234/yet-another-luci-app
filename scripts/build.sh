@@ -37,6 +37,9 @@ fi
 
 cd "${PROJECT_ROOT}"
 
+# Auto-fetch and upgrade to latest compatible package dependencies silently in the background
+flutter pub upgrade --quiet >/dev/null 2>&1 || true
+
 # Extract version from pubspec.yaml
 VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr -d '\r\n')
 RAW_VER=$(echo "${VERSION}" | cut -d'+' -f1)
@@ -124,6 +127,7 @@ build_and_archive() {
   echo "=========================================="
 
   flutter build $target_type --release \
+    --no-pub \
     --flavor $target_flavor \
     --dart-define=FLAVOR=$target_flavor \
     --dart-define=OFFICIAL_BUILD=$OFFICIAL \

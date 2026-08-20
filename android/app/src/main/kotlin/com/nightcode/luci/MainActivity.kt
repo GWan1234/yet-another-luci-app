@@ -10,8 +10,42 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
         
+        // Unlock high refresh rate (90Hz/120Hz/144Hz) for ultra-smooth 120fps scrolling
+        unlockHighRefreshRate()
+
         // Enable edge-to-edge display without using deprecated APIs
         setupEdgeToEdge()
+    }
+
+    private fun unlockHighRefreshRate() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val display = this.display
+                val supportedModes = display?.supportedModes
+                val maxMode = supportedModes?.maxByOrNull { it.refreshRate }
+                if (maxMode != null) {
+                    val lp = window.attributes
+                    lp.preferredDisplayModeId = maxMode.modeId
+                    window.attributes = lp
+                }
+            } catch (_: Exception) {
+                // High refresh rate API unsupported or managed by OS
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                @Suppress("DEPRECATION")
+                val display = windowManager.defaultDisplay
+                val supportedModes = display?.supportedModes
+                val maxMode = supportedModes?.maxByOrNull { it.refreshRate }
+                if (maxMode != null) {
+                    val lp = window.attributes
+                    lp.preferredDisplayModeId = maxMode.modeId
+                    window.attributes = lp
+                }
+            } catch (_: Exception) {
+                // High refresh rate API unsupported or managed by OS
+            }
+        }
     }
     
     private fun setupEdgeToEdge() {
@@ -47,5 +81,17 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         // Edge-to-edge is now handled natively without intercepting Flutter calls
         // This prevents deprecated API usage while maintaining compatibility
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW || level == android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
+            flutterEngine?.systemChannel?.sendMemoryPressureWarning()
+        }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        flutterEngine?.systemChannel?.sendMemoryPressureWarning()
     }
 }

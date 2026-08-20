@@ -3,13 +3,13 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/main.dart';
-import 'package:luci_mobile/models/router.dart' as model;
-import 'package:luci_mobile/services/router_service.dart';
-import 'package:luci_mobile/providers/entitlement_provider.dart';
-import 'package:luci_mobile/screens/paywall_screen.dart';
-import 'package:luci_mobile/widgets/luci_app_bar.dart';
-import 'package:luci_mobile/utils/url_parser.dart';
+import 'package:yet_another_luci_app/main.dart';
+import 'package:yet_another_luci_app/models/router.dart' as model;
+import 'package:yet_another_luci_app/services/router_service.dart';
+import 'package:yet_another_luci_app/providers/entitlement_provider.dart';
+import 'package:yet_another_luci_app/screens/paywall_screen.dart';
+import 'package:yet_another_luci_app/widgets/luci_app_bar.dart';
+import 'package:yet_another_luci_app/utils/url_parser.dart';
 
 class ManageRoutersScreen extends ConsumerStatefulWidget {
   const ManageRoutersScreen({super.key});

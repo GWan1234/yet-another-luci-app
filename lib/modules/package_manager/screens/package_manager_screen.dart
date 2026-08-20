@@ -3,11 +3,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/main.dart';
-import 'package:luci_mobile/design/luci_design_system.dart';
-import 'package:luci_mobile/models/router_capabilities.dart';
-import 'package:luci_mobile/models/rpc_result.dart';
-import 'package:luci_mobile/widgets/rpc_result_dialog.dart';
+import 'package:yet_another_luci_app/main.dart';
+import 'package:yet_another_luci_app/design/luci_design_system.dart';
+import 'package:yet_another_luci_app/models/router_capabilities.dart';
+import 'package:yet_another_luci_app/models/rpc_result.dart';
+import 'package:yet_another_luci_app/widgets/rpc_result_dialog.dart';
+import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 import '../models/package_info.dart';
 
 class PackageManagerScreen extends ConsumerStatefulWidget {
@@ -116,9 +117,7 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
                   onPressed: () async {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Re-probing router capabilities...')),
-                    );
+                    context.showToastInfo('Capabilities Probe', subtitle: 'Re-probing router capabilities...');
                     await ref.read(appStateProvider).redetectCapabilities();
                     await _loadPackages();
                   },
@@ -245,11 +244,9 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
                                   icon: const Icon(Icons.refresh),
                                   label: const Text('Retry'),
                                 ),
-                                 OutlinedButton.icon(
+                                OutlinedButton.icon(
                                   onPressed: () async {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Re-probing router capabilities...')),
-                                    );
+                                    context.showToastInfo('Capabilities Probe', subtitle: 'Re-probing router capabilities...');
                                     await ref.read(appStateProvider).redetectCapabilities();
                                     await _loadPackages();
                                   },
@@ -365,9 +362,12 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
 
             if (confirm != true) return;
 
+            final actionKey = 'pkg_remove_${pkg.name}';
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Removing ${pkg.name}...')),
+              context.showToastLoading(
+                'Removing Package',
+                subtitle: 'Removing ${pkg.name}...',
+                actionKey: actionKey,
               );
             }
 
@@ -377,9 +377,15 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
                 );
 
             if (context.mounted) {
-              _handleRpcResult(result, 'Removal of ${pkg.name}');
               if (result.isSuccess) {
+                context.showToastSuccess(
+                  'Package Removed',
+                  subtitle: '${pkg.name} uninstalled successfully.',
+                  actionKey: actionKey,
+                );
                 await _loadPackages();
+              } else {
+                _handleRpcResult(result, 'Removal of ${pkg.name}');
               }
             }
           },

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'package:flutter/material.dart';
-import 'package:luci_mobile/design/luci_design_system.dart';
+import 'package:yet_another_luci_app/design/luci_design_system.dart';
 
 class LuciAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String? title;
@@ -53,6 +53,7 @@ class LuciAppBar extends StatelessWidget implements PreferredSizeWidget {
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.onSurface,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 )
               : null),
       actions: actions,

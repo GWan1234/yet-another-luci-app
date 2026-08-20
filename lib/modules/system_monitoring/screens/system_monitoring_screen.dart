@@ -3,7 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/main.dart';
+import 'package:yet_another_luci_app/main.dart';
 import '../models/system_metrics.dart';
 
 class SystemMonitoringScreen extends ConsumerWidget {
@@ -14,7 +14,7 @@ class SystemMonitoringScreen extends ConsumerWidget {
     final appState = ref.watch(appStateProvider);
     final sysInfo = appState.dashboardData?['sysInfo'] as Map<String, dynamic>?;
     final boardInfo = appState.dashboardData?['boardInfo'] as Map<String, dynamic>?;
-    final metrics = SystemMetrics.fromSysInfo(sysInfo);
+    final metrics = SystemMetrics.fromSysInfo(sysInfo, boardInfo: boardInfo);
 
     final hostname = boardInfo?['hostname']?.toString() ?? 'Router';
     final model = boardInfo?['model']?.toString() ?? 'OpenWrt Router';

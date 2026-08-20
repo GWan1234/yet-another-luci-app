@@ -1,33 +1,89 @@
 // Copyright 2026 Tuhin Garai. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/main.dart';
-import 'package:luci_mobile/state/app_state.dart';
-import 'package:luci_mobile/modules/dhcp_dns/models/dhcp_dns_info.dart';
-import 'package:luci_mobile/widgets/luci_app_bar.dart';
-import 'package:luci_mobile/design/luci_design_system.dart';
+import 'package:yet_another_luci_app/main.dart';
+import 'package:yet_another_luci_app/state/app_state.dart';
+import 'package:yet_another_luci_app/utils/os_platform_integration.dart';
+import 'package:yet_another_luci_app/modules/dhcp_dns/models/dhcp_dns_info.dart';
+import 'package:yet_another_luci_app/widgets/luci_app_bar.dart';
+import 'package:yet_another_luci_app/widgets/luci_collapsible_card.dart';
+import 'package:yet_another_luci_app/widgets/luci_toast.dart';
+import 'package:yet_another_luci_app/design/luci_design_system.dart';
 import '../models/wireless_info.dart';
 import 'wifi_access_control_screen.dart';
 
-class WirelessManagementScreen extends ConsumerWidget {
+class WirelessManagementScreen extends ConsumerStatefulWidget {
   final bool showBack;
 
   const WirelessManagementScreen({super.key, this.showBack = false});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WirelessManagementScreen> createState() => _WirelessManagementScreenState();
+}
+
+class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScreen>
+    with AutomaticKeepAliveClientMixin {
+  Timer? _refreshTimer;
+  bool _isStationsExpanded = true;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _startRefreshTimerIfNeeded();
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startRefreshTimerIfNeeded() {
+    _refreshTimer?.cancel();
+    if (_isStationsExpanded) {
+      _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+        if (mounted) {
+          ref.read(appStateProvider).fetchDashboardData();
+        }
+      });
+    }
+  }
+
+  void _toggleStationsExpansion(bool expanded) {
+    if (_isStationsExpanded != expanded) {
+      setState(() {
+        _isStationsExpanded = expanded;
+      });
+      _startRefreshTimerIfNeeded();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
     final appState = ref.watch(appStateProvider);
     final overview = WirelessOverview.fromDashboardData(
       appState.dashboardData,
       isReviewerMode: appState.reviewerModeEnabled,
     );
 
+    int totalStationCount = 0;
+    for (final radio in overview.radios) {
+      for (final iface in radio.interfaces) {
+        totalStationCount += iface.stations.length;
+      }
+    }
+
     return Scaffold(
       appBar: LuciAppBar(
         title: 'Wireless',
-        showBack: showBack,
+        showBack: widget.showBack,
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -39,7 +95,10 @@ class WirelessManagementScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildSectionHeader(context, 'Wireless Radios', Icons.cell_tower_outlined),
+                Expanded(
+                  child: _buildSectionHeader(context, 'Wireless Radios', Icons.cell_tower_outlined),
+                ),
+                const SizedBox(width: 8),
                 OutlinedButton.icon(
                   onPressed: () {
                     Navigator.push(
@@ -58,12 +117,30 @@ class WirelessManagementScreen extends ConsumerWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            ...overview.radios.map((radio) => _buildRadioCard(context, radio, appState)),
+            if (overview.radios.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32.0),
+                child: LuciEmptyState(
+                  title: 'No Wireless Radios Found',
+                  message: 'No active wireless devices or radios were detected on this router. Pull down to refresh data.',
+                  icon: Icons.wifi_off_rounded,
+                  actionLabel: 'Refresh',
+                  onAction: () async {
+                    await appState.fetchDashboardData();
+                  },
+                ),
+              )
+            else
+              ...overview.radios.map((radio) => _buildRadioCard(context, radio, appState)),
             const SizedBox(height: 16),
-            _buildSectionHeader(context, 'Connected Wireless Stations', Icons.devices_other_outlined),
-            const SizedBox(height: 8),
-            _buildStationsList(context, overview, appState),
+            LuciCollapsibleCard(
+              title: 'Connected Wireless Stations',
+              icon: Icons.devices_other_outlined,
+              count: totalStationCount,
+              initiallyExpanded: _isStationsExpanded,
+              onExpansionChanged: _toggleStationsExpansion,
+              child: _buildStationsList(context, overview, appState),
+            ),
             const SizedBox(height: 32),
           ],
         ),
@@ -77,10 +154,13 @@ class WirelessManagementScreen extends ConsumerWidget {
       children: [
         Icon(icon, size: 20, color: theme.colorScheme.primary),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
+        Expanded(
+          child: Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -103,22 +183,35 @@ class WirelessManagementScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: theme.colorScheme.primaryContainer,
-                      child: Icon(Icons.wifi, color: theme.colorScheme.onPrimaryContainer),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(radio.name.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        Text('${radio.bandLabel} • Channel ${radio.channel}', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
-                      ],
-                    ),
-                  ],
+                Expanded(
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: theme.colorScheme.primaryContainer,
+                        child: Icon(Icons.wifi, color: theme.colorScheme.onPrimaryContainer),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              radio.name.toUpperCase(),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '${radio.bandLabel} • Channel ${radio.channel}',
+                              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
@@ -289,12 +382,11 @@ class WirelessManagementScreen extends ConsumerWidget {
       if (confirmed != true) return;
     }
 
+    final actionKey = 'toggle_ssid_${iface.sectionName}';
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${enable ? "Enabling" : "Disabling"} SSID "${iface.ssid}"...'),
-        duration: const Duration(seconds: 2),
-      ),
+    context.showToastLoading(
+      '${enable ? "Enabling" : "Disabling"} SSID "${iface.ssid}"...',
+      actionKey: actionKey,
     );
 
     final success = await appState.setSsidEnabled(
@@ -304,16 +396,19 @@ class WirelessManagementScreen extends ConsumerWidget {
     );
 
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          success
-              ? 'SSID "${iface.ssid}" ${enable ? "enabled" : "disabled"} successfully.'
-              : 'Failed to update SSID "${iface.ssid}".',
-        ),
-        backgroundColor: success ? Colors.green : Colors.red,
-      ),
-    );
+    if (success) {
+      unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
+      context.showToastSuccess(
+        'SSID "${iface.ssid}" ${enable ? "enabled" : "disabled"} successfully.',
+        actionKey: actionKey,
+      );
+    } else {
+      unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
+      context.showToastError(
+        'Failed to update SSID "${iface.ssid}".',
+        actionKey: actionKey,
+      );
+    }
   }
 
   Widget _buildStationsList(BuildContext context, WirelessOverview overview, AppState appState) {
@@ -334,6 +429,14 @@ class WirelessManagementScreen extends ConsumerWidget {
         }
       }
     }
+
+    allStations.sort((a, b) {
+      final stA = a['station'] as WirelessStation;
+      final stB = b['station'] as WirelessStation;
+      final aSig = stA.signalDbm ?? -999;
+      final bSig = stB.signalDbm ?? -999;
+      return aSig.compareTo(bSig); // Higher dBm station at bottom of list
+    });
 
     if (allStations.isEmpty) {
       return const Card(
@@ -378,34 +481,43 @@ class WirelessManagementScreen extends ConsumerWidget {
           margin: const EdgeInsets.only(bottom: 8),
           elevation: 1,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            leading: CircleAvatar(
-              backgroundColor: _getSignalColor(st.signalDbm).withValues(alpha: 0.12),
-              child: Icon(
-                Icons.wifi,
-                color: _getSignalColor(st.signalDbm),
-                size: 20,
-              ),
-            ),
-            title: Text(
-              titleText,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Text(
-              subtitleText,
-              style: TextStyle(
-                fontSize: 11,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
               children: [
+                CircleAvatar(
+                  backgroundColor: _getSignalColor(st.signalDbm).withValues(alpha: 0.12),
+                  child: Icon(
+                    Icons.wifi,
+                    color: _getSignalColor(st.signalDbm),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        titleText,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitleText,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -444,6 +556,7 @@ class WirelessManagementScreen extends ConsumerWidget {
                   ],
                 ),
                 PopupMenuButton<String>(
+                  tooltip: '',
                   icon: const Icon(Icons.more_vert, size: 20),
                   onSelected: (val) {
                     final isPaused = appState.isInternetPaused(st.macAddress);
@@ -486,11 +599,10 @@ class WirelessManagementScreen extends ConsumerWidget {
     bool pause,
     AppState appState,
   ) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${pause ? "Pausing" : "Resuming"} internet for $name...'),
-        duration: const Duration(seconds: 2),
-      ),
+    final actionKey = 'pause_internet_$mac';
+    context.showToastLoading(
+      '${pause ? "Pausing" : "Resuming"} internet for $name...',
+      actionKey: actionKey,
     );
     final success = await appState.pauseClientInternet(
       mac,
@@ -498,16 +610,19 @@ class WirelessManagementScreen extends ConsumerWidget {
       context: context,
     );
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          success
-              ? 'Internet ${pause ? "paused" : "restored"} for $name.'
-              : 'Failed to ${pause ? "pause" : "resume"} internet for $name.',
-        ),
-        backgroundColor: success ? Colors.green : Colors.red,
-      ),
-    );
+    if (success) {
+      unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
+      context.showToastSuccess(
+        'Internet ${pause ? "paused" : "restored"} for $name.',
+        actionKey: actionKey,
+      );
+    } else {
+      unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
+      context.showToastError(
+        'Failed to ${pause ? "pause" : "resume"} internet for $name.',
+        actionKey: actionKey,
+      );
+    }
   }
 
   String _formatBandwidthRate(num? rawRate) {
@@ -552,12 +667,22 @@ class WirelessManagementScreen extends ConsumerWidget {
   Widget _buildDetailRow(BuildContext context, String label, String value) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      padding: const EdgeInsets.symmetric(vertical: 3.0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          SizedBox(
+            width: 120,
+            child: Text(label, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SelectableText(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+          ),
         ],
       ),
     );

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:luci_mobile/models/client.dart';
+import 'package:yet_another_luci_app/models/client.dart';
 
 void main() {
   group('Client formattedLeaseTime tests', () {
@@ -65,7 +65,7 @@ void main() {
       expect(client.isStatic, isTrue);
     });
 
-    test('static lease client with null leaseTime returns "Static (Unlimited)"', () {
+    test('static lease client with null leaseTime returns "Static (Permanent)"', () {
       final client = Client(
         ipAddress: '10.0.0.60',
         macAddress: 'AA:11:22:33:44:55',
@@ -73,7 +73,7 @@ void main() {
         isStaticLease: true,
         leaseTime: null,
       );
-      expect(client.formattedLeaseTime, contains('Unlimited'));
+      expect(client.formattedLeaseTime, equals('Static (Permanent)'));
     });
 
     test('Option A retention rule excludes disconnected non-static devices with no active lease', () {

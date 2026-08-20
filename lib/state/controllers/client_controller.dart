@@ -3,15 +3,15 @@
 
 import 'dart:async';
 
-import 'package:luci_mobile/models/client.dart';
-import 'package:luci_mobile/models/router.dart' as model;
-import 'package:luci_mobile/services/api_service.dart';
-import 'package:luci_mobile/services/interfaces/api_service_interface.dart';
-import 'package:luci_mobile/services/interfaces/auth_service_interface.dart';
-import 'package:luci_mobile/services/router_service.dart';
-import 'package:luci_mobile/state/app_state.dart'
+import 'package:yet_another_luci_app/models/client.dart';
+import 'package:yet_another_luci_app/models/router.dart' as model;
+import 'package:yet_another_luci_app/services/api_service.dart';
+import 'package:yet_another_luci_app/services/interfaces/api_service_interface.dart';
+import 'package:yet_another_luci_app/services/interfaces/auth_service_interface.dart';
+import 'package:yet_another_luci_app/services/router_service.dart';
+import 'package:yet_another_luci_app/state/app_state.dart'
     show kNeighborProbeInterval, kNeighborProbeMaxBatch, normalizeMac, selectNeighborProbeTargets;
-import 'package:luci_mobile/utils/logger.dart';
+import 'package:yet_another_luci_app/utils/logger.dart';
 
 /// Encapsulates client list aggregation, neighbor table NUD active probing,
 /// Layer-2 bridge FDB mapping, DHCP lease processing, and device classification.
@@ -49,8 +49,13 @@ class ClientController {
   final Set<String> _knownWirelessMacs = {};
   final Map<String, DateTime> _recentWiredActiveTime = {};
   DateTime? _lastNeighborProbeTime;
+  List<Client>? _lastFetchedClients;
+  bool _isFetchingClients = false;
 
   Set<String> get knownWirelessMacs => _knownWirelessMacs;
+  List<Client>? get lastFetchedClients => _lastFetchedClients;
+  bool get isFetchingClients => _isFetchingClients;
+  bool get hasFetchedClients => _lastFetchedClients != null;
 
   IApiService? get _apiService => _apiServiceRef();
   IAuthService? get _authService => _authServiceRef();
@@ -60,6 +65,7 @@ class ClientController {
   /// Aggregates DHCP leases across all configured routers and classifies clients
   /// as wireless if their MAC appears in any router's associated stations list.
   Future<List<Client>> fetchAggregatedClients() async {
+    _isFetchingClients = true;
     try {
       final clientsMap = <String, Client>{};
       final routers = _routerService?.routers ?? [];
@@ -82,15 +88,19 @@ class ClientController {
             .toLowerCase()
             .compareTo(b.displayName.toLowerCase());
       });
+      _lastFetchedClients = list;
       return list;
     } catch (e, stack) {
       Logger.exception('Failed to aggregate clients', e, stack);
-      return [];
+      return _lastFetchedClients ?? [];
+    } finally {
+      _isFetchingClients = false;
     }
   }
 
   /// Returns clients for the currently selected router only
   Future<List<Client>> fetchClientsForSelectedRouter() async {
+    _isFetchingClients = true;
     try {
       if (_isReviewerMode) {
         final stationsMap = await _apiService!.fetchAssociatedStations();
@@ -242,16 +252,21 @@ class ClientController {
           if (cmpType != 0) return cmpType;
           return a.hostname.toLowerCase().compareTo(b.hostname.toLowerCase());
         });
+        _lastFetchedClients = reviewerClients;
         return reviewerClients;
       }
 
       if (_routerService?.selectedRouter == null || _authService?.sysauth == null) {
-        return [];
+        return _lastFetchedClients ?? [];
       }
-      return await _fetchClientsForRouter(_routerService!.selectedRouter!);
+      final result = await _fetchClientsForRouter(_routerService!.selectedRouter!);
+      _lastFetchedClients = result;
+      return result;
     } catch (e, stack) {
       Logger.exception('Failed to fetch clients for selected router', e, stack);
-      return [];
+      return _lastFetchedClients ?? [];
+    } finally {
+      _isFetchingClients = false;
     }
   }
 
@@ -541,6 +556,7 @@ class ClientController {
 
       final staticUciMacs = <String>{};
       final staticUciNames = <String, String>{};
+      final staticUciTimes = <String, String>{};
       final dashboardData = _dashboardDataRef?.call();
       if (dashboardData != null) {
         final rawUci = dashboardData['uciDhcpConfig'] ?? dashboardData['dhcp'];
@@ -551,6 +567,7 @@ class ClientController {
               if (sec is Map && sec['.type'] == 'host') {
                 final rawMac = sec['mac'];
                 final sName = sec['name']?.toString() ?? sec['hostname']?.toString() ?? '';
+                final sTime = sec['leasetime']?.toString() ?? sec['lease_time']?.toString() ?? '';
                 final macList = <String>[];
                 if (rawMac is List) {
                   macList.addAll(rawMac.map((e) => e.toString()));
@@ -562,6 +579,7 @@ class ClientController {
                   if (nM.isNotEmpty) {
                     staticUciMacs.add(nM);
                     if (sName.isNotEmpty) staticUciNames[nM] = sName;
+                    if (sTime.isNotEmpty) staticUciTimes[nM] = sTime;
                   }
                 }
               }
@@ -590,6 +608,7 @@ class ClientController {
         }
 
         final staticName = hostHints[macN]?['staticLeaseName']?.toString() ?? staticUciNames[macN];
+        final staticTime = staticUciTimes[macN] ?? hostHints[macN]?['staticLeaseTime']?.toString() ?? hostHints[macN]?['leasetime']?.toString();
         final isStaticEntry = hostHints[macN]?['isStaticLease'] == true || staticUciMacs.contains(macN);
         final isWireless = normalizedWireless.contains(macN);
         final foundSsid = macToSsidMap[macN];
@@ -608,6 +627,7 @@ class ClientController {
           wirelessIface: foundIface,
           staticLeaseName: staticName,
           isStaticLease: isStaticEntry,
+          staticLeaseTime: staticTime,
           ipv6Addresses: v6List,
         );
       }

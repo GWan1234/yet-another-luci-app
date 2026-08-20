@@ -5,19 +5,20 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/main.dart';
-import 'package:luci_mobile/screens/login_screen.dart';
-import 'package:luci_mobile/screens/settings_screen.dart';
-import 'package:luci_mobile/widgets/luci_app_bar.dart';
-import 'package:luci_mobile/design/luci_design_system.dart';
+import 'package:yet_another_luci_app/main.dart';
+import 'package:yet_another_luci_app/screens/login_screen.dart';
+import 'package:yet_another_luci_app/screens/settings_screen.dart';
+import 'package:yet_another_luci_app/widgets/luci_app_bar.dart';
+import 'package:yet_another_luci_app/widgets/luci_toast.dart';
+import 'package:yet_another_luci_app/design/luci_design_system.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher_string.dart';
-import 'package:luci_mobile/config/app_config.dart';
-import 'package:luci_mobile/utils/http_client_manager.dart';
-import 'package:luci_mobile/state/app_state.dart';
-import 'package:luci_mobile/modules/core/luci_module_registry.dart';
-import 'package:luci_mobile/screens/paywall_screen.dart';
-import 'package:luci_mobile/widgets/theme_router_logo.dart';
+import 'package:yet_another_luci_app/config/app_config.dart';
+import 'package:yet_another_luci_app/utils/http_client_manager.dart';
+import 'package:yet_another_luci_app/state/app_state.dart';
+import 'package:yet_another_luci_app/modules/core/luci_module_registry.dart';
+import 'package:yet_another_luci_app/screens/paywall_screen.dart';
+import 'package:yet_another_luci_app/widgets/theme_router_logo.dart';
 
 class _MoreScreenSection extends StatelessWidget {
   final List<Widget> tiles;
@@ -74,37 +75,10 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
 
   void _showRouterBackOnlineMessage() {
     if (mounted) {
-      final theme = Theme.of(context);
-      final colorScheme = theme.colorScheme;
-      // Dismiss the warning snackbar
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle, color: colorScheme.onPrimary, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Router is back online, reconnecting…',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onPrimary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: colorScheme.primary,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          margin: const EdgeInsets.symmetric(
-            horizontal: LuciSpacing.lg,
-            vertical: LuciSpacing.md,
-          ),
-          duration: const Duration(seconds: 3),
-        ),
+      context.showToastSuccess(
+        'Router Online',
+        subtitle: 'Router is back online, reconnecting…',
+        actionKey: 'router_reboot',
       );
     }
   }
@@ -167,51 +141,23 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
             FilledButton(
               child: const Text('Reboot'),
               onPressed: () async {
+                final parentContext = Navigator.of(context).context;
                 Navigator.of(context).pop();
-                // Show persistent warning snackbar
-                final theme = Theme.of(context);
-                final colorScheme = theme.colorScheme;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Row(
-                      children: [
-                        Icon(
-                          Icons.restart_alt_rounded,
-                          color: colorScheme.onPrimary,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Router is rebooting... The app will automatically reconnect once online.',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: colorScheme.onPrimary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    backgroundColor: colorScheme.primary,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
-                    ),
-                    duration: const Duration(seconds: 15),
-                  ),
-                );
-                final success = await appState.reboot(context: context);
-                if (!context.mounted) return;
-                if (!success) {
-                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Failed to send reboot command to router.'),
-                      backgroundColor: Colors.red,
-                    ),
+                const actionKey = 'router_reboot';
+                if (parentContext.mounted) {
+                  parentContext.showToastLoading(
+                    'Rebooting Router',
+                    subtitle: 'Router is rebooting... The app will automatically reconnect once online.',
+                    actionKey: actionKey,
+                    timeout: const Duration(seconds: 45),
+                  );
+                }
+                final success = await appState.reboot(context: parentContext.mounted ? parentContext : null);
+                if (parentContext.mounted && !success) {
+                  parentContext.showToastError(
+                    'Reboot Failed',
+                    subtitle: 'Failed to send reboot command to router.',
+                    actionKey: actionKey,
                   );
                 }
               },

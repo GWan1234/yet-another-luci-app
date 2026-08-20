@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:luci_mobile/modules/storage_monitoring/models/storage_info.dart';
+import 'package:yet_another_luci_app/modules/storage_monitoring/models/storage_info.dart';
 
 void main() {
   group('Storage Monitoring Tests', () {

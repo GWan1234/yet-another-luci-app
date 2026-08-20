@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'package:flutter/material.dart';
+import 'luci_toast.dart';
 import '../models/rpc_result.dart';
 import '../state/app_state.dart';
 
@@ -13,7 +14,7 @@ class RpcResultUiHelper {
       '# OpenWrt 24.10 and earlier (OPKG):\n'
       'opkg update && opkg install luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status && /etc/init.d/rpcd restart';
 
-  /// Displays appropriate user feedback (snackbars or dialogs) based on RpcResult status.
+  /// Displays appropriate user feedback (toasts or dialogs) based on RpcResult status.
   static void handleRpcResult<T>(
     BuildContext context,
     RpcResult<T> result,
@@ -22,9 +23,7 @@ class RpcResultUiHelper {
     if (!context.mounted) return;
 
     if (result.isSuccess) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$actionLabel completed successfully.')),
-      );
+      context.showToastSuccess('$actionLabel completed successfully.');
       return;
     }
 
@@ -34,22 +33,12 @@ class RpcResultUiHelper {
     }
 
     if (result.isMethodNotFound) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Action "$actionLabel" is unavailable on this router capabilities profile.'),
-          backgroundColor: Colors.orange.shade800,
-        ),
-      );
+      context.showToastWarning('Action "$actionLabel" is unavailable on this router capabilities profile.');
       return;
     }
 
     if (result.status == RpcCallStatus.networkError) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Network error during $actionLabel: ${result.errorMessage}'),
-          backgroundColor: Colors.red.shade700,
-        ),
-      );
+      context.showToastError('Network Error', subtitle: 'Network connection failed during $actionLabel.');
       return;
     }
 
@@ -107,13 +96,11 @@ class _PermissionDeniedDialogState extends State<_PermissionDeniedDialog> {
       final success = await AppState.instance.autoFixPermissions(context: context);
       if (!mounted) return;
       if (success) {
+        final parentContext = Navigator.of(context).context;
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Permissions fixed successfully! Capabilities re-probed.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        if (parentContext.mounted) {
+          parentContext.showToastSuccess('Permissions fixed successfully!', subtitle: 'Capabilities re-probed.');
+        }
       } else {
         setState(() {
           _isFixing = false;

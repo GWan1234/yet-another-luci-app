@@ -1,15 +1,15 @@
 // Copyright 2026 Tuhin Garai. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import 'package:luci_mobile/services/interfaces/auth_service_interface.dart';
-import 'package:luci_mobile/services/interfaces/api_service_interface.dart';
-import 'package:luci_mobile/services/auth_service.dart';
-import 'package:luci_mobile/services/api_service.dart';
-import 'package:luci_mobile/services/mock_auth_service.dart';
-import 'package:luci_mobile/services/mock_api_service.dart';
-import 'package:luci_mobile/services/secure_storage_service.dart';
-import 'package:luci_mobile/services/router_service.dart';
-import 'package:luci_mobile/services/throughput_service.dart';
+import 'package:yet_another_luci_app/services/interfaces/auth_service_interface.dart';
+import 'package:yet_another_luci_app/services/interfaces/api_service_interface.dart';
+import 'package:yet_another_luci_app/services/auth_service.dart';
+import 'package:yet_another_luci_app/services/api_service.dart';
+import 'package:yet_another_luci_app/services/mock_auth_service.dart';
+import 'package:yet_another_luci_app/services/mock_api_service.dart';
+import 'package:yet_another_luci_app/services/secure_storage_service.dart';
+import 'package:yet_another_luci_app/services/router_service.dart';
+import 'package:yet_another_luci_app/services/throughput_service.dart';
 
 abstract class ServiceFactory {
   IAuthService createAuthService();

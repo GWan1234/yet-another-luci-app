@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:luci_mobile/services/mock_api_service.dart';
+import 'package:yet_another_luci_app/services/mock_api_service.dart';
 
 void main() {
   group('Client Access Control & Live Router Query Tests', () {

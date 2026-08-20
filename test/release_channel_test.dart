@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:luci_mobile/utils/release_utils.dart';
+import 'package:yet_another_luci_app/utils/release_utils.dart';
 
 void main() {
   group('Release channel detection', () {

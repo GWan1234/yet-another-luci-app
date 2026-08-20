@@ -3,7 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:luci_mobile/widgets/add_static_lease_dialog.dart';
+import 'package:yet_another_luci_app/widgets/add_static_lease_dialog.dart';
 
 void main() {
   testWidgets('AddStaticLeaseDialog initializes without error when parameters are null', (WidgetTester tester) async {

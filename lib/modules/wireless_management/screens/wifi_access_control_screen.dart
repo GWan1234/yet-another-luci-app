@@ -1,16 +1,19 @@
 // Copyright 2026 Tuhin Garai. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/main.dart';
-import 'package:luci_mobile/models/client.dart';
-import 'package:luci_mobile/state/app_state.dart';
-import 'package:luci_mobile/widgets/luci_app_bar.dart';
-import 'package:luci_mobile/design/luci_design_system.dart';
-import 'package:luci_mobile/modules/dhcp_dns/models/dhcp_dns_info.dart';
-import 'package:luci_mobile/widgets/add_static_lease_dialog.dart';
+import 'package:yet_another_luci_app/main.dart';
+import 'package:yet_another_luci_app/models/client.dart';
+import 'package:yet_another_luci_app/state/app_state.dart';
+import 'package:yet_another_luci_app/utils/os_platform_integration.dart';
+import 'package:yet_another_luci_app/widgets/luci_app_bar.dart';
+import 'package:yet_another_luci_app/widgets/luci_toast.dart';
+import 'package:yet_another_luci_app/design/luci_design_system.dart';
+import 'package:yet_another_luci_app/modules/dhcp_dns/models/dhcp_dns_info.dart';
+import 'package:yet_another_luci_app/widgets/add_static_lease_dialog.dart';
 import '../models/wireless_info.dart';
 
 class WifiAccessControlScreen extends ConsumerStatefulWidget {
@@ -992,12 +995,8 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
     );
 
     if (confirmed == true && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Applying Wi-Fi Access Control changes...'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      final actionKey = 'wifi_access_control_$targetMac';
+      context.showToastLoading('Applying Wi-Fi Access Control changes...', actionKey: actionKey);
 
       final success = await appState.applyWifiAccessControl(
         newMaclistByIface: newMaclistByIface,
@@ -1009,19 +1008,11 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
 
       if (!context.mounted) return;
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Access Control applied. Revert timer started (25s).'),
-            backgroundColor: LuciStatusColors.connected,
-          ),
-        );
+        unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
+        context.showToastSuccess('Access Control applied.', subtitle: 'Auto-revert timer active (25s countdown).', actionKey: actionKey);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to apply Wi-Fi Access Control rules.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
+        context.showToastError('Failed to apply Wi-Fi Access Control rules.', actionKey: actionKey);
       }
     }
     }

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:luci_mobile/models/rpc_result.dart';
-import 'package:luci_mobile/modules/wireless_management/models/wireless_info.dart';
+import 'package:yet_another_luci_app/models/rpc_result.dart';
+import 'package:yet_another_luci_app/modules/wireless_management/models/wireless_info.dart';
 
 void main() {
   group('Wireless Security Mode & Frequency Display Unit Tests', () {

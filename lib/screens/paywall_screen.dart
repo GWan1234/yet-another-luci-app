@@ -5,7 +5,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/providers/entitlement_provider.dart';
+import 'package:yet_another_luci_app/providers/entitlement_provider.dart';
+import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 
 /// Screen displaying a single voluntary developer support purchase,
 /// a custom support amount input field, and purchase restoration.
@@ -49,13 +50,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     });
 
     FocusScope.of(context).unfocus();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Thank you so much for supporting with $_currencySymbol$amount! ❤️'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    context.showToastSuccess('Support Received!', subtitle: 'Thank you so much for supporting with $_currencySymbol$amount! ❤️');
   }
 
   @override
@@ -165,12 +160,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                               if (productDetails != null) {
                                 await ref.read(entitlementProvider.notifier).buyProduct(productDetails);
                               } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Thank you for supporting with $displayPrice! ❤️'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
+                                context.showToastSuccess('Support Received!', subtitle: 'Thank you for supporting with $displayPrice! ❤️');
                               }
                             },
                       style: ElevatedButton.styleFrom(
@@ -267,12 +257,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                           : () async {
                               await ref.read(entitlementProvider.notifier).restorePurchases();
                               if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Purchases restored successfully.'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
+                                context.showToastSuccess('Purchases Restored', subtitle: 'Purchases restored successfully.');
                               }
                             },
                       icon: const Icon(Icons.restore_rounded, size: 18),

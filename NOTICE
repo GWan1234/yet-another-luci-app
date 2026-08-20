@@ -2,7 +2,7 @@ Yet Another LuCI App
 Copyright 2026 Tuhin Garai (@nightcodex7)
 
 This product includes software developed at:
-https://github.com/nightcodex7/yet-another-luci-app
+<https://github.com/nightcodex7/yet-another-luci-app>
 
 Licensed under the Apache License, Version 2.0.
 
@@ -11,7 +11,7 @@ Licensed under the Apache License, Version 2.0.
 This project was originally derived from:
 
   cogwheel0/luci-mobile
-  https://github.com/cogwheel0/luci-mobile
+  <https://github.com/cogwheel0/luci-mobile>
   Licensed under the MIT License
 
 All subsequent modifications, feature additions, and architectural
@@ -21,8 +21,8 @@ changes are Copyright 2026 Tuhin Garai and licensed under Apache-2.0.
 
 Third-Party Dependencies & Acknowledgments:
 
-  Flutter Framework — https://flutter.dev (BSD-3-Clause)
-  Riverpod — https://riverpod.dev (MIT)
-  Dio — https://pub.dev/packages/dio (MIT)
-  flutter_secure_storage — https://pub.dev/packages/flutter_secure_storage (BSD-3-Clause)
-  OpenWrt Project — https://openwrt.org (GPL-2.0)
+  Flutter Framework — <https://flutter.dev> (BSD-3-Clause)
+  Riverpod — <https://riverpod.dev> (MIT)
+  Dio — <https://pub.dev/packages/dio> (MIT)
+  flutter_secure_storage — <https://pub.dev/packages/flutter_secure_storage> (BSD-3-Clause)
+  OpenWrt Project — <https://openwrt.org> (GPL-2.0)

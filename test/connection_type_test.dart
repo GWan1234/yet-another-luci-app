@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:luci_mobile/models/client.dart';
-import 'package:luci_mobile/state/app_state.dart';
+import 'package:yet_another_luci_app/models/client.dart';
+import 'package:yet_another_luci_app/state/app_state.dart';
 
 /// Tests for connection type classification (GitHub issue #5).
 ///

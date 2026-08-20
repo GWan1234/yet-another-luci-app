@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'package:flutter/material.dart';
-import 'package:luci_mobile/models/router_capabilities.dart';
+import 'package:yet_another_luci_app/models/router_capabilities.dart';
 
 /// Unify package manager enum across application
 typedef PackageManagerType = PackageManagerEngine;

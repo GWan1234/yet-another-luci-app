@@ -1,6 +1,8 @@
 // Copyright 2026 Tuhin Garai. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+enum ClientCategoryFilter { all, wired, wireless }
+
 enum ConnectionType { wired, wireless, unknown }
 
 /// Neighbor Unreachability Detection (NUD) state from the kernel's neighbor table.
@@ -41,6 +43,7 @@ class Client {
   final NeighborReachability neighState;
   final String? staticLeaseName;
   final bool isStaticLease;
+  final String? staticLeaseTime;
 
   Client({
     required this.ipAddress,
@@ -61,6 +64,7 @@ class Client {
     this.neighState = NeighborReachability.unknown,
     this.staticLeaseName,
     this.isStaticLease = false,
+    this.staticLeaseTime,
   });
 
   // Helper function to determine connection type from interface parameters
@@ -185,6 +189,9 @@ class Client {
       expiresAt: expiresAtTimestamp, // Store the calculated absolute timestamp
       connectionType: _determineConnectionType(lease),
       ipv6Addresses: ipv6Addresses,
+      staticLeaseName: toStringValue(lease['staticLeaseName']),
+      isStaticLease: lease['isStaticLease'] == true,
+      staticLeaseTime: toStringValue(lease['staticLeaseTime'] ?? lease['leasetime']),
     );
   }
 
@@ -202,13 +209,14 @@ class Client {
     );
   }
 
-  // Get formatted lease time (e.g., "2d 4h 30m" or "Static (Unlimited)")
+  // Get formatted lease time (e.g., "2d 4h 30m" or "Static (Permanent)")
   String get formattedLeaseTime {
     if (isStatic) {
-      if (leaseTime != null && leaseTime! > 0 && leaseTime! < 86400 * 365) {
-        return 'Static (${Client.formatDuration(leaseTime!)})';
+      final lt = staticLeaseTime?.trim();
+      if (lt != null && lt.isNotEmpty && lt.toLowerCase() != 'infinite' && lt.toLowerCase() != '0') {
+        return 'Static ($lt)';
       }
-      return 'Static (Unlimited)';
+      return 'Static (Permanent)';
     }
     if (leaseTime == null) return 'No active lease';
     if (leaseTime == 0) return 'Unlimited';
@@ -310,6 +318,7 @@ class Client {
     NeighborReachability? neighState,
     String? staticLeaseName,
     bool? isStaticLease,
+    String? staticLeaseTime,
   }) {
     return Client(
       ipAddress: ipAddress ?? this.ipAddress,
@@ -330,6 +339,7 @@ class Client {
       neighState: neighState ?? this.neighState,
       staticLeaseName: staticLeaseName ?? this.staticLeaseName,
       isStaticLease: isStaticLease ?? this.isStaticLease,
+      staticLeaseTime: staticLeaseTime ?? this.staticLeaseTime,
     );
   }
 

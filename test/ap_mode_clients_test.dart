@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:luci_mobile/models/client.dart';
+import 'package:yet_another_luci_app/models/client.dart';
 
 /// Tests for AP-mode client detection (GitHub issues #21, #52, #45, #32).
 ///

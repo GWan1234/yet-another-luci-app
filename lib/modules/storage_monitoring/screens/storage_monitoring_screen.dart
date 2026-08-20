@@ -3,8 +3,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/main.dart';
-import 'package:luci_mobile/widgets/luci_app_bar.dart';
+import 'package:yet_another_luci_app/main.dart';
+import 'package:yet_another_luci_app/widgets/luci_app_bar.dart';
+import 'package:yet_another_luci_app/widgets/luci_collapsible_card.dart';
 import '../models/storage_info.dart';
 
 class StorageMonitoringScreen extends ConsumerWidget {
@@ -92,11 +93,23 @@ class StorageMonitoringScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   _buildFlashMemoryCard(context, storage.rootFs),
                   const SizedBox(height: 16),
-                  _buildSectionHeader(context, 'Mounted Storage Devices', Icons.storage_outlined),
+                  _buildSectionHeader(context, 'Mounted Storage Devices (${storage.mountPoints.length})', Icons.storage_outlined),
                   const SizedBox(height: 8),
-                  Column(
-                    children: storage.mountPoints.map((mp) => _buildMountPointCard(context, mp)).toList(),
-                  ),
+                  if (storage.mountPoints.length > 2)
+                    LuciCollapsibleCard(
+                      title: 'All Mounted Storage Devices',
+                      count: storage.mountPoints.length,
+                      subtitle: '${storage.mountPoints.length} active filesystems • Tap to view all',
+                      icon: Icons.storage_outlined,
+                      iconColor: Colors.blue,
+                      child: Column(
+                        children: storage.mountPoints.map((mp) => _buildMountPointCard(context, mp)).toList(),
+                      ),
+                    )
+                  else
+                    Column(
+                      children: storage.mountPoints.map((mp) => _buildMountPointCard(context, mp)).toList(),
+                    ),
                   const SizedBox(height: 32),
                 ],
               ),
@@ -110,10 +123,13 @@ class StorageMonitoringScreen extends ConsumerWidget {
       children: [
         Icon(icon, size: 20, color: theme.colorScheme.primary),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
+        Expanded(
+          child: Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -292,10 +308,20 @@ class StorageMonitoringScreen extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+          SizedBox(
+            width: 130,
+            child: Text(label, style: const TextStyle(color: Colors.grey)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SelectableText(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
         ],
       ),
     );

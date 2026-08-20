@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:luci_mobile/models/client.dart';
-import 'package:luci_mobile/services/mock_api_service.dart';
+import 'package:yet_another_luci_app/models/client.dart';
+import 'package:yet_another_luci_app/services/mock_api_service.dart';
 
 void main() {
   group('Wireless Client Disconnection & Interface Mapping Tests', () {

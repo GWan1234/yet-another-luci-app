@@ -3,13 +3,13 @@
 
 import 'dart:async';
 
-import 'package:luci_mobile/models/router_capabilities.dart';
-import 'package:luci_mobile/models/rpc_result.dart';
-import 'package:luci_mobile/modules/package_manager/models/package_info.dart';
-import 'package:luci_mobile/services/interfaces/api_service_interface.dart';
-import 'package:luci_mobile/services/interfaces/auth_service_interface.dart';
-import 'package:luci_mobile/services/router_service.dart';
-import 'package:luci_mobile/utils/logger.dart';
+import 'package:yet_another_luci_app/models/router_capabilities.dart';
+import 'package:yet_another_luci_app/models/rpc_result.dart';
+import 'package:yet_another_luci_app/modules/package_manager/models/package_info.dart';
+import 'package:yet_another_luci_app/services/interfaces/api_service_interface.dart';
+import 'package:yet_another_luci_app/services/interfaces/auth_service_interface.dart';
+import 'package:yet_another_luci_app/services/router_service.dart';
+import 'package:yet_another_luci_app/utils/logger.dart';
 
 /// Encapsulates all package manager RPC operations — install, remove,
 /// upgrade, list-installed, list-available, and list-upgradable.

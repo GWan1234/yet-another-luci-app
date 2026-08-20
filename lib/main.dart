@@ -2,52 +2,87 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'package:flutter/material.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:luci_mobile/state/app_state.dart';
-import 'package:luci_mobile/screens/login_screen.dart';
-import 'package:luci_mobile/screens/main_screen.dart';
-import 'package:luci_mobile/screens/settings_screen.dart';
-import 'package:luci_mobile/screens/splash_screen.dart';
-import 'package:luci_mobile/screens/onboarding_screen.dart';
+import 'package:yet_another_luci_app/state/app_state.dart';
+import 'package:yet_another_luci_app/screens/login_screen.dart';
+import 'package:yet_another_luci_app/screens/main_screen.dart';
+import 'package:yet_another_luci_app/screens/settings_screen.dart';
+import 'package:yet_another_luci_app/screens/splash_screen.dart';
+import 'package:yet_another_luci_app/screens/onboarding_screen.dart';
 
-import 'package:luci_mobile/models/router_capabilities.dart';
-import 'package:luci_mobile/modules/built_in_modules.dart';
+import 'package:yet_another_luci_app/models/router_capabilities.dart';
+import 'package:yet_another_luci_app/modules/built_in_modules.dart';
 
 import 'package:flutter/foundation.dart';
 
-import 'package:luci_mobile/services/ad_consent_service.dart';
-import 'package:luci_mobile/config/app_config.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/gestures.dart';
+
+import 'package:yet_another_luci_app/services/ad_consent_service.dart';
+import 'package:yet_another_luci_app/config/app_config.dart';
+import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart' hide AppState;
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (AppConfig.isAdsEnabled) {
-    try {
-      await MobileAds.instance.initialize();
+  // Enable native ScrollCapture & Accessibility Semantics for OS long/autoscrolling screenshots
+  SemanticsBinding.instance.ensureSemantics();
 
-      if (kDebugMode) {
-        await MobileAds.instance.updateRequestConfiguration(
-          RequestConfiguration(
-            testDeviceIds: const [],
-          ),
-        );
-      }
-
-      await AdConsentService.initializeConsentAndAds();
-    } catch (e) {
-      debugPrint('MobileAds initialization skipped or failed: $e');
-    }
-  }
+  // Low-RAM Hardware Optimization: Cap image memory cache (30MB max, 100 entries max)
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 30 * 1024 * 1024;
+  PaintingBinding.instance.imageCache.maximumSize = 100;
 
   registerBuiltInModules();
+
   runApp(
     const ProviderScope(
       child: LuCIApp(),
     ),
   );
+
+  // Defer non-critical SDK initializations post-first-frame to eliminate startup latency & prevent cold start ANRs
+  if (AppConfig.isAdsEnabled) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initDeferredAds();
+    });
+  }
+}
+
+/// Standardized scroll behavior ensuring native long/autoscroll screenshot engine compatibility
+/// across all Android OEMs (Xiaomi MIUI/HyperOS, Samsung OneUI, Oppo ColorOS, Vivo FuntouchOS, Stock Android 12+).
+class LuciScrollBehavior extends MaterialScrollBehavior {
+  const LuciScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.stylus,
+        PointerDeviceKind.invertedStylus,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.unknown,
+      };
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return const ClampingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+  }
+}
+
+Future<void> _initDeferredAds() async {
+  try {
+    await MobileAds.instance.initialize();
+    if (kDebugMode) {
+      await MobileAds.instance.updateRequestConfiguration(
+        RequestConfiguration(testDeviceIds: const []),
+      );
+    }
+    await AdConsentService.initializeConsentAndAds();
+  } catch (e) {
+    debugPrint('MobileAds deferred initialization skipped or failed: $e');
+  }
 }
 
 final appStateProvider = ChangeNotifierProvider<AppState>(
@@ -70,8 +105,11 @@ class LuCIApp extends ConsumerWidget {
     const orangeSecondary = Color(0xFFFB923C);
 
     return MaterialApp(
+      navigatorKey: LuciToastManager.navigatorKey,
       title: 'Yet Another LuCI App',
+      restorationScopeId: 'root_luci_app',
       debugShowCheckedModeBanner: false,
+      scrollBehavior: const LuciScrollBehavior(),
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
@@ -103,12 +141,33 @@ class LuCIApp extends ConsumerWidget {
           ),
           color: const Color(0xFFFFFFFF),
         ),
+        splashFactory: InkRipple.splashFactory,
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+          },
+        ),
+        focusColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+        expansionTileTheme: const ExpansionTileThemeData(
+          shape: Border(),
+          collapsedShape: Border(),
+        ),
         dialogTheme: DialogThemeData(
           backgroundColor: const Color(0xFFFFFFFF),
           surfaceTintColor: Colors.transparent,
           elevation: 6,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
+          ),
+        ),
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: Color(0xFFFFFFFF),
+          surfaceTintColor: Colors.transparent,
+          elevation: 8,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
         ),
       ),
@@ -125,6 +184,13 @@ class LuCIApp extends ConsumerWidget {
           brightness: Brightness.dark,
         ),
         scaffoldBackgroundColor: const Color(0xFF0F1523),
+        focusColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+        expansionTileTheme: const ExpansionTileThemeData(
+          shape: Border(),
+          collapsedShape: Border(),
+        ),
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -143,12 +209,26 @@ class LuCIApp extends ConsumerWidget {
           ),
           color: const Color(0xFF151D30),
         ),
+        splashFactory: InkRipple.splashFactory,
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+          },
+        ),
         dialogTheme: DialogThemeData(
           backgroundColor: const Color(0xFF151D30),
           surfaceTintColor: Colors.transparent,
           elevation: 8,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
+          ),
+        ),
+        bottomSheetTheme: const BottomSheetThemeData(
+          backgroundColor: Color(0xFF151D30),
+          surfaceTintColor: Colors.transparent,
+          elevation: 8,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
         ),
       ),

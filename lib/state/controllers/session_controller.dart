@@ -5,17 +5,17 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:luci_mobile/config/app_config.dart';
-import 'package:luci_mobile/models/dashboard_preferences.dart';
-import 'package:luci_mobile/models/router.dart' as model;
-import 'package:luci_mobile/services/interfaces/api_service_interface.dart';
-import 'package:luci_mobile/services/interfaces/auth_service_interface.dart';
-import 'package:luci_mobile/services/router_service.dart';
-import 'package:luci_mobile/services/secure_storage_service.dart';
-import 'package:luci_mobile/services/service_factory.dart';
-import 'package:luci_mobile/state/controllers/dashboard_controller.dart';
-import 'package:luci_mobile/utils/http_client_manager.dart';
-import 'package:luci_mobile/utils/logger.dart';
+import 'package:yet_another_luci_app/config/app_config.dart';
+import 'package:yet_another_luci_app/models/dashboard_preferences.dart';
+import 'package:yet_another_luci_app/models/router.dart' as model;
+import 'package:yet_another_luci_app/services/interfaces/api_service_interface.dart';
+import 'package:yet_another_luci_app/services/interfaces/auth_service_interface.dart';
+import 'package:yet_another_luci_app/services/router_service.dart';
+import 'package:yet_another_luci_app/services/secure_storage_service.dart';
+import 'package:yet_another_luci_app/services/service_factory.dart';
+import 'package:yet_another_luci_app/state/controllers/dashboard_controller.dart';
+import 'package:yet_another_luci_app/utils/http_client_manager.dart';
+import 'package:yet_another_luci_app/utils/logger.dart';
 
 /// Encapsulates authentication session lifecycle, router profile selection,
 /// preference storage, theme persistence, and reviewer mode configuration.
@@ -119,13 +119,37 @@ class SessionController {
     _reviewerModeEnabled = stored == 'true';
   }
 
-  Future<void> setReviewerMode(bool enabled) async {
+  Future<void> setReviewerMode(bool enabled, {BuildContext? context}) async {
+    _cancelThroughputTimer();
+    _setLoadingState(true);
+    _setErrorState(null);
+
+    // Invalidate active auth session token to prevent real router context bleed into reviewer mode or vice versa
+    await _authService?.logout();
+    _dashboardController?.resetState();
+
     _reviewerModeEnabled = enabled;
     await _secureStorageService.writeValue(
       AppConfig.reviewerModeKey,
       enabled.toString(),
     );
+
+    ServiceContainer.configure(reviewerMode: enabled);
     _initializeServices();
+
+    if (enabled) {
+      setPublicIps('203.0.113.195', '2001:db8:85a3::8a2e:0370:7334');
+      await tryAutoLogin(context: (context != null && context.mounted) ? context : null);
+      await _fetchDashboardData();
+    } else {
+      _publicIpv4 = null;
+      _publicIpv6 = null;
+      final current = selectedRouter;
+      if (current != null) {
+        await selectRouter(current.id, context: (context != null && context.mounted) ? context : null);
+      }
+    }
+    _setLoadingState(false);
     _notifyListeners();
   }
 
@@ -316,9 +340,13 @@ class SessionController {
     if (found == null) return;
 
     _setLoadingState(true);
-    _dashboardController?.resetState();
-
+    _setErrorState(null);
     _cancelThroughputTimer();
+
+    // Context-aware guardrail: Ensure previous auth token & cookies are completely cleared
+    // before initializing a session for the newly selected router profile
+    await _authService?.logout();
+    _dashboardController?.resetState();
 
     await loadDashboardPreferences();
 
@@ -333,6 +361,11 @@ class SessionController {
     );
     if (loginSuccess) {
       await _fetchDashboardData();
+    } else {
+      // Guardrail: Reset dashboard state if connection fails to avoid displaying stale data under new profile label
+      _dashboardController?.resetState();
+      final routerLabel = found.lastKnownHostname ?? found.ipAddress;
+      _setErrorState('Failed to establish session with $routerLabel (${found.ipAddress}).');
     }
     _setLoadingState(false);
     _notifyListeners();
@@ -410,10 +443,13 @@ class SessionController {
   }
 
   Future<void> logout() async {
+    _cancelThroughputTimer();
     await _authService?.logout();
     await _routerService?.clearAllRouters();
     _dashboardController?.resetState();
-    _cancelThroughputTimer();
+    _publicIpv4 = null;
+    _publicIpv6 = null;
+    _setErrorState(null);
     _notifyListeners();
   }
 

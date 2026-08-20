@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:luci_mobile/modules/vpn_connectivity/models/vpn_info.dart';
+import 'package:yet_another_luci_app/modules/vpn_connectivity/models/vpn_info.dart';
 
 void main() {
   group('VPN & Connectivity Unit Tests', () {

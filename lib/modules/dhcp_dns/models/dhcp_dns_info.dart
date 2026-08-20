@@ -553,10 +553,31 @@ class DhcpDnsOverview {
             } else if (type == 'host') {
               final mapping = DhcpStaticMapping.fromJson(valMap);
               if (isValidMapping(mapping)) {
-                staticList.add(mapping);
-                for (final subMac in mapping.macAddress.toUpperCase().replaceAll('-', ':').split(',')) {
-                  final trimmed = subMac.trim();
-                  if (trimmed.isNotEmpty) uciMacs.add(trimmed);
+                final normMacs = mapping.macAddress
+                    .toUpperCase()
+                    .replaceAll('-', ':')
+                    .split(',')
+                    .map((e) => e.trim())
+                    .where((e) => e.isNotEmpty)
+                    .toSet();
+
+                final existingIndex = staticList.indexWhere((existing) {
+                  final eMacs = existing.macAddress
+                      .toUpperCase()
+                      .replaceAll('-', ':')
+                      .split(',')
+                      .map((e) => e.trim());
+                  return eMacs.any((m) => normMacs.contains(m));
+                });
+
+                if (existingIndex >= 0) {
+                  staticList[existingIndex] = mapping;
+                } else {
+                  staticList.add(mapping);
+                }
+
+                for (final subMac in normMacs) {
+                  uciMacs.add(subMac);
                 }
               }
             }

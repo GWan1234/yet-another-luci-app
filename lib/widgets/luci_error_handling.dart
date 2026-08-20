@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import '../design/luci_design_system.dart';
+import 'luci_toast.dart';
 
 /// Enhanced error handling widget with consistent styling and animations
 class LuciErrorCard extends StatefulWidget {
@@ -360,7 +361,7 @@ class _LuciInlineErrorState extends State<LuciInlineError>
   }
 }
 
-/// Snackbar-style error notification
+/// Snackbar-style error notification delegated to unified LuciToast system
 class LuciErrorSnackbar {
   static void show(
     BuildContext context, {
@@ -371,60 +372,30 @@ class LuciErrorSnackbar {
     VoidCallback? onAction,
     Duration duration = const Duration(seconds: 4),
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final color = _getSnackbarColor(type, colorScheme);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (title != null) ...[
-              Text(
-                title,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: colorScheme.onInverseSurface,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: LuciSpacing.xs),
-            ],
-            Text(
-              message,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onInverseSurface,
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: LuciCardStyles.standardRadius,
-        ),
-        action: actionLabel != null && onAction != null
-            ? SnackBarAction(
-                label: actionLabel,
-                textColor: colorScheme.onInverseSurface,
-                onPressed: onAction,
-              )
-            : null,
-        duration: duration,
-      ),
-    );
-  }
-
-  static Color _getSnackbarColor(LuciErrorType type, ColorScheme colorScheme) {
+    LuciToastType toastType;
     switch (type) {
       case LuciErrorType.error:
-        return colorScheme.error;
+        toastType = LuciToastType.error;
+        break;
       case LuciErrorType.warning:
-        return colorScheme.secondary;
+        toastType = LuciToastType.warning;
+        break;
       case LuciErrorType.info:
-        return colorScheme.primary;
+        toastType = LuciToastType.info;
+        break;
       case LuciErrorType.success:
-        return colorScheme.tertiary;
+        toastType = LuciToastType.success;
+        break;
     }
+
+    LuciToastManager.show(
+      context,
+      title: title ?? message,
+      subtitle: title != null ? message : null,
+      type: toastType,
+      duration: duration,
+      onAction: onAction,
+      actionLabel: actionLabel,
+    );
   }
 }

@@ -4,9 +4,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:luci_mobile/models/client.dart';
-import 'package:luci_mobile/modules/dhcp_dns/models/dhcp_dns_info.dart';
-import 'package:luci_mobile/state/app_state.dart';
+import 'package:yet_another_luci_app/models/client.dart';
+import 'package:yet_another_luci_app/modules/dhcp_dns/models/dhcp_dns_info.dart';
+import 'package:yet_another_luci_app/state/app_state.dart';
+import 'package:yet_another_luci_app/utils/os_platform_integration.dart';
+import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 
 /// Reusable dialog to create or edit a DHCP static IP reservation (host mapping).
 class AddStaticLeaseDialog extends StatefulWidget {
@@ -46,7 +48,6 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
   late TextEditingController _customLeaseController;
 
   String _selectedLeasePreset = '12h';
-  bool _isSubmitting = false;
   bool _submittedOnce = false;
   bool _macTouched = false;
   bool _nameTouched = false;
@@ -344,34 +345,19 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
           });
           _validateInputs();
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Pasted MAC: $parsed'),
-                duration: const Duration(seconds: 2),
-                backgroundColor: Colors.teal.shade800,
-              ),
-            );
+            unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.selection));
+            context.showToastSuccess('Pasted MAC: $parsed');
           }
           return;
         }
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Clipboard does not contain a valid MAC address.'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
+        context.showToastWarning('Clipboard does not contain a valid MAC address.');
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unable to read clipboard.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        context.showToastWarning('Unable to read clipboard.');
       }
     }
   }
@@ -514,15 +500,26 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
   }
 
   Future<void> _submit() async {
-    _submittedOnce = true;
-    _validateInputs();
-    if (_rawMacError != null || _rawDuidError != null || _rawNameError != null || _rawIpError != null || _rawIp6Error != null || _rawLeaseError != null) {
+    if (ActionRateLimiter.isRateLimited('add_static_lease_submit', cooldown: const Duration(milliseconds: 1200))) {
+      if (mounted) {
+        context.showToastWarning('Save in progress. Please wait a moment...');
+      }
       return;
     }
 
-    setState(() {
-      _isSubmitting = true;
-    });
+    _submittedOnce = true;
+    _validateInputs();
+    if (_rawMacError != null ||
+        _rawDuidError != null ||
+        _rawNameError != null ||
+        _rawIpError != null ||
+        _rawIp6Error != null ||
+        _rawLeaseError != null) {
+      if (mounted) {
+        context.showToastWarning('Please fix highlighted form errors.');
+      }
+      return;
+    }
 
     final targetMac = _effectiveMac;
     final hostname = _nameController.text.trim();
@@ -532,58 +529,80 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
     final leaseTime = _selectedLeasePreset == 'custom'
         ? _customLeaseController.text.trim()
         : _selectedLeasePreset;
+    final isEditMode = _isEditing;
+    final onSavedCallback = widget.onSaved;
 
-    final appState = AppState.instance;
-    final success = await appState.addStaticLease(
-      macAddress: targetMac,
-      targetIp: targetIp,
-      hostname: hostname,
-      targetIp6: targetIp6.isNotEmpty ? targetIp6 : null,
-      duid: duid.isNotEmpty ? duid : null,
-      leaseTime: leaseTime,
-      context: context,
-    );
+    final liveIp = widget.client?.ipAddress ?? widget.initialIp;
+    final hasIpDiscrepancy = liveIp != null &&
+        liveIp.isNotEmpty &&
+        liveIp != 'N/A' &&
+        liveIp != targetIp &&
+        (widget.client == null || widget.client!.isConnected);
 
-    if (!mounted) return;
+    unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
 
-    if (success) {
-      final liveIp = widget.client?.ipAddress ?? widget.initialIp;
-      final hasIpDiscrepancy = liveIp != null &&
-          liveIp.isNotEmpty &&
-          liveIp != 'N/A' &&
-          liveIp != targetIp &&
-          (widget.client == null || widget.client!.isConnected);
+    // Capture parent page context before popping dialog to preserve mounted context for toasts
+    final parentContext = Navigator.of(context).context;
+    Navigator.of(context).pop();
 
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isEditing ? 'Updated static lease: $hostname ($targetIp)' : 'Static lease reserved: $hostname ($targetIp)'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
+    final actionKey = 'static_lease_$targetMac';
+
+    // Show non-intrusive context-aware progress toast with rotating loader
+    if (parentContext.mounted) {
+      parentContext.showToastLoading(
+        isEditMode ? 'Updating static lease for $hostname...' : 'Creating static lease for $hostname...',
+        actionKey: actionKey,
       );
-      widget.onSaved?.call();
+    }
 
-      if (hasIpDiscrepancy) {
-        unawaited(_promptLiveClientRefresh(
-          context,
-          targetMac,
-          hostname,
-          liveIp,
-          targetIp,
-        ));
+    // Perform backend RPC update in background with exception guardrail
+    try {
+      final appState = AppState.instance;
+      final success = await appState.addStaticLease(
+        macAddress: targetMac,
+        targetIp: targetIp,
+        hostname: hostname,
+        targetIp6: targetIp6.isNotEmpty ? targetIp6 : null,
+        duid: duid.isNotEmpty ? duid : null,
+        leaseTime: leaseTime,
+        context: parentContext.mounted ? parentContext : null,
+      );
+
+      if (parentContext.mounted) {
+        if (success) {
+          unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
+          parentContext.showToastSuccess(
+            isEditMode ? 'Updated static lease: $hostname ($targetIp)' : 'Static lease reserved: $hostname ($targetIp)',
+            actionKey: actionKey,
+          );
+          onSavedCallback?.call();
+
+          if (hasIpDiscrepancy) {
+            unawaited(_promptLiveClientRefresh(
+              parentContext,
+              targetMac,
+              hostname,
+              liveIp,
+              targetIp,
+            ));
+          }
+        } else {
+          unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
+          parentContext.showToastError(
+            'Failed to ${isEditMode ? "update" : "create"} static lease for $hostname.',
+            actionKey: actionKey,
+          );
+        }
       }
-    } else {
-      setState(() {
-        _isSubmitting = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to save static lease for $targetMac'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    } catch (e) {
+      if (parentContext.mounted) {
+        unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
+        parentContext.showToastError(
+          'Failed to ${isEditMode ? "update" : "create"} static lease for $hostname.',
+          subtitle: 'Please check your router connection and try again.',
+          actionKey: actionKey,
+        );
+      }
     }
   }
 
@@ -657,15 +676,11 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
         context: context,
       );
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(res
-                ? 'Connection refresh signal sent for $hostname ($macAddress).'
-                : 'Failed to trigger connection refresh for $macAddress.'),
-            backgroundColor: res ? Colors.green : Colors.orange,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        if (res) {
+          context.showToastSuccess('Connection refresh signal sent for $hostname ($macAddress).');
+        } else {
+          context.showToastWarning('Failed to trigger connection refresh for $macAddress.');
+        }
       }
     }
   }
@@ -701,12 +716,7 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
     final diff = expiryDateTime.difference(now);
     if (diff.inSeconds < 120) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Lease expiry must be at least 2 minutes in the future.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        context.showToastWarning('Lease expiry must be at least 2 minutes in the future.');
       }
       return;
     }
@@ -827,7 +837,6 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
         _rawNameError == null &&
         _rawIpError == null &&
         _rawLeaseError == null &&
-        !_isSubmitting &&
         _hasChanges;
 
     final dhcpOverview = DhcpDnsOverview.fromDashboardData(
@@ -855,7 +864,6 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
         }
       }
     }
-
     return AlertDialog(
       backgroundColor: colorScheme.surface,
       surfaceTintColor: Colors.transparent,
@@ -1223,18 +1231,12 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
         ),
       actions: [
         TextButton(
-          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
         ElevatedButton.icon(
           onPressed: canSave ? _submit : null,
-          icon: _isSubmitting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                )
-              : const Icon(Icons.check, size: 18),
+          icon: const Icon(Icons.check, size: 18),
           label: Text(_isEditing ? 'Update Reservation' : 'Save Reservation'),
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.teal,

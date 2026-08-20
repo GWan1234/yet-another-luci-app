@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:luci_mobile/models/network_topology.dart';
-import 'package:luci_mobile/models/router_capabilities.dart';
-import 'package:luci_mobile/models/rpc_result.dart';
+import 'package:yet_another_luci_app/models/network_topology.dart';
+import 'package:yet_another_luci_app/models/router_capabilities.dart';
+import 'package:yet_another_luci_app/models/rpc_result.dart';
 
 void main() {
   group('Network Topology & Interfaces Unit Tests', () {

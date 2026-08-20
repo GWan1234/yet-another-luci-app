@@ -5,16 +5,17 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:luci_mobile/modules/vpn_connectivity/models/vpn_info.dart';
-import 'package:luci_mobile/models/dashboard_preferences.dart';
-import 'package:luci_mobile/models/router_capabilities.dart';
-import 'package:luci_mobile/modules/storage_monitoring/models/storage_info.dart';
-import 'package:luci_mobile/services/interfaces/api_service_interface.dart';
-import 'package:luci_mobile/services/interfaces/auth_service_interface.dart';
-import 'package:luci_mobile/services/router_service.dart';
-import 'package:luci_mobile/services/secure_storage_service.dart';
-import 'package:luci_mobile/state/controllers/throughput_controller.dart';
-import 'package:luci_mobile/utils/logger.dart';
+import 'package:yet_another_luci_app/modules/vpn_connectivity/models/vpn_info.dart';
+import 'package:yet_another_luci_app/models/dashboard_preferences.dart';
+import 'package:yet_another_luci_app/models/router_capabilities.dart';
+import 'package:yet_another_luci_app/modules/storage_monitoring/models/storage_info.dart';
+import 'package:yet_another_luci_app/services/interfaces/api_service_interface.dart';
+import 'package:yet_another_luci_app/services/interfaces/auth_service_interface.dart';
+import 'package:yet_another_luci_app/services/router_service.dart';
+import 'package:yet_another_luci_app/services/secure_storage_service.dart';
+import 'package:yet_another_luci_app/state/controllers/throughput_controller.dart';
+import 'package:yet_another_luci_app/utils/http_client_manager.dart';
+import 'package:yet_another_luci_app/utils/logger.dart';
 
 /// Enum matching AppState connection status for reporting connection failures.
 enum DashboardConnectionStatus {
@@ -513,9 +514,11 @@ class DashboardController {
       return;
     }
 
-    _isDashboardLoading = true;
-    _dashboardError = null;
-    _notifyListeners();
+    if (_dashboardData == null) {
+      _isDashboardLoading = true;
+      _dashboardError = null;
+      _notifyListeners();
+    }
 
     await probeRouterCapabilities();
 
@@ -687,6 +690,12 @@ class DashboardController {
         object: 'uci',
         method: 'get',
         params: {'config': 'cloudflared'},
+      );
+
+      final uciDdnsFuture = callOptionalRpc(
+        object: 'uci',
+        method: 'get',
+        params: {'config': 'ddns'},
       );
 
       Future<dynamic> fetchCronData() async {
@@ -965,6 +974,7 @@ class DashboardController {
         uciNextdnsFuture,
         uciCloudflaredFuture,
         tailscaleExecFuture,
+        uciDdnsFuture,
       ]);
       final wirelessRaw = optionalResults[0];
       final uciWirelessRaw = optionalResults[1];
@@ -980,6 +990,7 @@ class DashboardController {
       final uciNextdnsRaw = optionalResults[11];
       final uciCloudflaredRaw = optionalResults[12];
       final tailscaleExecRaw = optionalResults[13];
+      final uciDdnsRaw = optionalResults[14];
 
       Map<String, dynamic>? wirelessData;
       if (wirelessRaw != null) {
@@ -1519,6 +1530,17 @@ class DashboardController {
         }
       }
 
+      Map<String, dynamic>? ddnsData;
+      if (uciDdnsRaw != null) {
+        final parsedDdns = getOptionalData(uciDdnsRaw, 'uci.get ddns');
+        if (parsedDdns is Map<String, dynamic>) {
+          final values = parsedDdns['values'] is Map<String, dynamic>
+              ? parsedDdns['values'] as Map<String, dynamic>
+              : parsedDdns;
+          ddnsData = Map<String, dynamic>.from(values);
+        }
+      }
+
       _dashboardData = {
         'boardInfo': boardInfoData,
         'sysInfo': sysInfoData,
@@ -1543,6 +1565,7 @@ class DashboardController {
         'tailscale': tailscaleData,
         'nextdns': nextdnsData,
         'cloudflared': cloudflaredData,
+        'ddns': ddnsData,
         '_lastUpdated': DateTime.now().millisecondsSinceEpoch,
       };
 
@@ -1563,9 +1586,12 @@ class DashboardController {
         _setConnectionStatus(DashboardConnectionStatus.reconnecting);
         _notifyListeners();
 
+        // Flush stale HTTP client socket pools on connection error to ensure fresh socket connection on active network interface
+        HttpClientManager().disposeAll();
+
         bool reconnected = false;
         for (int attempt = 1; attempt <= 3; attempt++) {
-          await Future.delayed(Duration(milliseconds: 500 * attempt));
+          await Future.delayed(Duration(milliseconds: 300 * attempt));
           try {
             final autoLoginSuccess = await _tryAutoLogin();
             if (autoLoginSuccess) {
@@ -1593,7 +1619,7 @@ class DashboardController {
       } else {
         _dashboardError = 'Failed to fetch dashboard data: $e';
       }
-      _dashboardData = null;
+      // Preserve cached _dashboardData if present so existing UI components remain populated during temporary network interruptions
     } finally {
       _isDashboardLoading = false;
       _notifyListeners();

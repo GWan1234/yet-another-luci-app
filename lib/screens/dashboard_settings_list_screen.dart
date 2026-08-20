@@ -3,12 +3,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/main.dart';
-import 'package:luci_mobile/widgets/luci_app_bar.dart';
-import 'package:luci_mobile/design/luci_design_system.dart';
-import 'package:luci_mobile/screens/router_dashboard_settings_screen.dart';
+import 'package:yet_another_luci_app/main.dart';
+import 'package:yet_another_luci_app/widgets/luci_app_bar.dart';
+import 'package:yet_another_luci_app/design/luci_design_system.dart';
+import 'package:yet_another_luci_app/screens/router_dashboard_settings_screen.dart';
 
-import 'package:luci_mobile/widgets/theme_router_logo.dart';
+import 'package:yet_another_luci_app/widgets/theme_router_logo.dart';
 
 class DashboardSettingsListScreen extends ConsumerWidget {
   const DashboardSettingsListScreen({super.key});

@@ -441,13 +441,79 @@ class WirelessOverview {
     if (data != null) {
       assocData = data['wirelessStations'] as Map<String, dynamic>?;
 
-      final wirelessMap = (data['wireless'] ?? data['wirelessInterfaces'] ?? data['uciWirelessConfig']) as Map<String, dynamic>?;
-      if (wirelessMap != null) {
+      final wirelessMap = (data['wireless'] ?? data['wirelessInterfaces']) as Map<String, dynamic>?;
+      if (wirelessMap != null && wirelessMap.isNotEmpty) {
         wirelessMap.forEach((radioName, radioData) {
           if (radioData is Map<String, dynamic>) {
-            radioList.add(WirelessRadio.fromJson(radioName, radioData, assocData));
+            // Check if radioData contains valid radio structure (e.g. interfaces or config)
+            if (radioData.containsKey('interfaces') || radioData.containsKey('up') || radioData.containsKey('channel')) {
+              radioList.add(WirelessRadio.fromJson(radioName, radioData, assocData));
+            }
           }
         });
+      }
+
+      // If no valid radios were parsed from ubus 'wireless', try reconstructing from uciWirelessConfig
+      if (radioList.isEmpty && data['uciWirelessConfig'] != null) {
+        final uciConfig = data['uciWirelessConfig'];
+        final uciValues = (uciConfig is Map && uciConfig['values'] is Map)
+            ? uciConfig['values'] as Map
+            : (uciConfig is Map ? uciConfig : null);
+
+        if (uciValues != null) {
+          final uciRadios = <String, Map<String, dynamic>>{};
+          final uciIfacesByRadio = <String, List<Map<String, dynamic>>>{};
+
+          uciValues.forEach((key, value) {
+            if (value is Map) {
+              final mapVal = Map<String, dynamic>.from(value);
+              final type = mapVal['.type']?.toString();
+              if (type == 'wifi-device') {
+                uciRadios[key.toString()] = mapVal;
+              } else if (type == 'wifi-iface') {
+                final device = mapVal['device']?.toString() ?? 'radio0';
+                uciIfacesByRadio.putIfAbsent(device, () => []).add(mapVal);
+              }
+            }
+          });
+
+          uciRadios.forEach((radioName, radioMap) {
+            final ifaces = uciIfacesByRadio[radioName] ?? [];
+            final constructedInterfaces = ifaces.map((ifaceMap) {
+              final sectionName = ifaceMap['.name']?.toString() ?? ifaceMap['section']?.toString() ?? 'wifinet';
+              final ssid = ifaceMap['ssid']?.toString() ?? 'Unnamed';
+              final mode = (ifaceMap['mode']?.toString() ?? 'ap').toUpperCase();
+              final enc = ifaceMap['encryption']?.toString() ?? 'WPA2-PSK';
+              final disabled = ifaceMap['disabled'] == '1' || ifaceMap['disabled'] == true;
+              final ch = ifaceMap['channel']?.toString() ?? radioMap['channel']?.toString() ?? 'Auto';
+
+              return WirelessInterface(
+                ifName: ifaceMap['ifname']?.toString() ?? sectionName,
+                sectionName: sectionName,
+                ssid: ssid,
+                mode: mode,
+                encryption: enc,
+                securityMode: WifiSecurityMode.parse(rawConfigEnc: enc),
+                pmfState: PmfState.parse(ifaceMap['ieee80211w']),
+                channel: ch,
+                isEnabled: !disabled,
+                stations: const [],
+              );
+            }).toList();
+
+            radioList.add(
+              WirelessRadio(
+                name: radioName,
+                isUp: radioMap['disabled'] != '1' && radioMap['disabled'] != true,
+                channel: radioMap['channel']?.toString() ?? 'Auto',
+                frequency: int.tryParse(radioMap['frequency']?.toString() ?? ''),
+                txPowerDbm: int.tryParse(radioMap['txpower']?.toString() ?? ''),
+                country: radioMap['country']?.toString() ?? 'Global',
+                interfaces: constructedInterfaces,
+              ),
+            );
+          });
+        }
       }
     }
 
@@ -505,6 +571,55 @@ class WirelessOverview {
         ),
       ]);
     }
+
+    // Priority sorting: Active / UP radios, interfaces, and connected stations FIRST at top priority!
+    for (int i = 0; i < radioList.length; i++) {
+      final r = radioList[i];
+      final sortedInterfaces = List<WirelessInterface>.from(r.interfaces)..sort((a, b) {
+        if (a.isEnabled != b.isEnabled) {
+          return a.isEnabled ? -1 : 1;
+        }
+        return a.ssid.compareTo(b.ssid);
+      });
+
+      for (int j = 0; j < sortedInterfaces.length; j++) {
+        final ifc = sortedInterfaces[j];
+        final sortedStations = List<WirelessStation>.from(ifc.stations)..sort((a, b) {
+          final aSig = a.signalDbm ?? -999;
+          final bSig = b.signalDbm ?? -999;
+          return aSig.compareTo(bSig); // Higher dBm at bottom of list
+        });
+        sortedInterfaces[j] = WirelessInterface(
+          ifName: ifc.ifName,
+          sectionName: ifc.sectionName,
+          ssid: ifc.ssid,
+          mode: ifc.mode,
+          encryption: ifc.encryption,
+          securityMode: ifc.securityMode,
+          pmfState: ifc.pmfState,
+          channel: ifc.channel,
+          isEnabled: ifc.isEnabled,
+          stations: sortedStations,
+        );
+      }
+
+      radioList[i] = WirelessRadio(
+        name: r.name,
+        isUp: r.isUp,
+        channel: r.channel,
+        frequency: r.frequency,
+        txPowerDbm: r.txPowerDbm,
+        country: r.country,
+        interfaces: sortedInterfaces,
+      );
+    }
+
+    radioList.sort((a, b) {
+      if (a.isUp != b.isUp) {
+        return a.isUp ? -1 : 1;
+      }
+      return a.name.compareTo(b.name);
+    });
 
     return WirelessOverview(radios: radioList);
   }

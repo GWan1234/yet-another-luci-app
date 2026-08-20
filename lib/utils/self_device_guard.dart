@@ -3,6 +3,7 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 
 class SelfDeviceGuard {
   static Set<String>? _cachedLocalIpsAndMacs;
@@ -147,6 +148,22 @@ class SelfDeviceGuard {
         ],
       ),
     );
+
+    if (context.mounted) {
+      if (confirmed != true) {
+        LuciToastManager.showGuardrail(
+          context,
+          'Action Aborted by Guardrail',
+          subtitle: 'Modification on active managing device cancelled for safety.',
+        );
+      } else {
+        LuciToastManager.showWarning(
+          context,
+          'Self-Device Guardrail Bypassed',
+          subtitle: 'Proceeding with "$actionName" on managing device.',
+        );
+      }
+    }
 
     return confirmed == true;
   }

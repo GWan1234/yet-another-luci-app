@@ -5,7 +5,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
-import 'package:luci_mobile/config/app_config.dart';
+import 'package:yet_another_luci_app/config/app_config.dart';
 
 /// Manages Google UMP (User Messaging Platform) consent for GDPR/UK regions
 /// and initializes the Google Mobile Ads SDK prior to requesting any ads.
@@ -19,8 +19,8 @@ class AdConsentService {
       return;
     }
 
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android && defaultTargetPlatform != TargetPlatform.iOS) {
-      // Mobile Ads SDK is supported on Android and iOS
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      // Mobile Ads SDK is strictly supported on Android platforms (Phones, Tablets, Chromebooks)
       return;
     }
 

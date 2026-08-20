@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:luci_mobile/config/app_config.dart';
-import 'package:luci_mobile/providers/entitlement_provider.dart';
+import 'package:yet_another_luci_app/config/app_config.dart';
+import 'package:yet_another_luci_app/providers/entitlement_provider.dart';
 
 void main() {
   group('Compile-Time Flavor Gating Unit Tests', () {

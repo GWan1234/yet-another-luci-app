@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:luci_mobile/modules/services_system/models/services_system_info.dart';
+import 'package:yet_another_luci_app/modules/services_system/models/services_system_info.dart';
 
 void main() {
   group('Services & System Startup Init Scripts Tests', () {

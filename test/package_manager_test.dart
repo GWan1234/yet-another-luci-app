@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:luci_mobile/models/router_capabilities.dart';
-import 'package:luci_mobile/models/rpc_result.dart';
-import 'package:luci_mobile/modules/package_manager/models/package_info.dart';
-import 'package:luci_mobile/services/api_service.dart';
+import 'package:yet_another_luci_app/models/router_capabilities.dart';
+import 'package:yet_another_luci_app/models/rpc_result.dart';
+import 'package:yet_another_luci_app/modules/package_manager/models/package_info.dart';
+import 'package:yet_another_luci_app/services/api_service.dart';
 
 void main() {
   group('Package Manager Engine Wiring Tests', () {

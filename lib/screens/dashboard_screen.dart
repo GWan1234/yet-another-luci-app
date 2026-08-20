@@ -5,16 +5,19 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:luci_mobile/state/app_state.dart';
-import 'package:luci_mobile/main.dart';
-import 'package:luci_mobile/widgets/luci_app_bar.dart';
-import 'package:luci_mobile/widgets/luci_animation_system.dart';
-import 'package:luci_mobile/models/router.dart' as model;
-import 'package:luci_mobile/modules/core/luci_module_registry.dart';
-import 'package:luci_mobile/modules/wireless_management/models/wireless_info.dart';
-import 'package:luci_mobile/utils/release_utils.dart';
-import 'package:luci_mobile/design/luci_design_system.dart';
-import 'package:luci_mobile/models/client.dart';
+import 'package:yet_another_luci_app/state/app_state.dart';
+import 'package:yet_another_luci_app/main.dart';
+import 'package:yet_another_luci_app/widgets/luci_app_bar.dart';
+import 'package:yet_another_luci_app/models/router.dart' as model;
+import 'package:yet_another_luci_app/modules/core/luci_module_registry.dart';
+import 'package:yet_another_luci_app/modules/wireless_management/models/wireless_info.dart';
+import 'package:yet_another_luci_app/utils/release_utils.dart';
+import 'package:yet_another_luci_app/design/luci_design_system.dart';
+import 'package:yet_another_luci_app/models/client.dart';
+import 'package:yet_another_luci_app/widgets/luci_toast.dart';
+import 'package:yet_another_luci_app/modules/system_monitoring/models/system_metrics.dart';
+
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -25,39 +28,47 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   final ScrollController _wanScrollController = ScrollController();
-  bool _dismissedRpcWarning = false;
+  bool _dismissedRpcWarning = true;
 
   @override
   void initState() {
     super.initState();
+    _checkRpcWarningStatus();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(appStateProvider).fetchDashboardData();
+      LuciToastManager.dismissAllLoading();
+      final appState = ref.read(appStateProvider);
+      if (appState.dashboardData == null) {
+        appState.fetchDashboardData();
+      }
     });
+  }
+
+  Future<void> _checkRpcWarningStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final dismissed = prefs.getBool('hint_dismissed_rpc_missing_warning') ?? false;
+      if (mounted) {
+        setState(() {
+          _dismissedRpcWarning = dismissed;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _dismissRpcWarning() async {
+    setState(() {
+      _dismissedRpcWarning = true;
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('hint_dismissed_rpc_missing_warning', true);
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     _wanScrollController.dispose();
     super.dispose();
-  }
-
-  String _formatUptime(int seconds) {
-    final duration = Duration(seconds: seconds);
-    final days = duration.inDays;
-    final hours = duration.inHours.remainder(24);
-    final minutes = duration.inMinutes.remainder(60);
-    final parts = <String>[];
-    if (days > 0) parts.add('${days}d');
-    if (hours > 0 || days > 0) parts.add('${hours}h');
-    parts.add('${minutes}m');
-    return parts.join(' ');
-  }
-
-  String _formatCpuLoad(List<dynamic> load) {
-    if (load.isEmpty) return 'N/A';
-    // Use the first value as the main CPU load
-    final percent = ((load[0] / 65536) * 100).clamp(0, 100);
-    return '${percent.toStringAsFixed(0)}%';
   }
 
 
@@ -146,7 +157,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(releaseInfo.distributionName, style: labelStyle),
+                  Text(
+                    releaseInfo.distributionName,
+                    style: labelStyle,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   const SizedBox(height: 4),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -227,11 +242,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.onSurface,
+        Flexible(
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -547,11 +565,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final displaySpeed = speed.isNaN || speed.isInfinite || speed < 0
         ? 0.0
         : speed;
-    final speedText = Text(
-      _formatSpeed(displaySpeed),
-      style: Theme.of(
-        context,
-      ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+    final speedText = FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(
+        _formatSpeed(displaySpeed),
+        style: Theme.of(
+          context,
+        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+      ),
     );
 
     return Row(
@@ -683,41 +704,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildSystemVitalsCard(AppState appState) {
     final sysInfo = appState.dashboardData?['sysInfo'] as Map<String, dynamic>?;
+    final boardInfo = appState.dashboardData?['boardInfo'] as Map<String, dynamic>?;
+    final metrics = SystemMetrics.fromSysInfo(sysInfo, boardInfo: boardInfo);
 
-    final uptime = (sysInfo?['uptime'] is num)
-        ? (sysInfo!['uptime'] as num).toInt()
-        : (sysInfo?['uptime'] is String ? int.tryParse(sysInfo!['uptime']) : null);
-    final uptimeValue = uptime != null ? _formatUptime(uptime) : 'N/A';
-
-    final rawCpuLoad = sysInfo?['load'];
-    final cpuLoad = rawCpuLoad is List ? rawCpuLoad : (rawCpuLoad is Map ? rawCpuLoad.values.toList() : null);
-    final cpuLoadValue = cpuLoad != null ? _formatCpuLoad(cpuLoad) : 'N/A';
-
-    String loadAvgValue = 'N/A';
-    if (cpuLoad != null && cpuLoad.isNotEmpty) {
-      if (cpuLoad[0] is num) {
-        final num rawVal = cpuLoad[0] as num;
-        final double l1 = rawVal is int
-            ? rawVal.toDouble() / 65536.0
-            : (rawVal.toDouble() > 10.0
-                ? rawVal.toDouble() / 65536.0
-                : rawVal.toDouble());
-        loadAvgValue = l1.toStringAsFixed(2);
-      }
-    }
-
-    final totalMem = (sysInfo?['memory']?['total'] is num)
-        ? (sysInfo!['memory']['total'] as num).toInt()
-        : (sysInfo?['memory']?['total'] is String ? int.tryParse(sysInfo!['memory']['total']) ?? 0 : 0);
-    final freeMem = (sysInfo?['memory']?['free'] is num)
-        ? (sysInfo!['memory']['free'] as num).toInt()
-        : (sysInfo?['memory']?['free'] is String ? int.tryParse(sysInfo!['memory']['free']) ?? 0 : 0);
-    final bufferedMem = (sysInfo?['memory']?['buffered'] is num)
-        ? (sysInfo!['memory']['buffered'] as num).toInt()
-        : (sysInfo?['memory']?['buffered'] is String ? int.tryParse(sysInfo!['memory']['buffered']) ?? 0 : 0);
-    final usedMem = totalMem - freeMem - bufferedMem;
-    final memoryValue = totalMem > 0
-        ? '${(usedMem / totalMem * 100).toStringAsFixed(0)}%'
+    final uptimeValue = metrics.formattedUptime;
+    final cpuLoadValue = '${metrics.cpuUsagePercent.toStringAsFixed(0)}%';
+    final loadAvgValue = metrics.load1m.toStringAsFixed(2);
+    final memoryValue = metrics.totalMemoryBytes > 0
+        ? '${metrics.memoryUsagePercent.toStringAsFixed(0)}%'
         : 'N/A';
 
     return Card(
@@ -766,134 +760,155 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return FutureBuilder<List<Client>>(
-      future: appState.fetchClientsForSelectedRouter(),
-      builder: (context, snapshot) {
-        final clients = snapshot.data ?? [];
-        final connectedClients = clients.where((c) => c.isConnected).toList();
-        final wiredCount = connectedClients.where((c) => c.connectionType == ConnectionType.wired).length;
-        final wirelessCount = connectedClients.where((c) => c.connectionType == ConnectionType.wireless).length;
-        final isLoading = snapshot.connectionState == ConnectionState.waiting && clients.isEmpty;
+    final clients = appState.clients;
+    final connectedClients = clients.where((c) => c.isConnected).toList();
+    final wiredCount = connectedClients.where((c) => c.connectionType == ConnectionType.wired).length;
+    final wirelessCount = connectedClients.where((c) => c.connectionType == ConnectionType.wireless).length;
+    final isLoading = !appState.hasFetchedClients && (appState.isDashboardLoading || appState.isClientsLoading);
 
-        Widget buildCountText(int count) {
-          if (isLoading) {
-            return Align(
-              alignment: Alignment.centerLeft,
-              child: SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: colorScheme.primary,
-                ),
-              ),
-            );
-          }
-          return Text(
-            '$count Connected',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          );
-        }
-
-        return Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          margin: const EdgeInsets.symmetric(vertical: 4.0),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(18),
-            onTap: () {
-              appState.requestedTab = 2;
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 16.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: colorScheme.secondaryContainer.withValues(alpha: 0.7),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.lan,
-                            color: colorScheme.onSecondaryContainer,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Wired Clients',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              buildCountText(wiredCount),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    width: 1,
-                    height: 36,
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.3),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer.withValues(alpha: 0.7),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.wifi,
-                            color: colorScheme.onPrimaryContainer,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Wireless Clients',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              buildCountText(wirelessCount),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                  ),
-                ],
-              ),
+    Widget buildCountText(int count) {
+      if (isLoading) {
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: colorScheme.primary,
             ),
           ),
         );
-      },
+      }
+      return Text(
+        '$count Connected',
+        style: theme.textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.bold,
+        ),
+      );
+    }
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      margin: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Padding(
+        padding: const EdgeInsets.all(4.0),
+        child: Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(14),
+                  bottomLeft: Radius.circular(14),
+                ),
+                onTap: () {
+                  appState.requestTab(2, clientCategoryFilter: ClientCategoryFilter.wired);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 12.0),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: colorScheme.secondaryContainer.withValues(alpha: 0.7),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.lan,
+                          color: colorScheme.onSecondaryContainer,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Wired Clients',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            buildCountText(wiredCount),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Container(
+              width: 1,
+              height: 36,
+              color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+            ),
+            Expanded(
+              child: InkWell(
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(14),
+                  bottomRight: Radius.circular(14),
+                ),
+                onTap: () {
+                  appState.requestTab(2, clientCategoryFilter: ClientCategoryFilter.wireless);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 12.0),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primaryContainer.withValues(alpha: 0.7),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.wifi,
+                          color: colorScheme.onPrimaryContainer,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Wireless Clients',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            buildCountText(wirelessCount),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () {
+                appState.requestTab(2, clientCategoryFilter: ClientCategoryFilter.all);
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Icon(
+                  Icons.chevron_right_rounded,
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1149,27 +1164,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 ],
                               ),
                               PopupMenuButton<String>(
+                                tooltip: '',
                                 icon: const Icon(Icons.more_vert, size: 20),
                                 onSelected: (val) async {
                                   Navigator.pop(context);
+                                  final actionKey = 'pause_internet_${st.macAddress}';
                                   final isPaused = appState.isInternetPaused(st.macAddress);
                                   if (val == 'pause') {
+                                    context.showToastLoading(
+                                      '${!isPaused ? "Pausing" : "Resuming"} internet access...',
+                                      subtitle: 'Target: $hostname',
+                                      actionKey: actionKey,
+                                    );
                                     final res = await appState.pauseClientInternet(
                                       st.macAddress,
                                       pause: !isPaused,
                                       context: context,
                                     );
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            res
-                                                ? 'Internet ${!isPaused ? "paused" : "restored"} for $hostname.'
-                                                : 'Failed to update internet access for $hostname.',
-                                          ),
-                                          backgroundColor: res ? Colors.green : Colors.red,
-                                        ),
-                                      );
+                                      if (res) {
+                                        context.showToastSuccess(
+                                          'Internet ${!isPaused ? "paused" : "restored"} for $hostname.',
+                                          actionKey: actionKey,
+                                        );
+                                      } else {
+                                        context.showToastError(
+                                          'Failed to update internet access for $hostname.',
+                                          actionKey: actionKey,
+                                        );
+                                      }
                                     }
                                   }
                                 },
@@ -1740,7 +1763,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildBody(AppState appState) {
-    if (appState.dashboardError != null) {
+    if (appState.dashboardError != null && appState.dashboardData == null) {
       return LuciErrorDisplay(
         title: 'Connection Failed',
         message:
@@ -1802,8 +1825,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                child: LuciStaggeredAnimation(
-                  staggerDelay: const Duration(milliseconds: 50),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: landscapeContent,
                 ),
               ),
@@ -1907,11 +1930,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     color: Theme.of(context).colorScheme.onErrorContainer,
                     size: 18,
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _dismissedRpcWarning = true;
-                    });
-                  },
+                  onPressed: _dismissRpcWarning,
                   tooltip: 'Dismiss',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -1931,17 +1950,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () async {
+                      const actionKey = 'rpc_autofix';
+                      context.showToastLoading(
+                        'Installing RPC packages...',
+                        subtitle: 'Fixing router RPC permissions & modules...',
+                        actionKey: actionKey,
+                      );
                       final success = await appState.autoFixPermissions(context: context);
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              success
-                                  ? 'RPC packages and permissions installed successfully!'
-                                  : 'Auto-install failed. Tap "Manual Info" for shell commands.',
-                            ),
-                          ),
-                        );
+                        if (success) {
+                          context.showToastSuccess(
+                            'RPC Installed',
+                            subtitle: 'RPC packages and permissions installed successfully!',
+                            actionKey: actionKey,
+                          );
+                        } else {
+                          context.showToastError(
+                            'Auto-Install Failed',
+                            subtitle: 'Tap "Manual Info" for shell commands.',
+                            actionKey: actionKey,
+                          );
+                        }
                       }
                     },
                     icon: const Icon(Icons.build_circle_outlined, size: 18),

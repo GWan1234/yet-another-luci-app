@@ -4,6 +4,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:yet_another_luci_app/utils/os_platform_integration.dart';
+import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 import '../main.dart';
 
 class RestrictedClientsScreen extends ConsumerStatefulWidget {
@@ -65,52 +67,48 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
   }
 
   Future<void> _handleUnpause(String mac, String name) async {
+    final actionKey = 'unpause_$mac';
     final appState = ref.read(appStateProvider);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Resuming internet for $name...')),
+      context.showToastLoading(
+        'Resuming internet for $name...',
+        actionKey: actionKey,
       );
     }
 
     final success = await appState.pauseClientInternet(mac, pause: false, context: context);
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          success ? 'Internet restored for $name.' : 'Failed to restore internet for $name.',
-        ),
-        backgroundColor: success ? Colors.green : Colors.red,
-      ),
-    );
-
     if (success) {
+      unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
+      context.showToastSuccess('Internet restored for $name.', actionKey: actionKey);
       await _fetchLiveData();
+    } else {
+      unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
+      context.showToastError('Failed to restore internet for $name.', actionKey: actionKey);
     }
   }
 
   Future<void> _handleUnban(String mac, String name) async {
+    final actionKey = 'unban_$mac';
     final appState = ref.read(appStateProvider);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unbanning Wi-Fi access for $name...')),
+      context.showToastLoading(
+        'Unbanning Wi-Fi access for $name...',
+        actionKey: actionKey,
       );
     }
 
     final success = await appState.unbanWirelessClient(mac, context: context);
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          success ? 'Client $name unbanned successfully.' : 'Failed to unban client $name.',
-        ),
-        backgroundColor: success ? Colors.green : Colors.red,
-      ),
-    );
-
     if (success) {
+      unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
+      context.showToastSuccess('Client $name unbanned successfully.', actionKey: actionKey);
       await _fetchLiveData();
+    } else {
+      unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
+      context.showToastError('Failed to unban client $name.', actionKey: actionKey);
     }
   }
 

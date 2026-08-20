@@ -3,8 +3,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/main.dart';
-import 'package:luci_mobile/models/router_capabilities.dart';
+import 'package:yet_another_luci_app/main.dart';
+import 'package:yet_another_luci_app/models/router_capabilities.dart';
 import '../models/firewall_info.dart';
 
 class FirewallSecurityCard extends ConsumerWidget {

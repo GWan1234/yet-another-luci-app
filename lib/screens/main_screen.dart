@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'package:flutter/material.dart';
-import 'package:luci_mobile/screens/dashboard_screen.dart';
-import 'package:luci_mobile/screens/clients_screen.dart';
-import 'package:luci_mobile/screens/interfaces_screen.dart';
-import 'package:luci_mobile/screens/more_screen.dart';
-import 'package:luci_mobile/modules/wireless_management/screens/wireless_management_screen.dart';
-import 'package:luci_mobile/main.dart';
-import 'package:luci_mobile/widgets/luci_navigation_enhancements.dart';
+import 'package:yet_another_luci_app/screens/dashboard_screen.dart';
+import 'package:yet_another_luci_app/screens/clients_screen.dart';
+import 'package:yet_another_luci_app/screens/interfaces_screen.dart';
+import 'package:yet_another_luci_app/screens/more_screen.dart';
+import 'package:yet_another_luci_app/modules/wireless_management/screens/wireless_management_screen.dart';
+import 'package:yet_another_luci_app/main.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:yet_another_luci_app/widgets/scroll_jitter_guard.dart';
 
 class MainScreen extends ConsumerStatefulWidget {
   final int? initialTab;
@@ -24,13 +24,15 @@ class MainScreen extends ConsumerStatefulWidget {
 class _MainScreenState extends ConsumerState<MainScreen> {
   int _selectedIndex = 0;
   String? _currentInterfaceToScroll;
+  final Set<int> _activatedTabs = {0};
 
   @override
   void initState() {
     super.initState();
     if (widget.initialTab != null) {
-      _selectedIndex = widget.initialTab!;
+      _selectedIndex = widget.initialTab!.clamp(0, 4);
     }
+    _activatedTabs.add(_selectedIndex);
     _currentInterfaceToScroll = widget.interfaceToScroll;
   }
 
@@ -44,7 +46,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
     if (widget.initialTab != oldWidget.initialTab &&
         widget.initialTab != null) {
-      _selectedIndex = widget.initialTab!;
+      _selectedIndex = widget.initialTab!.clamp(0, 4);
+      _activatedTabs.add(_selectedIndex);
     }
   }
 
@@ -56,20 +59,13 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     }
   }
 
-  List<Widget> get _widgetOptions => [
-    const DashboardScreen(),
-    InterfacesScreen(
-      scrollToInterface: _currentInterfaceToScroll,
-      onScrollComplete: _clearInterfaceToScroll,
-    ),
-    const ClientsScreen(),
-    const WirelessManagementScreen(),
-    const MoreScreen(),
-  ];
-
   void _onItemTapped(int index) {
+    FocusScope.of(context).unfocus();
+    final safeIndex = index.clamp(0, 4);
+    if (_selectedIndex == safeIndex) return;
     setState(() {
-      _selectedIndex = index;
+      _selectedIndex = safeIndex;
+      _activatedTabs.add(safeIndex);
     });
 
     if (_selectedIndex != 1 && _currentInterfaceToScroll != null) {
@@ -82,12 +78,14 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     final appState = ref.watch(appStateProvider);
     if (appState.requestedTab != null &&
         appState.requestedTab != _selectedIndex) {
-      final requestedTab = appState.requestedTab!;
+      final safeRequestedTab = appState.requestedTab!.clamp(0, 4);
       final requestedInterface = appState.requestedInterfaceToScroll;
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        FocusScope.of(context).unfocus();
         setState(() {
-          _selectedIndex = requestedTab;
+          _selectedIndex = safeRequestedTab;
+          _activatedTabs.add(safeRequestedTab);
           if (requestedInterface != null) {
             _currentInterfaceToScroll = requestedInterface;
           }
@@ -101,10 +99,21 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      body: Center(
-        child: LuciTabTransition(
-          transitionKey: 'tab_$_selectedIndex',
-          child: _widgetOptions.elementAt(_selectedIndex),
+      body: ScrollJitterGuard(
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: [
+            _activatedTabs.contains(0) ? const DashboardScreen() : const SizedBox.shrink(),
+            _activatedTabs.contains(1)
+                ? InterfacesScreen(
+                    scrollToInterface: _currentInterfaceToScroll,
+                    onScrollComplete: _clearInterfaceToScroll,
+                  )
+                : const SizedBox.shrink(),
+            _activatedTabs.contains(2) ? const ClientsScreen() : const SizedBox.shrink(),
+            _activatedTabs.contains(3) ? const WirelessManagementScreen() : const SizedBox.shrink(),
+            _activatedTabs.contains(4) ? const MoreScreen() : const SizedBox.shrink(),
+          ],
         ),
       ),
       bottomNavigationBar: SafeArea(
@@ -146,6 +155,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                             icon: Icons.people_outline,
                             selectedIcon: Icons.people,
                             isRebooting: isRebooting,
+                            badgeCount: appState.clients.where((c) => c.isConnected).length,
                           ),
                         ],
                       ),
@@ -179,54 +189,57 @@ class _MainScreenState extends ConsumerState<MainScreen> {
               ),
 
               // Solid Flat Matt Circular Center Dashboard Badge Button (Index 0)
-              Positioned(
-                top: -12,
-                child: GestureDetector(
-                  onTap: () {
-                    if (isRebooting) return;
-                    _onItemTapped(0);
-                  },
-                  behavior: HitTestBehavior.opaque,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _selectedIndex == 0
-                              ? colorScheme.primary
-                              : colorScheme.surfaceContainerHigh,
-                          border: Border.all(
-                            color: colorScheme.surface,
-                            width: 3,
+              Align(
+                alignment: Alignment.topCenter,
+                child: Transform.translate(
+                  offset: const Offset(0, -12),
+                  child: GestureDetector(
+                    onTap: () {
+                      if (isRebooting) return;
+                      _onItemTapped(0);
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _selectedIndex == 0
+                                ? colorScheme.primary
+                                : colorScheme.surfaceContainerHigh,
+                            border: Border.all(
+                              color: colorScheme.surface,
+                              width: 3,
+                            ),
+                          ),
+                          child: Icon(
+                            _selectedIndex == 0
+                                ? Icons.dashboard_rounded
+                                : Icons.dashboard_outlined,
+                            color: _selectedIndex == 0
+                                ? colorScheme.onPrimary
+                                : colorScheme.onSurfaceVariant,
+                            size: 24,
                           ),
                         ),
-                        child: Icon(
-                          _selectedIndex == 0
-                              ? Icons.dashboard_rounded
-                              : Icons.dashboard_outlined,
-                          color: _selectedIndex == 0
-                              ? colorScheme.onPrimary
-                              : colorScheme.onSurfaceVariant,
-                          size: 24,
+                        const SizedBox(height: 2),
+                        Text(
+                          'Dashboard',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: _selectedIndex == 0
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: _selectedIndex == 0
+                                ? colorScheme.primary
+                                : colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Dashboard',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: _selectedIndex == 0
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                          color: _selectedIndex == 0
-                              ? colorScheme.primary
-                              : colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -243,6 +256,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     required IconData icon,
     required IconData selectedIcon,
     required bool isRebooting,
+    int? badgeCount,
   }) {
     final isSelected = _selectedIndex == index;
     final colorScheme = Theme.of(context).colorScheme;
@@ -250,30 +264,66 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         ? colorScheme.onSurface.withValues(alpha: 0.38)
         : (isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant);
 
-    return InkWell(
-      onTap: isRebooting ? null : () => _onItemTapped(index),
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isSelected ? selectedIcon : icon,
-              color: color,
-              size: 24,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: color,
+    final semanticText = '$label, tab ${index + 1} of 5. ${isSelected ? "Currently active tab." : "Double tap to switch to $label."}';
+
+    return Semantics(
+      selected: isSelected,
+      button: true,
+      label: semanticText,
+      child: InkWell(
+        onTap: isRebooting ? null : () => _onItemTapped(index),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(
+                    isSelected ? selectedIcon : icon,
+                    color: color,
+                    size: 24,
+                  ),
+                  if (badgeCount != null && badgeCount > 0)
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: Transform.translate(
+                        offset: const Offset(8, -4),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: isSelected ? colorScheme.primary : colorScheme.secondary,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                          child: Text(
+                            badgeCount > 99 ? '99+' : '$badgeCount',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onPrimary,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -11,20 +11,22 @@
 -keep class com.nightcode.luci.MainActivity { *; }
 -keep class io.flutter.plugins.GeneratedPluginRegistrant { *; }
 
-# Flutter Plugins
+# Flutter Plugins (Future-proofed wildcard rules for any newly added pubspec plugins)
 -keep class com.it_ne.flutter_secure_storage.** { *; }
 -keep class androidx.security.crypto.** { *; }
 -keep class dev.flutter.plugins.** { *; }
--keep class io.flutter.plugins.pathprovider.** { *; }
--keep class io.flutter.plugins.packageinfo.** { *; }
--keep class io.flutter.plugins.urllauncher.** { *; }
--keep class io.flutter.plugins.googlemobileads.** { *; }
--keep class io.flutter.plugins.inapppurchase.** { *; }
+-keep class io.flutter.plugins.** { *; }
 
-# Riverpod & State Management
--keep class flutter_riverpod.** { *; }
+# Anti-Decompilation, Obfuscation & APK Parser Protection
+-repackageclasses ''
+-allowaccessmodification
+-renamesourcefileattribute SourceFile
+-keepattributes !SourceFile,!LineNumberTable,!LocalVariableTable,!LocalVariableTypeTable
+-useuniqueclassmembernames
 
-# Dio & HTTP Networking
--dontwarn dio.**
--dontwarn okhttp3.**
--dontwarn okio.**
+# Strip Debug Logging in Release Bytecode
+-assumenosideeffects class android.util.Log {
+    public static *** d(...);
+    public static *** v(...);
+    public static *** i(...);
+}

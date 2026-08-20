@@ -106,20 +106,26 @@ class NetworkTopologyCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      isDsa ? Icons.hub_outlined : Icons.settings_input_component,
-                      color: colorScheme.primary,
-                      size: 22,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      isDsa ? 'DSA Switch Topology' : 'Legacy swconfig Topology',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ],
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(
+                        isDsa ? Icons.hub_outlined : Icons.settings_input_component,
+                        color: colorScheme.primary,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          isDsa ? 'DSA Switch Topology' : 'Legacy swconfig Topology',
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
@@ -185,9 +191,12 @@ class NetworkTopologyCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                vlan.name,
-                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              Expanded(
+                child: Text(
+                  vlan.name,
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),

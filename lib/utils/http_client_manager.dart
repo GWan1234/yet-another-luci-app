@@ -73,15 +73,15 @@ class HttpClientManager {
   }) {
     final dio = Dio(
       BaseOptions(
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 15),
-        sendTimeout: const Duration(seconds: 15),
+        connectTimeout: const Duration(seconds: 5),
+        receiveTimeout: const Duration(seconds: 8),
+        sendTimeout: const Duration(seconds: 8),
         followRedirects: true,
         // Status is validated per request when needed (e.g., handle 302 on login)
       ),
     );
 
-    // Only log request errors; suppress per-request debug noise
+    // Automatically evict dead cached clients on socket/connection errors
     dio.interceptors.add(
       InterceptorsWrapper(
         onError: (e, handler) {
@@ -90,25 +90,35 @@ class HttpClientManager {
             e,
             e.stackTrace,
           );
+
+          if (e.type == DioExceptionType.connectionTimeout ||
+              e.type == DioExceptionType.sendTimeout ||
+              e.type == DioExceptionType.receiveTimeout ||
+              e.type == DioExceptionType.connectionError ||
+              e.error is SocketException) {
+            Logger.info('Network transition or socket failure detected for $host. Evicting stale client.');
+            disposeClient(host, useHttps);
+          }
+
           handler.next(e);
         },
       ),
     );
 
-    if (useHttps) {
-      final adapter = IOHttpClientAdapter();
-      adapter.createHttpClient = () {
-        final httpClient = HttpClient();
-        httpClient.connectionTimeout = const Duration(seconds: 10);
+    final adapter = IOHttpClientAdapter();
+    adapter.createHttpClient = () {
+      final httpClient = HttpClient();
+      httpClient.connectionTimeout = const Duration(seconds: 5);
+      if (useHttps) {
         httpClient.badCertificateCallback = (cert, certHost, port) {
           final certKey = '$certHost:$port';
           // Allow only if previously accepted
           return _userAcceptedCerts[certKey] == true;
         };
-        return httpClient;
-      };
-      dio.httpClientAdapter = adapter;
-    }
+      }
+      return httpClient;
+    };
+    dio.httpClientAdapter = adapter;
 
     return dio;
   }

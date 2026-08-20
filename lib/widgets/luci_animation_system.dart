@@ -24,12 +24,12 @@ class LuciAdvancedAnimations {
     milliseconds: 750,
   ); // Multi-step animations
 
-  // Advanced curves for specific interactions
-  static const Curve bounceIn = Curves.elasticOut;
+  // Advanced curves for specific interactions (smooth, non-jittery)
+  static const Curve bounceIn = Curves.easeOutCubic;
   static const Curve smoothEase = Curves.easeInOutCubic;
-  static const Curve quickSnap = Curves.easeOutBack;
+  static const Curve quickSnap = Curves.easeOutCubic;
   static const Curve gentleFloat = Curves.easeInOutSine;
-  static const Curve sharpPop = Curves.easeOutExpo;
+  static const Curve sharpPop = Curves.easeOutQuad;
 
   // Spring physics for natural feeling animations
   static const SpringDescription gentleSpring = SpringDescription(
@@ -177,7 +177,7 @@ class _LuciSlideTransitionState extends State<LuciSlideTransition>
         .animate(
           CurvedAnimation(
             parent: _controller,
-            curve: widget.bounce ? Curves.elasticOut : widget.curve,
+            curve: widget.bounce ? Curves.easeOutCubic : widget.curve,
           ),
         );
 
@@ -247,20 +247,10 @@ class _LuciScaleTransitionState extends State<LuciScaleTransition>
     super.initState();
     _controller = AnimationController(duration: widget.duration, vsync: this);
 
-    if (widget.useSpringPhysics) {
-      _scaleAnimation = Tween<double>(
-        begin: widget.initialScale,
-        end: widget.finalScale,
-      ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
-    } else {
-      _scaleAnimation =
-          Tween<double>(
-            begin: widget.initialScale,
-            end: widget.finalScale,
-          ).animate(
-            CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
-          );
-    }
+    _scaleAnimation = Tween<double>(
+      begin: widget.initialScale,
+      end: widget.finalScale,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
     if (widget.delay > Duration.zero) {
       Future.delayed(widget.delay, () {
@@ -487,8 +477,8 @@ class LuciPageTransition extends PageRouteBuilder {
   LuciPageTransition({
     required this.child,
     this.transitionType = LuciTransitionType.slideRight,
-    this.duration = const Duration(milliseconds: 400),
-    this.curve = Curves.easeInOutCubic,
+    this.duration = const Duration(milliseconds: 300),
+    this.curve = Curves.fastOutSlowIn,
   }) : super(
          pageBuilder: (context, animation, secondaryAnimation) => child,
          transitionDuration: duration,

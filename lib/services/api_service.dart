@@ -8,9 +8,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
-import 'package:luci_mobile/services/interfaces/api_service_interface.dart';
+import 'package:yet_another_luci_app/modules/services_system/models/ddns_info.dart';
+import 'package:yet_another_luci_app/services/interfaces/api_service_interface.dart';
 import '../utils/http_client_manager.dart';
 import '../utils/logger.dart';
+import '../widgets/luci_toast.dart';
 
 class LoginResult {
   final String? token;
@@ -378,6 +380,9 @@ class RealApiService implements IApiService {
           data: jsonEncode(rpcPayload),
           options: Options(
             headers: {'Content-Type': 'application/json'},
+            responseDecoder: (responseBytes, options, responseBody) {
+              return utf8.decode(responseBytes, allowMalformed: true);
+            },
             validateStatus: (status) => status != null && status < 500,
           ),
         );
@@ -1525,12 +1530,10 @@ exit 0
 
     // If used for the FIRST time (rule didn't exist before), notify the user as requested
     if (!ruleExisted && context != null && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Created firewall rule "$ruleName" to restrict client $macUpper'),
-          duration: const Duration(seconds: 4),
-          backgroundColor: Colors.blue.shade800,
-        ),
+      context.showToastInfo(
+        'Firewall Rule Created',
+        subtitle: 'Created firewall rule "$ruleName" to restrict client $macUpper',
+        duration: const Duration(seconds: 4),
       );
     }
 
@@ -2782,6 +2785,265 @@ rm -f "$leasePath" /tmp/dhcp.leases /var/dhcp.leases /tmp/dnsmasq.leases /var/li
       return executedAny;
     } catch (e, stack) {
       Logger.exception('forceRefreshDhcpLeases failed', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> saveCronJobs(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required List<String> cronLines,
+    BuildContext? context,
+  }) async {
+    try {
+      final sanitizedLines = cronLines
+          .map((l) => l.trim())
+          .where((l) => l.isNotEmpty)
+          .toList();
+      final content = sanitizedLines.isEmpty ? '' : '${sanitizedLines.join('\n')}\n';
+
+      // 1. Write the crontab file to /etc/crontabs/root
+      final writeRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'file',
+        method: 'write',
+        params: {
+          'path': '/etc/crontabs/root',
+          'data': content,
+        },
+        context: mountedContext(context),
+      );
+
+      final success = execSucceeded(writeRes);
+
+      if (success) {
+        // 2. Restart the cron daemon service so changes take effect immediately
+        try {
+          await manageServiceAction(
+            ipAddress,
+            sysauth,
+            useHttps,
+            serviceName: 'cron',
+            action: 'restart',
+            context: mountedContext(context),
+          );
+        } catch (_) {}
+      }
+
+      return success;
+    } catch (e, stack) {
+      Logger.exception('saveCronJobs failed', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> saveDdnsInstance(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required DdnsInstance instance,
+    BuildContext? context,
+  }) async {
+    try {
+      final setRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'set',
+        params: {
+          'config': 'ddns',
+          'section': instance.name,
+          'type': 'service',
+          'values': instance.toUciParams(),
+        },
+        context: mountedContext(context),
+      );
+
+      if (!execSucceeded(setRes)) return false;
+
+      await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'commit',
+        params: {'config': 'ddns'},
+        context: mountedContext(context),
+      );
+
+      try {
+        await manageServiceAction(
+          ipAddress,
+          sysauth,
+          useHttps,
+          serviceName: 'ddns',
+          action: 'reload',
+          context: mountedContext(context),
+        );
+      } catch (_) {}
+
+      return true;
+    } catch (e, stack) {
+      Logger.exception('saveDdnsInstance failed', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> deleteDdnsInstance(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String instanceName,
+    BuildContext? context,
+  }) async {
+    try {
+      final delRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'delete',
+        params: {
+          'config': 'ddns',
+          'section': instanceName,
+        },
+        context: mountedContext(context),
+      );
+
+      if (!execSucceeded(delRes)) return false;
+
+      await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'commit',
+        params: {'config': 'ddns'},
+        context: mountedContext(context),
+      );
+
+      try {
+        await manageServiceAction(
+          ipAddress,
+          sysauth,
+          useHttps,
+          serviceName: 'ddns',
+          action: 'reload',
+          context: mountedContext(context),
+        );
+      } catch (_) {}
+
+      return true;
+    } catch (e, stack) {
+      Logger.exception('deleteDdnsInstance failed', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<DdnsValidationResult> testDdnsConfiguration(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required DdnsInstance instance,
+    BuildContext? context,
+  }) async {
+    try {
+      if (instance.lookupHost.isEmpty && instance.domain.isEmpty) {
+        return DdnsValidationResult.failure('Lookup Hostname / Domain cannot be empty.');
+      }
+
+      final hostToTest = instance.lookupHost.isNotEmpty ? instance.lookupHost : instance.domain;
+
+      final rpcRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': 'nslookup',
+          'params': [hostToTest],
+        },
+        context: mountedContext(context),
+      );
+
+      final stdout = rpcRes is Map ? rpcRes['stdout']?.toString() ?? '' : '';
+      final stderr = rpcRes is Map ? rpcRes['stderr']?.toString() ?? '' : '';
+      final combined = '$stdout\n$stderr'.trim();
+
+      if (combined.contains('Address:') || combined.contains('Name:')) {
+        return DdnsValidationResult.success(
+          testOutput: 'DNS Lookup Successful:\n$combined',
+        );
+      } else if (combined.contains("can't find") || combined.contains('NXDOMAIN') || combined.contains('ServFail')) {
+        return DdnsValidationResult.failure(
+          'Hostname DNS lookup failed ($hostToTest). Ensure domain exists or is registered.',
+          testOutput: combined,
+        );
+      }
+
+      return DdnsValidationResult.success(
+        testOutput: 'Configuration passed basic validation checks.\n$combined',
+      );
+    } catch (e) {
+      return DdnsValidationResult.failure('Validation test execution error: $e');
+    }
+  }
+
+  @override
+  Future<bool> toggleGlobalDdns(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required bool enable,
+    BuildContext? context,
+  }) async {
+    try {
+      await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'set',
+        params: {
+          'config': 'ddns',
+          'section': 'global',
+          'type': 'global',
+          'values': {'is_enabled': enable ? '1' : '0'},
+        },
+        context: mountedContext(context),
+      );
+
+      await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'commit',
+        params: {'config': 'ddns'},
+        context: mountedContext(context),
+      );
+
+      await manageServiceAction(
+        ipAddress,
+        sysauth,
+        useHttps,
+        serviceName: 'ddns',
+        action: enable ? 'start' : 'stop',
+        context: mountedContext(context),
+      );
+
+      return true;
+    } catch (e, stack) {
+      Logger.exception('toggleGlobalDdns failed', e, stack);
       return false;
     }
   }

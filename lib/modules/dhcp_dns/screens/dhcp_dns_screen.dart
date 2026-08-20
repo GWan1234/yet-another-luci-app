@@ -3,9 +3,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/main.dart';
-import 'package:luci_mobile/widgets/add_static_lease_dialog.dart';
+import 'package:yet_another_luci_app/main.dart';
+import 'package:yet_another_luci_app/widgets/add_static_lease_dialog.dart';
 import '../models/dhcp_dns_info.dart';
+
+import 'package:yet_another_luci_app/widgets/luci_collapsible_card.dart';
+import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 
 class DhcpDnsScreen extends ConsumerWidget {
   const DhcpDnsScreen({super.key});
@@ -41,23 +44,28 @@ class DhcpDnsScreen extends ConsumerWidget {
             const SizedBox(height: 8),
             _buildDnsConfigCard(context, overview.dnsConfig),
             const SizedBox(height: 16),
-            _buildSectionHeader(context, 'Active DHCP Leases', Icons.badge_outlined),
-            const SizedBox(height: 8),
-            _buildLeasesList(context, ref, overview.activeLeases, overview.staticMappings),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildSectionHeader(context, 'Static IP Reservations (Host Mappings)', Icons.pin_drop_outlined),
-                TextButton.icon(
-                  onPressed: () => _showAddStaticLeaseDialog(context, ref),
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Add Static', style: TextStyle(fontSize: 12)),
-                ),
-              ],
+            LuciCollapsibleCard(
+              title: 'Active DHCP Leases',
+              count: overview.activeLeases.length,
+              subtitle: '${overview.activeLeases.length} active client leases • Tap to expand',
+              icon: Icons.badge_outlined,
+              iconColor: Colors.blue,
+              child: _buildLeasesList(context, ref, overview.activeLeases, overview.staticMappings),
             ),
-            const SizedBox(height: 8),
-            _buildStaticMappingsList(context, ref, overview.staticMappings),
+            const SizedBox(height: 16),
+            LuciCollapsibleCard(
+              title: 'Static IP Reservations',
+              count: overview.staticMappings.length,
+              subtitle: '${overview.staticMappings.length} static IP mappings configured • Tap to expand',
+              icon: Icons.pin_drop_outlined,
+              iconColor: Colors.teal,
+              trailingAction: IconButton(
+                icon: const Icon(Icons.add_circle_outline, color: Colors.teal),
+                tooltip: 'Add Static Lease',
+                onPressed: () => _showAddStaticLeaseDialog(context, ref),
+              ),
+              child: _buildStaticMappingsList(context, ref, overview.staticMappings),
+            ),
             const SizedBox(height: 32),
           ],
         ),
@@ -90,15 +98,15 @@ class DhcpDnsScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildDetailRow('Local Domain Name', '.${config.localDomain}'),
+            _buildDetailRow(context, 'Local Domain Name', '.${config.localDomain}'),
             const Divider(height: 16),
-            _buildDetailRow('Upstream DNS Forwarders', config.upstreamDnsServers.join(', ')),
+            _buildDetailRow(context, 'Upstream DNS Forwarders', config.upstreamDnsServers.join(', ')),
             const Divider(height: 16),
-            _buildDetailRow('Rebind Protection', config.rebindProtection ? 'ENABLED' : 'DISABLED'),
+            _buildDetailRow(context, 'Rebind Protection', config.rebindProtection ? 'ENABLED' : 'DISABLED'),
             const Divider(height: 16),
-            _buildDetailRow('Domain Needed (Strict Order)', config.domainNeeded ? 'ENABLED' : 'DISABLED'),
+            _buildDetailRow(context, 'Domain Needed (Strict Order)', config.domainNeeded ? 'ENABLED' : 'DISABLED'),
             const Divider(height: 16),
-            _buildDetailRow('Authoritative Mode', config.authoritative ? 'ENABLED' : 'DISABLED'),
+            _buildDetailRow(context, 'Authoritative Mode', config.authoritative ? 'ENABLED' : 'DISABLED'),
           ],
         ),
       ),
@@ -117,8 +125,22 @@ class DhcpDnsScreen extends ConsumerWidget {
       );
     }
 
-    return Column(
-      children: leases.map((lease) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      // ignore: deprecated_member_use
+      cacheExtent: 250.0,
+      itemCount: leases.length,
+      // ignore: deprecated_member_use
+      findChildIndexCallback: (Key key) {
+        if (key is ValueKey<String>) {
+          final index = leases.indexWhere((l) => l.macAddress == key.value);
+          return index != -1 ? index : null;
+        }
+        return null;
+      },
+      itemBuilder: (context, index) {
+        final lease = leases[index];
         final normLeaseMac = lease.macAddress.toUpperCase().replaceAll('-', ':');
         final normLeaseIp = lease.ipAddress.trim();
 
@@ -135,6 +157,7 @@ class DhcpDnsScreen extends ConsumerWidget {
         final isStatic = matchingStatic != null;
 
         return Card(
+          key: ValueKey<String>(lease.macAddress),
           margin: const EdgeInsets.only(bottom: 8),
           elevation: 1,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -181,7 +204,7 @@ class DhcpDnsScreen extends ConsumerWidget {
             ),
           ),
         );
-      }).toList(),
+      },
     );
   }
 
@@ -192,9 +215,24 @@ class DhcpDnsScreen extends ConsumerWidget {
       );
     }
 
-    return Column(
-      children: mappings.map((mapping) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      // ignore: deprecated_member_use
+      cacheExtent: 250.0,
+      itemCount: mappings.length,
+      // ignore: deprecated_member_use
+      findChildIndexCallback: (Key key) {
+        if (key is ValueKey<String>) {
+          final index = mappings.indexWhere((m) => m.macAddress == key.value);
+          return index != -1 ? index : null;
+        }
+        return null;
+      },
+      itemBuilder: (context, index) {
+        final mapping = mappings[index];
         return Card(
+          key: ValueKey<String>(mapping.macAddress),
           margin: const EdgeInsets.only(bottom: 8),
           elevation: 1,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -231,11 +269,18 @@ class DhcpDnsScreen extends ConsumerWidget {
             ),
           ),
         );
-      }).toList(),
+      },
     );
   }
 
   Future<void> _confirmDeleteStaticLease(BuildContext context, WidgetRef ref, DhcpStaticMapping mapping) async {
+    if (ActionRateLimiter.isRateLimited('delete_static_lease_${mapping.macAddress}', cooldown: const Duration(milliseconds: 1200))) {
+      if (context.mounted) {
+        context.showToastWarning('Removal in progress. Please wait a moment...');
+      }
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -281,12 +326,8 @@ class DhcpDnsScreen extends ConsumerWidget {
     );
 
     if (confirmed == true && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Removing static lease for ${mapping.hostname}...'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      final actionKey = 'delete_static_lease_${mapping.macAddress}';
+      context.showToastLoading('Removing static lease for ${mapping.hostname}...', actionKey: actionKey);
 
       final appState = ref.read(appStateProvider);
       final success = await appState.deleteStaticLease(
@@ -302,16 +343,11 @@ class DhcpDnsScreen extends ConsumerWidget {
 
       if (!context.mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            success
-                ? 'Static lease removed for ${mapping.hostname}.'
-                : 'Failed to remove static lease for ${mapping.hostname}.',
-          ),
-          backgroundColor: success ? Colors.green : Colors.red,
-        ),
-      );
+      if (success) {
+        context.showToastSuccess('Static lease removed for ${mapping.hostname}.', actionKey: actionKey);
+      } else {
+        context.showToastError('Failed to remove static lease for ${mapping.hostname}.', actionKey: actionKey);
+      }
     }
   }
 
@@ -340,12 +376,33 @@ class DhcpDnsScreen extends ConsumerWidget {
 
 
 
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(BuildContext context, String label, String value) {
+    final theme = Theme.of(context);
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+        SizedBox(
+          width: 120,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontSize: 13,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: SelectableText(
+            value,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              color: theme.colorScheme.onSurface,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+        ),
       ],
     );
   }

@@ -136,21 +136,60 @@ class InitScript {
 class CronJob {
   final String expression;
   final String command;
+  final bool isCommented;
+  final String rawLine;
 
   const CronJob({
     required this.expression,
     required this.command,
+    this.isCommented = false,
+    required this.rawLine,
   });
+
+  CronJob copyWith({
+    String? expression,
+    String? command,
+    bool? isCommented,
+    String? rawLine,
+  }) {
+    final newExpr = expression ?? this.expression;
+    final newCmd = command ?? this.command;
+    final newCommented = isCommented ?? this.isCommented;
+    final line = '$newExpr $newCmd';
+    return CronJob(
+      expression: newExpr,
+      command: newCmd,
+      isCommented: newCommented,
+      rawLine: newCommented ? '# $line' : line,
+    );
+  }
 
   factory CronJob.fromCronLine(String line) {
     final trimmed = line.trim();
-    final parts = trimmed.split(RegExp(r'\s+'));
+    final isCommented = trimmed.startsWith('#');
+    final clean = isCommented ? trimmed.substring(1).trim() : trimmed;
+    final parts = clean.split(RegExp(r'\s+'));
     if (parts.length >= 6) {
       final expr = parts.sublist(0, 5).join(' ');
       final cmd = parts.sublist(5).join(' ');
-      return CronJob(expression: expr, command: cmd);
+      return CronJob(
+        expression: expr,
+        command: cmd,
+        isCommented: isCommented,
+        rawLine: trimmed,
+      );
     }
-    return CronJob(expression: '* * * * *', command: trimmed);
+    return CronJob(
+      expression: '* * * * *',
+      command: clean.isEmpty ? line : clean,
+      isCommented: isCommented,
+      rawLine: trimmed,
+    );
+  }
+
+  String toCronLine() {
+    final line = '$expression $command';
+    return isCommented ? '# $line' : line;
   }
 }
 
@@ -193,7 +232,7 @@ class ServicesSystemOverview {
       final cronRaw = data['cronJobs'];
       if (cronRaw is List) {
         for (final item in cronRaw) {
-          if (item is String && item.trim().isNotEmpty && !item.trim().startsWith('#')) {
+          if (item is String && item.trim().isNotEmpty) {
             cronList.add(CronJob.fromCronLine(item));
           }
         }
@@ -225,11 +264,35 @@ class ServicesSystemOverview {
 
       if (cronList.isEmpty) {
         cronList.addAll([
-          const CronJob(expression: '0 4 * * *', command: '/sbin/reboot'),
-          const CronJob(expression: '*/15 * * * *', command: '/usr/bin/ping-check.sh'),
+          const CronJob(expression: '0 4 * * *', command: '/sbin/reboot', rawLine: '0 4 * * * /sbin/reboot'),
+          const CronJob(expression: '*/15 * * * *', command: '/usr/bin/ping-check.sh', rawLine: '*/15 * * * * /usr/bin/ping-check.sh'),
         ]);
       }
     }
+
+    // Priority sorting: Active / Running / Enabled items FIRST at top priority!
+    initList.sort((a, b) {
+      if (a.isEnabled != b.isEnabled) {
+        return a.isEnabled ? -1 : 1;
+      }
+      final prioCompare = a.startPriority.compareTo(b.startPriority);
+      if (prioCompare != 0) return prioCompare;
+      return a.name.compareTo(b.name);
+    });
+
+    serviceList.sort((a, b) {
+      if (a.isRunning != b.isRunning) {
+        return a.isRunning ? -1 : 1;
+      }
+      return a.name.compareTo(b.name);
+    });
+
+    cronList.sort((a, b) {
+      if (a.isCommented != b.isCommented) {
+        return a.isCommented ? 1 : -1;
+      }
+      return a.command.compareTo(b.command);
+    });
 
     return ServicesSystemOverview(
       services: serviceList,

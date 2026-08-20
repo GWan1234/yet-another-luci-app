@@ -4,11 +4,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
-import 'package:luci_mobile/models/client.dart';
-import 'package:luci_mobile/services/interfaces/api_service_interface.dart';
-import 'package:luci_mobile/services/interfaces/auth_service_interface.dart';
-import 'package:luci_mobile/services/router_service.dart';
-import 'package:luci_mobile/utils/logger.dart';
+import 'package:yet_another_luci_app/models/client.dart';
+import 'package:yet_another_luci_app/services/interfaces/api_service_interface.dart';
+import 'package:yet_another_luci_app/services/interfaces/auth_service_interface.dart';
+import 'package:yet_another_luci_app/services/router_service.dart';
+import 'package:yet_another_luci_app/utils/logger.dart';
 
 /// Encapsulates all network actions:
 /// - VPN and secure tunnel toggles (OpenVPN, Tailscale, NextDNS, Cloudflared, WireGuard)
@@ -906,13 +906,43 @@ heal_dns() {
         if (rawUciDhcp is Map) {
           final values = rawUciDhcp['values'] ?? rawUciDhcp;
           if (values is Map) {
-            values['sec_${macUpper.replaceAll(":", "")}'] = {
-              '.type': 'host',
-              'name': hostname,
-              'mac': macUpper,
-              'ip': targetIp,
-              if (leaseTime != null && leaseTime.isNotEmpty) 'leasetime': leaseTime,
-            };
+            bool updated = false;
+            values.forEach((k, v) {
+              if (v is Map && v['.type'] == 'host') {
+                final rawMac = v['mac'];
+                final macList = <String>[];
+                if (rawMac is List) {
+                  macList.addAll(rawMac.map((e) => e.toString().toUpperCase().replaceAll('-', ':')));
+                } else if (rawMac != null) {
+                  macList.addAll(rawMac.toString().split(RegExp(r'\s+')).map((e) => e.toUpperCase().replaceAll('-', ':')));
+                }
+                if (macList.contains(macUpper)) {
+                  v['name'] = hostname;
+                  v['ip'] = targetIp;
+                  if (targetIp6 != null && targetIp6.isNotEmpty) v['ip6addr'] = targetIp6;
+                  if (duid != null && duid.isNotEmpty) v['duid'] = duid;
+                  if (leaseTime != null && leaseTime.isNotEmpty) {
+                    v['leasetime'] = leaseTime;
+                  } else {
+                    v.remove('leasetime');
+                  }
+                  updated = true;
+                }
+              }
+            });
+            if (!updated) {
+              final newSecKey = 'sec_${macUpper.replaceAll(":", "")}';
+              values[newSecKey] = {
+                '.type': 'host',
+                '.name': newSecKey,
+                'name': hostname,
+                'mac': macUpper,
+                'ip': targetIp,
+                if (targetIp6 != null && targetIp6.isNotEmpty) 'ip6addr': targetIp6,
+                if (duid != null && duid.isNotEmpty) 'duid': duid,
+                if (leaseTime != null && leaseTime.isNotEmpty) 'leasetime': leaseTime,
+              };
+            }
           }
         }
       }

@@ -5,21 +5,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:luci_mobile/models/client.dart';
-import 'package:luci_mobile/state/app_state.dart';
-import 'package:luci_mobile/main.dart';
-import 'package:luci_mobile/widgets/luci_app_bar.dart';
+import 'package:yet_another_luci_app/models/client.dart';
+import 'package:yet_another_luci_app/state/app_state.dart';
+import 'package:yet_another_luci_app/main.dart';
+import 'package:yet_another_luci_app/widgets/luci_app_bar.dart';
 
-import 'package:luci_mobile/design/luci_design_system.dart';
-import 'package:luci_mobile/widgets/luci_loading_states.dart';
-import 'package:luci_mobile/widgets/luci_refresh_components.dart';
+import 'package:yet_another_luci_app/design/luci_design_system.dart';
+import 'package:yet_another_luci_app/widgets/luci_loading_states.dart';
+import 'package:yet_another_luci_app/widgets/luci_refresh_components.dart';
 
-import 'package:luci_mobile/utils/self_device_guard.dart';
-import 'package:luci_mobile/widgets/add_static_lease_dialog.dart';
+import 'package:yet_another_luci_app/utils/self_device_guard.dart';
+import 'package:yet_another_luci_app/widgets/luci_toast.dart';
+import 'package:yet_another_luci_app/widgets/add_static_lease_dialog.dart';
 import 'restricted_clients_screen.dart';
-import 'package:luci_mobile/modules/dhcp_dns/models/dhcp_dns_info.dart';
-
-enum ClientCategoryFilter { all, wired, wireless }
+import 'package:yet_another_luci_app/modules/dhcp_dns/models/dhcp_dns_info.dart';
 
 class ClientsScreen extends ConsumerStatefulWidget {
   const ClientsScreen({super.key});
@@ -29,14 +28,19 @@ class ClientsScreen extends ConsumerStatefulWidget {
 }
 
 class _ClientsScreenState extends ConsumerState<ClientsScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+
+  @override
+  bool get wantKeepAlive => true;
   String _searchQuery = '';
   final Set<String> _expandedClientMacs = {};
+  final Set<String> _expandedIpv6Macs = {};
   late AnimationController _controller;
   late TextEditingController _searchController;
   Timer? _searchDebounceTimer;
   Timer? _autoRefreshTimer;
   bool _aggregateAllRouters = true;
+  List<Client> _cachedClients = [];
   Future<List<Client>>? _clientsFuture;
   String? _lastSelectedRouterId;
   dynamic _lastDashboardUpdated;
@@ -85,9 +89,15 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
 
   void _computeClientsFuture() {
     final appState = ref.read(appStateProvider);
-    _clientsFuture = _aggregateAllRouters
+    final future = _aggregateAllRouters
         ? appState.fetchAggregatedClients()
         : appState.fetchClientsForSelectedRouter();
+    _clientsFuture = future;
+    future.then((list) {
+      if (mounted) {
+        _cachedClients = list;
+      }
+    });
   }
 
   @override
@@ -101,22 +111,43 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final watchedAppState = ref.watch(appStateProvider);
+    if (watchedAppState.requestedClientCategoryFilter != null) {
+      final reqFilter = watchedAppState.requestedClientCategoryFilter!;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _categoryFilter = reqFilter;
+          });
+        }
+        watchedAppState.requestedClientCategoryFilter = null;
+      });
+    }
     // Recompute future when selected router or dashboard data timestamp changes
     final currentId = watchedAppState.selectedRouter?.id;
     final lastUpdated = watchedAppState.dashboardData?['_lastUpdated'];
     if (currentId != _lastSelectedRouterId || lastUpdated != _lastDashboardUpdated) {
       _lastSelectedRouterId = currentId;
       _lastDashboardUpdated = lastUpdated;
-      _computeClientsFuture();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _computeClientsFuture();
+          });
+        }
+      });
     }
     Future<List<Client>>? future = _clientsFuture;
     return FutureBuilder<List<Client>>(
       future: future,
       builder: (context, snapshot) {
-        final aggregatedClients = snapshot.data ?? [];
+        if (snapshot.hasData && snapshot.data != null) {
+          _cachedClients = snapshot.data!;
+        }
+        final aggregatedClients = (snapshot.hasData && snapshot.data != null) ? snapshot.data! : _cachedClients;
         return Scaffold(
           appBar: LuciAppBar(
             title: 'Clients',
@@ -327,6 +358,16 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                                 )
                               : ListView.separated(
                                   padding: const EdgeInsets.only(bottom: 16),
+                                  // ignore: deprecated_member_use
+                                  cacheExtent: 350.0,
+                                  // ignore: deprecated_member_use
+                                  findChildIndexCallback: (Key key) {
+                                    if (key is ValueKey<String>) {
+                                      final index = filteredClients.indexWhere((c) => c.macAddress == key.value);
+                                      return index != -1 ? index : null;
+                                    }
+                                    return null;
+                                  },
                                   separatorBuilder: (context, idx) =>
                                       const SizedBox(height: 4),
                                   itemCount: filteredClients.length,
@@ -335,7 +376,9 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                                     final isExpanded = _expandedClientMacs
                                         .contains(client.macAddress);
 
+                                    final isIpv6Expanded = _expandedIpv6Macs.contains(client.macAddress);
                                     return Padding(
+                                      key: ValueKey<String>(client.macAddress),
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 16.0,
                                         vertical: 8.0,
@@ -343,10 +386,20 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                                       child: _UnifiedClientCard(
                                         client: client,
                                         isExpanded: isExpanded,
+                                        isIpv6Expanded: isIpv6Expanded,
                                         allClients: clients,
                                         onRefreshNeeded: () {
                                           setState(() {
                                             _computeClientsFuture();
+                                          });
+                                        },
+                                        onToggleIpv6: () {
+                                          setState(() {
+                                            if (isIpv6Expanded) {
+                                              _expandedIpv6Macs.remove(client.macAddress);
+                                            } else {
+                                              _expandedIpv6Macs.add(client.macAddress);
+                                            }
                                           });
                                         },
                                         onTap: () {
@@ -406,46 +459,52 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildSummaryItem(
-              icon: Icons.devices_rounded,
-              label: 'Total',
-              count: totalCount,
-              color: colorScheme.primary,
-              isSelected: _categoryFilter == ClientCategoryFilter.all,
-              onTap: () {
-                setState(() {
-                  _categoryFilter = ClientCategoryFilter.all;
-                });
-              },
-              colorScheme: colorScheme,
+            Expanded(
+              child: _buildSummaryItem(
+                icon: Icons.devices_rounded,
+                label: 'Total',
+                count: totalCount,
+                color: colorScheme.primary,
+                isSelected: _categoryFilter == ClientCategoryFilter.all,
+                onTap: () {
+                  setState(() {
+                    _categoryFilter = ClientCategoryFilter.all;
+                  });
+                },
+                colorScheme: colorScheme,
+              ),
             ),
             Container(width: 1, height: 20, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
-            _buildSummaryItem(
-              icon: Icons.lan_outlined,
-              label: 'Wired',
-              count: wiredCount,
-              color: colorScheme.secondary,
-              isSelected: _categoryFilter == ClientCategoryFilter.wired,
-              onTap: () {
-                setState(() {
-                  _categoryFilter = ClientCategoryFilter.wired;
-                });
-              },
-              colorScheme: colorScheme,
+            Expanded(
+              child: _buildSummaryItem(
+                icon: Icons.lan_outlined,
+                label: 'Wired',
+                count: wiredCount,
+                color: colorScheme.secondary,
+                isSelected: _categoryFilter == ClientCategoryFilter.wired,
+                onTap: () {
+                  setState(() {
+                    _categoryFilter = ClientCategoryFilter.wired;
+                  });
+                },
+                colorScheme: colorScheme,
+              ),
             ),
             Container(width: 1, height: 20, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
-            _buildSummaryItem(
-              icon: Icons.wifi_rounded,
-              label: 'Wireless',
-              count: wirelessCount,
-              color: colorScheme.tertiary,
-              isSelected: _categoryFilter == ClientCategoryFilter.wireless,
-              onTap: () {
-                setState(() {
-                  _categoryFilter = ClientCategoryFilter.wireless;
-                });
-              },
-              colorScheme: colorScheme,
+            Expanded(
+              child: _buildSummaryItem(
+                icon: Icons.wifi_rounded,
+                label: 'Wireless',
+                count: wirelessCount,
+                color: colorScheme.tertiary,
+                isSelected: _categoryFilter == ClientCategoryFilter.wireless,
+                onTap: () {
+                  setState(() {
+                    _categoryFilter = ClientCategoryFilter.wireless;
+                  });
+                },
+                colorScheme: colorScheme,
+              ),
             ),
           ],
         ),
@@ -471,28 +530,31 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 16, color: activeColor),
-              const SizedBox(width: 5),
-              Text(
-                '$label: ',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: activeColor,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: activeColor),
+                const SizedBox(width: 5),
+                Text(
+                  '$label: ',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: activeColor,
+                  ),
                 ),
-              ),
-              Text(
-                '$count',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: isSelected ? color : colorScheme.onSurface,
+                Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? color : colorScheme.onSurface,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -505,14 +567,18 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
 class _UnifiedClientCard extends StatefulWidget {
   final Client client;
   final bool isExpanded;
+  final bool isIpv6Expanded;
   final VoidCallback onTap;
+  final VoidCallback? onToggleIpv6;
   final List<Client> allClients;
   final VoidCallback onRefreshNeeded;
 
   const _UnifiedClientCard({
     required this.client,
     required this.isExpanded,
+    this.isIpv6Expanded = false,
     required this.onTap,
+    this.onToggleIpv6,
     this.allClients = const [],
     required this.onRefreshNeeded,
   });
@@ -524,7 +590,6 @@ class _UnifiedClientCard extends StatefulWidget {
 class _UnifiedClientCardState extends State<_UnifiedClientCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  bool _showAllIpv6 = false;
 
   @override
   void initState() {
@@ -621,9 +686,9 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
       ),
       clipBehavior: Clip.antiAlias,
       child: AnimatedScale(
-        scale: widget.isExpanded ? 1.02 : 1.0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOutBack,
+        scale: widget.isExpanded ? 1.01 : 1.0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
         child: Column(
           children: [
             Opacity(
@@ -650,9 +715,9 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                               shape: BoxShape.circle,
                             ),
                             child: AnimatedScale(
-                              scale: widget.isExpanded ? 1.1 : 1.0,
-                              duration: const Duration(milliseconds: 500),
-                              curve: Curves.elasticOut,
+                              scale: widget.isExpanded ? 1.05 : 1.0,
+                              duration: const Duration(milliseconds: 200),
+                              curve: Curves.easeOutCubic,
                               child: Icon(
                                 Icons.person_outline,
                                 color: widget.client.isConnected
@@ -663,9 +728,8 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                               ),
                             ),
                           ),
-                          Positioned(
-                            right: 0,
-                            top: 0,
+                          Align(
+                            alignment: Alignment.topRight,
                             child: Tooltip(
                               message: _statusTooltip(widget.client),
                               child: Container(
@@ -939,7 +1003,7 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
       }).toList();
       classified.sort((a, b) => _ipv6SortPriority(a.label).compareTo(_ipv6SortPriority(b.label)));
 
-      final displayEntries = (classified.length > 1 && !_showAllIpv6)
+      final displayEntries = (classified.length > 1 && !widget.isIpv6Expanded)
           ? classified.take(1).toList()
           : classified;
 
@@ -958,11 +1022,7 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
             child: InkWell(
-              onTap: () {
-                setState(() {
-                  _showAllIpv6 = !_showAllIpv6;
-                });
-              },
+              onTap: widget.onToggleIpv6,
               borderRadius: BorderRadius.circular(8),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
@@ -970,7 +1030,7 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      _showAllIpv6
+                      widget.isIpv6Expanded
                           ? 'Collapse IPv6 addresses'
                           : 'Show $remainingCount more IPv6 address${remainingCount > 1 ? 'es' : ''}',
                       style: TextStyle(
@@ -981,7 +1041,7 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                     ),
                     const SizedBox(width: 4),
                     Icon(
-                      _showAllIpv6 ? Icons.expand_less : Icons.expand_more,
+                      widget.isIpv6Expanded ? Icons.expand_less : Icons.expand_more,
                       size: 16,
                       color: theme.colorScheme.primary,
                     ),
@@ -1222,6 +1282,13 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
   }
 
   Future<void> _confirmRemoveStaticLease(BuildContext context, Client client) async {
+    if (ActionRateLimiter.isRateLimited('delete_static_lease_${client.macAddress}', cooldown: const Duration(milliseconds: 1200))) {
+      if (context.mounted) {
+        context.showToastWarning('Removal in progress. Please wait a moment...');
+      }
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1267,11 +1334,10 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
     );
 
     if (confirmed == true && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Removing static lease for ${client.displayName}...'),
-          duration: const Duration(seconds: 2),
-        ),
+      final actionKey = 'remove_lease_${client.macAddress}';
+      context.showToastLoading(
+        'Removing static lease for ${client.displayName}...',
+        actionKey: actionKey,
       );
 
       final appState = AppState.instance;
@@ -1282,19 +1348,17 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
 
       if (!context.mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            success
-                ? 'Static lease removed for ${client.displayName}.'
-                : 'Failed to remove static lease for ${client.displayName}.',
-          ),
-          backgroundColor: success ? Colors.green : Colors.red,
-        ),
-      );
-
       if (success) {
+        context.showToastSuccess(
+          'Static lease removed for ${client.displayName}.',
+          actionKey: actionKey,
+        );
         widget.onRefreshNeeded();
+      } else {
+        context.showToastError(
+          'Failed to remove static lease for ${client.displayName}.',
+          actionKey: actionKey,
+        );
       }
     }
   }
@@ -1312,29 +1376,41 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
       if (!context.mounted) return;
     }
 
+    final actionKey = 'pause_internet_${client.macAddress}';
+    if (ActionRateLimiter.isRateLimited(actionKey, cooldown: const Duration(seconds: 2))) {
+      final remaining = ActionRateLimiter.getRemainingCooldown(actionKey, cooldown: const Duration(seconds: 2));
+      context.showToastRateLimited('${pause ? "Pause" : "Resume"} Internet (${client.displayName})', remaining);
+      return;
+    }
+
     final appState = AppState.instance;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${pause ? "Pausing" : "Resuming"} internet for ${client.displayName}...'),
-        duration: const Duration(seconds: 2),
-      ),
+    context.showToastLoading(
+      '${pause ? "Pausing" : "Resuming"} internet access...',
+      subtitle: 'Target: ${client.displayName}',
+      actionKey: actionKey,
     );
+
     final success = await appState.pauseClientInternet(
       client.macAddress,
       pause: pause,
       context: context,
     );
+
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          success
-              ? 'Internet ${pause ? "paused" : "restored"} for ${client.displayName}.'
-              : 'Failed to ${pause ? "pause" : "resume"} internet for ${client.displayName}.',
-        ),
-        backgroundColor: success ? Colors.green : Colors.red,
-      ),
-    );
+
+    if (success) {
+      context.showToastSuccess(
+        'Internet ${pause ? "Paused" : "Restored"}',
+        subtitle: 'Target: ${client.displayName}',
+        actionKey: actionKey,
+      );
+    } else {
+      context.showToastError(
+        'Failed to ${pause ? "pause" : "resume"} internet',
+        subtitle: 'Target: ${client.displayName}',
+        actionKey: actionKey,
+      );
+    }
     setState(() {});
   }
 
@@ -1360,12 +1436,7 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
 
   void _copyToClipboard(BuildContext context, String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$label copied to clipboard'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    context.showToastSuccess('$label copied', subtitle: 'Copied to clipboard.');
   }
 }
 

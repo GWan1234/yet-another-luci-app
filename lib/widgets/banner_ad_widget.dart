@@ -6,9 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:luci_mobile/config/app_config.dart';
-import 'package:luci_mobile/config/ad_config.dart';
-import 'package:luci_mobile/providers/entitlement_provider.dart';
+import 'package:yet_another_luci_app/config/app_config.dart';
+import 'package:yet_another_luci_app/config/ad_config.dart';
+import 'package:yet_another_luci_app/providers/entitlement_provider.dart';
 
 /// Fixed-height banner ad widget gated on entitlement state.
 /// Reserves container height upfront to prevent layout shift.
@@ -33,7 +33,7 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> {
 
   void _loadAdIfNeeded() {
     if (!AppConfig.isAdsEnabled) return;
-    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
+    if (kIsWeb || !Platform.isAndroid) {
       return;
     }
 
@@ -86,7 +86,7 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> {
     }
 
     final theme = Theme.of(context);
-    final isMobile = !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+    final isAndroid = !kIsWeb && Platform.isAndroid;
 
     return Container(
       width: double.infinity,
@@ -100,7 +100,7 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> {
         ),
       ),
       alignment: Alignment.center,
-      child: isMobile && _isAdLoaded && _bannerAd != null
+      child: isAndroid && _isAdLoaded && _bannerAd != null
           ? ClipRRect(
               borderRadius: BorderRadius.circular(12.0),
               child: AdWidget(ad: _bannerAd!),
@@ -115,7 +115,7 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  isMobile ? 'Loading Sponsor Banner...' : 'Ad Space (Free Tier) — Upgrade to remove',
+                  isAndroid ? 'Loading Sponsor Banner...' : 'Ad Space (Free Tier) — Upgrade to remove',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                     fontSize: 11,
