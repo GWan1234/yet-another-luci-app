@@ -383,13 +383,21 @@ New contributors are welcome! We're happy to:
 - Provide guidance on complex features
 - Answer questions about the codebase
 
+## 🛡️ Attribution & Fork Visibility Rules
+
+1. **Mandatory GitHub Contributor Retention:** All forks of this repository MUST retain **Tuhin Garai (@nightcodex7)** ([https://github.com/nightcodex7](https://github.com/nightcodex7)) as the founding creator and primary contributor in all GitHub repository metadata, `README.md`, `CONTRIBUTORS.md`, and `NOTICE` files.
+2. **Preserve Git Commit History:** Fork owners must not rewrite or wipe git author commit history in a way that strips `@nightcodex7` author credits from GitHub contributor graphs.
+3. **Apache 2.0 Notice Compliance:** Pursuant to Section 4 of the Apache License 2.0, any derivative work or fork distributed on GitHub or elsewhere MUST include a copy of the `NOTICE` file containing original attribution for Tuhin Garai.
+
+---
+
 ## Recognition
 
 Contributors will be recognized in:
 
-- Project README
+- Project README (`README.md`)
+- `CONTRIBUTORS.md` and `.all-contributorsrc`
 - Release notes
-- Contributor hall of fame
-- GitHub contributors page
+- GitHub contributors graph
 
 Thank you for contributing to Yet Another LuCI App! Your contributions help make this project better for everyone.
