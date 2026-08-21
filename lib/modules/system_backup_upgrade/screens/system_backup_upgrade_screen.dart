@@ -1464,7 +1464,7 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         // 3. Save mtdblock contents (Collapsible by default)
         LuciCollapsibleCard(
           title: 'Save Partition (mtdblock) Image',
-          subtitle: 'Low-level partition dumps (bootloader, art, firmware) • Tap to expand',
+          subtitle: 'Low-level partition dumps (bootloader, art, firmware)',
           icon: Icons.sd_storage_outlined,
           iconColor: Colors.amber.shade800,
           child: Column(
@@ -1518,7 +1518,7 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         // 4. Flash new firmware image (Collapsible by default)
         LuciCollapsibleCard(
           title: 'Flash New Firmware Image',
-          subtitle: 'Sysupgrade firmware upgrade (.bin, .img.gz, .tar.gz) • Tap to expand',
+          subtitle: 'Sysupgrade firmware upgrade (.bin, .img.gz, .tar.gz)',
           icon: Icons.system_update_alt,
           iconColor: Colors.blue,
           child: Column(

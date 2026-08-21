@@ -484,12 +484,16 @@ class LuciPageTransition extends PageRouteBuilder {
          transitionDuration: duration,
          reverseTransitionDuration: duration,
          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-           return _buildTransition(
-             child: child,
-             animation: animation,
-             secondaryAnimation: secondaryAnimation,
-             transitionType: transitionType,
-             curve: curve,
+           final disableAnimations = MediaQuery.of(context).disableAnimations;
+           if (disableAnimations) return child;
+           return RepaintBoundary(
+             child: _buildTransition(
+               child: child,
+               animation: animation,
+               secondaryAnimation: secondaryAnimation,
+               transitionType: transitionType,
+               curve: curve,
+             ),
            );
          },
        );

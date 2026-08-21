@@ -297,6 +297,7 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
     final mac = client['mac']?.toString() ?? '';
     final name = client['name']?.toString() ?? mac;
     final ip = client['ip']?.toString() ?? 'N/A';
+    final source = client['source']?.toString() ?? 'Firewall Rule';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -306,6 +307,7 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
         side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.4)),
       ),
       child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: CircleAvatar(
           backgroundColor: Colors.orange.withValues(alpha: 0.15),
           child: const Icon(Icons.pause, color: Colors.orange),
@@ -314,7 +316,22 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
           name,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        subtitle: Text('IP: $ip • MAC: $mac'),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('IP: $ip • MAC: $mac'),
+            const SizedBox(height: 2),
+            Text(
+              'Context: $source',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.primary.withValues(alpha: 0.8),
+              ),
+            ),
+          ],
+        ),
         trailing: FilledButton.tonalIcon(
           onPressed: onAction,
           icon: const Icon(Icons.play_arrow, size: 18),
@@ -337,6 +354,7 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
     final mac = client['mac']?.toString() ?? '';
     final name = client['name']?.toString() ?? mac;
     final ip = client['ip']?.toString() ?? 'N/A';
+    final source = client['source']?.toString() ?? 'Wi-Fi Access Control';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -346,6 +364,7 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
         side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.4)),
       ),
       child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: CircleAvatar(
           backgroundColor: Colors.red.withValues(alpha: 0.15),
           child: const Icon(Icons.block, color: Colors.red),
@@ -354,7 +373,22 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
           name,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        subtitle: Text('IP: $ip • MAC: $mac'),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('IP: $ip • MAC: $mac'),
+            const SizedBox(height: 2),
+            Text(
+              'Context: $source',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Colors.red.shade700,
+              ),
+            ),
+          ],
+        ),
         trailing: FilledButton.tonalIcon(
           onPressed: onAction,
           icon: const Icon(Icons.check_circle_outline, size: 18),

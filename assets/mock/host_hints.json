@@ -146,5 +146,49 @@
     "vendor": "Lenovo Group Ltd.",
     "ipaddrs": ["192.168.1.123"],
     "ip6addrs": ["2409:4060:2e81:a102::123", "fe80::ccdd:eeff:fe98:7654"]
+  },
+  "DD:EE:FF:11:22:33": {
+    "name": "RayBan-Meta-Smart-Glasses",
+    "vendor": "Meta Platforms Inc.",
+    "ipaddrs": ["192.168.1.124"],
+    "ip6addrs": ["fe80::ddee:ffff:fe11:2233"]
+  },
+  "DD:EE:FF:44:55:66": {
+    "name": "ESP32-Environmental-Sensor",
+    "vendor": "Espressif Systems",
+    "ipaddrs": ["192.168.1.125"],
+    "ip6addrs": ["fe80::ddee:ffff:fe44:5566"]
+  },
+  "DD:EE:FF:77:88:99": {
+    "name": "Yale-Assure-Smart-Lock",
+    "vendor": "Assa Abloy Americas",
+    "ipaddrs": ["192.168.1.126"],
+    "ip6addrs": ["fe80::ddee:ffff:fe77:8899"]
+  },
+  "DD:EE:FF:AA:BB:CC": {
+    "name": "Roborock-S8-MaxV-Vacuum",
+    "vendor": "Beijing Roborock Technology",
+    "ipaddrs": ["192.168.1.127"],
+    "ip6addrs": ["fe80::ddee:ffff:feaa:bbcc"]
+  },
+  "DD:EE:FF:DD:EE:FF": {
+    "name": "Synology-DiskStation-NAS",
+    "staticLeaseName": "Storage-Vault-NAS",
+    "isStaticLease": true,
+    "vendor": "Synology Inc.",
+    "ipaddrs": ["192.168.1.128"],
+    "ip6addrs": ["2409:4060:2e81:a102::128", "fe80::ddee:ffff:fedd:eeff"]
+  },
+  "DD:EE:FF:12:34:56": {
+    "name": "Meta-Quest-3-VR-Headset",
+    "vendor": "Meta Platforms Inc.",
+    "ipaddrs": ["192.168.1.129"],
+    "ip6addrs": ["fe80::ddee:ffff:fe12:3456"]
+  },
+  "DD:EE:FF:65:43:21": {
+    "name": "Aqara-Smart-Motion-Sensor",
+    "vendor": "Lumi United Technology",
+    "ipaddrs": ["192.168.1.130"],
+    "ip6addrs": ["fe80::ddee:ffff:fe65:4321"]
   }
 }

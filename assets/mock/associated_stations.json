@@ -8,7 +8,11 @@
     "BB:CC:DD:77:88:99",
     "BB:CC:DD:12:34:56",
     "CC:DD:EE:77:88:99",
-    "CC:DD:EE:12:34:56"
+    "CC:DD:EE:12:34:56",
+    "DD:EE:FF:11:22:33",
+    "DD:EE:FF:44:55:66",
+    "DD:EE:FF:77:88:99",
+    "DD:EE:FF:12:34:56"
   ],
   "wlan1": [
     "AA:BB:CC:AA:BB:CC",
@@ -19,6 +23,8 @@
     "AA:BB:CC:65:43:21",
     "CC:DD:EE:44:55:66",
     "CC:DD:EE:65:43:21",
-    "CC:DD:EE:98:76:54"
+    "CC:DD:EE:98:76:54",
+    "DD:EE:FF:AA:BB:CC",
+    "DD:EE:FF:65:43:21"
   ]
 }

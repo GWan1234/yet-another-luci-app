@@ -77,6 +77,12 @@ abstract class IApiService {
     required Map<String, String> values,
     BuildContext? context,
   });
+  Future<List<String>> fetchNetworkInterfaces({
+    required String ipAddress,
+    required String sysauth,
+    required bool useHttps,
+    BuildContext? context,
+  });
   Future<dynamic> uciCommit(
     String ipAddress,
     String sysauth,
@@ -106,6 +112,92 @@ abstract class IApiService {
     bool useHttps, {
     required String ifaceSection,
     required bool enabled,
+    BuildContext? context,
+  });
+  Future<bool> updateWirelessInterfaceConfig(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String sectionName,
+    required Map<String, String> values,
+    BuildContext? context,
+  });
+  Future<bool> revertWirelessInterfaceConfig(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String sectionName,
+    required Map<String, String> priorValues,
+    BuildContext? context,
+  });
+  Future<bool> updateWirelessRadioConfig(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String sectionName,
+    required Map<String, String> values,
+    BuildContext? context,
+  });
+  Future<bool> revertWirelessRadioConfig(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String sectionName,
+    required Map<String, String> priorValues,
+    BuildContext? context,
+  });
+  Future<bool> addWirelessInterface(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String radioName,
+    required String ssid,
+    required String encryption,
+    required String key,
+    required String network,
+    BuildContext? context,
+  });
+  Future<bool> deleteWirelessInterface(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String sectionName,
+    BuildContext? context,
+  });
+  Future<bool> provisionGuestNetwork(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String radioName,
+    required String ssid,
+    required String encryption,
+    required String key,
+    String guestIp = '192.168.2.1',
+    bool isolateClients = true,
+    String network = 'guest',
+    // Advanced radio settings
+    String? country,
+    String? channel,
+    String? htMode,
+    String? txPower,
+    // Fast roaming (802.11r/k/v)
+    bool ieee80211r = false,
+    bool ftOverDs = false,
+    bool ftPskGenerateLocal = false,
+    String? mobilityDomain,
+    // Wireless advanced settings
+    bool wmm = true,
+    bool hidden = false,
+    int? dtimPeriod,
+    int? gtkRekey,
+    int? inactivityLimit,
+    int? maxListenInterval,
+    bool disassocLowAck = true,
+    bool multicastToUnicast = false,
+    bool wds = false,
+    // MAC filtering
+    String? macfilter,
+    List<String>? maclist,
     BuildContext? context,
   });
   Future<bool> setWifiAccessControl(
@@ -256,6 +348,34 @@ abstract class IApiService {
     String sysauth,
     bool useHttps, {
     required bool enable,
+    BuildContext? context,
+  });
+
+  /// Fetches hardware-supported encryptions and ciphers from iwinfo for a wireless device
+  Future<Map<String, List<Map<String, String>>>> fetchWirelessHardwareCapabilities({
+    required String sectionName,
+    String? radioName,
+    required String ipAddress,
+    required String sysauth,
+    required bool useHttps,
+    BuildContext? context,
+  });
+
+  /// Fetches physical radio hardware capabilities (countrylist, freqlist, htmodelist, txpowerlist) from iwinfo for a wireless radio
+  Future<Map<String, dynamic>> fetchWirelessRadioCapabilities({
+    required String radioName,
+    required String ipAddress,
+    required String sysauth,
+    required bool useHttps,
+    BuildContext? context,
+  });
+
+  /// Detects anonymous `cfg######` wifi-iface sections (created by uci add) and renames
+  /// them to named `wifinet#` identifiers so LuCI does not prompt a configuration migration.
+  Future<int> migrateAnonymousWirelessSections(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
     BuildContext? context,
   });
 }

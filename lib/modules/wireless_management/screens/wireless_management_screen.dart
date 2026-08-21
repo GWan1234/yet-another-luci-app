@@ -13,7 +13,13 @@ import 'package:yet_another_luci_app/widgets/luci_collapsible_card.dart';
 import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 import 'package:yet_another_luci_app/design/luci_design_system.dart';
 import '../models/wireless_info.dart';
+import '../widgets/wireless_interface_card.dart';
+import '../widgets/edit_radio_dialog.dart';
+import '../widgets/add_ssid_dialog.dart';
+import 'package:yet_another_luci_app/widgets/luci_guardrail.dart';
+import '../widgets/wireless_rollback_banner.dart';
 import 'wifi_access_control_screen.dart';
+import 'guest_wifi_management_screen.dart';
 
 class WirelessManagementScreen extends ConsumerStatefulWidget {
   final bool showBack;
@@ -27,7 +33,8 @@ class WirelessManagementScreen extends ConsumerStatefulWidget {
 class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScreen>
     with AutomaticKeepAliveClientMixin {
   Timer? _refreshTimer;
-  bool _isStationsExpanded = true;
+  bool _isStationsExpanded = false;
+  bool _migrationChecked = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -36,12 +43,33 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
   void initState() {
     super.initState();
     _startRefreshTimerIfNeeded();
+    // Run migration check after first frame so BuildContext is fully mounted
+    WidgetsBinding.instance.addPostFrameCallback((_) => _runMigrationCheck());
   }
 
   @override
   void dispose() {
     _refreshTimer?.cancel();
     super.dispose();
+  }
+
+  /// Checks for and auto-fixes any anonymous wifi-iface sections (cfg######)
+  /// that would trigger LuCI's "Wireless configuration migration" dialog.
+  Future<void> _runMigrationCheck() async {
+    if (_migrationChecked || !mounted) return;
+    _migrationChecked = true;
+
+    final appState = ref.read(appStateProvider);
+    final migrated = await appState.migrateAnonymousWirelessSections();
+
+    if (migrated > 0 && mounted) {
+      context.showToastSuccess(
+        'Auto-fixed $migrated anonymous wireless section${migrated > 1 ? 's' : ''}',
+        subtitle: 'Renamed to wifinet# — LuCI migration dialog will no longer appear.',
+      );
+      // Refresh so the UI picks up the new section names
+      await appState.fetchDashboardData();
+    }
   }
 
   void _startRefreshTimerIfNeeded() {
@@ -80,43 +108,104 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
       }
     }
 
-    return Scaffold(
-      appBar: LuciAppBar(
-        title: 'Wireless',
-        showBack: widget.showBack,
+    final hasGuestNetworks = overview.radios.any(
+      (radio) => radio.interfaces.any(
+        (iface) => iface.isGuestInterface(
+          appState.customGuestSections,
+          appState.excludedGuestSections,
+        ),
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await appState.fetchDashboardData();
-        },
-        child: ListView(
-          padding: const EdgeInsets.all(16.0),
+    );
+
+    return PopScope(
+      canPop: !appState.isAccessControlPendingConfirmation,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final canExit = await LuciGuardrail.confirmStagedChangesOrExit(context, appState);
+        if (canExit && context.mounted) {
+          Navigator.pop(context);
+        }
+      },
+      child: Scaffold(
+        appBar: LuciAppBar(
+          title: 'Wireless',
+          showBack: widget.showBack,
+        ),
+        body: Column(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            const WirelessRollbackBanner(),
+            Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await appState.fetchDashboardData();
+              },
+              child: ListView(
+                padding: const EdgeInsets.all(16.0),
+                children: [
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                Expanded(
-                  child: _buildSectionHeader(context, 'Wireless Radios', Icons.cell_tower_outlined),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const WifiAccessControlScreen(),
+                _buildSectionHeader(context, 'Wireless Radios', Icons.cell_tower_outlined),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const GuestWifiManagementScreen(),
+                          ),
+                        );
+                      },
+                      icon: Icon(
+                        Icons.shield_moon_rounded,
+                        size: 16,
+                        color: hasGuestNetworks ? Colors.green : Colors.red,
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.security_rounded, size: 16),
-                  label: const Text('Access Control', style: TextStyle(fontSize: 12)),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    visualDensity: VisualDensity.compact,
-                  ),
+                      label: Text(
+                        'Guest Network Management',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: hasGuestNetworks ? Colors.green : Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        side: BorderSide(
+                          color: hasGuestNetworks
+                              ? Colors.green.withValues(alpha: 0.5)
+                              : Colors.red.withValues(alpha: 0.5),
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const WifiAccessControlScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.security_rounded, size: 16),
+                      label: const Text('Access Control', style: TextStyle(fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
+            const SizedBox(height: 12),
             if (overview.radios.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 32.0),
@@ -131,7 +220,7 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
                 ),
               )
             else
-              ...overview.radios.map((radio) => _buildRadioCard(context, radio, appState)),
+              ...overview.radios.map((radio) => _buildRadioCard(context, radio, overview, appState)),
             const SizedBox(height: 16),
             LuciCollapsibleCard(
               title: 'Connected Wireless Stations',
@@ -145,8 +234,14 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
           ],
         ),
       ),
-    );
+    ),
+  ],
+),
+),
+);
   }
+
+
 
   Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
     final theme = Theme.of(context);
@@ -167,153 +262,120 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
     );
   }
 
-  Widget _buildRadioCard(BuildContext context, WirelessRadio radio, AppState appState) {
+  Widget _buildRadioCard(BuildContext context, WirelessRadio radio, WirelessOverview overview, AppState appState) {
     final theme = Theme.of(context);
     final freqStr = radio.formattedFrequency ?? 'Channel ${radio.channel} (Freq Unreported)';
+
+    final regularIfaces = radio.interfaces
+        .where((i) => !i.isGuestInterface(appState.customGuestSections, appState.excludedGuestSections))
+        .toList();
+    final guestIfaces = radio.interfaces
+        .where((i) => i.isGuestInterface(appState.customGuestSections, appState.excludedGuestSections))
+        .toList();
+
+    final minimalSummary = radio.isUp
+        ? '${radio.bandLabel} • Ch ${radio.channel} • ${radio.interfaces.length} SSID${radio.interfaces.length == 1 ? '' : 's'} (${regularIfaces.length} main, ${guestIfaces.length} guest)'
+        : 'DISABLED • ${radio.bandLabel} • Ch ${radio.channel}';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: theme.colorScheme.primaryContainer,
-                        child: Icon(Icons.wifi, color: theme.colorScheme.onPrimaryContainer),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              radio.name.toUpperCase(),
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              '${radio.bandLabel} • Channel ${radio.channel}',
-                              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+      child: Theme(
+        data: theme.copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: true,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+          leading: CircleAvatar(
+            backgroundColor: theme.colorScheme.primaryContainer,
+            child: Icon(Icons.wifi, color: theme.colorScheme.onPrimaryContainer),
+          ),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  radio.name.toUpperCase(),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: radio.isUp ? LuciStatusColors.connected.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  radio.isUp ? 'ACTIVE' : 'DISABLED',
+                  style: TextStyle(
+                    color: radio.isUp ? LuciStatusColors.connected : Colors.red,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 10,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: radio.isUp ? LuciStatusColors.connected.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    radio.isUp ? 'ACTIVE' : 'DISABLED',
-                    style: TextStyle(
-                      color: radio.isUp ? LuciStatusColors.connected : Colors.red,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 11,
-                    ),
-                  ),
-                ),
-              ],
+              ),
+            ],
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              minimalSummary,
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
+              overflow: TextOverflow.ellipsis,
             ),
-            const Divider(height: 24),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
+                tooltip: 'Add Virtual SSID Interface',
+                onPressed: () => _showAddSsidDialog(context, overview.radios, radio),
+              ),
+              IconButton(
+                icon: const Icon(Icons.settings_outlined, size: 20),
+                tooltip: 'Edit Physical Radio Settings',
+                onPressed: () => _showEditRadioDialog(context, radio),
+              ),
+            ],
+          ),
+          children: [
+            const Divider(height: 16),
             _buildDetailRow(context, 'TX Power', '${radio.txPowerDbm ?? 20} dBm'),
             _buildDetailRow(context, 'Frequency', freqStr),
             _buildDetailRow(context, 'Country Code', radio.country),
             const SizedBox(height: 12),
-            if (radio.interfaces.isNotEmpty) ...[
-              const Text('Interfaces / SSIDs', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            if (regularIfaces.isNotEmpty) ...[
+              const Text('Primary Interfaces / SSIDs', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 6),
-              ...radio.interfaces.map((iface) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text('${iface.ssid} (${iface.mode})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                              const SizedBox(width: 6),
-                              Text(
-                                iface.isEnabled ? '(Enabled)' : '(Disabled)',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: iface.isEnabled ? LuciStatusColors.connected : Colors.red,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: iface.securityMode.badgeColor.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  iface.securityMode.shortBadgeLabel,
-                                  style: TextStyle(
-                                    color: iface.securityMode.badgeColor,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 10,
-                                  ),
-                                ),
-                              ),
-                              if (iface.pmfState != PmfState.disabled) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: (iface.pmfState == PmfState.required ? theme.colorScheme.tertiary : theme.colorScheme.secondary).withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    iface.pmfState.displayName,
-                                    style: TextStyle(
-                                      color: iface.pmfState == PmfState.required ? theme.colorScheme.tertiary : theme.colorScheme.secondary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Text('${iface.stations.length} clients', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
-                        const SizedBox(width: 8),
-                        Switch(
-                          value: iface.isEnabled,
-                          onChanged: (val) => _handleToggleSsid(context, radio, iface, val, appState),
-                        ),
-                      ],
-                    ),
-                  ],
+              ...regularIfaces.map(
+                (iface) => WirelessInterfaceCard(
+                  radio: radio,
+                  interface: iface,
+                  onToggleEnabled: (val) => _handleToggleSsid(context, radio, iface, val, appState),
                 ),
-              )),
+              ),
+            ],
+            if (guestIfaces.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              LuciCollapsibleCard(
+                title: 'Guest Networks & SSIDs',
+                icon: Icons.shield_moon_rounded,
+                count: guestIfaces.length,
+                initiallyExpanded: true,
+                child: Column(
+                  children: guestIfaces
+                      .map(
+                        (iface) => WirelessInterfaceCard(
+                          radio: radio,
+                          interface: iface,
+                          onToggleEnabled: (val) => _handleToggleSsid(context, radio, iface, val, appState),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
             ],
           ],
         ),
@@ -334,6 +396,35 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
       if (st.macAddress.toUpperCase() == (appState.dashboardData?['activeSessionMac']?.toString().toUpperCase())) {
         isConnectedToThisSsid = true;
         break;
+      }
+    }
+
+    // Guard rail: Prevent disabling the last enabled SSID on a radio (would lose all wireless access)
+    if (!enable) {
+      final enabledInterfacesOnRadio = radio.interfaces
+          .where((i) => i.mode.toLowerCase() == 'ap' && i.isEnabled)
+          .toList();
+
+      if (enabledInterfacesOnRadio.length == 1 && enabledInterfacesOnRadio.first.sectionName == iface.sectionName) {
+        if (!context.mounted) return;
+        await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            icon: const Icon(Icons.block_rounded, color: Colors.red, size: 36),
+            title: const Text('Cannot Disable Last SSID'),
+            content: Text(
+              'Disabling "${iface.ssid}" would leave no active wireless networks on ${radio.name} (${radio.bandLabel}). '
+              'You would lose all wireless connectivity. Please enable another SSID first or keep this one enabled.',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return;
       }
     }
 
@@ -685,6 +776,20 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
           ),
         ],
       ),
+    );
+  }
+
+  void _showEditRadioDialog(BuildContext context, WirelessRadio radio) {
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => EditRadioDialog(radio: radio),
+    );
+  }
+
+  void _showAddSsidDialog(BuildContext context, List<WirelessRadio> radios, WirelessRadio targetRadio) {
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => AddSsidDialog(radios: radios, targetRadio: targetRadio),
     );
   }
 }

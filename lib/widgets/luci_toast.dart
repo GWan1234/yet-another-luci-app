@@ -1,9 +1,13 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:yet_another_luci_app/design/luci_design_system.dart';
 import 'package:yet_another_luci_app/utils/os_platform_integration.dart';
+import 'package:yet_another_luci_app/widgets/luci_smooth_spinner.dart';
 
 /// Semantic toast notification types.
 enum LuciToastType {
@@ -271,13 +275,10 @@ class LuciToastManager {
                 shape: BoxShape.circle,
               ),
               child: type == LuciToastType.loading
-                  ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.2,
-                        valueColor: AlwaysStoppedAnimation<Color>(style.accent),
-                      ),
+                  ? LuciSmoothSpinner(
+                      size: 20,
+                      strokeWidth: 2.2,
+                      color: style.accent,
                     )
                   : Icon(
                       style.icon,
@@ -354,6 +355,8 @@ class LuciToastManager {
     Duration? actionCooldown,
     bool? useNativeOs,
     bool showProgressBar = true,
+    IconData? customIcon,
+    Color? customAccentColor,
   }) {
     final sanitized = _sanitizeToastText(title, subtitle);
     title = sanitized.title;
@@ -454,6 +457,8 @@ class LuciToastManager {
         showProgressBar: showProgressBar,
         toastItem: toastItem,
         parentContext: effectiveContext,
+        customIcon: customIcon,
+        customAccentColor: customAccentColor,
         onDismissed: () {
           _activeToasts.remove(toastItem);
         },
@@ -709,6 +714,8 @@ class _LuciToastWidget extends StatefulWidget {
   final VoidCallback onDismissed;
   final _ToastItem toastItem;
   final BuildContext? parentContext;
+  final IconData? customIcon;
+  final Color? customAccentColor;
 
   const _LuciToastWidget({
     required this.title,
@@ -721,6 +728,8 @@ class _LuciToastWidget extends StatefulWidget {
     required this.onDismissed,
     required this.toastItem,
     this.parentContext,
+    this.customIcon,
+    this.customAccentColor,
   });
 
   @override
@@ -821,7 +830,12 @@ class _LuciToastWidgetState extends State<_LuciToastWidget> with TickerProviderS
 
   ({Color background, Color accent, IconData icon}) _getTypeStyle(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return getLuciToastStyle(widget.type, isDark);
+    final base = getLuciToastStyle(widget.type, isDark);
+    return (
+      background: base.background,
+      accent: widget.customAccentColor ?? base.accent,
+      icon: widget.customIcon ?? base.icon,
+    );
   }
 
   @override
@@ -899,13 +913,10 @@ class _LuciToastWidgetState extends State<_LuciToastWidget> with TickerProviderS
                                             shape: BoxShape.circle,
                                           ),
                                           child: widget.type == LuciToastType.loading
-                                              ? SizedBox(
-                                                  width: 16,
-                                                  height: 16,
-                                                  child: CircularProgressIndicator(
-                                                    strokeWidth: 2.0,
-                                                    valueColor: AlwaysStoppedAnimation<Color>(style.accent),
-                                                  ),
+                                              ? LuciSmoothSpinner(
+                                                  size: 16,
+                                                  strokeWidth: 2.0,
+                                                  color: style.accent,
                                                 )
                                               : Icon(
                                                   style.icon,
@@ -973,28 +984,20 @@ class _LuciToastWidgetState extends State<_LuciToastWidget> with TickerProviderS
                                       ],
                                     ),
                                   ),
-                                  if (widget.showProgressBar)
-                                    widget.type == LuciToastType.loading
-                                        ? LinearProgressIndicator(
-                                            minHeight: 1.8,
-                                            backgroundColor: style.accent.withValues(alpha: 0.15),
-                                            valueColor: AlwaysStoppedAnimation<Color>(
-                                              style.accent.withValues(alpha: 0.85),
-                                            ),
-                                          )
-                                        : AnimatedBuilder(
-                                            animation: _progressController,
-                                            builder: (context, child) {
-                                              return LinearProgressIndicator(
-                                                value: _progressController.value,
-                                                minHeight: 1.8,
-                                                backgroundColor: Colors.transparent,
-                                                valueColor: AlwaysStoppedAnimation<Color>(
-                                                  style.accent.withValues(alpha: 0.75),
-                                                ),
-                                              );
-                                            },
+                                  if (widget.showProgressBar && widget.type != LuciToastType.loading)
+                                    AnimatedBuilder(
+                                      animation: _progressController,
+                                      builder: (context, child) {
+                                        return LinearProgressIndicator(
+                                          value: _progressController.value,
+                                          minHeight: 1.8,
+                                          backgroundColor: Colors.transparent,
+                                          valueColor: AlwaysStoppedAnimation<Color>(
+                                            style.accent.withValues(alpha: 0.75),
                                           ),
+                                        );
+                                      },
+                                    ),
                                 ],
                               ),
                             ),
@@ -1019,24 +1022,24 @@ extension LuciToastExtension on BuildContext {
     LuciToastManager.showLoading(this, title, subtitle: subtitle, actionKey: actionKey, timeout: timeout ?? const Duration(seconds: 60), useNativeOs: useNativeOs);
   }
 
-  void showToastSuccess(String title, {String? subtitle, Duration? duration, String? actionKey, bool? useNativeOs, bool showProgressBar = true}) {
-    LuciToastManager.showSuccess(this, title, subtitle: subtitle, duration: duration ?? const Duration(seconds: 3), actionKey: actionKey, useNativeOs: useNativeOs, showProgressBar: showProgressBar);
+  void showToastSuccess(String title, {String? subtitle, Duration? duration, String? actionKey, bool? useNativeOs, bool showProgressBar = true, IconData? customIcon, Color? customAccentColor}) {
+    LuciToastManager.show(this, title: title, subtitle: subtitle, type: LuciToastType.success, duration: duration ?? const Duration(seconds: 3), actionKey: actionKey, useNativeOs: useNativeOs, showProgressBar: showProgressBar, customIcon: customIcon, customAccentColor: customAccentColor);
   }
 
-  void showToastError(String title, {String? subtitle, Duration? duration, VoidCallback? onRetry, String? actionKey, bool? useNativeOs, bool showProgressBar = true}) {
-    LuciToastManager.showError(this, title, subtitle: subtitle, duration: duration ?? const Duration(seconds: 5), onRetry: onRetry, actionKey: actionKey, useNativeOs: useNativeOs, showProgressBar: showProgressBar);
+  void showToastError(String title, {String? subtitle, Duration? duration, VoidCallback? onRetry, String? actionKey, bool? useNativeOs, bool showProgressBar = true, IconData? customIcon, Color? customAccentColor}) {
+    LuciToastManager.show(this, title: title, subtitle: subtitle, type: LuciToastType.error, duration: duration ?? const Duration(seconds: 5), onAction: onRetry, actionLabel: onRetry != null ? 'Retry' : null, actionKey: actionKey, useNativeOs: useNativeOs, showProgressBar: showProgressBar, customIcon: customIcon, customAccentColor: customAccentColor);
   }
 
-  void showToastWarning(String title, {String? subtitle, Duration? duration, String? actionKey, bool? useNativeOs, bool showProgressBar = true}) {
-    LuciToastManager.showWarning(this, title, subtitle: subtitle, duration: duration ?? const Duration(seconds: 4), actionKey: actionKey, useNativeOs: useNativeOs, showProgressBar: showProgressBar);
+  void showToastWarning(String title, {String? subtitle, Duration? duration, String? actionKey, bool? useNativeOs, bool showProgressBar = true, IconData? customIcon, Color? customAccentColor}) {
+    LuciToastManager.show(this, title: title, subtitle: subtitle, type: LuciToastType.warning, duration: duration ?? const Duration(seconds: 4), actionKey: actionKey, useNativeOs: useNativeOs, showProgressBar: showProgressBar, customIcon: customIcon, customAccentColor: customAccentColor);
   }
 
-  void showToastInfo(String title, {String? subtitle, Duration? duration, String? actionKey, bool? useNativeOs, bool showProgressBar = true}) {
-    LuciToastManager.showInfo(this, title, subtitle: subtitle, duration: duration ?? const Duration(seconds: 3), actionKey: actionKey, useNativeOs: useNativeOs, showProgressBar: showProgressBar);
+  void showToastInfo(String title, {String? subtitle, Duration? duration, String? actionKey, bool? useNativeOs, bool showProgressBar = true, IconData? customIcon, Color? customAccentColor}) {
+    LuciToastManager.show(this, title: title, subtitle: subtitle, type: LuciToastType.info, duration: duration ?? const Duration(seconds: 3), actionKey: actionKey, useNativeOs: useNativeOs, showProgressBar: showProgressBar, customIcon: customIcon, customAccentColor: customAccentColor);
   }
 
-  void showToastGuardrail(String title, {String? subtitle, Duration? duration, bool? useNativeOs}) {
-    LuciToastManager.showGuardrail(this, title, subtitle: subtitle, duration: duration ?? const Duration(seconds: 5), useNativeOs: useNativeOs);
+  void showToastGuardrail(String title, {String? subtitle, Duration? duration, bool? useNativeOs, IconData? customIcon, Color? customAccentColor}) {
+    LuciToastManager.show(this, title: title, subtitle: subtitle ?? 'Self-device safety guardrail engaged.', type: LuciToastType.guardrail, duration: duration ?? const Duration(seconds: 5), useNativeOs: useNativeOs, customIcon: customIcon, customAccentColor: customAccentColor);
   }
 
   void showToastRateLimited(String actionName, Duration remaining, {bool? useNativeOs}) {

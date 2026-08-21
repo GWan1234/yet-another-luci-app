@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:yet_another_luci_app/services/secure_storage_service.dart';
 import 'package:yet_another_luci_app/config/app_config.dart';
 import 'package:yet_another_luci_app/widgets/theme_router_logo.dart';
+import 'package:yet_another_luci_app/screens/main_screen.dart';
+import 'package:yet_another_luci_app/screens/login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -18,21 +20,29 @@ class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _logoScale;
+  late Animation<double> _logoFade;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 800),
     );
-    _logoScale = CurvedAnimation(parent: _controller, curve: Curves.elasticOut);
+    _logoScale = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    );
+    _logoFade = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
+    );
     _controller.forward();
     _checkReviewerMode();
   }
 
   Future<void> _checkReviewerMode() async {
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(milliseconds: 1800));
 
     if (!mounted) return;
 
@@ -43,12 +53,66 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     if (reviewerModeEnabled == 'true' && mounted) {
-      // Navigate directly to main screen in reviewer mode
-      unawaited(Navigator.of(context).pushReplacementNamed('/'));
+      _navigateToMainScreen();
     } else if (mounted) {
-      // Direct flow - go straight to login screen
-      unawaited(Navigator.of(context).pushReplacementNamed('/login'));
+      _navigateToLoginScreen();
     }
+  }
+
+  void _navigateToMainScreen() {
+    if (!mounted) return;
+    final disableAnimations = MediaQuery.of(context).disableAnimations;
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => const MainScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          if (disableAnimations) return child;
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          );
+          final scaleAnimation = Tween<double>(begin: 0.96, end: 1.0).animate(curved);
+          return RepaintBoundary(
+            child: FadeTransition(
+              opacity: curved,
+              child: ScaleTransition(
+                scale: scaleAnimation,
+                child: child,
+              ),
+            ),
+          );
+        },
+        transitionDuration: disableAnimations ? Duration.zero : const Duration(milliseconds: 400),
+      ),
+    );
+  }
+
+  void _navigateToLoginScreen() {
+    if (!mounted) return;
+    final disableAnimations = MediaQuery.of(context).disableAnimations;
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => const LoginScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          if (disableAnimations) return child;
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeInOutCubic,
+          );
+          final scaleAnimation = Tween<double>(begin: 0.97, end: 1.0).animate(curved);
+          return RepaintBoundary(
+            child: FadeTransition(
+              opacity: curved,
+              child: ScaleTransition(
+                scale: scaleAnimation,
+                child: child,
+              ),
+            ),
+          );
+        },
+        transitionDuration: disableAnimations ? Duration.zero : const Duration(milliseconds: 450),
+      ),
+    );
   }
 
   @override
@@ -61,101 +125,296 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final primaryColor = colorScheme.primary;
+    final isDark = theme.brightness == Brightness.dark;
+
+    final meshColor = isDark
+        ? Colors.white.withValues(alpha: 0.05)
+        : Colors.black.withValues(alpha: 0.04);
+
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              colorScheme.primary.withValues(alpha: 0.8),
-              colorScheme.primaryContainer.withValues(alpha: 0.7),
-              colorScheme.surface,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: Stack(
+        children: [
+          // Subtle Network Topology Mesh Background Graphic
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _NetworkTopologyMeshPainter(meshColor: meshColor),
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Stack(
-            children: [
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ScaleTransition(
-                      scale: _logoScale,
-                      child: const ThemeRouterLogo(
-                        width: 140,
-                        height: 140,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    Text(
-                      'Yet Another LuCI App',
-                      style: theme.textTheme.headlineLarge?.copyWith(
-                        color: colorScheme.onSurface,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'OpenWrt Router Management System',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 36),
-                    const CircularProgressIndicator(),
-                  ],
-                ),
-              ),
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'by Tuhin Garai',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
-                          fontStyle: FontStyle.italic,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.5,
+
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Column(
+                children: [
+                  // Centered Vertical Lockup
+                  Expanded(
+                    child: Center(
+                      child: SingleChildScrollView(
+                        physics: const ClampingScrollPhysics(),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Clean Logo Container
+                            ScaleTransition(
+                              scale: _logoScale,
+                              child: FadeTransition(
+                                opacity: _logoFade,
+                                child: Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.surfaceContainer,
+                                    borderRadius: BorderRadius.circular(24),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.04),
+                                        blurRadius: 16,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const ThemeRouterLogo(
+                                    width: 88,
+                                    height: 88,
+                                    showShadow: false,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+
+                            // Technical Brand Typography
+                            FadeTransition(
+                              opacity: _logoFade,
+                              child: Column(
+                                children: [
+                                  Text(
+                                    'Yet Another LuCI App',
+                                    style: theme.textTheme.headlineMedium?.copyWith(
+                                      color: colorScheme.onSurface,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.3,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 10),
+
+                                  // Matte Technical Subtitle Badge
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.router_outlined,
+                                          size: 14,
+                                          color: primaryColor,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Flexible(
+                                          child: Text(
+                                            'OpenWrt Router Management System',
+                                            style: theme.textTheme.labelMedium?.copyWith(
+                                              color: colorScheme.onSurfaceVariant,
+                                              fontWeight: FontWeight.w600,
+                                              letterSpacing: 0.2,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+
+                            // Compact Status / Loading Indicator
+                            FadeTransition(
+                              opacity: _logoFade,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.surfaceContainer.withValues(alpha: 0.8),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      'INITIALIZING CONSOLE',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.8,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                    ),
+                  ),
+
+                  // Clean Footer Pinned at Bottom
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainer.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          Text(
+                            'by Tuhin Garai',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                              fontStyle: FontStyle.italic,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 8),
+                            width: 3,
+                            height: 3,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                            ),
+                          ),
                           const Text(
                             '🐙',
-                            style: TextStyle(fontSize: 14),
+                            style: TextStyle(fontSize: 12),
                           ),
                           const SizedBox(width: 4),
                           Text(
                             '@nightcodex7',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
+                              color: primaryColor,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
+  }
+}
+
+/// Network Topology Mesh Background Graphic
+class _NetworkTopologyMeshPainter extends CustomPainter {
+  final Color meshColor;
+
+  _NetworkTopologyMeshPainter({required this.meshColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = meshColor
+      ..strokeWidth = 1.0;
+
+    final nodePaint = Paint()
+      ..color = meshColor.withValues(alpha: (meshColor.a * 1.8).clamp(0.0, 1.0))
+      ..style = PaintingStyle.fill;
+
+    const double spacing = 64.0;
+    final int cols = (size.width / spacing).ceil() + 1;
+    final int rows = (size.height / spacing).ceil() + 1;
+
+    // Generate deterministic grid node offsets for an architectural isometric mesh
+    final List<List<Offset>> grid = [];
+
+    for (int r = 0; r < rows; r++) {
+      final List<Offset> row = [];
+      for (int c = 0; c < cols; c++) {
+        final double x = c * spacing + (r % 2 == 1 ? spacing * 0.5 : 0.0);
+        final double y = r * spacing * 0.866; // Hexagonal vertical ratio
+        row.add(Offset(x, y));
+      }
+      grid.add(row);
+    }
+
+    // Draw isometric connecting lines
+    for (int r = 0; r < rows; r++) {
+      for (int c = 0; c < cols; c++) {
+        final Offset pt = grid[r][c];
+
+        // Right connection
+        if (c + 1 < cols) {
+          canvas.drawLine(pt, grid[r][c + 1], linePaint);
+        }
+        // Down-right connection
+        if (r + 1 < rows) {
+          if (r % 2 == 0) {
+            if (c < cols) canvas.drawLine(pt, grid[r + 1][c], linePaint);
+            if (c - 1 >= 0) canvas.drawLine(pt, grid[r + 1][c - 1], linePaint);
+          } else {
+            if (c < cols) canvas.drawLine(pt, grid[r + 1][c], linePaint);
+            if (c + 1 < cols) canvas.drawLine(pt, grid[r + 1][c + 1], linePaint);
+          }
+        }
+
+        // Draw small node points at alternate intersections
+        if ((r + c) % 3 == 0) {
+          canvas.drawCircle(pt, 2.0, nodePaint);
+        }
+      }
+    }
+
+    // Border tick marks / scale indicators for technical feel
+    final tickPaint = Paint()
+      ..color = meshColor.withValues(alpha: (meshColor.a * 2.0).clamp(0.0, 1.0))
+      ..strokeWidth = 1.2;
+
+    const double tickLen = 6.0;
+    for (double y = 40; y < size.height - 40; y += 40) {
+      canvas.drawLine(Offset(0, y), Offset(tickLen, y), tickPaint);
+      canvas.drawLine(Offset(size.width - tickLen, y), Offset(size.width, y), tickPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _NetworkTopologyMeshPainter oldDelegate) {
+    return oldDelegate.meshColor != meshColor;
   }
 }

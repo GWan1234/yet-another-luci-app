@@ -1,0 +1,29 @@
+{
+  "projectName": "yet-another-luci-app",
+  "projectOwner": "nightcodex7",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "files": [
+    "README.md",
+    "CONTRIBUTORS.md"
+  ],
+  "imageSize": 100,
+  "commit": false,
+  "contributors": [
+    {
+      "login": "nightcodex7",
+      "name": "Tuhin Garai",
+      "avatar_url": "https://avatars.githubusercontent.com/u/nightcodex7",
+      "profile": "https://github.com/nightcodex7",
+      "contributions": [
+        "code",
+        "design",
+        "doc",
+        "maintenance",
+        "security",
+        "infrastructure"
+      ]
+    }
+  ],
+  "contributorsPerLine": 7
+}

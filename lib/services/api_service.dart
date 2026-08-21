@@ -995,6 +995,40 @@ class RealApiService implements IApiService {
   }
 
   @override
+  Future<List<String>> fetchNetworkInterfaces({
+    required String ipAddress,
+    required String sysauth,
+    required bool useHttps,
+    BuildContext? context,
+  }) async {
+    try {
+      final mCtx = mountedContext(context);
+      final res = await callWithContext(
+        ipAddress, sysauth, useHttps,
+        object: 'uci', method: 'get',
+        params: {'config': 'network'},
+        context: mCtx,
+      );
+      if (res is List && res.length > 1 && res[0] == 0) {
+        final uciData = res[1];
+        final valuesMap = (uciData is Map && uciData['values'] is Map)
+            ? uciData['values'] as Map
+            : (uciData is Map ? uciData : {});
+        final interfaces = <String>[];
+        valuesMap.forEach((key, val) {
+          if (val is Map && val['.type'] == 'interface') {
+            interfaces.add(key);
+          }
+        });
+        return interfaces;
+      }
+      return ['lan', 'wan', 'guest'];
+    } catch (e) {
+      return ['lan', 'wan', 'guest'];
+    }
+  }
+
+  @override
   Future<dynamic> systemExec(
     String ipAddress,
     String sysauth,
@@ -1094,6 +1128,1067 @@ class RealApiService implements IApiService {
   }
 
   @override
+  Future<bool> updateWirelessInterfaceConfig(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String sectionName,
+    required Map<String, String> values,
+    BuildContext? context,
+  }) async {
+    try {
+      final setRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'set',
+        params: {'config': 'wireless', 'section': sectionName, 'values': values},
+        context: mountedContext(context),
+      );
+      if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) {
+        return false;
+      }
+
+      final applyRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'apply',
+        params: {'rollback': false},
+        context: mountedContext(context),
+      );
+      if (applyRes is List && applyRes.isNotEmpty && applyRes[0] == 0) {
+        await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'confirm',
+          context: mountedContext(context),
+        );
+        return true;
+      }
+      return false;
+    } catch (e, stack) {
+      Logger.exception('updateWirelessInterfaceConfig failed for $sectionName', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> revertWirelessInterfaceConfig(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String sectionName,
+    required Map<String, String> priorValues,
+    BuildContext? context,
+  }) async {
+    try {
+      final res = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'revert',
+        params: {'config': 'wireless'},
+        context: mountedContext(context),
+      );
+
+      if (priorValues.isNotEmpty) {
+        await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'set',
+          params: {'config': 'wireless', 'section': sectionName, 'values': priorValues},
+          context: mountedContext(context),
+        );
+        await uciCommit(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
+      }
+
+      final reloadRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': '/sbin/wifi',
+          'params': ['reload'],
+        },
+        context: mountedContext(context),
+      );
+
+      return res is List && res.isNotEmpty && res[0] == 0 && _execSucceeded(reloadRes);
+    } catch (e, stack) {
+      Logger.exception('revertWirelessInterfaceConfig failed for $sectionName', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> updateWirelessRadioConfig(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String sectionName,
+    required Map<String, String> values,
+    BuildContext? context,
+  }) async {
+    try {
+      final setRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'set',
+        params: {'config': 'wireless', 'section': sectionName, 'values': values},
+        context: mountedContext(context),
+      );
+      if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) {
+        return false;
+      }
+
+      final applyRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'apply',
+        params: {'rollback': false},
+        context: mountedContext(context),
+      );
+      if (applyRes is List && applyRes.isNotEmpty && applyRes[0] == 0) {
+        await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'confirm',
+          context: mountedContext(context),
+        );
+        return true;
+      }
+      return false;
+    } catch (e, stack) {
+      Logger.exception('updateWirelessRadioConfig failed for $sectionName', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> revertWirelessRadioConfig(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String sectionName,
+    required Map<String, String> priorValues,
+    BuildContext? context,
+  }) async {
+    try {
+      final res = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'revert',
+        params: {'config': 'wireless'},
+        context: mountedContext(context),
+      );
+
+      if (priorValues.isNotEmpty) {
+        await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'set',
+          params: {'config': 'wireless', 'section': sectionName, 'values': priorValues},
+          context: mountedContext(context),
+        );
+        await uciCommit(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
+      }
+
+      final reloadRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: {
+          'command': '/sbin/wifi',
+          'params': ['reload'],
+        },
+        context: mountedContext(context),
+      );
+
+      return res is List && res.isNotEmpty && res[0] == 0 && _execSucceeded(reloadRes);
+    } catch (e, stack) {
+      Logger.exception('revertWirelessRadioConfig failed for $sectionName', e, stack);
+      return false;
+    }
+  }
+
+  // ─── Anonymous Section Migration Helpers ─────────────────────────────────
+
+  /// Returns the next available wifinet# name that is not already used in the
+  /// current wireless config, by reading all named wifi-iface section names.
+  Future<String> _nextWifinetName(
+    String ipAddress,
+    String sysauth,
+    bool useHttps,
+    BuildContext? context,
+  ) async {
+    try {
+      final res = await callWithContext(
+        ipAddress, sysauth, useHttps,
+        object: 'uci', method: 'get',
+        params: {'config': 'wireless'},
+        context: context,
+      );
+      final usedIndices = <int>{};
+      if (res is List && res.length > 1 && res[0] == 0) {
+        final values = (res[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>?;
+        if (values != null) {
+          for (final key in values.keys) {
+            final match = RegExp(r'^wifinet(\d+)$').firstMatch(key.toString());
+            if (match != null) {
+              final idx = int.tryParse(match.group(1)!);
+              if (idx != null) usedIndices.add(idx);
+            }
+          }
+        }
+      }
+      // Also consider staging/uci changes that might have already been renamed
+      int next = 0;
+      while (usedIndices.contains(next)) {
+        next++;
+      }
+      return 'wifinet$next';
+    } catch (_) {
+      return 'wifinet0';
+    }
+  }
+
+  /// Renames an anonymous section (e.g. cfg033579) to the provided named
+  /// identifier via `uci rename`. Returns true if the rename succeeded.
+  Future<bool> _renameUciSection(
+    String ipAddress,
+    String sysauth,
+    bool useHttps,
+    String config,
+    String anonymousSection,
+    String namedSection,
+    BuildContext? context,
+  ) async {
+    try {
+      final res = await callWithContext(
+        ipAddress, sysauth, useHttps,
+        object: 'uci', method: 'rename',
+        params: {
+          'config': config,
+          'section': anonymousSection,
+          'name': namedSection,
+        },
+        context: context,
+      );
+      return res is List && res.isNotEmpty && res[0] == 0;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<int> migrateAnonymousWirelessSections(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  }) async {
+    try {
+      final res = await callWithContext(
+        ipAddress, sysauth, useHttps,
+        object: 'uci', method: 'get',
+        params: {'config': 'wireless'},
+        context: context,
+      );
+
+      if (res is! List || res.length < 2 || res[0] != 0) return 0;
+      final values = (res[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>?;
+      if (values == null) return 0;
+
+      // Collect existing wifinet indices to avoid collisions when renaming
+      final usedIndices = <int>{};
+      final anonymousSections = <String>[];
+      for (final entry in values.entries) {
+        final key = entry.key.toString();
+        final sectionMap = entry.value;
+        if (sectionMap is Map) {
+          final type = sectionMap['.type']?.toString();
+          final isAnon = sectionMap['.anonymous'] == true ||
+              sectionMap['.anonymous'].toString() == 'true';
+          if (type == 'wifi-iface' && isAnon) {
+            anonymousSections.add(key);
+          } else if (type == 'wifi-iface') {
+            final match = RegExp(r'^wifinet(\d+)$').firstMatch(key);
+            if (match != null) {
+              final idx = int.tryParse(match.group(1)!);
+              if (idx != null) usedIndices.add(idx);
+            }
+          }
+        }
+      }
+
+      if (anonymousSections.isEmpty) return 0;
+
+      int migratedCount = 0;
+      for (final anonSection in anonymousSections) {
+        // Find next unused wifinet# index
+        int idx = 0;
+        while (usedIndices.contains(idx)) {
+          idx++;
+        }
+        final namedSection = 'wifinet$idx';
+        usedIndices.add(idx);
+
+        final renamed = await _renameUciSection(
+          ipAddress, sysauth, useHttps,
+          'wireless', anonSection, namedSection, context,
+        );
+        if (renamed) migratedCount++;
+      }
+
+      // Commit all renames atomically if any succeeded
+      if (migratedCount > 0) {
+        await callWithContext(
+          ipAddress, sysauth, useHttps,
+          object: 'uci', method: 'commit',
+          params: {'config': 'wireless'},
+          context: context,
+        );
+      }
+
+      return migratedCount;
+    } catch (e, stack) {
+      Logger.exception('migrateAnonymousWirelessSections failed', e, stack);
+      return 0;
+    }
+  }
+
+  @override
+  Future<Map<String, List<Map<String, String>>>> fetchWirelessHardwareCapabilities({
+    required String sectionName,
+    String? radioName,
+    required String ipAddress,
+    required String sysauth,
+    required bool useHttps,
+    BuildContext? context,
+  }) async {
+    try {
+      final targetDevice = sectionName.isNotEmpty ? sectionName : (radioName ?? 'wlan0');
+      final mCtx = mountedContext(context);
+
+      final encResult = await callWithContext(
+        ipAddress, sysauth, useHttps,
+        object: 'iwinfo', method: 'encryption',
+        params: {'device': targetDevice},
+        context: mCtx,
+      );
+
+      final cipherResult = await callWithContext(
+        ipAddress, sysauth, useHttps,
+        object: 'iwinfo', method: 'ciphers',
+        params: {'device': targetDevice},
+        context: mCtx,
+      );
+
+      final encList = <Map<String, String>>[];
+      final cipherList = <Map<String, String>>[];
+
+      if (encResult is List && encResult.length > 1 && encResult[0] == 0) {
+        final data = encResult[1];
+        if (data is Map<String, dynamic>) {
+          final encs = data['encryption'] ?? data['encryptions'];
+          if (encs is List) {
+            for (final item in encs) {
+              final val = item.toString().toLowerCase();
+              encList.add({'value': val, 'label': _formatEncLabel(val)});
+            }
+          }
+        }
+      }
+
+      if (cipherResult is List &&
+          cipherResult.length > 1 &&
+          cipherResult[0] == 0) {
+        final data = cipherResult[1];
+        if (data is Map<String, dynamic>) {
+          final ciphers = data['ciphers'];
+          if (ciphers is List) {
+            for (final item in ciphers) {
+              final val = item.toString().toLowerCase();
+              cipherList.add({'value': val, 'label': _formatCipherLabel(val)});
+            }
+          }
+        }
+      }
+
+      if (encList.isNotEmpty || cipherList.isNotEmpty) {
+        return {
+          'encryptions': encList.isNotEmpty ? encList : _fallbackEncryptions(),
+          'ciphers': cipherList.isNotEmpty ? cipherList : _fallbackCiphers(),
+        };
+      }
+    } catch (e) {
+      Logger.debug('fetchWirelessHardwareCapabilities failed for $sectionName: $e');
+    }
+    return {'encryptions': _fallbackEncryptions(), 'ciphers': _fallbackCiphers()};
+  }
+
+  @override
+  Future<Map<String, dynamic>> fetchWirelessRadioCapabilities({
+    required String radioName,
+    required String ipAddress,
+    required String sysauth,
+    required bool useHttps,
+    BuildContext? context,
+  }) async {
+    final result = <String, dynamic>{
+      'countryCodes': <Map<String, String>>[],
+      'channels': <String>[],
+      'htModes': <String>[],
+      'txPowers': <String>[],
+    };
+    try {
+      final targetDevice = radioName.isNotEmpty ? radioName : 'wlan0';
+      final mCtx = mountedContext(context);
+
+      final responses = await Future.wait([
+        callWithContext(
+          ipAddress, sysauth, useHttps,
+          object: 'iwinfo', method: 'countrylist',
+          params: {'device': targetDevice},
+          context: mCtx,
+        ),
+        callWithContext(
+          ipAddress, sysauth, useHttps,
+          object: 'iwinfo', method: 'freqlist',
+          params: {'device': targetDevice},
+          context: mCtx,
+        ),
+        callWithContext(
+          ipAddress, sysauth, useHttps,
+          object: 'iwinfo', method: 'htmodelist',
+          params: {'device': targetDevice},
+          context: mCtx,
+        ),
+        callWithContext(
+          ipAddress, sysauth, useHttps,
+          object: 'iwinfo', method: 'txpowerlist',
+          params: {'device': targetDevice},
+          context: mCtx,
+        ),
+      ]);
+
+      final countryRes = responses[0];
+      final freqRes = responses[1];
+      final htRes = responses[2];
+      final txRes = responses[3];
+
+      // Parse countrylist
+      final countries = <Map<String, String>>[];
+      dynamic countryData;
+      if (countryRes is List && countryRes.length > 1 && countryRes[0] == 0) {
+        countryData = countryRes[1];
+      }
+      if (countryData is Map) {
+        countryData = countryData['results'] ?? countryData['countrylist'];
+      }
+      if (countryData is List) {
+        for (final item in countryData) {
+          if (item is Map) {
+            final code = (item['code'] ?? item['iso'] ?? item['country'])?.toString().toUpperCase();
+            final name = (item['name'] ?? item['country'] ?? code)?.toString();
+            if (code != null && code.isNotEmpty) {
+              countries.add({
+                'code': code,
+                'label': name != null && name != code ? '$code — $name' : '$code — Country Code',
+              });
+            }
+          } else if (item is String && item.isNotEmpty) {
+            final code = item.toUpperCase();
+            countries.add({'code': code, 'label': '$code — Country Code'});
+          }
+        }
+      }
+      if (countries.isNotEmpty) {
+        result['countryCodes'] = countries;
+      }
+
+      // Parse freqlist / channellist
+      final channels = <String>['auto'];
+      dynamic freqData;
+      if (freqRes is List && freqRes.length > 1 && freqRes[0] == 0) {
+        freqData = freqRes[1];
+      }
+      if (freqData is Map) {
+        freqData = freqData['results'] ?? freqData['freqlist'] ?? freqData['channellist'];
+      }
+      if (freqData is List) {
+        for (final item in freqData) {
+          if (item is Map && item['channel'] != null) {
+            final ch = item['channel'].toString();
+            if (!channels.contains(ch)) channels.add(ch);
+          } else if (item != null) {
+            final ch = item.toString();
+            if (!channels.contains(ch)) channels.add(ch);
+          }
+        }
+      }
+      if (channels.length > 1) {
+        result['channels'] = channels;
+      }
+
+      // Parse htmodelist
+      final htModes = <String>[];
+      dynamic htData;
+      if (htRes is List && htRes.length > 1 && htRes[0] == 0) {
+        htData = htRes[1];
+      }
+      if (htData is Map) {
+        final resObj = htData['results'] ?? htData['htmodelist'];
+        if (resObj is Map) {
+          resObj.forEach((k, v) {
+            if (v == true || v == 1 || v == '1') htModes.add(k.toString());
+          });
+        } else if (resObj is List) {
+          htData = resObj;
+        }
+      }
+      if (htData is List) {
+        for (final item in htData) {
+          if (item != null && item.toString().isNotEmpty) {
+            htModes.add(item.toString());
+          }
+        }
+      }
+      if (htModes.isEmpty) {
+        try {
+          final infoRes = await callWithContext(
+            ipAddress, sysauth, useHttps,
+            object: 'iwinfo', method: 'info',
+            params: {'device': targetDevice},
+            context: mCtx,
+          );
+          if (infoRes is List && infoRes.length > 1 && infoRes[0] == 0 && infoRes[1] is Map) {
+            final infoMap = infoRes[1] as Map;
+            final modesList = infoMap['htmodes'];
+            if (modesList is List) {
+              for (final item in modesList) {
+                if (item != null && item.toString().isNotEmpty) {
+                  htModes.add(item.toString());
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (htModes.isNotEmpty) {
+        result['htModes'] = htModes;
+      }
+
+      // Parse txpowerlist
+      final txPowers = <String>['auto'];
+      dynamic txData;
+      if (txRes is List && txRes.length > 1 && txRes[0] == 0) {
+        txData = txRes[1];
+      }
+      if (txData is Map) {
+        txData = txData['results'] ?? txData['txpowerlist'];
+      }
+      if (txData is List) {
+        for (final item in txData) {
+          if (item is Map && item['dbm'] != null) {
+            final dbm = item['dbm'].toString();
+            if (!txPowers.contains(dbm)) txPowers.add(dbm);
+          } else if (item != null) {
+            final pwr = item.toString();
+            if (!txPowers.contains(pwr)) txPowers.add(pwr);
+          }
+        }
+      }
+      if (txPowers.length > 1) {
+        result['txPowers'] = txPowers;
+      }
+    } catch (e) {
+      Logger.debug('fetchWirelessRadioCapabilities failed for $radioName: $e');
+    }
+    return result;
+  }
+
+  List<Map<String, String>> _fallbackEncryptions() => [
+    {'value': 'sae', 'label': 'WPA3-SAE (Personal / Strict)'},
+    {'value': 'sae-mixed', 'label': 'WPA2/WPA3 Mixed (Transitional)'},
+    {'value': 'psk2', 'label': 'WPA2-PSK (CCMP / AES)'},
+    {'value': 'psk', 'label': 'WPA-PSK (Legacy / WPA1)'},
+    {'value': 'owe', 'label': 'Enhanced Open (OWE)'},
+    {'value': 'none', 'label': 'Open / No Encryption'},
+  ];
+
+  List<Map<String, String>> _fallbackCiphers() => [
+    {'value': 'auto', 'label': 'Auto (Hardware Default)'},
+    {'value': 'ccmp', 'label': 'CCMP (AES)'},
+    {'value': 'gcmp256', 'label': 'GCMP-256 (High Security)'},
+    {'value': 'gcmp128', 'label': 'GCMP-128'},
+    {'value': 'tkip', 'label': 'TKIP (Legacy)'},
+  ];
+
+  String _formatEncLabel(String raw) {
+    switch (raw) {
+      case 'sae':
+        return 'WPA3-SAE (Personal / Strict)';
+      case 'psk2+ccmp':
+      case 'psk2':
+        return 'WPA2-PSK (CCMP / AES)';
+      case 'psk+ccmp':
+      case 'psk':
+        return 'WPA-PSK (Legacy / WPA1)';
+      case 'owe':
+        return 'Enhanced Open (OWE)';
+      case 'none':
+        return 'Open / No Encryption';
+      case 'sae-mixed':
+      case 'psk2+sae':
+        return 'WPA2/WPA3 Mixed (Transitional)';
+      default:
+        return raw.toUpperCase();
+    }
+  }
+
+  String _formatCipherLabel(String raw) {
+    switch (raw) {
+      case 'auto':
+        return 'Auto (Hardware Default)';
+      case 'ccmp':
+        return 'CCMP (AES)';
+      case 'gcmp-256':
+      case 'gcmp256':
+        return 'GCMP-256 (High Security)';
+      case 'gcmp-128':
+      case 'gcmp128':
+        return 'GCMP-128';
+      case 'tkip':
+        return 'TKIP (Legacy)';
+      default:
+        return raw.toUpperCase();
+    }
+  }
+
+  @override
+  Future<bool> addWirelessInterface(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String radioName,
+    required String ssid,
+    required String encryption,
+    required String key,
+    required String network,
+    BuildContext? context,
+  }) async {
+    try {
+      final addRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'add',
+        params: {'config': 'wireless', 'type': 'wifi-iface'},
+        context: mountedContext(context),
+      );
+
+      String? sectionName;
+      if (addRes is List && addRes.isNotEmpty && addRes[0] == 0 && addRes.length > 1) {
+        final data = addRes[1];
+        if (data is Map && data['section'] != null) {
+          sectionName = data['section'].toString();
+        } else if (data is String) {
+          sectionName = data;
+        }
+      }
+
+      if (sectionName == null || sectionName.isEmpty) {
+        return false;
+      }
+
+      // Immediately rename anonymous cfg###### section to wifinet# to prevent
+      // LuCI "Wireless configuration migration" dialog on next UI visit.
+      final namedSection = await _nextWifinetName(
+        ipAddress, sysauth, useHttps, mountedContext(context),
+      );
+      final renamed = await _renameUciSection(
+        ipAddress, sysauth, useHttps,
+        'wireless', sectionName, namedSection, mountedContext(context),
+      );
+      if (renamed) sectionName = namedSection;
+
+      final values = <String, String>{
+        'device': radioName,
+        'mode': 'ap',
+        'network': network,
+        'ssid': ssid,
+        'encryption': encryption,
+        'disabled': '0',
+      };
+      if (encryption != 'none' && key.isNotEmpty) {
+        values['key'] = key;
+      }
+      if (encryption == 'sae' || encryption == 'sae-mixed') {
+        values['ieee80211w'] = encryption == 'sae' ? '2' : '1';
+      }
+
+      final setRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'set',
+        params: {'config': 'wireless', 'section': sectionName, 'values': values},
+        context: mountedContext(context),
+      );
+
+      if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) {
+        return false;
+      }
+
+      final applyRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'apply',
+        params: {'rollback': false},
+        context: mountedContext(context),
+      );
+      if (applyRes is List && applyRes.isNotEmpty && applyRes[0] == 0) {
+        await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'confirm',
+          context: mountedContext(context),
+        );
+        return true;
+      }
+      return false;
+    } catch (e, stack) {
+      Logger.exception('addWirelessInterface failed for radio $radioName', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> deleteWirelessInterface(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String sectionName,
+    BuildContext? context,
+  }) async {
+    try {
+      final delRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'delete',
+        params: {'config': 'wireless', 'section': sectionName},
+        context: mountedContext(context),
+      );
+
+      if (delRes is List && delRes.isNotEmpty && delRes[0] != 0) {
+        return false;
+      }
+
+      final applyRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'apply',
+        params: {'rollback': false},
+        context: mountedContext(context),
+      );
+      if (applyRes is List && applyRes.isNotEmpty && applyRes[0] == 0) {
+        await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'confirm',
+          context: mountedContext(context),
+        );
+        return true;
+      }
+      return false;
+    } catch (e, stack) {
+      Logger.exception('deleteWirelessInterface failed for $sectionName', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> provisionGuestNetwork(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String radioName,
+    required String ssid,
+    required String encryption,
+    required String key,
+    String guestIp = '192.168.2.1',
+    bool isolateClients = true,
+    String network = 'guest',
+    // Advanced radio settings
+    String? country,
+    String? channel,
+    String? htMode,
+    String? txPower,
+    // Fast roaming (802.11r/k/v)
+    bool ieee80211r = false,
+    bool ftOverDs = false,
+    bool ftPskGenerateLocal = false,
+    String? mobilityDomain,
+    // Wireless advanced settings
+    bool wmm = true,
+    bool hidden = false,
+    int? dtimPeriod,
+    int? gtkRekey,
+    int? inactivityLimit,
+    int? maxListenInterval,
+    bool disassocLowAck = true,
+    bool multicastToUnicast = false,
+    bool wds = false,
+    // MAC filtering
+    String? macfilter,
+    List<String>? maclist,
+    BuildContext? context,
+  }) async {
+    try {
+      final mCtx = mountedContext(context);
+
+      // Step 1 & 2: Configure network and DHCP only if creating the default 'guest' network
+      // If using a different network, assume it already exists with proper DHCP/firewall config
+      if (network == 'guest') {
+        // Configure /etc/config/network interface 'guest'
+        await callWithContext(
+          ipAddress, sysauth, useHttps,
+          object: 'uci', method: 'set',
+          params: {
+            'config': 'network',
+            'section': 'guest',
+            'values': {
+              'proto': 'static',
+              'ipaddr': guestIp,
+              'netmask': '255.255.255.0',
+            },
+          },
+          context: mCtx,
+        );
+
+        // Configure /etc/config/dhcp section 'guest'
+        await callWithContext(
+          ipAddress, sysauth, useHttps,
+          object: 'uci', method: 'set',
+          params: {
+            'config': 'dhcp',
+            'section': 'guest',
+            'values': {
+              'interface': 'guest',
+              'start': '100',
+              'limit': '150',
+              'leasetime': '12h',
+            },
+          },
+          context: mCtx,
+        );
+
+        // Step 3: Configure /etc/config/firewall zone and forwarding for guest
+        await callWithContext(
+          ipAddress, sysauth, useHttps,
+          object: 'uci', method: 'set',
+          params: {
+            'config': 'firewall',
+            'section': 'zone_guest',
+            'values': {
+              'name': 'guest',
+              'network': ['guest'],
+              'input': 'ACCEPT',
+              'output': 'ACCEPT',
+              'forward': 'REJECT',
+            },
+          },
+          context: mCtx,
+        );
+
+        await callWithContext(
+          ipAddress, sysauth, useHttps,
+          object: 'uci', method: 'set',
+          params: {
+            'config': 'firewall',
+            'section': 'fwd_guest_wan',
+            'values': {
+              'src': 'guest',
+              'dest': 'wan',
+            },
+          },
+          context: mCtx,
+        );
+      }
+
+      // Step 4: Add wireless interface for guest SSID
+      final addWifiRes = await callWithContext(
+        ipAddress, sysauth, useHttps,
+        object: 'uci', method: 'add',
+        params: {'config': 'wireless', 'type': 'wifi-iface'},
+        context: mCtx,
+      );
+
+      String? sectionName;
+      if (addWifiRes is List && addWifiRes.isNotEmpty && addWifiRes[0] == 0 && addWifiRes.length > 1) {
+        final data = addWifiRes[1];
+        if (data is Map && data['section'] != null) {
+          sectionName = data['section'].toString();
+        } else if (data is String) {
+          sectionName = data;
+        }
+      }
+
+      if (sectionName == null || sectionName.isEmpty) {
+        return false;
+      }
+
+      // Immediately rename anonymous cfg###### section to wifinet# to prevent
+      // LuCI "Wireless configuration migration" dialog on next UI visit.
+      final namedGuestSection = await _nextWifinetName(ipAddress, sysauth, useHttps, mCtx);
+      final guestRenamed = await _renameUciSection(
+        ipAddress, sysauth, useHttps,
+        'wireless', sectionName, namedGuestSection, mCtx,
+      );
+      if (guestRenamed) sectionName = namedGuestSection;
+
+      final wifiValues = <String, String>{
+        'device': radioName,
+        'mode': 'ap',
+        'network': network,
+        'ssid': ssid,
+        'encryption': encryption,
+        'isolate': isolateClients ? '1' : '0',
+        'disabled': '0',
+      };
+
+      // Add advanced radio settings
+      if (country != null && country.isNotEmpty) {
+        wifiValues['country'] = country;
+      }
+      if (channel != null && channel.isNotEmpty) {
+        wifiValues['channel'] = channel;
+      }
+      if (htMode != null && htMode.isNotEmpty) {
+        wifiValues['htmode'] = htMode;
+      }
+      if (txPower != null && txPower.isNotEmpty && txPower != 'auto') {
+        wifiValues['txpower'] = txPower;
+      }
+
+      // Add encryption and key
+      if (encryption != 'none' && key.isNotEmpty) {
+        wifiValues['key'] = key;
+      }
+
+      // Handle PMF (ieee80211w) for SAE/SAE-mixed and 802.11r
+      if (encryption == 'sae' || encryption == 'sae-mixed' || ieee80211r) {
+        if (encryption == 'sae') {
+          wifiValues['ieee80211w'] = '2'; // Required for WPA3-SAE
+        } else if (encryption == 'sae-mixed' || ieee80211r) {
+          wifiValues['ieee80211w'] = '1'; // Optional for transitional or 802.11r
+        }
+      }
+
+      // Fast roaming (802.11r/k/v)
+      if (ieee80211r) {
+        wifiValues['ieee80211r'] = '1';
+        if (ftOverDs) wifiValues['ft_over_ds'] = '1';
+        if (ftPskGenerateLocal) wifiValues['ft_psk_generate_local'] = '1';
+        if (mobilityDomain != null && mobilityDomain.isNotEmpty) {
+          wifiValues['mobility_domain'] = mobilityDomain;
+        }
+      }
+
+      // Wireless advanced settings
+      wifiValues['wmm'] = wmm ? '1' : '0';
+      wifiValues['hidden'] = hidden ? '1' : '0';
+
+      if (dtimPeriod != null) {
+        wifiValues['dtim_period'] = dtimPeriod.toString();
+      }
+      if (gtkRekey != null) {
+        wifiValues['gtk_rekey'] = gtkRekey.toString();
+      }
+      if (inactivityLimit != null) {
+        wifiValues['inactivity_limit'] = inactivityLimit.toString();
+      }
+      if (maxListenInterval != null) {
+        wifiValues['max_listen_interval'] = maxListenInterval.toString();
+      }
+      wifiValues['disassoc_low_ack'] = disassocLowAck ? '1' : '0';
+      wifiValues['multicast_to_unicast'] = multicastToUnicast ? '1' : '0';
+      wifiValues['wds'] = wds ? '1' : '0';
+
+      // MAC filtering
+      if (macfilter != null && macfilter.isNotEmpty && macfilter != 'disable') {
+        wifiValues['macfilter'] = macfilter;
+        if (maclist != null && maclist.isNotEmpty) {
+          wifiValues['maclist'] = maclist.join(' ');
+        }
+      }
+
+      await callWithContext(
+        ipAddress, sysauth, useHttps,
+        object: 'uci', method: 'set',
+        params: {'config': 'wireless', 'section': sectionName, 'values': wifiValues},
+        context: mCtx,
+      );
+
+      // Step 5: Execute cross-config atomic apply and immediately confirm to persist changes
+      final applyRes = await callWithContext(
+        ipAddress, sysauth, useHttps,
+        object: 'uci', method: 'apply',
+        params: {'rollback': false},
+        context: mCtx,
+      );
+      if (applyRes is List && applyRes.isNotEmpty && applyRes[0] == 0) {
+        await callWithContext(
+          ipAddress, sysauth, useHttps,
+          object: 'uci', method: 'confirm',
+          context: mCtx,
+        );
+        return true;
+      }
+      return false;
+    } catch (e, stack) {
+      Logger.exception('provisionGuestNetwork failed for radio $radioName', e, stack);
+      return false;
+    }
+  }
+
+  @override
   Future<bool> setWifiAccessControl(
     String ipAddress,
     String sysauth,
@@ -1133,7 +2228,7 @@ class RealApiService implements IApiService {
         useHttps,
         object: 'uci',
         method: 'apply',
-        params: {'rollback': true, 'timeout': 25},
+        params: {'rollback': false},
         context: mountedContext(context),
       );
       return applyRes is List && applyRes.isNotEmpty && applyRes[0] == 0;
@@ -1552,6 +2647,7 @@ exit 0
     final macLower = macAddress.toLowerCase();
     final macClean = macUpper.replaceAll(':', '');
     final ruleName = "nointernet_wireless_clients";
+    bool modified = false;
 
     try {
       final getRes = await callWithContext(
@@ -1571,12 +2667,58 @@ exit 0
           final sec = entry.value;
           if (sec is Map<String, dynamic>) {
             final name = sec['name']?.toString() ?? '';
+            final target = sec['target']?.toString().toUpperCase() ?? '';
             final srcMac = sec['src_mac'];
-            List<String> macs = srcMac is List ? srcMac.map((e) => e.toString().toUpperCase()).toList() : (srcMac != null ? [srcMac.toString().toUpperCase()] : []);
-            
-            if (name == ruleName) {
-              macs.removeWhere((m) => m == macUpper || m.toLowerCase() == macLower);
-              if (macs.isEmpty) {
+            final destMac = sec['dest_mac'];
+
+            List<String> macs = [];
+            if (srcMac is List) {
+              macs.addAll(srcMac.map((e) => e.toString().toUpperCase().replaceAll('-', ':')));
+            } else if (srcMac != null) {
+              macs.add(srcMac.toString().toUpperCase().replaceAll('-', ':'));
+            }
+            if (destMac is List) {
+              macs.addAll(destMac.map((e) => e.toString().toUpperCase().replaceAll('-', ':')));
+            } else if (destMac != null) {
+              macs.add(destMac.toString().toUpperCase().replaceAll('-', ':'));
+            }
+
+            final matchesTargetMac = macs.any((m) => m == macUpper || m.toLowerCase() == macLower);
+            final isBlockTarget = target == 'DROP' || target == 'REJECT' || target == 'STOP' ||
+                name.startsWith('Pause_Internet_') ||
+                name.startsWith('Ban_Client_') ||
+                name.startsWith('Kick_Client_') ||
+                name == ruleName;
+
+            if (matchesTargetMac && isBlockTarget) {
+              if (name == ruleName || macs.length > 1) {
+                macs.removeWhere((m) => m == macUpper || m.toLowerCase() == macLower);
+                if (macs.isEmpty) {
+                  await callWithContext(
+                    ipAddress,
+                    sysauth,
+                    useHttps,
+                    object: 'uci',
+                    method: 'delete',
+                    params: {'config': 'firewall', 'section': secKey},
+                    context: mountedContext(context),
+                  );
+                } else {
+                  await callWithContext(
+                    ipAddress,
+                    sysauth,
+                    useHttps,
+                    object: 'uci',
+                    method: 'set',
+                    params: {
+                      'config': 'firewall',
+                      'section': secKey,
+                      'values': {'src_mac': macs},
+                    },
+                    context: mountedContext(context),
+                  );
+                }
+              } else {
                 await callWithContext(
                   ipAddress,
                   sysauth,
@@ -1586,54 +2728,31 @@ exit 0
                   params: {'config': 'firewall', 'section': secKey},
                   context: mountedContext(context),
                 );
-              } else {
-                await callWithContext(
-                  ipAddress,
-                  sysauth,
-                  useHttps,
-                  object: 'uci',
-                  method: 'set',
-                  params: {
-                    'config': 'firewall',
-                    'section': secKey,
-                    'values': {'src_mac': macs},
-                  },
-                  context: mountedContext(context),
-                );
               }
-            } else if (name.startsWith('Pause_Internet_$macClean') ||
-                       name.startsWith('Ban_Client_$macClean') ||
-                       name.startsWith('Kick_Client_$macClean')) {
-              await callWithContext(
-                ipAddress,
-                sysauth,
-                useHttps,
-                object: 'uci',
-                method: 'delete',
-                params: {'config': 'firewall', 'section': secKey},
-                context: mountedContext(context),
-              );
+              modified = true;
             }
           }
         }
-        await callWithContext(
-          ipAddress,
-          sysauth,
-          useHttps,
-          object: 'uci',
-          method: 'commit',
-          params: {'config': 'firewall'},
-          context: mountedContext(context),
-        );
-        await callWithContext(
-          ipAddress,
-          sysauth,
-          useHttps,
-          object: 'rc',
-          method: 'init',
-          params: {'name': 'firewall', 'action': 'reload'},
-          context: mountedContext(context),
-        );
+        if (modified) {
+          await callWithContext(
+            ipAddress,
+            sysauth,
+            useHttps,
+            object: 'uci',
+            method: 'commit',
+            params: {'config': 'firewall'},
+            context: mountedContext(context),
+          );
+          await callWithContext(
+            ipAddress,
+            sysauth,
+            useHttps,
+            object: 'rc',
+            method: 'init',
+            params: {'name': 'firewall', 'action': 'reload'},
+            context: mountedContext(context),
+          );
+        }
       }
     } catch (e) {
       Logger.warning('Native ubus firewall remove encountered issue: $e');
@@ -1645,22 +2764,23 @@ MAC_L="$macLower"
 CLEAN="$macClean"
 RULE_NAME="$ruleName"
 
-SEC=\$(uci show firewall 2>/dev/null | grep -i "name=['"]*\${RULE_NAME}['"]*" | cut -d. -f2)
-if [ -n "\$SEC" ]; then
-  uci del_list firewall.\${SEC}.src_mac="\$MAC_U" 2>/dev/null || true
-  uci del_list firewall.\${SEC}.src_mac="\$MAC_L" 2>/dev/null || true
-  REMAINING=\$(uci get firewall.\${SEC}.src_mac 2>/dev/null | tr ' ' '\\n' | grep -v "^\$" | wc -l)
+for sec in \$(uci show firewall 2>/dev/null | grep -iE "src_mac|dest_mac" | grep -i "\$MAC_U" | cut -d. -f2); do
+  uci del_list firewall.\${sec}.src_mac="\$MAC_U" 2>/dev/null || true
+  uci del_list firewall.\${sec}.src_mac="\$MAC_L" 2>/dev/null || true
+  uci del_list firewall.\${sec}.dest_mac="\$MAC_U" 2>/dev/null || true
+  uci del_list firewall.\${sec}.dest_mac="\$MAC_L" 2>/dev/null || true
+  REMAINING=\$(uci get firewall.\${sec}.src_mac 2>/dev/null | tr ' ' '\\n' | grep -v "^\$" | wc -l)
   if [ "\$REMAINING" -eq 0 ]; then
-    uci delete firewall.\${SEC} 2>/dev/null || true
+    uci delete firewall.\${sec} 2>/dev/null || true
   fi
-fi
+done
 
-for legacy in \$(uci show firewall 2>/dev/null | grep -iE "Pause_Internet_\${CLEAN}|Ban_Client_\${CLEAN}" | cut -d. -f2); do
+for legacy in \$(uci show firewall 2>/dev/null | grep -iE "Pause_Internet_\${CLEAN}|Ban_Client_\${CLEAN}|Kick_Client_\${CLEAN}" | cut -d. -f2); do
   uci delete firewall.\${legacy} 2>/dev/null || true
 done
 
 uci commit firewall
-/etc/init.d/firewall reload >/dev/null 2>&1
+/etc/init.d/firewall reload >/dev/null 2>&1 || true
 
 nft delete rule inet fw4 forward ether saddr "\$MAC_U" >/dev/null 2>&1 || true
 nft delete rule inet fw4 forward ether saddr "\$MAC_L" >/dev/null 2>&1 || true
@@ -1669,15 +2789,131 @@ iptables -D FORWARD -m mac --mac-source "\$MAC_L" -j DROP >/dev/null 2>&1 || tru
 exit 0
 ''';
 
-    await callWithContext(
-      ipAddress,
-      sysauth,
-      useHttps,
-      object: 'file',
-      method: 'exec',
-      params: fileExecParams('/bin/sh', ['-c', script]),
-      context: mountedContext(context),
-    );
+    try {
+      await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: fileExecParams('/bin/sh', ['-c', script]),
+        context: mountedContext(context),
+      );
+    } catch (e) {
+      Logger.warning('_removeFirewallBlock shell script error: $e');
+    }
+
+    return true;
+  }
+
+  /// Removes wireless MAC-filter ban rules for the specified client MAC.
+  Future<bool> _removeWirelessMacFilter({
+    required String ipAddress,
+    required String sysauth,
+    required bool useHttps,
+    required String macAddress,
+    BuildContext? context,
+  }) async {
+    final macUpper = macAddress.toUpperCase().replaceAll('-', ':');
+    final macLower = macAddress.toLowerCase();
+    bool modified = false;
+
+    try {
+      final getRes = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'get',
+        params: {'config': 'wireless'},
+        context: mountedContext(context),
+      );
+
+      if (getRes is List && getRes.length > 1 && getRes[0] == 0) {
+        final values = (getRes[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>? ?? {};
+        for (final entry in values.entries) {
+          final secKey = entry.key;
+          final sec = entry.value;
+          if (sec is Map<String, dynamic>) {
+            final macfilter = sec['macfilter']?.toString().toLowerCase();
+            if (macfilter == 'deny' || macfilter == '2') {
+              final rawMaclist = sec['maclist'];
+              List<String> macs = rawMaclist is List
+                  ? rawMaclist.map((e) => e.toString().toUpperCase().replaceAll('-', ':')).toList()
+                  : (rawMaclist != null ? [rawMaclist.toString().toUpperCase().replaceAll('-', ':')] : []);
+
+              if (macs.any((m) => m == macUpper || m.toLowerCase() == macLower)) {
+                macs.removeWhere((m) => m == macUpper || m.toLowerCase() == macLower);
+                await callWithContext(
+                  ipAddress,
+                  sysauth,
+                  useHttps,
+                  object: 'uci',
+                  method: 'set',
+                  params: {
+                    'config': 'wireless',
+                    'section': secKey,
+                    'values': {'maclist': macs},
+                  },
+                  context: mountedContext(context),
+                );
+                modified = true;
+              }
+            }
+          }
+        }
+        if (modified) {
+          await callWithContext(
+            ipAddress,
+            sysauth,
+            useHttps,
+            object: 'uci',
+            method: 'commit',
+            params: {'config': 'wireless'},
+            context: mountedContext(context),
+          );
+          await callWithContext(
+            ipAddress,
+            sysauth,
+            useHttps,
+            object: 'network.wireless',
+            method: 'up',
+            params: {},
+            context: mountedContext(context),
+          );
+        }
+      }
+    } catch (e) {
+      Logger.warning('_removeWirelessMacFilter ubus error: $e');
+    }
+
+    final script = '''
+MAC_U="$macUpper"
+MAC_L="$macLower"
+
+for sec in \$(uci show wireless 2>/dev/null | grep -i "maclist" | grep -i "\$MAC_U" | cut -d. -f2); do
+  uci del_list wireless.\${sec}.maclist="\$MAC_U" 2>/dev/null || true
+  uci del_list wireless.\${sec}.maclist="\$MAC_L" 2>/dev/null || true
+done
+
+uci commit wireless
+wifi reload >/dev/null 2>&1 || ubus call network.wireless reload >/dev/null 2>&1 || true
+exit 0
+''';
+
+    try {
+      await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: fileExecParams('/bin/sh', ['-c', script]),
+        context: mountedContext(context),
+      );
+    } catch (e) {
+      Logger.warning('_removeWirelessMacFilter shell error: $e');
+    }
 
     return true;
   }
@@ -1854,13 +3090,21 @@ exit 0
     required String macAddress,
     BuildContext? context,
   }) async {
-    return _removeFirewallBlock(
+    final fwOk = await _removeFirewallBlock(
       ipAddress: ipAddress,
       sysauth: sysauth,
       useHttps: useHttps,
       macAddress: macAddress,
       context: context,
     );
+    final wifiOk = await _removeWirelessMacFilter(
+      ipAddress: ipAddress,
+      sysauth: sysauth,
+      useHttps: useHttps,
+      macAddress: macAddress,
+      context: context,
+    );
+    return fwOk && wifiOk;
   }
 
   @override
@@ -1872,13 +3116,13 @@ exit 0
   }) async {
     try {
       final script = '''
-RESTRICTED_MACS=\$(uci show firewall 2>/dev/null | grep -iE "target=['"]*(DROP|REJECT)['"]*|nointernet_wireless_clients|Pause_Internet_|Ban_Client_" -B 2 -A 25 | grep -i "src_mac" | grep -oE "([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}" || true)
+RESTRICTED_MACS=\$(uci show firewall 2>/dev/null | grep -iE "(src_mac|dest_mac|target|name)" -B 5 -A 5 | grep -iE "src_mac|dest_mac" | grep -oE "([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}" || true)
 NFT_MACS=\$(nft list chain inet fw4 forward 2>/dev/null | grep -iE "drop|reject" | grep -oE "([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}" || true)
 IPT_MACS=\$(iptables -L FORWARD -v -n 2>/dev/null | grep -iE "DROP|REJECT" | grep -oE "([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}" || true)
 
 ALL_RESTRICTED=\$(echo "\$RESTRICTED_MACS \$NFT_MACS \$IPT_MACS" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^FF:FF:FF:FF:FF:FF\$" | sort -u | grep -v "^\$")
 
-BANNED_MACS=\$(uci show wireless 2>/dev/null | grep -iE "macfilter=['"]*(deny|2)['"]*" -A 5 | grep -i "maclist" | grep -oE "([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}" || true)
+BANNED_MACS=\$(uci show wireless 2>/dev/null | grep -iE "macfilter=['"]*(deny|2)['"]*" -A 10 | grep -i "maclist" | grep -oE "([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}" || true)
 
 ALL_BANNED=\$(echo "\$BANNED_MACS" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^FF:FF:FF:FF:FF:FF\$" | sort -u | grep -v "^\$")
 
@@ -1917,11 +3161,11 @@ echo "\$ALL_BANNED"
         return cachedHostHints!;
       }
 
+      final hostHints = await getHostHints();
+
       if (res is List && res.length > 1 && res[0] == 0) {
         final resMap = res[1] as Map<String, dynamic>?;
         final stdout = resMap?['stdout']?.toString() ?? '';
-
-        final hostHints = await getHostHints();
 
         String currentSection = '';
         for (final line in stdout.split('\n')) {
@@ -1952,52 +3196,61 @@ echo "\$ALL_BANNED"
               'name': name,
               'ip': ip,
               'type': currentSection,
+              'source': currentSection == 'restricted' ? 'Firewall / Traffic Rule' : 'Wireless MAC Filter',
             };
 
-            if (currentSection == 'restricted') {
+            if (currentSection == 'restricted' && !result['restricted']!.any((e) => e['mac'] == macUpper)) {
               result['restricted']!.add(entry);
-            } else if (currentSection == 'banned') {
+            } else if (currentSection == 'banned' && !result['banned']!.any((e) => e['mac'] == macUpper)) {
               result['banned']!.add(entry);
             }
           }
         }
       }
 
-      if (result['restricted']!.isEmpty && result['banned']!.isEmpty) {
-        try {
-          final wirelessRes = await callWithContext(
-            ipAddress,
-            sysauth,
-            useHttps,
-            object: 'uci',
-            method: 'get',
-            params: {'config': 'wireless'},
-            context: mountedContext(context),
-          );
-          if (wirelessRes is List && wirelessRes.length > 1 && wirelessRes[0] == 0) {
-            final values = (wirelessRes[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>?;
-            if (values != null) {
-              final hostHints = await getHostHints();
-              for (final sec in values.values) {
-                if (sec is Map<String, dynamic>) {
-                  final macfilter = sec['macfilter']?.toString().toLowerCase();
-                  if (macfilter == 'deny' || macfilter == '2') {
-                    final maclist = sec['maclist'];
-                    final macs = maclist is List ? maclist : (maclist != null ? [maclist] : []);
-                    for (final m in macs) {
-                      final mStr = m.toString();
-                      if (mStr.isNotEmpty && (mStr.contains(':') || mStr.contains('-'))) {
-                        final macUpper = mStr.toUpperCase().replaceAll('-', ':');
-                        if (macUpper != '00:00:00:00:00:00' && macUpper != 'FF:FF:FF:FF:FF:FF' && !result['banned']!.any((e) => e['mac'] == macUpper)) {
-                          final rawHint = hostHints[macUpper] ?? hostHints[macUpper.toLowerCase()];
-                          final hint = rawHint is Map<String, dynamic> ? rawHint : <String, dynamic>{};
-                          final name = hint['name']?.toString() ?? hint['staticLeaseName']?.toString() ?? macUpper;
+      // ALWAYS perform structured UCI parsing to discover manual LuCI Web UI rules and rule names!
+      try {
+        final wirelessRes = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'get',
+          params: {'config': 'wireless'},
+          context: mountedContext(context),
+        );
+        if (wirelessRes is List && wirelessRes.length > 1 && wirelessRes[0] == 0) {
+          final values = (wirelessRes[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>?;
+          if (values != null) {
+            for (final sec in values.values) {
+              if (sec is Map<String, dynamic>) {
+                final macfilter = sec['macfilter']?.toString().toLowerCase();
+                if (macfilter == 'deny' || macfilter == '2') {
+                  final maclist = sec['maclist'];
+                  final macs = maclist is List ? maclist : (maclist != null ? [maclist] : []);
+                  final ssid = sec['ssid']?.toString();
+                  for (final m in macs) {
+                    final mStr = m.toString();
+                    if (mStr.isNotEmpty && (mStr.contains(':') || mStr.contains('-'))) {
+                      final macUpper = mStr.toUpperCase().replaceAll('-', ':');
+                      if (macUpper != '00:00:00:00:00:00' && macUpper != 'FF:FF:FF:FF:FF:FF') {
+                        final rawHint = hostHints[macUpper] ?? hostHints[macUpper.toLowerCase()];
+                        final hint = rawHint is Map<String, dynamic> ? rawHint : <String, dynamic>{};
+                        final name = hint['name']?.toString() ?? hint['staticLeaseName']?.toString() ?? macUpper;
+                        final existing = result['banned']!.firstWhere(
+                          (e) => e['mac'] == macUpper,
+                          orElse: () => <String, dynamic>{},
+                        );
+                        if (existing.isEmpty) {
                           result['banned']!.add({
                             'mac': macUpper,
                             'name': name,
                             'ip': 'N/A',
                             'type': 'banned',
+                            'source': ssid != null && ssid.isNotEmpty ? 'Wi-Fi MAC Filter ($ssid)' : 'Wireless MAC Filter',
                           });
+                        } else if (ssid != null && ssid.isNotEmpty) {
+                          existing['source'] = 'Wi-Fi MAC Filter ($ssid)';
                         }
                       }
                     }
@@ -2006,41 +3259,70 @@ echo "\$ALL_BANNED"
               }
             }
           }
+        }
 
-          final firewallRes = await callWithContext(
-            ipAddress,
-            sysauth,
-            useHttps,
-            object: 'uci',
-            method: 'get',
-            params: {'config': 'firewall'},
-            context: mountedContext(context),
-          );
-          if (firewallRes is List && firewallRes.length > 1 && firewallRes[0] == 0) {
-            final values = (firewallRes[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>?;
-            if (values != null) {
-              final hostHints = await getHostHints();
-              for (final sec in values.values) {
-                if (sec is Map<String, dynamic>) {
-                  final target = sec['target']?.toString().toUpperCase();
-                  final name = sec['name']?.toString();
-                  if (target == 'DROP' || target == 'REJECT' || (name != null && (name.startsWith('Pause_Internet_') || name.startsWith('Ban_Client_') || name.startsWith('Kick_Client_')))) {
-                    final srcMac = sec['src_mac'];
-                    final macs = srcMac is List ? srcMac : (srcMac != null ? [srcMac] : []);
-                    for (final m in macs) {
-                      final mStr = m.toString();
-                      if (mStr.isNotEmpty && (mStr.contains(':') || mStr.contains('-'))) {
-                        final macUpper = mStr.toUpperCase().replaceAll('-', ':');
-                        if (macUpper != '00:00:00:00:00:00' && macUpper != 'FF:FF:FF:FF:FF:FF' && !result['restricted']!.any((e) => e['mac'] == macUpper)) {
-                          final rawHint = hostHints[macUpper] ?? hostHints[macUpper.toLowerCase()];
-                          final hint = rawHint is Map<String, dynamic> ? rawHint : <String, dynamic>{};
-                          final name = hint['name']?.toString() ?? hint['staticLeaseName']?.toString() ?? macUpper;
+        final firewallRes = await callWithContext(
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'get',
+          params: {'config': 'firewall'},
+          context: mountedContext(context),
+        );
+        if (firewallRes is List && firewallRes.length > 1 && firewallRes[0] == 0) {
+          final values = (firewallRes[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>?;
+          if (values != null) {
+            for (final sec in values.values) {
+              if (sec is Map<String, dynamic>) {
+                final target = sec['target']?.toString().toUpperCase();
+                final ruleName = sec['name']?.toString();
+                final isDropOrReject = target == 'DROP' || target == 'REJECT' || target == 'STOP';
+                final isAppRule = ruleName != null && (ruleName.startsWith('Pause_Internet_') || ruleName.startsWith('Ban_Client_') || ruleName.startsWith('Kick_Client_') || ruleName == 'nointernet_wireless_clients');
+
+                if (isDropOrReject || isAppRule) {
+                  final srcMac = sec['src_mac'];
+                  final destMac = sec['dest_mac'];
+                  final macs = <dynamic>[];
+                  if (srcMac is List) {
+                    macs.addAll(srcMac);
+                  } else if (srcMac != null) {
+                    macs.add(srcMac);
+                  }
+                  if (destMac is List) {
+                    macs.addAll(destMac);
+                  } else if (destMac != null) {
+                    macs.add(destMac);
+                  }
+
+                  final sourceLabel = ruleName != null && ruleName.isNotEmpty
+                      ? (isAppRule ? 'Internet Access Paused' : 'LuCI Firewall Rule "$ruleName"')
+                      : 'Firewall Block Rule';
+
+                  for (final m in macs) {
+                    final mStr = m.toString();
+                    if (mStr.isNotEmpty && (mStr.contains(':') || mStr.contains('-'))) {
+                      final macUpper = mStr.toUpperCase().replaceAll('-', ':');
+                      if (macUpper != '00:00:00:00:00:00' && macUpper != 'FF:FF:FF:FF:FF:FF') {
+                        final rawHint = hostHints[macUpper] ?? hostHints[macUpper.toLowerCase()];
+                        final hint = rawHint is Map<String, dynamic> ? rawHint : <String, dynamic>{};
+                        final name = hint['name']?.toString() ?? hint['staticLeaseName']?.toString() ?? macUpper;
+                        final existing = result['restricted']!.firstWhere(
+                          (e) => e['mac'] == macUpper,
+                          orElse: () => <String, dynamic>{},
+                        );
+                        if (existing.isEmpty) {
                           result['restricted']!.add({
                             'mac': macUpper,
                             'name': name,
                             'ip': 'N/A',
                             'type': 'restricted',
+                            'ruleName': ruleName ?? '',
+                            'source': sourceLabel,
                           });
+                        } else {
+                          existing['ruleName'] = ruleName ?? '';
+                          existing['source'] = sourceLabel;
                         }
                       }
                     }
@@ -2049,9 +3331,9 @@ echo "\$ALL_BANNED"
               }
             }
           }
-        } catch (e) {
-          Logger.warning('UCI fallback in fetchRestrictedAndBannedClientsLive encountered issue: $e');
         }
+      } catch (e) {
+        Logger.warning('UCI fallback in fetchRestrictedAndBannedClientsLive encountered issue: $e');
       }
 
       return result;

@@ -13,8 +13,10 @@ import 'package:yet_another_luci_app/widgets/luci_app_bar.dart';
 import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 import 'package:yet_another_luci_app/design/luci_design_system.dart';
 import 'package:yet_another_luci_app/modules/dhcp_dns/models/dhcp_dns_info.dart';
+import 'package:yet_another_luci_app/widgets/luci_guardrail.dart';
 import 'package:yet_another_luci_app/widgets/add_static_lease_dialog.dart';
 import '../models/wireless_info.dart';
+import '../widgets/wireless_rollback_banner.dart';
 
 class WifiAccessControlScreen extends ConsumerStatefulWidget {
   const WifiAccessControlScreen({super.key});
@@ -50,6 +52,9 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
     _macController.dispose();
     super.dispose();
   }
+
+  // ... (keeping internal state methods)
+
 
   Future<void> _loadClients() async {
     final appState = ref.read(appStateProvider);
@@ -263,13 +268,21 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
       isReviewerMode: appState.reviewerModeEnabled,
     );
 
-    return Scaffold(
-      appBar: const LuciAppBar(title: 'Wi-Fi Access Control'),
-      body: Column(
-        children: [
-          if (appState.isAccessControlPendingConfirmation)
-            _buildAutoRevertCountdownBanner(context, appState),
-          Expanded(
+    return PopScope(
+      canPop: !appState.isAccessControlPendingConfirmation,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final canExit = await LuciGuardrail.confirmStagedChangesOrExit(context, appState);
+        if (canExit && context.mounted) {
+          Navigator.pop(context);
+        }
+      },
+      child: Scaffold(
+        appBar: const LuciAppBar(title: 'Wi-Fi Access Control'),
+        body: Column(
+          children: [
+            const WirelessRollbackBanner(),
+            Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -312,58 +325,7 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildAutoRevertCountdownBanner(BuildContext context, AppState appState) {
-    final seconds = appState.accessControlCountdownSeconds;
-    return Container(
-      width: double.infinity,
-      color: Colors.amber.shade900,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.timer_outlined, color: Colors.white, size: 24),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Wi-Fi Access Control updated. Confirm changes working within ${seconds}s or auto-reverting.',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  side: const BorderSide(color: Colors.white),
-                ),
-                onPressed: () async {
-                  await appState.revertWifiAccessControlChanges(context: context);
-                },
-                child: const Text('Revert Now'),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.black,
-                ),
-                onPressed: () async {
-                  await appState.confirmWifiAccessControlChanges();
-                },
-                child: const Text('Confirm & Keep'),
-              ),
-            ],
-          ),
-        ],
-      ),
+    ),
     );
   }
 
@@ -782,13 +744,15 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
 
                     return CheckboxListTile(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      title: Row(
+                      title: Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
-                          Expanded(
-                            child: Text(
-                              iface.ssid,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                            ),
+                          Text(
+                            iface.ssid,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                           ),
                           currentStatusChip,
                         ],
@@ -1009,7 +973,7 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
       if (!context.mounted) return;
       if (success) {
         unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
-        context.showToastSuccess('Access Control applied.', subtitle: 'Auto-revert timer active (25s countdown).', actionKey: actionKey);
+        context.showToastSuccess('Access Control applied.', subtitle: 'Wi-Fi access rules updated successfully.', actionKey: actionKey);
       } else {
         unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
         context.showToastError('Failed to apply Wi-Fi Access Control rules.', actionKey: actionKey);

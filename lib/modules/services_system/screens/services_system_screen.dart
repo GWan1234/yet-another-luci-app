@@ -234,7 +234,7 @@ class _ServicesSystemScreenState extends ConsumerState<ServicesSystemScreen> {
               LuciCollapsibleCard(
                 title: 'Procd System Services',
                 count: overview.services.length,
-                subtitle: '${overview.services.length} system services configured • Tap to expand',
+                subtitle: '${overview.services.length} system services configured',
                 icon: Icons.miscellaneous_services_outlined,
                 iconColor: Colors.teal,
                 child: Column(
@@ -245,7 +245,7 @@ class _ServicesSystemScreenState extends ConsumerState<ServicesSystemScreen> {
               LuciCollapsibleCard(
                 title: 'Startup Init Scripts',
                 count: overview.initScripts.length,
-                subtitle: '${overview.initScripts.length} /etc/init.d startup scripts • Tap to expand',
+                subtitle: '${overview.initScripts.length} /etc/init.d startup scripts',
                 icon: Icons.playlist_add_check_outlined,
                 iconColor: Colors.blue,
                 child: _buildInitScriptsCard(context, overview.initScripts),

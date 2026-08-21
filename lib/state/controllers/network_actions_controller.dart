@@ -10,6 +10,56 @@ import 'package:yet_another_luci_app/services/interfaces/auth_service_interface.
 import 'package:yet_another_luci_app/services/router_service.dart';
 import 'package:yet_another_luci_app/utils/logger.dart';
 
+/// Lifecycle observer stub — auto-revert timer removed per developer requirement.
+class AccessControlTimerLifecycleManager {
+  AccessControlTimerLifecycleManager({
+    required NetworkActionsController controller,
+  }) : _controller = controller {
+    _lifecycleListener = AppLifecycleListener(
+      onPause: _onPause,
+      onResume: _onResume,
+      onDetach: _onDetach,
+    );
+  }
+
+  final NetworkActionsController _controller;
+  late final AppLifecycleListener _lifecycleListener;
+  bool _wasPendingConfirmation = false;
+  int _pausedCountdownSeconds = 0;
+
+  void _onPause() {
+    if (_controller._isAccessControlPendingConfirmation) {
+      _wasPendingConfirmation = true;
+      _pausedCountdownSeconds = _controller._accessControlCountdownSeconds;
+      // Pause the countdown timer - don't let it tick down while backgrounded
+      _controller._accessControlCountdownTimer?.cancel();
+      _controller._accessControlCountdownTimer = null;
+      // Note: We keep the revert timer running but don't want it to fire while app is backgrounded
+      // The revert timer will be handled on resume
+    }
+  }
+
+  void _onResume() {
+    if (_wasPendingConfirmation) {
+      _wasPendingConfirmation = false;
+      // Restore the countdown with remaining seconds
+      _controller.startAccessControlAutoRevertTimer(
+        initialSeconds: _pausedCountdownSeconds,
+        priorMaclist: _controller._priorMaclistSnapshot,
+        priorMacfilter: _controller._priorMacfilterSnapshot,
+      );
+    }
+  }
+
+  void _onDetach() {
+    _lifecycleListener.dispose();
+  }
+
+  void dispose() {
+    _lifecycleListener.dispose();
+  }
+}
+
 /// Encapsulates all network actions:
 /// - VPN and secure tunnel toggles (OpenVPN, Tailscale, NextDNS, Cloudflared, WireGuard)
 /// - Interface & service control (Wired/Wireless status, Firewall rules, init actions)
@@ -51,6 +101,11 @@ class NetworkActionsController {
   bool _isAccessControlPendingConfirmation = false;
   int _accessControlCountdownSeconds = 25;
 
+  String? _pendingSectionName;
+  String? _pendingTargetType; // 'radio', 'ssid', or 'access_control'
+  dynamic _pendingTargetRadio;
+  dynamic _pendingTargetInterface;
+
   Timer? _accessControlRevertTimer;
   Timer? _accessControlCountdownTimer;
   Timer? _accessControlRevertRetryTimer;
@@ -59,16 +114,36 @@ class NetworkActionsController {
   int get accessControlCountdownSeconds => _accessControlCountdownSeconds;
   Map<String, List<String>> get priorMaclistSnapshot => _priorMaclistSnapshot;
   Map<String, String> get priorMacfilterSnapshot => _priorMacfilterSnapshot;
+  String? get pendingSectionName => _pendingSectionName;
+  String? get pendingTargetType => _pendingTargetType;
+  dynamic get pendingTargetRadio => _pendingTargetRadio;
+  dynamic get pendingTargetInterface => _pendingTargetInterface;
 
-  // ── Paused Internet State ─────────────────────────────────────────
+  // ── Paused Internet & Banned Wireless State ───────────────────────
   final Set<String> _pausedInternetMacs = {};
+  final Set<String> _bannedWirelessMacs = {};
+
   Set<String> get pausedInternetMacs => _pausedInternetMacs;
+  Set<String> get bannedWirelessMacs => _bannedWirelessMacs;
+
   bool isInternetPaused(String mac) =>
       _pausedInternetMacs.contains(mac.toUpperCase().replaceAll('-', ':'));
+
+  bool isWirelessBanned(String mac) =>
+      _bannedWirelessMacs.contains(mac.toUpperCase().replaceAll('-', ':'));
+
+  bool isRestrictedOrBanned(String mac) =>
+      isInternetPaused(mac) || isWirelessBanned(mac);
 
   void updatePausedInternetMacs(Set<String> macs) {
     _pausedInternetMacs.clear();
     _pausedInternetMacs.addAll(macs);
+    _notifyListeners();
+  }
+
+  void updateBannedWirelessMacs(Set<String> macs) {
+    _bannedWirelessMacs.clear();
+    _bannedWirelessMacs.addAll(macs);
     _notifyListeners();
   }
 
@@ -579,6 +654,229 @@ heal_dns() {
 
   // ── Wi-Fi Access Control & Auto-Revert Safety ───────────────────────
 
+  Map<String, String> _priorValuesSnapshot = {};
+
+  Future<bool> applyWirelessInterfaceConfig({
+    required String sectionName,
+    required Map<String, String> newValues,
+    required Map<String, String> priorValuesSnapshot,
+    dynamic targetRadio,
+    dynamic targetInterface,
+    BuildContext? context,
+  }) async {
+    _pendingSectionName = sectionName;
+    _pendingTargetType = 'ssid';
+    _pendingTargetRadio = targetRadio;
+    _pendingTargetInterface = targetInterface;
+    _priorValuesSnapshot = priorValuesSnapshot;
+
+    bool success = true;
+    if (!_isReviewerMode) {
+      final ip = _ip;
+      final sysauth = _sysauth;
+      if (ip == null || sysauth == null || _apiService == null) return false;
+
+      success = await _apiService!.updateWirelessInterfaceConfig(
+        ip, sysauth, _useHttps,
+        sectionName: sectionName,
+        values: newValues,
+        context: (context != null && context.mounted) ? context : null,
+      );
+    }
+
+    if (success) {
+      startAccessControlAutoRevertTimer(initialSeconds: 25);
+      await _refreshDashboard();
+    }
+    return success;
+  }
+
+  Future<bool> applyWirelessRadioConfig({
+    required String sectionName,
+    required Map<String, String> newValues,
+    required Map<String, String> priorValuesSnapshot,
+    dynamic targetRadio,
+    BuildContext? context,
+  }) async {
+    _pendingSectionName = sectionName;
+    _pendingTargetType = 'radio';
+    _pendingTargetRadio = targetRadio;
+    _pendingTargetInterface = null;
+    _priorValuesSnapshot = priorValuesSnapshot;
+
+    bool success = true;
+    if (!_isReviewerMode) {
+      final ip = _ip;
+      final sysauth = _sysauth;
+      if (ip == null || sysauth == null || _apiService == null) return false;
+
+      success = await _apiService!.updateWirelessRadioConfig(
+        ip, sysauth, _useHttps,
+        sectionName: sectionName,
+        values: newValues,
+        context: (context != null && context.mounted) ? context : null,
+      );
+    }
+
+    if (success) {
+      startAccessControlAutoRevertTimer(initialSeconds: 25);
+      await _refreshDashboard();
+    }
+    return success;
+  }
+
+  Future<bool> addWirelessInterface({
+    required String radioName,
+    required String ssid,
+    required String encryption,
+    required String key,
+    required String network,
+    BuildContext? context,
+  }) async {
+    bool success = true;
+    if (!_isReviewerMode) {
+      final ip = _ip;
+      final sysauth = _sysauth;
+      if (ip == null || sysauth == null || _apiService == null) return false;
+
+      success = await _apiService!.addWirelessInterface(
+        ip, sysauth, _useHttps,
+        radioName: radioName,
+        ssid: ssid,
+        encryption: encryption,
+        key: key,
+        network: network,
+        context: (context != null && context.mounted) ? context : null,
+      );
+    }
+
+    if (success) {
+      startAccessControlAutoRevertTimer(initialSeconds: 25);
+      await _refreshDashboard();
+    }
+    return success;
+  }
+
+  Future<bool> deleteWirelessInterface({
+    required String sectionName,
+    BuildContext? context,
+  }) async {
+    bool success = true;
+    if (!_isReviewerMode) {
+      final ip = _ip;
+      final sysauth = _sysauth;
+      if (ip == null || sysauth == null || _apiService == null) return false;
+
+      success = await _apiService!.deleteWirelessInterface(
+        ip, sysauth, _useHttps,
+        sectionName: sectionName,
+        context: (context != null && context.mounted) ? context : null,
+      );
+    }
+
+    if (success) {
+      startAccessControlAutoRevertTimer(initialSeconds: 25);
+      await _refreshDashboard();
+    }
+    return success;
+  }
+
+  Future<bool> provisionGuestNetwork({
+    required String radioName,
+    required String ssid,
+    required String encryption,
+    required String key,
+    String guestIp = '192.168.2.1',
+    bool isolateClients = true,
+    String network = 'guest',
+    // Advanced radio settings
+    String? country,
+    String? channel,
+    String? htMode,
+    String? txPower,
+    // Fast roaming (802.11r/k/v)
+    bool ieee80211r = false,
+    bool ftOverDs = false,
+    bool ftPskGenerateLocal = false,
+    String? mobilityDomain,
+    // Wireless advanced settings
+    bool wmm = true,
+    bool hidden = false,
+    int? dtimPeriod,
+    int? gtkRekey,
+    int? inactivityLimit,
+    int? maxListenInterval,
+    bool disassocLowAck = true,
+    bool multicastToUnicast = false,
+    bool wds = false,
+    // MAC filtering
+    String? macfilter,
+    List<String>? maclist,
+    BuildContext? context,
+  }) async {
+    bool success = true;
+    if (!_isReviewerMode) {
+      final ip = _ip;
+      final sysauth = _sysauth;
+      if (ip == null || sysauth == null || _apiService == null) return false;
+
+      success = await _apiService!.provisionGuestNetwork(
+        ip, sysauth, _useHttps,
+        radioName: radioName,
+        ssid: ssid,
+        encryption: encryption,
+        key: key,
+        guestIp: guestIp,
+        isolateClients: isolateClients,
+        network: network,
+        country: country,
+        channel: channel,
+        htMode: htMode,
+        txPower: txPower,
+        ieee80211r: ieee80211r,
+        ftOverDs: ftOverDs,
+        ftPskGenerateLocal: ftPskGenerateLocal,
+        mobilityDomain: mobilityDomain,
+        wmm: wmm,
+        hidden: hidden,
+        dtimPeriod: dtimPeriod,
+        gtkRekey: gtkRekey,
+        inactivityLimit: inactivityLimit,
+        maxListenInterval: maxListenInterval,
+        disassocLowAck: disassocLowAck,
+        multicastToUnicast: multicastToUnicast,
+        wds: wds,
+        macfilter: macfilter,
+        maclist: maclist,
+        context: (context != null && context.mounted) ? context : null,
+      );
+    }
+
+    if (success) {
+      startAccessControlAutoRevertTimer(initialSeconds: 25);
+      await _refreshDashboard();
+    }
+    return success;
+  }
+
+  Future<List<String>> fetchNetworkInterfaces({
+    BuildContext? context,
+  }) async {
+    if (!_isReviewerMode) {
+      final ip = _ip;
+      final sysauth = _sysauth;
+      if (ip == null || sysauth == null || _apiService == null) return ['lan', 'wan', 'guest'];
+
+      return await _apiService!.fetchNetworkInterfaces(
+        ipAddress: ip,
+        sysauth: sysauth,
+        useHttps: _useHttps,
+        context: (context != null && context.mounted) ? context : null,
+      );
+    }
+    return ['lan', 'wan', 'guest'];
+  }
+
   Future<bool> applyWifiAccessControl({
     required Map<String, List<String>> newMaclistByIface,
     required Map<String, String> newMacfilterByIface,
@@ -615,31 +913,12 @@ heal_dns() {
     Map<String, List<String>>? priorMaclist,
     Map<String, String>? priorMacfilter,
   }) {
-    if (priorMaclist != null) _priorMaclistSnapshot = priorMaclist;
-    if (priorMacfilter != null) _priorMacfilterSnapshot = priorMacfilter;
-
+    // Auto-revert timer removed per developer requirement. Changes require explicit user confirmation.
     _accessControlRevertTimer?.cancel();
     _accessControlCountdownTimer?.cancel();
-
-    _isAccessControlPendingConfirmation = true;
-    _accessControlCountdownSeconds = initialSeconds;
+    _isAccessControlPendingConfirmation = false;
+    _accessControlCountdownSeconds = 0;
     _notifyListeners();
-
-    _accessControlCountdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_accessControlCountdownSeconds > 1) {
-        _accessControlCountdownSeconds--;
-        _notifyListeners();
-      } else {
-        timer.cancel();
-      }
-    });
-
-    _accessControlRevertTimer = Timer(Duration(seconds: initialSeconds), () {
-      if (_isAccessControlPendingConfirmation) {
-        Logger.warning('Wi-Fi Access Control auto-revert timer expired. Reverting changes.');
-        revertWifiAccessControlChanges();
-      }
-    });
   }
 
   Future<bool> confirmWifiAccessControlChanges() async {
@@ -660,6 +939,8 @@ heal_dns() {
 
     _priorMaclistSnapshot = {};
     _priorMacfilterSnapshot = {};
+    _pendingSectionName = null;
+    _priorValuesSnapshot = {};
     _notifyListeners();
     return success;
   }
@@ -670,7 +951,9 @@ heal_dns() {
     _isAccessControlPendingConfirmation = false;
     _notifyListeners();
 
-    if (_priorMaclistSnapshot.isEmpty && _priorMacfilterSnapshot.isEmpty) {
+    if (_priorMaclistSnapshot.isEmpty &&
+        _priorMacfilterSnapshot.isEmpty &&
+        _pendingSectionName == null) {
       return true;
     }
 
@@ -679,12 +962,21 @@ heal_dns() {
       final ip = _ip;
       final sysauth = _sysauth;
       if (ip != null && sysauth != null && _apiService != null) {
-        success = await _apiService!.revertWifiAccessControl(
-          ip, sysauth, _useHttps,
-          maclistByIface: _priorMaclistSnapshot,
-          macfilterByIface: _priorMacfilterSnapshot,
-          context: (context != null && context.mounted) ? context : null,
-        );
+        if (_pendingSectionName != null) {
+          success = await _apiService!.revertWirelessInterfaceConfig(
+            ip, sysauth, _useHttps,
+            sectionName: _pendingSectionName!,
+            priorValues: _priorValuesSnapshot,
+            context: (context != null && context.mounted) ? context : null,
+          );
+        } else {
+          success = await _apiService!.revertWifiAccessControl(
+            ip, sysauth, _useHttps,
+            maclistByIface: _priorMaclistSnapshot,
+            macfilterByIface: _priorMacfilterSnapshot,
+            context: (context != null && context.mounted) ? context : null,
+          );
+        }
 
         if (!success) {
           int retries = 0;
@@ -697,11 +989,17 @@ heal_dns() {
               _accessControlRevertRetryTimer = null;
               return;
             }
-            final retried = await _apiService!.revertWifiAccessControl(
-              ip, sysauth, _useHttps,
-              maclistByIface: _priorMaclistSnapshot,
-              macfilterByIface: _priorMacfilterSnapshot,
-            );
+            final retried = _pendingSectionName != null
+                ? await _apiService!.revertWirelessInterfaceConfig(
+                    ip, sysauth, _useHttps,
+                    sectionName: _pendingSectionName!,
+                    priorValues: _priorValuesSnapshot,
+                  )
+                : await _apiService!.revertWifiAccessControl(
+                    ip, sysauth, _useHttps,
+                    maclistByIface: _priorMaclistSnapshot,
+                    macfilterByIface: _priorMacfilterSnapshot,
+                  );
             if (retried) {
               retryTimer.cancel();
               _accessControlRevertRetryTimer = null;
@@ -714,6 +1012,8 @@ heal_dns() {
 
     _priorMaclistSnapshot = {};
     _priorMacfilterSnapshot = {};
+    _pendingSectionName = null;
+    _priorValuesSnapshot = {};
     await _refreshDashboard();
     _notifyListeners();
     return success;
@@ -1155,8 +1455,12 @@ heal_dns() {
     String macAddress, {
     BuildContext? context,
   }) async {
+    final macUpper = macAddress.toUpperCase().replaceAll('-', ':');
     if (_isReviewerMode) {
       await Future.delayed(const Duration(milliseconds: 300));
+      _bannedWirelessMacs.remove(macUpper);
+      _pausedInternetMacs.remove(macUpper);
+      _notifyListeners();
       await _refreshDashboard();
       return true;
     }
@@ -1170,6 +1474,9 @@ heal_dns() {
       context: context,
     );
     if (res) {
+      _bannedWirelessMacs.remove(macUpper);
+      _pausedInternetMacs.remove(macUpper);
+      _notifyListeners();
       await _refreshDashboard();
     }
     return res;

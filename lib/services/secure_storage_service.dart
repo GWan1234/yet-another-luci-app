@@ -36,11 +36,36 @@ class SecureStorageService {
       final username = await _storage.read(key: 'username');
       final password = await _storage.read(key: 'password');
       final useHttps = await _storage.read(key: 'useHttps');
+      if (ipAddress != null && ipAddress.isNotEmpty && username != null && password != null) {
+        return {
+          'ipAddress': ipAddress,
+          'username': username,
+          'password': password,
+          'useHttps': useHttps,
+        };
+      }
+      final routers = await getRouters();
+      if (routers.isNotEmpty) {
+        // Prefer the explicitly selected router; fall back to first in list
+        final selectedId = await getSelectedRouterId();
+        final router = selectedId != null
+            ? routers.firstWhere(
+                (r) => r.id == selectedId,
+                orElse: () => routers.first,
+              )
+            : routers.first;
+        return {
+          'ipAddress': router.ipAddress,
+          'username': router.username,
+          'password': router.password,
+          'useHttps': router.useHttps.toString(),
+        };
+      }
       return {
-        'ipAddress': ipAddress,
-        'username': username,
-        'password': password,
-        'useHttps': useHttps,
+        'ipAddress': null,
+        'username': null,
+        'password': null,
+        'useHttps': null,
       };
     } catch (e, stack) {
       Logger.exception('Failed to get credentials', e, stack);

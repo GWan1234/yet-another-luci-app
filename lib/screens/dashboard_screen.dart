@@ -136,72 +136,97 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 340 || MediaQuery.textScalerOf(context).scale(14) > 18;
+            final versionRow = Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                Text(
+                  versionDisplay,
+                  style: valueStyle,
+                  textAlign: TextAlign.center,
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: channelColors.background,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    channelLabel,
+                    style: TextStyle(
+                      color: channelColors.foreground,
+                      fontWeight: FontWeight.bold,
+                      fontSize: Theme.of(context).textTheme.bodySmall?.fontSize,
+                    ),
+                  ),
+                ),
+              ],
+            );
+
+            if (isNarrow) {
+              return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Model', style: labelStyle),
-                  const SizedBox(height: 4),
-                  Text(
-                    model,
-                    style: valueStyle,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    releaseInfo.distributionName,
-                    style: labelStyle,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Flexible(
-                        child: Text(
-                          versionDisplay,
-                          style: valueStyle,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: channelColors.background,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          channelLabel,
-                          style: TextStyle(
-                            color: channelColors.foreground,
-                            fontWeight: FontWeight.bold,
-                            fontSize: Theme.of(
-                              context,
-                            ).textTheme.bodySmall?.fontSize,
-                          ),
-                        ),
-                      ),
+                      Text('Model', style: labelStyle),
+                      const SizedBox(height: 2),
+                      Text(model, style: valueStyle, textAlign: TextAlign.center),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(releaseInfo.distributionName, style: labelStyle),
+                      const SizedBox(height: 2),
+                      versionRow,
                     ],
                   ),
                 ],
-              ),
-            ),
-          ],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Model', style: labelStyle),
+                      const SizedBox(height: 4),
+                      Text(
+                        model,
+                        style: valueStyle,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        releaseInfo.distributionName,
+                        style: labelStyle,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      versionRow,
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -720,37 +745,39 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 0),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
-        child: Row(
-          children: [
-            Expanded(
-              child: _buildVitalsColumn(
-                context,
-                label: 'CPU Load',
-                value: cpuLoadValue,
-              ),
-            ),
-            Expanded(
-              child: _buildVitalsColumn(
-                context,
-                label: 'RAM Usage',
-                value: memoryValue,
-              ),
-            ),
-            Expanded(
-              child: _buildVitalsColumn(
-                context,
-                label: 'Load Avg',
-                value: loadAvgValue,
-              ),
-            ),
-            Expanded(
-              child: _buildVitalsColumn(
-                context,
-                label: 'Uptime',
-                value: uptimeValue,
-              ),
-            ),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 360 || MediaQuery.textScalerOf(context).scale(14) > 18;
+            if (isNarrow) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: _buildVitalsColumn(context, label: 'CPU Load', value: cpuLoadValue)),
+                      Expanded(child: _buildVitalsColumn(context, label: 'RAM Usage', value: memoryValue)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(child: _buildVitalsColumn(context, label: 'Load Avg', value: loadAvgValue)),
+                      Expanded(child: _buildVitalsColumn(context, label: 'Uptime', value: uptimeValue)),
+                    ],
+                  ),
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(child: _buildVitalsColumn(context, label: 'CPU Load', value: cpuLoadValue)),
+                Expanded(child: _buildVitalsColumn(context, label: 'RAM Usage', value: memoryValue)),
+                Expanded(child: _buildVitalsColumn(context, label: 'Load Avg', value: loadAvgValue)),
+                Expanded(child: _buildVitalsColumn(context, label: 'Uptime', value: uptimeValue)),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -1739,19 +1766,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         centerTitle: true,
         title: null, // Always use titleWidget now
         titleWidget: _buildTitleWithTimestamp(headerText, appState),
-        actions: [
-          if (appState.reviewerModeEnabled)
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: ActionChip(
-                avatar: const Icon(Icons.rate_review, size: 14, color: Colors.white),
-                label: const Text('REVIEWER', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                backgroundColor: Colors.amber.shade900,
-                side: BorderSide.none,
-                onPressed: () => _showExitReviewerModeDialog(context, ref),
-              ),
-            ),
-        ],
       ),
       body: Column(
         children: [

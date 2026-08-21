@@ -17,6 +17,13 @@ This project was originally derived from:
 All subsequent modifications, feature additions, and architectural
 changes are Copyright 2026 Tuhin Garai and licensed under Apache-2.0.
 
+Mandatory Attribution Requirement for Forks:
+Pursuant to Section 4 of the Apache License 2.0, all forks and derivative works
+of this repository hosted on GitHub or elsewhere MUST retain original creator credit
+and GitHub profile links for Tuhin Garai (@nightcodex7) in README.md, CONTRIBUTORS.md,
+NOTICE, and repository contributor metadata. Stripping original author attribution
+from repository forks or commit history is strictly prohibited.
+
 ------------------------------------------------------------------------
 
 Third-Party Dependencies & Acknowledgments:

@@ -47,7 +47,7 @@ class DhcpDnsScreen extends ConsumerWidget {
             LuciCollapsibleCard(
               title: 'Active DHCP Leases',
               count: overview.activeLeases.length,
-              subtitle: '${overview.activeLeases.length} active client leases • Tap to expand',
+              subtitle: '${overview.activeLeases.length} active client leases',
               icon: Icons.badge_outlined,
               iconColor: Colors.blue,
               child: _buildLeasesList(context, ref, overview.activeLeases, overview.staticMappings),
@@ -56,7 +56,7 @@ class DhcpDnsScreen extends ConsumerWidget {
             LuciCollapsibleCard(
               title: 'Static IP Reservations',
               count: overview.staticMappings.length,
-              subtitle: '${overview.staticMappings.length} static IP mappings configured • Tap to expand',
+              subtitle: '${overview.staticMappings.length} static IP mappings configured',
               icon: Icons.pin_drop_outlined,
               iconColor: Colors.teal,
               trailingAction: IconButton(

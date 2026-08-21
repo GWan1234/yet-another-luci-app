@@ -1,3 +1,6 @@
+// Copyright 2026 Tuhin Garai. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
 // Integration probe for live OpenWrt router API compatibility.
 // Run: dart run test/integration/router_api_probe.dart
 // Credentials via env: ROUTER_IP, ROUTER_USER, ROUTER_PASS, ROUTER_HTTPS (optional)

@@ -23,6 +23,9 @@ class MockApiService implements IApiService {
   static int _baseLanTxBytes = 1876543210;
   static int _baseLanRxPackets = 23456;
   static int _baseLanTxPackets = 18765;
+  static final Set<String> _mockRestrictedMacs = {'11:22:33:44:55:66'};
+  static final Set<String> _mockBannedMacs = {'99:88:77:66:55:44'};
+
   @override
   Future<String> login(
     String ipAddress,
@@ -1099,6 +1102,17 @@ class MockApiService implements IApiService {
   }
 
   @override
+  Future<List<String>> fetchNetworkInterfaces({
+    required String ipAddress,
+    required String sysauth,
+    required bool useHttps,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 100));
+    return ['lan', 'wan', 'guest'];
+  }
+
+  @override
   Future<dynamic> systemExec(
     String ipAddress,
     String sysauth,
@@ -1302,6 +1316,9 @@ class MockApiService implements IApiService {
     BuildContext? context,
   }) async {
     await Future.delayed(const Duration(milliseconds: 200));
+    final macUpper = macAddress.toUpperCase().replaceAll('-', ':');
+    _mockRestrictedMacs.remove(macUpper);
+    _mockBannedMacs.remove(macUpper);
     return true;
   }
 
@@ -1314,22 +1331,20 @@ class MockApiService implements IApiService {
   }) async {
     await Future.delayed(const Duration(milliseconds: 300));
     return {
-      'restricted': [
-        {
-          'mac': '11:22:33:44:55:66',
-          'name': 'Restricted-Tablet',
-          'ip': '192.168.1.150',
-          'type': 'restricted',
-        }
-      ],
-      'banned': [
-        {
-          'mac': '99:88:77:66:55:44',
-          'name': 'Banned-Guest-Phone',
-          'ip': 'N/A',
-          'type': 'banned',
-        }
-      ],
+      'restricted': _mockRestrictedMacs.map((m) => {
+        'mac': m,
+        'name': 'Restricted-Tablet',
+        'ip': '192.168.1.150',
+        'type': 'restricted',
+        'source': 'LuCI Firewall Rule "Pause_Internet_112233445566"',
+      }).toList(),
+      'banned': _mockBannedMacs.map((m) => {
+        'mac': m,
+        'name': 'Banned-Guest-Phone',
+        'ip': 'N/A',
+        'type': 'banned',
+        'source': 'Wi-Fi Access Control (macfilter=deny)',
+      }).toList(),
     };
   }
 
@@ -1477,5 +1492,193 @@ class MockApiService implements IApiService {
   }) async {
     await Future.delayed(const Duration(milliseconds: 300));
     return true;
+  }
+
+  @override
+  Future<bool> updateWirelessInterfaceConfig(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String sectionName,
+    required Map<String, String> values,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return true;
+  }
+
+  @override
+  Future<bool> revertWirelessInterfaceConfig(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String sectionName,
+    required Map<String, String> priorValues,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return true;
+  }
+
+  @override
+  Future<bool> updateWirelessRadioConfig(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String sectionName,
+    required Map<String, String> values,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return true;
+  }
+
+  @override
+  Future<bool> revertWirelessRadioConfig(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String sectionName,
+    required Map<String, String> priorValues,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return true;
+  }
+
+  @override
+  Future<bool> addWirelessInterface(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String radioName,
+    required String ssid,
+    required String encryption,
+    required String key,
+    required String network,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return true;
+  }
+
+  @override
+  Future<bool> deleteWirelessInterface(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String sectionName,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return true;
+  }
+
+  @override
+  Future<bool> provisionGuestNetwork(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String radioName,
+    required String ssid,
+    required String encryption,
+    required String key,
+    String guestIp = '192.168.2.1',
+    bool isolateClients = true,
+    String network = 'guest',
+    // Advanced radio settings
+    String? country,
+    String? channel,
+    String? htMode,
+    String? txPower,
+    // Fast roaming (802.11r/k/v)
+    bool ieee80211r = false,
+    bool ftOverDs = false,
+    bool ftPskGenerateLocal = false,
+    String? mobilityDomain,
+    // Wireless advanced settings
+    bool wmm = true,
+    bool hidden = false,
+    int? dtimPeriod,
+    int? gtkRekey,
+    int? inactivityLimit,
+    int? maxListenInterval,
+    bool disassocLowAck = true,
+    bool multicastToUnicast = false,
+    bool wds = false,
+    // MAC filtering
+    String? macfilter,
+    List<String>? maclist,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return true;
+  }
+
+  @override
+  Future<Map<String, List<Map<String, String>>>> fetchWirelessHardwareCapabilities({
+    required String sectionName,
+    String? radioName,
+    required String ipAddress,
+    required String sysauth,
+    required bool useHttps,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 100));
+    // Return mock hardware capabilities matching the fallback data
+    return {
+      'encryptions': [
+        {'value': 'sae', 'label': 'WPA3-SAE (Personal / Strict)'},
+        {'value': 'sae-mixed', 'label': 'WPA2/WPA3 Mixed (Transitional)'},
+        {'value': 'psk2', 'label': 'WPA2-PSK (CCMP / AES)'},
+        {'value': 'psk', 'label': 'WPA-PSK (Legacy / WPA1)'},
+        {'value': 'owe', 'label': 'Enhanced Open (OWE)'},
+        {'value': 'none', 'label': 'Open / No Encryption'},
+      ],
+      'ciphers': [
+        {'value': 'auto', 'label': 'Auto (Hardware Default)'},
+        {'value': 'ccmp', 'label': 'CCMP (AES)'},
+        {'value': 'gcmp256', 'label': 'GCMP-256 (High Security)'},
+        {'value': 'gcmp128', 'label': 'GCMP-128'},
+        {'value': 'tkip', 'label': 'TKIP (Legacy)'},
+      ],
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> fetchWirelessRadioCapabilities({
+    required String radioName,
+    required String ipAddress,
+    required String sysauth,
+    required bool useHttps,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 100));
+    return {
+      'countryCodes': [
+        {'code': '00', 'label': '00 — World / Global (Universal)'},
+        {'code': 'US', 'label': 'US — United States'},
+        {'code': 'DE', 'label': 'DE — Germany'},
+        {'code': 'GB', 'label': 'GB — United Kingdom'},
+        {'code': 'IN', 'label': 'IN — India'},
+        {'code': 'JP', 'label': 'JP — Japan'},
+        {'code': 'CA', 'label': 'CA — Canada'},
+        {'code': 'AU', 'label': 'AU — Australia'},
+      ],
+      'channels': ['auto', '1', '6', '11', '36', '40', '44', '48', '149', '153', '157', '161'],
+      'htModes': ['HT20', 'HT40', 'VHT20', 'VHT40', 'VHT80', 'HE20', 'HE40', 'HE80'],
+      'txPowers': ['auto', '30', '23', '20', '17', '14', '10'],
+    };
+  }
+
+  @override
+  Future<int> migrateAnonymousWirelessSections(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  }) async {
+    // No anonymous sections exist in mock data — always clean
+    return 0;
   }
 }

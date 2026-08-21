@@ -445,7 +445,8 @@ class SessionController {
   Future<void> logout() async {
     _cancelThroughputTimer();
     await _authService?.logout();
-    await _routerService?.clearAllRouters();
+    // Preserve saved router profiles — only clear the active session token.
+    // Router profiles persist until the user explicitly removes them from the profile list.
     _dashboardController?.resetState();
     _publicIpv4 = null;
     _publicIpv6 = null;
@@ -463,7 +464,7 @@ class SessionController {
         context: context,
       );
     }
-    return await _authService?.tryAutoLogin(
+    final success = await _authService?.tryAutoLogin(
           null,
           null,
           null,
@@ -471,5 +472,12 @@ class SessionController {
           context: context,
         ) ??
         false;
+    if (success) {
+      await loadRouters();
+      await _fetchDashboardData();
+      _startThroughputTimer();
+      _notifyListeners();
+    }
+    return success;
   }
 }

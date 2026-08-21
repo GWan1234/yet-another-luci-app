@@ -61,76 +61,74 @@ class _LuciCollapsibleCardState extends State<LuciCollapsibleCard> {
     final theme = Theme.of(context);
     final effectiveIconColor = widget.iconColor ?? theme.colorScheme.primary;
     final displayTitle = widget.count != null ? '${widget.title} (${widget.count})' : widget.title;
-    final displaySubtitle = widget.subtitle ?? (widget.count != null ? '${widget.count} items • Tap to expand' : 'Tap to expand');
+    final displaySubtitle = widget.subtitle ?? (widget.count != null ? '${widget.count} items' : null);
 
     return RepaintBoundary(
-      child: MediaQuery.withClampedTextScaling(
-        minScaleFactor: 0.85,
-        maxScaleFactor: 1.4,
-        child: Card(
-          elevation: 2,
-          clipBehavior: Clip.antiAlias,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Theme(
-            data: theme.copyWith(
-              dividerColor: Colors.transparent,
-              focusColor: Colors.transparent,
-              hoverColor: Colors.transparent,
-              splashColor: Colors.transparent,
-              highlightColor: Colors.transparent,
+      child: Card(
+        elevation: 2,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Theme(
+          data: theme.copyWith(
+            dividerColor: Colors.transparent,
+            focusColor: Colors.transparent,
+            hoverColor: Colors.transparent,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+          ),
+          child: ExpansionTile(
+            initiallyExpanded: widget.initiallyExpanded,
+            onExpansionChanged: (expanded) {
+              if (expanded && !_hasBeenExpanded) {
+                setState(() {
+                  _hasBeenExpanded = true;
+                });
+              }
+              widget.onExpansionChanged?.call(expanded);
+            },
+            maintainState: true,
+            shape: const Border(),
+            collapsedShape: const Border(),
+            expansionAnimationStyle: const AnimationStyle(
+              duration: Duration(milliseconds: 220),
+              curve: Curves.fastOutSlowIn,
             ),
-            child: ExpansionTile(
-              initiallyExpanded: widget.initiallyExpanded,
-              onExpansionChanged: (expanded) {
-                if (expanded && !_hasBeenExpanded) {
-                  setState(() {
-                    _hasBeenExpanded = true;
-                  });
-                }
-                widget.onExpansionChanged?.call(expanded);
-              },
-              maintainState: true,
-              shape: const Border(),
-              collapsedShape: const Border(),
-              expansionAnimationStyle: const AnimationStyle(
-                duration: Duration(milliseconds: 220),
-                curve: Curves.fastOutSlowIn,
-              ),
-              leading: Icon(widget.icon, color: effectiveIconColor),
-              title: Text(
-                displayTitle,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 2,
-              ),
-              subtitle: Text(
-                displaySubtitle,
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 2,
-              ),
-              trailing: widget.trailingAction != null
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        widget.trailingAction!,
-                        const SizedBox(width: 4),
-                        const Icon(Icons.expand_more),
-                      ],
-                    )
-                  : null,
-              children: [
-                if (_hasBeenExpanded)
-                  RepaintBoundary(
-                    child: Padding(
-                      padding: widget.padding,
-                      child: widget.childBuilder != null
-                          ? Builder(builder: widget.childBuilder!)
-                          : widget.child!,
-                    ),
+            leading: Icon(widget.icon, color: effectiveIconColor),
+            title: Text(
+              displayTitle,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+            ),
+            subtitle: displaySubtitle != null
+                ? Text(
+                    displaySubtitle,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                  )
+                : null,
+            trailing: widget.trailingAction != null
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      widget.trailingAction!,
+                      const SizedBox(width: 4),
+                      const Icon(Icons.expand_more),
+                    ],
+                  )
+                : null,
+            children: [
+              if (_hasBeenExpanded)
+                RepaintBoundary(
+                  child: Padding(
+                    padding: widget.padding,
+                    child: widget.childBuilder != null
+                        ? Builder(builder: widget.childBuilder!)
+                        : widget.child!,
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
         ),
       ),

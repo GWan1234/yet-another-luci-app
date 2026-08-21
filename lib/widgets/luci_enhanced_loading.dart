@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import '../design/luci_design_system.dart';
+import 'luci_smooth_spinner.dart';
 
 /// Enhanced loading widget with multiple display modes
 class LuciEnhancedLoadingWidget extends StatelessWidget {
@@ -37,13 +38,10 @@ class LuciEnhancedLoadingWidget extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            width: size ?? 32,
-            height: size ?? 32,
-            child: CircularProgressIndicator(
-              color: colorScheme.primary,
-              strokeWidth: 3,
-            ),
+          LuciSmoothSpinner(
+            size: size ?? 32,
+            strokeWidth: 3,
+            color: colorScheme.primary,
           ),
           if (message != null) ...[
             SizedBox(height: LuciSpacing.md),

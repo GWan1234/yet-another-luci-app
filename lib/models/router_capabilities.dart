@@ -130,6 +130,15 @@ class RouterCapabilities {
   /// Helper to check if both RPC modules and execution permissions are available
   bool get isRpcComplete => hasLuciRpc && hasFileExec;
 
+  /// Helper to check if ubus session has write authorization for uci configs
+  bool get hasUciWriteAccess {
+    if (probeFailed || ubusObjects.isEmpty) return true; // conservative optimistic default
+    if (!ubusObjects.contains('uci')) return false;
+    final methods = ubusMethods['uci'];
+    if (methods == null) return ubusObjects.contains('uci');
+    return methods.contains('set') && (methods.contains('apply') || methods.contains('commit'));
+  }
+
   /// Serialize for secure storage cache
   Map<String, dynamic> toJson() {
     return {

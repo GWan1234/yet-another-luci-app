@@ -14,11 +14,14 @@ import 'package:yet_another_luci_app/design/luci_design_system.dart';
 import 'package:yet_another_luci_app/widgets/luci_loading_states.dart';
 import 'package:yet_another_luci_app/widgets/luci_refresh_components.dart';
 
+import 'package:yet_another_luci_app/utils/client_naming_helper.dart';
 import 'package:yet_another_luci_app/utils/self_device_guard.dart';
+import 'package:yet_another_luci_app/utils/os_platform_integration.dart';
 import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 import 'package:yet_another_luci_app/widgets/add_static_lease_dialog.dart';
 import 'restricted_clients_screen.dart';
 import 'package:yet_another_luci_app/modules/dhcp_dns/models/dhcp_dns_info.dart';
+import 'package:yet_another_luci_app/modules/wireless_management/models/wireless_info.dart';
 
 class ClientsScreen extends ConsumerStatefulWidget {
   const ClientsScreen({super.key});
@@ -359,7 +362,9 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                               : ListView.separated(
                                   padding: const EdgeInsets.only(bottom: 16),
                                   // ignore: deprecated_member_use
-                                  cacheExtent: 350.0,
+                                  cacheExtent: 500.0,
+                                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                                  physics: const AlwaysScrollableScrollPhysics(),
                                   // ignore: deprecated_member_use
                                   findChildIndexCallback: (Key key) {
                                     if (key is ValueKey<String>) {
@@ -698,19 +703,20 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                 borderRadius: BorderRadius.circular(18.0),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 8.0,
+                    horizontal: 14.0,
+                    vertical: 12.0,
                   ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Stack(
                         alignment: Alignment.topRight,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8.0),
+                            padding: const EdgeInsets.all(10.0),
                             decoration: BoxDecoration(
                               color: colorScheme.primaryContainer.withValues(
-                                alpha: widget.client.isConnected ? 0.13 : 0.05,
+                                alpha: widget.client.isConnected ? 0.15 : 0.05,
                               ),
                               shape: BoxShape.circle,
                             ),
@@ -719,17 +725,18 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                               duration: const Duration(milliseconds: 200),
                               curve: Curves.easeOutCubic,
                               child: Icon(
-                                Icons.person_outline,
+                                ClientNamingHelper.getDeviceIcon(widget.client),
                                 color: widget.client.isConnected
                                     ? colorScheme.primary
                                     : colorScheme.onSurfaceVariant,
-                                size: 22,
+                                size: 20,
                                 semanticLabel: 'Client icon',
                               ),
                             ),
                           ),
-                          Align(
-                            alignment: Alignment.topRight,
+                          Positioned(
+                            top: 0,
+                            right: 0,
                             child: Tooltip(
                               message: _statusTooltip(widget.client),
                               child: Container(
@@ -740,7 +747,7 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                                   shape: BoxShape.circle,
                                   border: Border.all(
                                     color: colorScheme.surface,
-                                    width: 1.5,
+                                    width: 1.8,
                                   ),
                                 ),
                               ),
@@ -748,7 +755,7 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                           ),
                         ],
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -761,16 +768,7 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const SizedBox(height: LuciSpacing.xs),
-                            Container(
-                              margin: const EdgeInsets.only(right: 32),
-                              child: Divider(
-                                color: colorScheme.surfaceContainerHighest
-                                    .withValues(alpha: 0.10),
-                                thickness: 1,
-                                height: 8,
-                              ),
-                            ),
+                            const SizedBox(height: 2),
                             Text(
                               _buildMinimalClientSubtitle(widget.client),
                               style: LuciTextStyles.cardSubtitle(context),
@@ -783,19 +781,17 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                                 widget.client.vendor!,
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: colorScheme.onSurface.withValues(
-                                    alpha: 0.7,
+                                    alpha: 0.65,
                                   ),
+                                  fontSize: 11,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 semanticsLabel: 'Vendor: ${widget.client.vendor}',
                               ),
+                            _buildBadgePills(context, widget.client),
                           ],
                         ),
-                      ),
-                      _buildStatusBadges(
-                        context,
-                        widget.client,
                       ),
                       const SizedBox(width: 8),
                       Icon(
@@ -824,84 +820,160 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
     );
   }
 
-  Widget _buildStatusBadges(BuildContext context, Client client) {
+  bool _isGuestClient(Client client, AppState appState) {
+    if (client.connectionType != ConnectionType.wireless) return false;
+    final overview = WirelessOverview.fromDashboardData(
+      appState.dashboardData,
+      isReviewerMode: appState.reviewerModeEnabled,
+    );
+    final guestIfaces = overview.radios
+        .expand((r) => r.interfaces)
+        .where((i) => i.isGuestInterface(appState.customGuestSections, appState.excludedGuestSections))
+        .toList();
+    for (final g in guestIfaces) {
+      if (client.ssid != null && client.ssid!.isNotEmpty && g.ssid == client.ssid) {
+        return true;
+      }
+      if (client.wirelessIface != null && client.wirelessIface!.isNotEmpty) {
+        if (g.sectionName == client.wirelessIface || g.ifName == client.wirelessIface) {
+          return true;
+        }
+      }
+    }
+    final ssidLower = client.ssid?.toLowerCase() ?? '';
+    final ifaceLower = client.wirelessIface?.toLowerCase() ?? '';
+    return ssidLower.contains('guest') || ifaceLower.contains('guest');
+  }
+
+  Widget _buildBadgePills(BuildContext context, Client client) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final badges = <Widget>[];
+    final appState = AppState.instance;
+    final pills = <Widget>[];
 
-    if (client.isStatic) {
-      badges.add(
-        Chip(
-          label: const Text('STATIC'),
-          avatar: const Icon(Icons.push_pin, size: 13, color: Colors.teal),
-          backgroundColor: Colors.teal.withValues(alpha: 0.15),
-          labelStyle: theme.textTheme.labelSmall?.copyWith(
-            color: Colors.teal.shade800,
-            fontWeight: FontWeight.bold,
-            fontSize: 10,
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-      );
-    }
+    final isGuest = _isGuestClient(client, appState);
+    final isPaused = appState.isInternetPaused(client.macAddress);
+    final isBanned = appState.isWirelessBanned(client.macAddress);
+    final isStatic = client.isStatic || appState.findStaticLeaseByMac(client.macAddress) != null;
 
-    if (client.isConnected && client.connectionType == ConnectionType.wireless) {
-      final bgColor = colorScheme.primaryContainer;
-      final fgColor = colorScheme.onPrimaryContainer;
-      badges.add(
-        Chip(
-          label: const Text('Wi-Fi'),
-          avatar: Icon(Icons.wifi, size: 14, color: fgColor),
-          backgroundColor: bgColor,
-          labelStyle: theme.textTheme.labelSmall?.copyWith(color: fgColor, fontSize: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    Widget buildPill({
+      required String label,
+      required IconData icon,
+      required Color bg,
+      required Color border,
+      required Color fg,
+    }) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: border, width: 0.8),
         ),
-      );
-      if (client.ssid != null && client.ssid!.isNotEmpty) {
-        badges.add(
-          Padding(
-            padding: const EdgeInsets.only(top: 1),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-              decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                'SSID: ${client.ssid}',
-                style: const TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
-                ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 11, color: fg),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: fg,
+                height: 1.1,
               ),
             ),
-          ),
-        );
-      }
-    } else if (client.isConnected && client.connectionType == ConnectionType.wired) {
-      final bgColor = colorScheme.secondaryContainer;
-      final fgColor = colorScheme.onSecondaryContainer;
-      badges.add(
-        Chip(
-          label: const Text('Wired'),
-          avatar: Icon(Icons.lan, size: 14, color: fgColor),
-          backgroundColor: bgColor,
-          labelStyle: theme.textTheme.labelSmall?.copyWith(color: fgColor, fontSize: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ],
         ),
       );
     }
 
-    if (badges.isEmpty) return const SizedBox.shrink();
+    // 1. Connection & SSID Pill
+    if (client.isConnected && client.connectionType == ConnectionType.wireless) {
+      final labelText = (client.ssid != null && client.ssid!.isNotEmpty)
+          ? 'Wi-Fi • ${client.ssid}'
+          : 'Wi-Fi';
+      pills.add(
+        buildPill(
+          label: labelText,
+          icon: Icons.wifi_rounded,
+          bg: colorScheme.primaryContainer.withValues(alpha: 0.5),
+          border: colorScheme.primary.withValues(alpha: 0.35),
+          fg: colorScheme.onPrimaryContainer,
+        ),
+      );
+    } else if (client.isConnected && client.connectionType == ConnectionType.wired) {
+      pills.add(
+        buildPill(
+          label: 'Wired',
+          icon: Icons.lan_rounded,
+          bg: colorScheme.secondaryContainer.withValues(alpha: 0.5),
+          border: colorScheme.secondary.withValues(alpha: 0.35),
+          fg: colorScheme.onSecondaryContainer,
+        ),
+      );
+    }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: badges,
+    // 2. Static Lease Pill
+    if (isStatic) {
+      pills.add(
+        buildPill(
+          label: 'STATIC',
+          icon: Icons.push_pin_rounded,
+          bg: Colors.teal.shade700.withValues(alpha: 0.15),
+          border: Colors.teal.shade600.withValues(alpha: 0.4),
+          fg: theme.brightness == Brightness.dark ? Colors.teal.shade200 : Colors.teal.shade800,
+        ),
+      );
+    }
+
+    // 3. Isolated Guest Pill
+    if (isGuest) {
+      pills.add(
+        buildPill(
+          label: 'Isolated Guest',
+          icon: Icons.shield_moon_rounded,
+          bg: Colors.amber.shade700.withValues(alpha: 0.15),
+          border: Colors.amber.shade700.withValues(alpha: 0.4),
+          fg: theme.brightness == Brightness.dark ? Colors.amber.shade300 : Colors.amber.shade900,
+        ),
+      );
+    }
+
+    // 4. Banned / Paused Access Pill
+    if (isBanned) {
+      pills.add(
+        buildPill(
+          label: 'Wi-Fi Banned',
+          icon: Icons.block_rounded,
+          bg: Colors.red.shade700.withValues(alpha: 0.15),
+          border: Colors.red.shade700.withValues(alpha: 0.4),
+          fg: theme.brightness == Brightness.dark ? Colors.red.shade300 : Colors.red.shade900,
+        ),
+      );
+    } else if (isPaused) {
+      pills.add(
+        buildPill(
+          label: 'PAUSED',
+          icon: Icons.pause_circle_filled_rounded,
+          bg: Colors.orange.shade700.withValues(alpha: 0.15),
+          border: Colors.orange.shade700.withValues(alpha: 0.4),
+          fg: theme.brightness == Brightness.dark ? Colors.orange.shade300 : Colors.orange.shade900,
+        ),
+      );
+    }
+
+    if (pills.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: pills,
+      ),
     );
   }
 
@@ -930,47 +1002,51 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
       VoidCallback? onTap,
       String? semanticsLabel,
     }) {
+      final isIpv6Value = title.contains('IPv6');
       return InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
         child: Padding(
           padding: const EdgeInsets.symmetric(
-            horizontal: LuciSpacing.md,
-            vertical: LuciSpacing.sm,
+            horizontal: 14.0,
+            vertical: 3.5,
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
                 title,
-                style: LuciTextStyles.detailLabel(context),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontSize: 12,
+                ),
                 semanticsLabel: title,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Flexible(
-                      child: SelectableText(
-                        value,
-                        style: valueColor != null
-                            ? LuciTextStyles.detailValue(
-                                context,
-                              ).copyWith(color: valueColor)
-                            : LuciTextStyles.detailValue(context),
+                      child: Text(
+                        isIpv6Value ? value.replaceAll(':', ':\u200B') : value,
+                        style: (valueColor != null
+                                ? LuciTextStyles.detailValue(context).copyWith(color: valueColor)
+                                : LuciTextStyles.detailValue(context))
+                            .copyWith(fontSize: 12),
                         textAlign: TextAlign.end,
                       ),
                     ),
                     if (onTap != null)
                       GestureDetector(
                         onTap: onTap,
-                        child: const Padding(
-                          padding: EdgeInsets.only(left: 8.0),
+                        child: Padding(
+                          padding: const EdgeInsets.only(left: 6.0),
                           child: Icon(
-                            Icons.copy_all_outlined,
-                            size: 16,
+                            Icons.copy_all_rounded,
+                            size: 14,
+                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                             semanticLabel: 'Copy',
                           ),
                         ),
@@ -1020,12 +1096,12 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
         final remainingCount = classified.length - 1;
         ipv6Rows.add(
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+            padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 2.0),
             child: InkWell(
               onTap: widget.onToggleIpv6,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+                padding: const EdgeInsets.symmetric(vertical: 3.0, horizontal: 6.0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -1034,7 +1110,7 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                           ? 'Collapse IPv6 addresses'
                           : 'Show $remainingCount more IPv6 address${remainingCount > 1 ? 'es' : ''}',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
                         color: theme.colorScheme.primary,
                       ),
@@ -1042,7 +1118,7 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                     const SizedBox(width: 4),
                     Icon(
                       widget.isIpv6Expanded ? Icons.expand_less : Icons.expand_more,
-                      size: 16,
+                      size: 15,
                       color: theme.colorScheme.primary,
                     ),
                   ],
@@ -1057,12 +1133,13 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest.withValues(
-          alpha: 0.18,
+          alpha: 0.12,
         ),
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
       ),
       child: Column(
         children: [
+          const SizedBox(height: 4),
           detailRow(
             'IP Address',
             client.ipAddress,
@@ -1084,12 +1161,6 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
               client.vendor!,
               semanticsLabel: 'Vendor: ${client.vendor}',
             ),
-          if (client.ssid != null && client.ssid!.isNotEmpty)
-            detailRow(
-              'Connected Wireless SSID',
-              client.ssid!,
-              semanticsLabel: 'SSID: ${client.ssid}',
-            ),
           if (client.dnsName != null && client.dnsName!.isNotEmpty)
             detailRow(
               'DNS Name',
@@ -1098,8 +1169,9 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                   _copyToClipboard(context, client.dnsName!, 'DNS Name'),
               semanticsLabel: 'DNS Name: ${client.dnsName}',
             ),
-          const Divider(height: 1, indent: 16, endIndent: 16),
-          const SizedBox(height: 8),
+          const SizedBox(height: 2),
+          const Divider(height: 1, indent: 14, endIndent: 14),
+          const SizedBox(height: 2),
           detailRow(
             'Lease Time Remaining',
             client.formattedLeaseTime,
@@ -1111,133 +1183,182 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
             semanticsLabel:
                 'Lease Time Remaining: ${client.formattedLeaseTime}',
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-            child: Column(
-              children: [
-                // Option 1: Temporarily pause local network access / internet access
-                ListenableBuilder(
-                  listenable: AppState.instance,
-                  builder: (ctx, _) {
-                    final appState = AppState.instance;
-                    final isPaused = appState.isInternetPaused(client.macAddress);
-                    final canPause = client.isConnected || isPaused;
-                    return Column(
-                      children: [
-                        if (canPause)
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: () => _toggleInternetPause(context, client, !isPaused),
-                              icon: Icon(
-                                isPaused ? Icons.play_circle_outline_rounded : Icons.pause_circle_outline_rounded,
-                                color: isPaused ? LuciStatusColors.connected : Colors.orange,
-                                size: 20,
-                              ),
-                              label: Text(
-                                isPaused ? 'Resume Internet Access' : 'Pause Internet Access',
-                                style: TextStyle(
-                                  color: isPaused ? LuciStatusColors.connected : Colors.orange.shade800,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(
-                                  color: isPaused ? LuciStatusColors.connected : Colors.orange.shade600,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          ),
-                        if (!client.isStatic && !_isIpv6Only(client)) ...[
-                          if (canPause) const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: () => _showAddStaticLeaseDialog(context, client),
-                              icon: const Icon(
-                                Icons.push_pin_outlined,
-                                color: Colors.teal,
-                                size: 20,
-                              ),
-                              label: Text(
-                                'Add to Static Leases',
-                                style: TextStyle(
-                                  color: Colors.teal.shade800,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: Colors.teal.shade600),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                        if (client.isStatic) ...[
-                          if (canPause) const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: () => _showAddStaticLeaseDialog(context, client),
-                              icon: const Icon(
-                                Icons.edit_outlined,
-                                color: Colors.teal,
-                                size: 20,
-                              ),
-                              label: Text(
-                                'Edit Static Lease',
-                                style: TextStyle(
-                                  color: Colors.teal.shade800,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: Colors.teal.shade600),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: () => _confirmRemoveStaticLease(context, client),
-                              icon: const Icon(
-                                Icons.delete_outline,
-                                color: Colors.redAccent,
-                                size: 20,
-                              ),
-                              label: const Text(
-                                'Remove from Static Leases',
-                                style: TextStyle(
-                                  color: Colors.redAccent,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.5)),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    );
-                  },
-                ),
-              ],
+            padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 6.0),
+            child: ListenableBuilder(
+              listenable: AppState.instance,
+              builder: (ctx, _) {
+                final appState = AppState.instance;
+                final isPaused = appState.isInternetPaused(client.macAddress);
+                final isBanned = appState.isWirelessBanned(client.macAddress);
+                final canPause = client.isConnected || isPaused;
+                final isWireless = client.connectionType == ConnectionType.wireless ||
+                    (client.ssid != null && client.ssid!.isNotEmpty) ||
+                    (client.wirelessIface != null && client.wirelessIface!.isNotEmpty);
+
+                final actionButtons = <Widget>[];
+
+                // 0. Unban Client (if currently banned)
+                if (isBanned) {
+                  actionButtons.add(
+                    OutlinedButton.icon(
+                      onPressed: () => _unbanWirelessClient(context, client),
+                      icon: const Icon(Icons.check_circle_outline_rounded, size: 14, color: Colors.blue),
+                      label: const Text(
+                        'Unban Client',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: const Size(0, 32),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        side: BorderSide(color: Colors.blue.shade400, width: 0.9),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  );
+                }
+
+                // 1. Pause / Resume Internet Switch
+                if (canPause && !isBanned) {
+                  actionButtons.add(
+                    OutlinedButton.icon(
+                      onPressed: () => _toggleInternetPause(context, client, !isPaused),
+                      icon: Icon(
+                        isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                        size: 15,
+                        color: isPaused ? Colors.green.shade700 : Colors.red.shade700,
+                      ),
+                      label: Text(
+                        isPaused ? 'Resume Access' : 'Pause Access',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isPaused ? Colors.green.shade700 : Colors.red.shade700,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: const Size(0, 32),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        side: BorderSide(
+                          color: isPaused ? Colors.green.shade400 : Colors.red.shade300,
+                          width: 0.9,
+                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  );
+                }
+
+                // 2. Disconnect / Kick Wireless Client
+                if (isWireless && !isBanned) {
+                  actionButtons.add(
+                    OutlinedButton.icon(
+                      onPressed: () => _kickWirelessClient(context, client),
+                      icon: const Icon(Icons.wifi_off_rounded, size: 14, color: Colors.orange),
+                      label: const Text(
+                        'Kick Client',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: const Size(0, 32),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        side: BorderSide(color: Colors.orange.shade300, width: 0.9),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  );
+                }
+
+                // 3. Static Lease Controls (Add / Edit / Remove)
+                final isStatic = client.isStatic || appState.findStaticLeaseByMac(client.macAddress) != null;
+
+                if (!isStatic && !_isIpv6Only(client)) {
+                  actionButtons.add(
+                    OutlinedButton.icon(
+                      onPressed: () => _showAddStaticLeaseDialog(context, client),
+                      icon: const Icon(Icons.push_pin_outlined, size: 14, color: Colors.teal),
+                      label: Text(
+                        'Static Lease',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.teal.shade800,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: const Size(0, 32),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        side: BorderSide(color: Colors.teal.shade400, width: 0.9),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  );
+                }
+
+                if (isStatic) {
+                  actionButtons.add(
+                    OutlinedButton.icon(
+                      onPressed: () => _showAddStaticLeaseDialog(context, client),
+                      icon: const Icon(Icons.edit_outlined, size: 14, color: Colors.teal),
+                      label: Text(
+                        'Edit Static Lease',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.teal.shade800,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: const Size(0, 32),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        side: BorderSide(color: Colors.teal.shade400, width: 0.9),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  );
+
+                  actionButtons.add(
+                    OutlinedButton.icon(
+                      onPressed: () => _confirmRemoveStaticLease(context, client),
+                      icon: const Icon(Icons.delete_outline, size: 14, color: Colors.redAccent),
+                      label: const Text(
+                        'Remove Lease',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.redAccent,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: const Size(0, 32),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.5), width: 0.9),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  );
+                }
+
+                return _buildJustifiedActionButtons(actionButtons);
+              },
             ),
           ),
+          const SizedBox(height: 2),
         ],
       ),
     );
@@ -1414,6 +1535,179 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
     setState(() {});
   }
 
+  Future<void> _kickWirelessClient(BuildContext context, Client client) async {
+    final safe = await SelfDeviceGuard.checkSelfActionGuardrail(
+      context,
+      actionName: 'Disconnect / Kick Wireless Client',
+      targetMac: client.macAddress,
+      targetIp: client.ipAddress,
+      targetHostname: client.displayName,
+    );
+    if (!safe || !context.mounted) return;
+
+    final actionKey = 'kick_client_${client.macAddress}';
+    if (ActionRateLimiter.isRateLimited(actionKey, cooldown: const Duration(seconds: 2))) {
+      final remaining = ActionRateLimiter.getRemainingCooldown(actionKey, cooldown: const Duration(seconds: 2));
+      context.showToastRateLimited('Kick Client (${client.displayName})', remaining);
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.wifi_off_rounded, color: Colors.orange, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Disconnect Wireless Device?',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to disconnect "${client.displayName}" (${client.macAddress}) from Wi-Fi${client.ssid != null && client.ssid!.isNotEmpty ? " '${client.ssid}'" : ""}? Device will be deauthenticated from the router.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            icon: const Icon(Icons.wifi_off_rounded, size: 16),
+            label: const Text('Disconnect Device'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.orange.shade800,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      context.showToastLoading(
+        'Disconnecting ${client.displayName}...',
+        subtitle: 'Target SSID: ${client.ssid ?? "Wireless"}',
+        actionKey: actionKey,
+      );
+
+      final appState = AppState.instance;
+      final success = await appState.disconnectWirelessClient(
+        client.macAddress,
+        iface: client.wirelessIface,
+        context: context,
+      );
+
+      if (!context.mounted) return;
+
+      if (success) {
+        context.showToastSuccess(
+          'Disconnected ${client.displayName}',
+          subtitle: 'Deauthenticated from Wi-Fi',
+          actionKey: actionKey,
+        );
+        widget.onRefreshNeeded();
+      } else {
+        context.showToastError(
+          'Failed to disconnect ${client.displayName}',
+          subtitle: 'Target MAC: ${client.macAddress}',
+          actionKey: actionKey,
+        );
+      }
+    }
+  }
+
+  Future<void> _unbanWirelessClient(BuildContext context, Client client) async {
+    final actionKey = 'unban_client_${client.macAddress}';
+    if (ActionRateLimiter.isRateLimited(actionKey, cooldown: const Duration(seconds: 2))) {
+      final remaining = ActionRateLimiter.getRemainingCooldown(actionKey, cooldown: const Duration(seconds: 2));
+      context.showToastRateLimited('Unban Client (${client.displayName})', remaining);
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.blue.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.check_circle_outline_rounded, color: Colors.blue, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Unban Wireless Device?',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to unban "${client.displayName}" (${client.macAddress})? This will restore Wi-Fi association and remove firewall blocking rules.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+            label: const Text('Unban Device'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.blue.shade700,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final appState = AppState.instance;
+    context.showToastLoading(
+      'Unbanning ${client.displayName}...',
+      actionKey: actionKey,
+    );
+
+    final success = await appState.unbanWirelessClient(
+      client.macAddress,
+      context: context,
+    );
+
+    if (!context.mounted) return;
+
+    if (success) {
+      unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
+      context.showToastSuccess('${client.displayName} unbanned successfully.', actionKey: actionKey);
+      widget.onRefreshNeeded();
+    } else {
+      unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
+      context.showToastError('Failed to unban ${client.displayName}.', actionKey: actionKey);
+    }
+  }
+
   String _buildMinimalClientSubtitle(Client client) {
     final v4 = client.ipAddress;
     final v6s = client.ipv6Addresses ?? [];
@@ -1437,6 +1731,62 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
   void _copyToClipboard(BuildContext context, String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
     context.showToastSuccess('$label copied', subtitle: 'Copied to clipboard.');
+  }
+
+  Widget _buildJustifiedActionButtons(List<Widget> buttons) {
+    if (buttons.isEmpty) return const SizedBox.shrink();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double availableWidth = constraints.maxWidth;
+
+        if (availableWidth < 480) {
+          final List<Widget> rows = [];
+          for (int i = 0; i < buttons.length; i += 2) {
+            if (i + 1 < buttons.length) {
+              rows.add(
+                Row(
+                  children: [
+                    Expanded(child: buttons[i]),
+                    const SizedBox(width: 8),
+                    Expanded(child: buttons[i + 1]),
+                  ],
+                ),
+              );
+            } else {
+              rows.add(
+                Row(
+                  children: [
+                    Expanded(child: buttons[i]),
+                  ],
+                ),
+              );
+            }
+          }
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (int r = 0; r < rows.length; r++) ...[
+                if (r > 0) const SizedBox(height: 8),
+                rows[r],
+              ],
+            ],
+          );
+        }
+
+        return Align(
+          alignment: Alignment.centerRight,
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: buttons,
+          ),
+        );
+      },
+    );
   }
 }
 

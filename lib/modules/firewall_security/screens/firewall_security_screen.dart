@@ -8,6 +8,7 @@ import 'package:yet_another_luci_app/design/luci_design_system.dart';
 import 'package:yet_another_luci_app/models/router_capabilities.dart';
 import 'package:yet_another_luci_app/widgets/luci_collapsible_card.dart';
 import 'package:yet_another_luci_app/widgets/luci_toast.dart';
+import 'package:yet_another_luci_app/widgets/luci_guardrail.dart';
 import '../models/firewall_info.dart';
 
 class FirewallSecurityScreen extends ConsumerStatefulWidget {
@@ -45,29 +46,11 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
   }
 
   Future<bool> _showConfirmAndDiscardDialog() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Discard Unsaved Changes?'),
-        content: Text(
-          'Are you sure you want to discard staged changes for ${_stagedCustomRuleStates.length} custom firewall rule(s)?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Discard'),
-          ),
-        ],
-      ),
+    return LuciGuardrail.confirmUnsavedChanges(
+      context,
+      unsavedCount: _stagedCustomRuleStates.length,
+      itemLabel: 'firewall rule(s)',
     );
-    return confirm ?? false;
   }
 
   Future<void> _confirmAndDiscardChanges() async {
@@ -155,41 +138,21 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
   }
 
   Future<bool?> _showUnsavedChangesDialog() async {
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Unsaved Firewall Rule Changes'),
-        content: Text(
-          'You have ${_stagedCustomRuleStates.length} unsaved change(s) to firewall custom rules. Would you like to save them before leaving?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(null),
-            child: const Text('Cancel'),
-          ),
-          OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            onPressed: () {
-              _discardChanges();
-              Navigator.of(ctx).pop(true);
-            },
-            child: const Text('Discard & Leave'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.of(ctx).pop(false);
-              final saved = await _saveChanges();
-              if (saved && mounted) {
-                Navigator.of(context).pop();
-              }
-            },
-            child: const Text('Save & Exit'),
-          ),
-        ],
-      ),
+    final action = await LuciGuardrail.confirmSaveOrDiscardChanges(
+      context,
+      count: _stagedCustomRuleStates.length,
+      itemLabel: 'firewall rule change(s)',
+      title: 'Unsaved Firewall Rule Changes',
     );
+
+    if (action == 'discard') {
+      _discardChanges();
+      return true;
+    } else if (action == 'save') {
+      final saved = await _saveChanges();
+      return saved;
+    }
+    return null;
   }
 
   @override
@@ -253,7 +216,7 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
                     LuciCollapsibleCard(
                       title: 'Inter-Zone Forwarding Rules',
                       count: overview.forwardings.length,
-                      subtitle: '${overview.forwardings.length} inter-zone policies • Tap to expand',
+                      subtitle: '${overview.forwardings.length} inter-zone policies',
                       icon: Icons.alt_route_outlined,
                       iconColor: Colors.blue,
                       child: _buildForwardingsCard(context, overview.forwardings),
@@ -262,7 +225,7 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
                     LuciCollapsibleCard(
                       title: 'Port Forwarding / Redirects',
                       count: overview.portForwards.length,
-                      subtitle: '${overview.portForwards.length} port forward rules • Tap to expand',
+                      subtitle: '${overview.portForwards.length} port forward rules',
                       icon: Icons.import_export_outlined,
                       iconColor: Colors.orange,
                       child: _buildPortForwardingsList(context, overview.portForwards),
@@ -271,7 +234,7 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
                     LuciCollapsibleCard(
                       title: 'Custom Security Rules',
                       count: overview.customRules.length,
-                      subtitle: '${overview.customRules.length} custom rules • Tap to expand',
+                      subtitle: '${overview.customRules.length} custom rules',
                       icon: Icons.rule_outlined,
                       iconColor: Colors.teal,
                       child: _buildCustomRulesList(context, overview.customRules),

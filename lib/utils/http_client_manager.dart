@@ -73,9 +73,9 @@ class HttpClientManager {
   }) {
     final dio = Dio(
       BaseOptions(
-        connectTimeout: const Duration(seconds: 5),
-        receiveTimeout: const Duration(seconds: 8),
-        sendTimeout: const Duration(seconds: 8),
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 30),
+        sendTimeout: const Duration(seconds: 30),
         followRedirects: true,
         // Status is validated per request when needed (e.g., handle 302 on login)
       ),
@@ -97,7 +97,7 @@ class HttpClientManager {
               e.type == DioExceptionType.connectionError ||
               e.error is SocketException) {
             Logger.info('Network transition or socket failure detected for $host. Evicting stale client.');
-            disposeClient(host, useHttps);
+            disposeClient(host, useHttps, forceCloseAdapter: false);
           }
 
           handler.next(e);
@@ -108,7 +108,7 @@ class HttpClientManager {
     final adapter = IOHttpClientAdapter();
     adapter.createHttpClient = () {
       final httpClient = HttpClient();
-      httpClient.connectionTimeout = const Duration(seconds: 5);
+      httpClient.connectionTimeout = const Duration(seconds: 15);
       if (useHttps) {
         httpClient.badCertificateCallback = (cert, certHost, port) {
           final certKey = '$certHost:$port';
@@ -156,7 +156,7 @@ class HttpClientManager {
   }
 
   /// Disposes of a specific client
-  void disposeClient(String host, bool useHttps) {
+  void disposeClient(String host, bool useHttps, {bool forceCloseAdapter = false}) {
     // Remove any cached clients that match the host (with or without port)
     final hostname = _extractHostname(host);
     final keysToRemove = _clients.keys
@@ -168,19 +168,23 @@ class HttpClientManager {
         .toList();
     for (final key in keysToRemove) {
       final dio = _clients.remove(key);
-      final adapter = dio?.httpClientAdapter;
-      if (adapter is IOHttpClientAdapter) {
-        adapter.close(force: true);
+      if (forceCloseAdapter) {
+        final adapter = dio?.httpClientAdapter;
+        if (adapter is IOHttpClientAdapter) {
+          adapter.close(force: true);
+        }
       }
     }
   }
 
   /// Disposes of all cached clients
-  void disposeAll() {
+  void disposeAll({bool forceCloseAdapter = false}) {
     for (final dio in _clients.values) {
-      final adapter = dio.httpClientAdapter;
-      if (adapter is IOHttpClientAdapter) {
-        adapter.close(force: true);
+      if (forceCloseAdapter) {
+        final adapter = dio.httpClientAdapter;
+        if (adapter is IOHttpClientAdapter) {
+          adapter.close(force: true);
+        }
       }
     }
     _clients.clear();
@@ -193,13 +197,7 @@ class HttpClientManager {
     _userAcceptedCerts.clear();
 
     // Clear all cached HTTP clients
-    for (final dio in _clients.values) {
-      final adapter = dio.httpClientAdapter;
-      if (adapter is IOHttpClientAdapter) {
-        adapter.close(force: true);
-      }
-    }
-    _clients.clear();
+    disposeAll(forceCloseAdapter: true);
 
     // Delete from secure storage
     try {
@@ -258,7 +256,7 @@ class HttpClientManager {
 
     // Try to make a test connection to trigger certificate validation
     final testClient = HttpClient();
-    testClient.connectionTimeout = const Duration(seconds: 5);
+    testClient.connectionTimeout = const Duration(seconds: 15);
 
     // Apply the same certificate validation logic
     testClient.badCertificateCallback = (cert, certHost, port) {

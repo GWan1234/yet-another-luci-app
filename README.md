@@ -201,9 +201,26 @@ Contributions, bug reports, and feature suggestions are welcome! Please read [CO
 
 ---
 
+## 👥 Contributors & Original Creator Attribution
+
+This repository is created and maintained by **[Tuhin Garai (@nightcodex7)](https://github.com/nightcodex7)**.
+
+<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+[![All Contributors](https://img.shields.io/badge/all_contributors-1-orange.svg?style=flat-square)](#-contributors--original-creator-attribution)
+<!-- ALL-CONTRIBUTORS-BADGE:END -->
+
+| [<img src="https://github.com/nightcodex7.png?size=100" width="100px;" alt="Tuhin Garai"/><br /><sub><b>Tuhin Garai (@nightcodex7)</b></sub>](https://github.com/nightcodex7) |
+| :---: |
+| **Creator & Lead Maintainer** |
+
+> [!IMPORTANT]
+> **Mandatory Fork Attribution Requirement:** Under Apache License 2.0 (Section 4), all forks and derivative versions of this repository on GitHub **MUST** retain original author credit for **Tuhin Garai (@nightcodex7)** in the `README.md`, `CONTRIBUTORS.md`, `NOTICE`, and repository commit history. Stripping or obscuring original creator attribution on GitHub repository forks is strictly prohibited. See [CONTRIBUTORS.md](CONTRIBUTORS.md) for details.
+
+---
+
 ## 📜 License & Credits
 
-Distributed under the **Apache License 2.0**. See [`LICENSE`](LICENSE) and [`LICENSE_CHANGE.md`](LICENSE_CHANGE.md) for details.
+Distributed under the **Apache License 2.0**. See [`LICENSE`](LICENSE), [`NOTICE`](NOTICE), and [`LICENSE_CHANGE.md`](LICENSE_CHANGE.md) for details.
 
 ### Acknowledgments
 

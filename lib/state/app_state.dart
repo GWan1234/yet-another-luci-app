@@ -32,12 +32,9 @@ import 'package:yet_another_luci_app/models/network_topology.dart';
 import 'package:yet_another_luci_app/modules/firewall_security/models/firewall_info.dart';
 import 'package:yet_another_luci_app/modules/services_system/models/ddns_info.dart';
 import 'package:yet_another_luci_app/modules/wireless_management/models/wireless_info.dart';
+import 'package:yet_another_luci_app/modules/dhcp_dns/models/dhcp_dns_info.dart';
 
-enum RouterConnectionStatus {
-  connected,
-  reconnecting,
-  disconnected,
-}
+enum RouterConnectionStatus { connected, reconnecting, disconnected }
 
 class _RouterCommand {
   final String command;
@@ -58,6 +55,7 @@ class AppState extends ChangeNotifier {
   SessionController? _sessionController;
   PackageController? _packageController;
   NetworkActionsController? _networkActionsController;
+  AccessControlTimerLifecycleManager? _accessControlTimerLifecycleManager;
   ClientController? _clientController;
   DashboardController? _dashboardController;
   final HttpClientManager _httpClientManager = HttpClientManager();
@@ -72,7 +70,8 @@ class AppState extends ChangeNotifier {
       !reviewerModeEnabled;
 
   // Reviewer mode state
-  bool get reviewerModeEnabled => _sessionController?.reviewerModeEnabled ?? false;
+  bool get reviewerModeEnabled =>
+      _sessionController?.reviewerModeEnabled ?? false;
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -82,7 +81,9 @@ class AppState extends ChangeNotifier {
 
   Timer? _throughputTimer;
   final int _throughputIntervalSeconds = 2;
-  int get throughputIntervalSeconds => _throughputController?.throughputIntervalSeconds ?? _throughputIntervalSeconds;
+  int get throughputIntervalSeconds =>
+      _throughputController?.throughputIntervalSeconds ??
+      _throughputIntervalSeconds;
   Timer? _pollingTimer;
   int _pollAttempts = 0;
   static const int _maxPollAttempts =
@@ -102,10 +103,12 @@ class AppState extends ChangeNotifier {
   ThemeMode get themeMode => _sessionController?.themeMode ?? ThemeMode.system;
 
   // Clients view mode (aggregate across routers)
-  bool get clientsAggregateAllRouters => _sessionController?.clientsAggregateAllRouters ?? true;
+  bool get clientsAggregateAllRouters =>
+      _sessionController?.clientsAggregateAllRouters ?? true;
 
   // Dashboard preferences state
-  DashboardPreferences get dashboardPreferences => _sessionController?.dashboardPreferences ?? DashboardPreferences();
+  DashboardPreferences get dashboardPreferences =>
+      _sessionController?.dashboardPreferences ?? DashboardPreferences();
 
   List<model.Router> get routers => _sessionController?.routers ?? [];
   model.Router? get selectedRouter => _sessionController?.selectedRouter;
@@ -118,7 +121,39 @@ class AppState extends ChangeNotifier {
   String? requestedInterfaceToScroll;
   ClientCategoryFilter? requestedClientCategoryFilter;
 
-  void requestTab(int index, {String? interfaceToScroll, ClientCategoryFilter? clientCategoryFilter}) {
+  // Custom Guest WiFi section overrides & exclusions
+  final Set<String> _customGuestSections = {};
+  final Set<String> _excludedGuestSections = {};
+
+  Set<String> get customGuestSections => Set.unmodifiable(_customGuestSections);
+  Set<String> get excludedGuestSections => Set.unmodifiable(_excludedGuestSections);
+
+  bool isCustomGuestSection(String sectionName) => _customGuestSections.contains(sectionName);
+  bool isExcludedGuestSection(String sectionName) => _excludedGuestSections.contains(sectionName);
+
+  void markAsGuestSection(String sectionName) {
+    _excludedGuestSections.remove(sectionName);
+    _customGuestSections.add(sectionName);
+    notifyListeners();
+  }
+
+  void markAsStandardSection(String sectionName) {
+    _customGuestSections.remove(sectionName);
+    _excludedGuestSections.add(sectionName);
+    notifyListeners();
+  }
+
+  void resetGuestSectionOverride(String sectionName) {
+    _customGuestSections.remove(sectionName);
+    _excludedGuestSections.remove(sectionName);
+    notifyListeners();
+  }
+
+  void requestTab(
+    int index, {
+    String? interfaceToScroll,
+    ClientCategoryFilter? clientCategoryFilter,
+  }) {
     requestedTab = index;
     requestedInterfaceToScroll = interfaceToScroll;
     requestedClientCategoryFilter = clientCategoryFilter;
@@ -143,7 +178,8 @@ class AppState extends ChangeNotifier {
     _initializeServices();
     await _sessionController?.loadThemeMode();
     await loadRouters(); // Load routers on app start (sets selectedRouter)
-    await _sessionController?.migrateGlobalDashboardPreferencesIfNeeded(); // Proactively migrate legacy prefs
+    await _sessionController
+        ?.migrateGlobalDashboardPreferencesIfNeeded(); // Proactively migrate legacy prefs
     await _sessionController?.loadClientsViewMode();
     await loadDashboardPreferences(); // Load prefs scoped to selected router
     await _loadPendingAccessControlState();
@@ -229,6 +265,9 @@ class AppState extends ChangeNotifier {
       redetectCapabilities: redetectCapabilities,
       notifyListeners: notifyListeners,
     );
+    _accessControlTimerLifecycleManager = AccessControlTimerLifecycleManager(
+      controller: _networkActionsController!,
+    );
     _clientController = ClientController(
       apiServiceRef: () => _apiService,
       authServiceRef: () => _authService,
@@ -240,7 +279,21 @@ class AppState extends ChangeNotifier {
     );
   }
 
+  bool _hasShownReviewerNotice = false;
+  bool get hasShownReviewerNotice => _hasShownReviewerNotice;
+
+  void markReviewerNoticeShown() {
+    _hasShownReviewerNotice = true;
+  }
+
+  void resetReviewerNoticeFlag() {
+    _hasShownReviewerNotice = false;
+  }
+
   Future<void> setReviewerMode(bool enabled, {BuildContext? context}) async {
+    if (enabled) {
+      _hasShownReviewerNotice = false;
+    }
     await _sessionController!.setReviewerMode(enabled, context: context);
     _initializeServices();
     notifyListeners();
@@ -267,17 +320,20 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Map<String, dynamic>? get dashboardData => _dashboardController?.dashboardData;
+  Map<String, dynamic>? get dashboardData =>
+      _dashboardController?.dashboardData;
   List<double> get rxHistory => _throughputController?.rxHistory ?? [];
   List<double> get txHistory => _throughputController?.txHistory ?? [];
   double get currentRxRate => _throughputController?.currentRxRate ?? 0.0;
   double get currentTxRate => _throughputController?.currentTxRate ?? 0.0;
-  bool get isDashboardLoading => _dashboardController?.isDashboardLoading ?? false;
+  bool get isDashboardLoading =>
+      _dashboardController?.isDashboardLoading ?? false;
   String? get dashboardError => _dashboardController?.dashboardError;
 
   String? get publicIpv4 => _sessionController?.publicIpv4;
   String? get publicIpv6 => _sessionController?.publicIpv6;
-  bool get isFetchingPublicIps => _sessionController?.isFetchingPublicIps ?? false;
+  bool get isFetchingPublicIps =>
+      _sessionController?.isFetchingPublicIps ?? false;
 
   Future<void> fetchPublicIps({BuildContext? context}) =>
       _sessionController!.fetchPublicIps(context: context);
@@ -285,22 +341,34 @@ class AppState extends ChangeNotifier {
   // Interface-specific throughput getters
   List<double> getRxHistoryForInterface(String interface) {
     final deviceName = _getDeviceNameForInterface(interface);
-    return _throughputController?.getRxHistoryForInterface(deviceName ?? interface) ?? [];
+    return _throughputController?.getRxHistoryForInterface(
+          deviceName ?? interface,
+        ) ??
+        [];
   }
 
   List<double> getTxHistoryForInterface(String interface) {
     final deviceName = _getDeviceNameForInterface(interface);
-    return _throughputController?.getTxHistoryForInterface(deviceName ?? interface) ?? [];
+    return _throughputController?.getTxHistoryForInterface(
+          deviceName ?? interface,
+        ) ??
+        [];
   }
 
   double getCurrentRxRateForInterface(String interface) {
     final deviceName = _getDeviceNameForInterface(interface);
-    return _throughputController?.getCurrentRxRateForInterface(deviceName ?? interface) ?? 0.0;
+    return _throughputController?.getCurrentRxRateForInterface(
+          deviceName ?? interface,
+        ) ??
+        0.0;
   }
 
   double getCurrentTxRateForInterface(String interface) {
     final deviceName = _getDeviceNameForInterface(interface);
-    return _throughputController?.getCurrentTxRateForInterface(deviceName ?? interface) ?? 0.0;
+    return _throughputController?.getCurrentTxRateForInterface(
+          deviceName ?? interface,
+        ) ??
+        0.0;
   }
 
   Future<void> loadRouters() => _sessionController!.loadRouters();
@@ -308,8 +376,7 @@ class AppState extends ChangeNotifier {
   Future<void> addRouter(model.Router router) =>
       _sessionController!.addRouter(router);
 
-  Future<void> removeRouter(String id) =>
-      _sessionController!.removeRouter(id);
+  Future<void> removeRouter(String id) => _sessionController!.removeRouter(id);
 
   Future<void> selectRouter(String id, {BuildContext? context}) =>
       _sessionController!.selectRouter(id, context: context);
@@ -324,15 +391,14 @@ class AppState extends ChangeNotifier {
     bool useHttps, {
     bool fromRouter = false,
     BuildContext? context,
-  }) =>
-      _sessionController!.login(
-        ip,
-        user,
-        pass,
-        useHttps,
-        fromRouter: fromRouter,
-        context: context,
-      );
+  }) => _sessionController!.login(
+    ip,
+    user,
+    pass,
+    useHttps,
+    fromRouter: fromRouter,
+    context: context,
+  );
 
   Future<void> logout() => _sessionController!.logout();
 
@@ -342,7 +408,9 @@ class AppState extends ChangeNotifier {
   }
 
   /// Probe and cache actual ubus objects, methods, package manager engine, firewall backend, and network model.
-  Future<RouterCapabilities> probeRouterCapabilities({bool forceRefresh = false}) async {
+  Future<RouterCapabilities> probeRouterCapabilities({
+    bool forceRefresh = false,
+  }) async {
     return await _dashboardController?.probeRouterCapabilities(
           forceRefresh: forceRefresh,
         ) ??
@@ -353,8 +421,6 @@ class AppState extends ChangeNotifier {
     await _dashboardController?.fetchDashboardData();
     await fetchClientsForSelectedRouter();
   }
-
-
 
   /// Lazy capability-aware fetch returning a list of installed OpenWrtPackage objects
   Future<RpcResult<List<OpenWrtPackage>>> fetchInstalledPackages() =>
@@ -378,7 +444,9 @@ class AppState extends ChangeNotifier {
 
     final model = capabilities?.networkModel ?? NetworkModel.unknown;
     if (model == NetworkModel.unknown) {
-      return RpcResult.methodNotFound('Network model is unknown or in conservative fallback mode');
+      return RpcResult.methodNotFound(
+        'Network model is unknown or in conservative fallback mode',
+      );
     }
 
     try {
@@ -391,7 +459,9 @@ class AppState extends ChangeNotifier {
         params: {'config': 'network'},
       );
 
-      final rpcRes = RpcResult.fromUbusResponse<NetworkTopology>(rawRpc, (data) {
+      final rpcRes = RpcResult.fromUbusResponse<NetworkTopology>(rawRpc, (
+        data,
+      ) {
         if (data is Map) {
           final map = Map<String, dynamic>.from(data);
           if (model == NetworkModel.dsa) {
@@ -400,17 +470,24 @@ class AppState extends ChangeNotifier {
             return SwconfigTopologyParser.parse(map, null);
           }
         }
-        return NetworkTopology.unavailable(model, 'Invalid network config payload format');
+        return NetworkTopology.unavailable(
+          model,
+          'Invalid network config payload format',
+        );
       });
 
       if (rpcRes.status == RpcCallStatus.methodNotFound) {
-        Logger.warning('Network topology fetch returned methodNotFound. Triggering background capability re-probe.');
+        Logger.warning(
+          'Network topology fetch returned methodNotFound. Triggering background capability re-probe.',
+        );
         unawaited(redetectCapabilities());
       }
 
       return rpcRes;
     } catch (e) {
-      return RpcResult.networkError('Network error fetching switch topology: $e');
+      return RpcResult.networkError(
+        'Network error fetching switch topology: $e',
+      );
     }
   }
 
@@ -433,7 +510,9 @@ class AppState extends ChangeNotifier {
         params: {'config': 'firewall'},
       );
 
-      final rpcRes = RpcResult.fromUbusResponse<FirewallOverview>(rawRpc, (data) {
+      final rpcRes = RpcResult.fromUbusResponse<FirewallOverview>(rawRpc, (
+        data,
+      ) {
         if (data is Map) {
           final map = Map<String, dynamic>.from(data);
           return FirewallOverview.fromUciData(
@@ -442,17 +521,24 @@ class AppState extends ChangeNotifier {
             isReviewerMode: reviewerModeEnabled,
           );
         }
-        return FirewallOverview.unavailable(backend, 'Invalid firewall config payload format');
+        return FirewallOverview.unavailable(
+          backend,
+          'Invalid firewall config payload format',
+        );
       });
 
       if (rpcRes.status == RpcCallStatus.methodNotFound) {
-        Logger.warning('Firewall config fetch returned methodNotFound. Triggering background capability re-probe.');
+        Logger.warning(
+          'Firewall config fetch returned methodNotFound. Triggering background capability re-probe.',
+        );
         unawaited(redetectCapabilities());
       }
 
       return rpcRes;
     } catch (e) {
-      return RpcResult.networkError('Network error fetching firewall overview: $e');
+      return RpcResult.networkError(
+        'Network error fetching firewall overview: $e',
+      );
     }
   }
 
@@ -474,21 +560,26 @@ class AppState extends ChangeNotifier {
         params: {},
       );
 
-      final rpcRes = RpcResult.fromUbusResponse<WirelessOverview>(rawRpc, (data) {
-        return WirelessOverview.fromDashboardData(
-          {'wireless': data},
-          isReviewerMode: reviewerModeEnabled,
-        );
+      final rpcRes = RpcResult.fromUbusResponse<WirelessOverview>(rawRpc, (
+        data,
+      ) {
+        return WirelessOverview.fromDashboardData({
+          'wireless': data,
+        }, isReviewerMode: reviewerModeEnabled);
       });
 
       if (rpcRes.status == RpcCallStatus.methodNotFound) {
-        Logger.warning('Wireless devices fetch returned methodNotFound. Triggering background capability re-probe.');
+        Logger.warning(
+          'Wireless devices fetch returned methodNotFound. Triggering background capability re-probe.',
+        );
         unawaited(redetectCapabilities());
       }
 
       return rpcRes;
     } catch (e) {
-      return RpcResult.networkError('Network error fetching wireless overview: $e');
+      return RpcResult.networkError(
+        'Network error fetching wireless overview: $e',
+      );
     }
   }
 
@@ -496,21 +587,19 @@ class AppState extends ChangeNotifier {
   Future<RpcResult<String>> managePackageResult({
     required String packageName,
     required String action,
-  }) =>
-      _packageController!.managePackageResult(
-        packageName: packageName,
-        action: action,
-      );
+  }) => _packageController!.managePackageResult(
+    packageName: packageName,
+    action: action,
+  );
 
   /// Backward compatible wrapper for managePackage
   Future<bool> managePackage({
     required String packageName,
     required String action,
-  }) =>
-      _packageController!.managePackage(
-        packageName: packageName,
-        action: action,
-      );
+  }) => _packageController!.managePackage(
+    packageName: packageName,
+    action: action,
+  );
 
   /// Check and fetch upgradable packages returning classified RpcResult
   Future<RpcResult<List<OpenWrtPackage>>> fetchUpgradablePackagesResult() =>
@@ -521,8 +610,15 @@ class AppState extends ChangeNotifier {
       _packageController!.fetchUpgradablePackages();
 
   /// Execute generic router shell command via file.exec RPC
-  Future<dynamic> callRpc(String object, String method, [Map<String, dynamic>? params]) async {
-    if (reviewerModeEnabled || _apiService == null || selectedRouter == null || _authService?.sysauth == null) {
+  Future<dynamic> callRpc(
+    String object,
+    String method, [
+    Map<String, dynamic>? params,
+  ]) async {
+    if (reviewerModeEnabled ||
+        _apiService == null ||
+        selectedRouter == null ||
+        _authService?.sysauth == null) {
       return null;
     }
     return await _apiService!.call(
@@ -543,7 +639,11 @@ class AppState extends ChangeNotifier {
     final normalized = _normalizeRouterCommand(command, args);
     final execCommand = normalized.command;
     final execArgs = normalized.args;
-    final isShellCmd = execCommand == 'sh' || execCommand == '/bin/sh' || execCommand == 'ash' || execCommand == '/bin/ash';
+    final isShellCmd =
+        execCommand == 'sh' ||
+        execCommand == '/bin/sh' ||
+        execCommand == 'ash' ||
+        execCommand == '/bin/ash';
     final cmdStr = isShellCmd && execArgs.length >= 2 && execArgs[0] == '-c'
         ? execArgs[1]
         : ([execCommand, ...execArgs]).join(' ');
@@ -601,7 +701,8 @@ class AppState extends ChangeNotifier {
       if (res.length > 1 && res[1] is Map) {
         final map = res[1] as Map;
         if (map['code'] is int) return map['code'] == 0;
-        return res[0] == 0 && (map.containsKey('stdout') || map.containsKey('data'));
+        return res[0] == 0 &&
+            (map.containsKey('stdout') || map.containsKey('data'));
       }
       if (res[0] == 0) return true;
     } else if (res is Map) {
@@ -635,7 +736,10 @@ class AppState extends ChangeNotifier {
   }
 
   /// Execute generic router shell command via file.exec or file.read RPC and return output String
-  Future<String?> executeRouterCommandOutput(String command, List<String> args) async {
+  Future<String?> executeRouterCommandOutput(
+    String command,
+    List<String> args,
+  ) async {
     final ip = _routerService?.selectedRouter?.ipAddress;
     if (ip == null || _authService?.sysauth == null) return null;
     final useHttps = _routerService?.selectedRouter?.useHttps ?? false;
@@ -643,7 +747,11 @@ class AppState extends ChangeNotifier {
     final normalized = _normalizeRouterCommand(command, args);
     final execCommand = normalized.command;
     final execArgs = normalized.args;
-    final isShellCmd = execCommand == 'sh' || execCommand == '/bin/sh' || execCommand == 'ash' || execCommand == '/bin/ash';
+    final isShellCmd =
+        execCommand == 'sh' ||
+        execCommand == '/bin/sh' ||
+        execCommand == 'ash' ||
+        execCommand == '/bin/ash';
     final cmdStr = isShellCmd && execArgs.length >= 2 && execArgs[0] == '-c'
         ? execArgs[1]
         : ([execCommand, ...execArgs]).join(' ');
@@ -777,7 +885,10 @@ class AppState extends ChangeNotifier {
   }
 
   Map<String, dynamic> _processDhcpLeases(Map<String, dynamic> rawDhcpData) {
-    final rawStr = rawDhcpData['data']?.toString() ?? rawDhcpData['stdout']?.toString() ?? '';
+    final rawStr =
+        rawDhcpData['data']?.toString() ??
+        rawDhcpData['stdout']?.toString() ??
+        '';
     final leases = <Map<String, dynamic>>[];
 
     for (final line in rawStr.split('\n')) {
@@ -806,14 +917,16 @@ class AppState extends ChangeNotifier {
   }
 
   String? _getDeviceNameForInterface(String interfaceName) =>
-      _dashboardController?.getDeviceNameForInterface(interfaceName) ?? interfaceName;
+      _dashboardController?.getDeviceNameForInterface(interfaceName) ??
+      interfaceName;
 
   void setThroughputInterval(int seconds) {
     if (_throughputController?.setInterval(
-      seconds,
-      isRebooting: _isRebooting,
-      onTick: _updateThroughputOnly,
-    ) ?? false) {
+          seconds,
+          isRebooting: _isRebooting,
+          onTick: _updateThroughputOnly,
+        ) ??
+        false) {
       notifyListeners();
     }
   }
@@ -885,7 +998,9 @@ class AppState extends ChangeNotifier {
         final wanDeviceNames = {'eth0'}; // Mock WAN device
 
         // Resolve specific interface from preferences
-        final specificInterface = ThroughputController.resolveSpecificInterface(dashboardPreferences);
+        final specificInterface = ThroughputController.resolveSpecificInterface(
+          dashboardPreferences,
+        );
 
         _throughputController?.updateThroughput(
           networkData,
@@ -963,7 +1078,9 @@ class AppState extends ChangeNotifier {
         }
 
         // Resolve specific interface from preferences
-        final specificInterface = ThroughputController.resolveSpecificInterface(dashboardPreferences);
+        final specificInterface = ThroughputController.resolveSpecificInterface(
+          dashboardPreferences,
+        );
 
         _throughputController?.updateThroughput(
           networkData,
@@ -1115,9 +1232,9 @@ class AppState extends ChangeNotifier {
         // Create a fresh Dio client for pinging to avoid certificate/connection issues
         final dio = Dio(
           BaseOptions(
-            connectTimeout: const Duration(seconds: 5),
-            receiveTimeout: const Duration(seconds: 5),
-            sendTimeout: const Duration(seconds: 5),
+            connectTimeout: const Duration(seconds: 15),
+            receiveTimeout: const Duration(seconds: 30),
+            sendTimeout: const Duration(seconds: 30),
             followRedirects: false,
             validateStatus: (code) => code != null && code >= 200 && code < 500,
           ),
@@ -1127,7 +1244,7 @@ class AppState extends ChangeNotifier {
           final adapter = IOHttpClientAdapter();
           adapter.createHttpClient = () {
             final httpClient = HttpClient();
-            httpClient.connectionTimeout = const Duration(seconds: 5);
+            httpClient.connectionTimeout = const Duration(seconds: 15);
             // Accept any cert for ping only
             httpClient.badCertificateCallback = (cert, host, port) => true;
             return httpClient;
@@ -1140,7 +1257,8 @@ class AppState extends ChangeNotifier {
         // print('[Ping] Response from $endpoint: ${response.statusCode}');
 
         // Accept various status codes as "alive"
-        final isAlive = response.statusCode != null &&
+        final isAlive =
+            response.statusCode != null &&
             response.statusCode! >= 200 &&
             response.statusCode! < 500;
 
@@ -1148,7 +1266,7 @@ class AppState extends ChangeNotifier {
           if (_pollAttempts > 5) {
             // If we've been polling for a while and get a response,
             // wait a bit more to ensure services are fully started
-            await Future.delayed(const Duration(seconds: 5));
+            await Future.delayed(const Duration(seconds: 10));
           }
           return true;
         }
@@ -1183,30 +1301,37 @@ class AppState extends ChangeNotifier {
   Set<String> get pausedInternetMacs =>
       _networkActionsController?.pausedInternetMacs ?? {};
 
+  Set<String> get bannedWirelessMacs =>
+      _networkActionsController?.bannedWirelessMacs ?? {};
+
   bool isInternetPaused(String mac) =>
       _networkActionsController?.isInternetPaused(mac) ?? false;
+
+  bool isWirelessBanned(String mac) =>
+      _networkActionsController?.isWirelessBanned(mac) ?? false;
+
+  bool isRestrictedOrBanned(String mac) =>
+      isInternetPaused(mac) || isWirelessBanned(mac);
 
   Future<bool> disconnectWirelessClient(
     String macAddress, {
     String? iface,
     BuildContext? context,
-  }) =>
-      _networkActionsController!.disconnectWirelessClient(
-        macAddress,
-        iface: iface,
-        context: context,
-      );
+  }) => _networkActionsController!.disconnectWirelessClient(
+    macAddress,
+    iface: iface,
+    context: context,
+  );
 
   Future<bool> pauseClientInternet(
     String macAddress, {
     required bool pause,
     BuildContext? context,
-  }) =>
-      _networkActionsController!.pauseClientInternet(
-        macAddress,
-        pause: pause,
-        context: context,
-      );
+  }) => _networkActionsController!.pauseClientInternet(
+    macAddress,
+    pause: pause,
+    context: context,
+  );
 
   Future<bool> addStaticLease({
     required String macAddress,
@@ -1249,7 +1374,9 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> forceRefreshDhcpLeases({BuildContext? context}) async {
-    final res = await _networkActionsController!.forceRefreshDhcpLeases(context: context);
+    final res = await _networkActionsController!.forceRefreshDhcpLeases(
+      context: context,
+    );
     await fetchClientsForSelectedRouter();
     await fetchDashboardData();
 
@@ -1257,14 +1384,18 @@ class AppState extends ChangeNotifier {
       dashboardData!['forcePurged'] = true;
       dashboardData!['forcePurgedAt'] = DateTime.now().millisecondsSinceEpoch;
       if (clients.isNotEmpty) {
-        dashboardData!['clients'] = clients.map((c) => {
-          'macAddress': c.macAddress,
-          'ipAddress': c.ipAddress,
-          'hostname': c.hostname,
-          'isConnected': c.isConnected,
-          'isOnline': c.isConnected,
-          'isStaticLease': c.isStaticLease,
-        }).toList();
+        dashboardData!['clients'] = clients
+            .map(
+              (c) => {
+                'macAddress': c.macAddress,
+                'ipAddress': c.ipAddress,
+                'hostname': c.hostname,
+                'isConnected': c.isConnected,
+                'isOnline': c.isConnected,
+                'isStaticLease': c.isStaticLease,
+              },
+            )
+            .toList();
       }
     }
 
@@ -1275,46 +1406,41 @@ class AppState extends ChangeNotifier {
   Future<bool> refreshClientConnection({
     required String macAddress,
     BuildContext? context,
-  }) =>
-      _networkActionsController!.refreshClientConnection(
-        macAddress: macAddress,
-        context: context,
-      );
+  }) => _networkActionsController!.refreshClientConnection(
+    macAddress: macAddress,
+    context: context,
+  );
 
   Future<int> flushUnusedDhcpLeases({
     List<Client>? clients,
     List<String>? macsToFlush,
     BuildContext? context,
-  }) =>
-      _networkActionsController!.flushUnusedDhcpLeases(
-        clients: clients,
-        macsToFlush: macsToFlush,
-        context: context,
-      );
+  }) => _networkActionsController!.flushUnusedDhcpLeases(
+    clients: clients,
+    macsToFlush: macsToFlush,
+    context: context,
+  );
 
   Future<bool> banWirelessClient(
     String macAddress, {
     String? iface,
     BuildContext? context,
-  }) =>
-      _networkActionsController!.banWirelessClient(
-        macAddress,
-        iface: iface,
-        context: context,
-      );
+  }) => _networkActionsController!.banWirelessClient(
+    macAddress,
+    iface: iface,
+    context: context,
+  );
 
   Future<bool> unbanWirelessClient(
     String macAddress, {
     BuildContext? context,
-  }) =>
-      _networkActionsController!.unbanWirelessClient(
-        macAddress,
-        context: context,
-      );
+  }) => _networkActionsController!.unbanWirelessClient(
+    macAddress,
+    context: context,
+  );
 
-  Future<Map<String, List<Map<String, dynamic>>>> fetchRestrictedAndBannedClientsLive({
-    BuildContext? context,
-  }) async {
+  Future<Map<String, List<Map<String, dynamic>>>>
+  fetchRestrictedAndBannedClientsLive({BuildContext? context}) async {
     if (reviewerModeEnabled) {
       return {
         'restricted': [
@@ -1323,7 +1449,7 @@ class AppState extends ChangeNotifier {
             'name': 'Restricted-Tablet',
             'ip': '192.168.1.150',
             'type': 'restricted',
-          }
+          },
         ],
         'banned': [
           {
@@ -1331,7 +1457,7 @@ class AppState extends ChangeNotifier {
             'name': 'Banned-Guest-Phone',
             'ip': 'N/A',
             'type': 'banned',
-          }
+          },
         ],
       };
     }
@@ -1344,14 +1470,21 @@ class AppState extends ChangeNotifier {
       _authService!.useHttps,
       context: context,
     );
-    
-    // Update local set of paused internet MACs from live router response
+
+    // Update local set of paused internet MACs and banned wireless MACs from live router response
     if (data['restricted'] != null) {
       final macs = data['restricted']!
           .map((e) => e['mac']?.toString().toUpperCase() ?? '')
           .where((m) => m.isNotEmpty)
           .toSet();
       _networkActionsController?.updatePausedInternetMacs(macs);
+    }
+    if (data['banned'] != null) {
+      final macs = data['banned']!
+          .map((e) => e['mac']?.toString().toUpperCase() ?? '')
+          .where((m) => m.isNotEmpty)
+          .toSet();
+      _networkActionsController?.updateBannedWirelessMacs(macs);
     }
     return data;
   }
@@ -1383,16 +1516,21 @@ class AppState extends ChangeNotifier {
     return res;
   }
 
-  static const String _wifiAccessControlPendingKey = 'wifi_access_control_pending_revert';
+  static const String _wifiAccessControlPendingKey =
+      'wifi_access_control_pending_revert';
 
   Future<void> _saveAccessControlPendingState(int startTimeMs) async {
     try {
       final payload = {
         'timestamp': startTimeMs,
         'priorMaclist': _networkActionsController?.priorMaclistSnapshot ?? {},
-        'priorMacfilter': _networkActionsController?.priorMacfilterSnapshot ?? {},
+        'priorMacfilter':
+            _networkActionsController?.priorMacfilterSnapshot ?? {},
       };
-      await _secureStorageService.writeValue(_wifiAccessControlPendingKey, jsonEncode(payload));
+      await _secureStorageService.writeValue(
+        _wifiAccessControlPendingKey,
+        jsonEncode(payload),
+      );
     } catch (e, stack) {
       Logger.exception('Failed to save access control pending state', e, stack);
     }
@@ -1402,36 +1540,23 @@ class AppState extends ChangeNotifier {
     try {
       await _secureStorageService.deleteValue(_wifiAccessControlPendingKey);
     } catch (e, stack) {
-      Logger.exception('Failed to clear access control pending state', e, stack);
+      Logger.exception(
+        'Failed to clear access control pending state',
+        e,
+        stack,
+      );
     }
   }
 
   Future<void> _loadPendingAccessControlState() async {
     try {
-      final jsonStr = await _secureStorageService.readValue(_wifiAccessControlPendingKey);
+      final jsonStr = await _secureStorageService.readValue(
+        _wifiAccessControlPendingKey,
+      );
       if (jsonStr == null || jsonStr.isEmpty) return;
-      final Map<String, dynamic> data = jsonDecode(jsonStr);
-      final timestamp = data['timestamp'] as int? ?? 0;
-      final now = DateTime.now().millisecondsSinceEpoch;
-      final elapsedSec = (now - timestamp) ~/ 1000;
-
-      final maclistMap = (data['priorMaclist'] as Map<String, dynamic>?)?.map(
-        (k, v) => MapEntry(k, (v as List).map((e) => e.toString()).toList()),
-      ) ?? {};
-      final macfilterMap = (data['priorMacfilter'] as Map<String, dynamic>?)?.map(
-        (k, v) => MapEntry(k, v.toString()),
-      ) ?? {};
-
-      if (elapsedSec < 25) {
-        final remaining = 25 - elapsedSec;
-        _networkActionsController?.startAccessControlAutoRevertTimer(
-          initialSeconds: remaining,
-          priorMaclist: maclistMap,
-          priorMacfilter: macfilterMap,
-        );
-      } else {
-        await revertWifiAccessControlChanges();
-      }
+      // Auto-revert timer removed per developer requirement.
+      // Any previously unconfirmed access control state is cleared on app resume.
+      await _clearAccessControlPendingState();
     } catch (e, stack) {
       Logger.exception('Failed to load pending access control state', e, stack);
     }
@@ -1476,10 +1601,20 @@ class AppState extends ChangeNotifier {
   Future<bool> autoFixPermissions({BuildContext? context}) =>
       _networkActionsController!.autoFixPermissions(context: context);
 
-  Future<bool> manageServiceAction(String serviceName, String action, {BuildContext? context}) =>
-      _networkActionsController!.manageServiceAction(serviceName, action, context: context);
+  Future<bool> manageServiceAction(
+    String serviceName,
+    String action, {
+    BuildContext? context,
+  }) => _networkActionsController!.manageServiceAction(
+    serviceName,
+    action,
+    context: context,
+  );
 
-  Future<bool> saveCronJobs(List<String> cronLines, {BuildContext? context}) async {
+  Future<bool> saveCronJobs(
+    List<String> cronLines, {
+    BuildContext? context,
+  }) async {
     if (reviewerModeEnabled) {
       if (dashboardData != null) {
         dashboardData!['cronJobs'] = List<String>.from(cronLines);
@@ -1510,10 +1645,16 @@ class AppState extends ChangeNotifier {
     return success;
   }
 
-  Future<bool> saveDdnsInstance(DdnsInstance instance, {BuildContext? context}) async {
+  Future<bool> saveDdnsInstance(
+    DdnsInstance instance, {
+    BuildContext? context,
+  }) async {
     if (reviewerModeEnabled) {
       if (dashboardData != null) {
-        final overview = DdnsOverview.fromDashboardData(dashboardData, isReviewerMode: true);
+        final overview = DdnsOverview.fromDashboardData(
+          dashboardData,
+          isReviewerMode: true,
+        );
         final list = List<DdnsInstance>.from(overview.instances);
         final existingIdx = list.indexWhere((i) => i.name == instance.name);
         if (existingIdx >= 0) {
@@ -1523,7 +1664,8 @@ class AppState extends ChangeNotifier {
         }
         dashboardData!['ddns'] = {
           'global': {'is_enabled': '1'},
-          for (final item in list) item.name: item.toUciParams()..['.type'] = 'service',
+          for (final item in list)
+            item.name: item.toUciParams()..['.type'] = 'service',
         };
       }
       notifyListeners();
@@ -1549,7 +1691,10 @@ class AppState extends ChangeNotifier {
     return success;
   }
 
-  Future<bool> deleteDdnsInstance(String instanceName, {BuildContext? context}) async {
+  Future<bool> deleteDdnsInstance(
+    String instanceName, {
+    BuildContext? context,
+  }) async {
     if (reviewerModeEnabled) {
       if (dashboardData != null && dashboardData!['ddns'] is Map) {
         (dashboardData!['ddns'] as Map).remove(instanceName);
@@ -1577,14 +1722,26 @@ class AppState extends ChangeNotifier {
     return success;
   }
 
-  Future<DdnsValidationResult> testDdnsConfiguration(DdnsInstance instance, {BuildContext? context}) async {
+  Future<DdnsValidationResult> testDdnsConfiguration(
+    DdnsInstance instance, {
+    BuildContext? context,
+  }) async {
     if (reviewerModeEnabled) {
-      return _apiService!.testDdnsConfiguration('', '', false, instance: instance, context: context);
+      return _apiService!.testDdnsConfiguration(
+        '',
+        '',
+        false,
+        instance: instance,
+        context: context,
+      );
     }
 
     final ip = selectedRouter?.ipAddress;
     if (ip == null || sysauth == null) {
-      return const DdnsValidationResult(isValid: false, errorMessage: 'No active router session');
+      return const DdnsValidationResult(
+        isValid: false,
+        errorMessage: 'No active router session',
+      );
     }
     final useHttps = selectedRouter?.useHttps ?? false;
 
@@ -1630,22 +1787,31 @@ class AppState extends ChangeNotifier {
     String sectionKey,
     bool enabled, {
     BuildContext? context,
-  }) =>
-      _networkActionsController!.updateFirewallCustomRuleStatus(sectionKey, enabled, context: context);
+  }) => _networkActionsController!.updateFirewallCustomRuleStatus(
+    sectionKey,
+    enabled,
+    context: context,
+  );
 
   Future<bool> updateWiredInterfaceStatus(
     String interfaceName,
     bool enabled, {
     BuildContext? context,
-  }) =>
-      _networkActionsController!.updateWiredInterfaceStatus(interfaceName, enabled, context: context);
+  }) => _networkActionsController!.updateWiredInterfaceStatus(
+    interfaceName,
+    enabled,
+    context: context,
+  );
 
   Future<bool> updateWirelessInterfaceStatus(
     String sectionKey,
     bool enabled, {
     BuildContext? context,
-  }) =>
-      _networkActionsController!.updateWirelessInterfaceStatus(sectionKey, enabled, context: context);
+  }) => _networkActionsController!.updateWirelessInterfaceStatus(
+    sectionKey,
+    enabled,
+    context: context,
+  );
 
   Future<bool> restartWiredInterface(
     String interfaceName, {
@@ -1694,7 +1860,8 @@ class AppState extends ChangeNotifier {
           },
           context: (ctx != null && ctx.mounted) ? ctx : null,
         );
-        if (_apiService!.execSucceeded(upRes) || _apiService!.execSucceeded(downRes)) {
+        if (_apiService!.execSucceeded(upRes) ||
+            _apiService!.execSucceeded(downRes)) {
           success = true;
         }
       } catch (_) {}
@@ -1734,7 +1901,8 @@ class AppState extends ChangeNotifier {
           ip,
           sysauth,
           useHttps,
-          command: 'ifdown $interfaceName 2>/dev/null; sleep 1; ifup $interfaceName 2>/dev/null',
+          command:
+              'ifdown $interfaceName 2>/dev/null; sleep 1; ifup $interfaceName 2>/dev/null',
           context: (ctx != null && ctx.mounted) ? ctx : null,
         );
         if (_apiService!.execSucceeded(execRes)) {
@@ -1744,7 +1912,11 @@ class AppState extends ChangeNotifier {
 
       return success;
     } catch (e, stack) {
-      Logger.exception('restartWiredInterface failed for $interfaceName', e, stack);
+      Logger.exception(
+        'restartWiredInterface failed for $interfaceName',
+        e,
+        stack,
+      );
       return false;
     }
   }
@@ -1781,10 +1953,7 @@ class AppState extends ChangeNotifier {
           useHttps,
           object: 'file',
           method: 'exec',
-          params: {
-            'command': '/sbin/wifi',
-            'params': wifiReloadArgs,
-          },
+          params: {'command': '/sbin/wifi', 'params': wifiReloadArgs},
           context: ctx,
         );
         if (_apiService!.execSucceeded(reloadRes)) {
@@ -1807,10 +1976,7 @@ class AppState extends ChangeNotifier {
             useHttps,
             object: 'file',
             method: 'exec',
-            params: {
-              'command': '/sbin/wifi',
-              'params': wifiDownArgs,
-            },
+            params: {'command': '/sbin/wifi', 'params': wifiDownArgs},
             context: (ctx != null && ctx.mounted) ? ctx : null,
           );
           await Future.delayed(const Duration(milliseconds: 500));
@@ -1820,10 +1986,7 @@ class AppState extends ChangeNotifier {
             useHttps,
             object: 'file',
             method: 'exec',
-            params: {
-              'command': '/sbin/wifi',
-              'params': wifiUpArgs,
-            },
+            params: {'command': '/sbin/wifi', 'params': wifiUpArgs},
             context: (ctx != null && ctx.mounted) ? ctx : null,
           );
           if (_apiService!.execSucceeded(upRes)) {
@@ -1863,7 +2026,9 @@ class AppState extends ChangeNotifier {
 
       // 4. Shell fallback via systemExec
       if (!success) {
-        final rName = (radioName != null && radioName.isNotEmpty) ? radioName : '';
+        final rName = (radioName != null && radioName.isNotEmpty)
+            ? radioName
+            : '';
         final cmd = rName.isNotEmpty
             ? 'wifi reload $rName 2>/dev/null || (wifi down $rName 2>/dev/null; sleep 1; wifi up $rName 2>/dev/null) || wifi reload'
             : 'wifi reload 2>/dev/null || (wifi down 2>/dev/null; sleep 1; wifi up 2>/dev/null)';
@@ -1882,7 +2047,11 @@ class AppState extends ChangeNotifier {
 
       return success;
     } catch (e, stack) {
-      Logger.exception('restartWirelessInterface failed for $sectionKey', e, stack);
+      Logger.exception(
+        'restartWirelessInterface failed for $sectionKey',
+        e,
+        stack,
+      );
       return false;
     }
   }
@@ -1944,25 +2113,125 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<bool> tryAutoLogin({BuildContext? context}) async {
-    if (reviewerModeEnabled) {
-      return await _authService!.tryAutoLogin(
-        null,
-        null,
-        null,
-        null,
-        context: context,
+  /// Fetches live configuration for a specific wireless section from router UCI
+  Future<Map<String, dynamic>?> fetchWirelessSectionConfig(
+    String sectionName,
+  ) async {
+    if (reviewerModeEnabled ||
+        _apiService == null ||
+        _authService?.sysauth == null ||
+        _authService?.ipAddress == null) {
+      return null;
+    }
+    try {
+      final rawRpc = await _apiService!.call(
+        _authService!.ipAddress!,
+        _authService!.sysauth!,
+        _authService!.useHttps,
+        object: 'uci',
+        method: 'get',
+        params: {'config': 'wireless', 'section': sectionName},
+      );
+      if (rawRpc is List && rawRpc.length > 1 && rawRpc[0] == 0) {
+        final values = rawRpc[1];
+        if (values is Map<String, dynamic>) {
+          final valuesMap = values['values'] ?? values;
+          if (valuesMap is Map) {
+            return Map<String, dynamic>.from(valuesMap);
+          }
+        }
+      }
+    } catch (e) {
+      Logger.debug(
+        'fetchWirelessSectionConfig failed for section $sectionName: $e',
       );
     }
-    return await _authService?.tryAutoLogin(
-          null,
-          null,
-          null,
-          null,
-          context: context,
-        ) ??
-        false;
+    return null;
   }
+
+  /// Auto-migrates anonymous `cfg######` wifi-iface sections to named `wifinet#` identifiers.
+  /// Returns the number of sections that were renamed (0 means nothing needed fixing).
+  /// This prevents the "Wireless configuration migration" dialog in the LuCI web UI.
+  Future<int> migrateAnonymousWirelessSections() async {
+    if (reviewerModeEnabled ||
+        _apiService == null ||
+        _authService?.sysauth == null ||
+        _authService?.ipAddress == null) {
+      return 0;
+    }
+    return _apiService!.migrateAnonymousWirelessSections(
+      _authService!.ipAddress!,
+      _authService!.sysauth!,
+      _authService!.useHttps,
+    );
+  }
+
+  /// Fetches hardware-supported encryptions and ciphers directly from iwinfo/ubus for a specific wireless section
+  Future<Map<String, List<Map<String, String>>>>
+  fetchWirelessHardwareCapabilities({
+    required String sectionName,
+    String? radioName,
+    BuildContext? context,
+  }) async {
+    if (reviewerModeEnabled ||
+        _apiService == null ||
+        _authService?.sysauth == null ||
+        _authService?.ipAddress == null) {
+      return _fallbackHardwareCapabilities();
+    }
+
+    return _apiService!.fetchWirelessHardwareCapabilities(
+      sectionName: sectionName,
+      radioName: radioName,
+      ipAddress: _authService!.ipAddress!,
+      sysauth: _authService!.sysauth!,
+      useHttps: _authService!.useHttps,
+      context: context,
+    );
+  }
+
+  Future<Map<String, dynamic>> fetchWirelessRadioCapabilities({
+    required String radioName,
+    BuildContext? context,
+  }) async {
+    if (_apiService == null ||
+        _authService?.sysauth == null ||
+        _authService?.ipAddress == null) {
+      return {};
+    }
+
+    return _apiService!.fetchWirelessRadioCapabilities(
+      radioName: radioName,
+      ipAddress: _authService!.ipAddress!,
+      sysauth: _authService!.sysauth!,
+      useHttps: _authService!.useHttps,
+      context: context,
+    );
+  }
+
+  Map<String, List<Map<String, String>>> _fallbackHardwareCapabilities() {
+    return {'encryptions': fallbackEncryptions, 'ciphers': fallbackCiphers};
+  }
+
+  List<Map<String, String>> get fallbackEncryptions => [
+    {'value': 'sae', 'label': 'WPA3-SAE (Personal / Strict)'},
+    {'value': 'sae-mixed', 'label': 'WPA2/WPA3 Mixed (Transitional)'},
+    {'value': 'psk2', 'label': 'WPA2-PSK (CCMP / AES)'},
+    {'value': 'psk', 'label': 'WPA-PSK (Legacy / WPA1)'},
+    {'value': 'owe', 'label': 'Enhanced Open (OWE)'},
+    {'value': 'none', 'label': 'Open / No Encryption'},
+  ];
+
+  List<Map<String, String>> get fallbackCiphers => [
+    {'value': 'auto', 'label': 'Auto (Hardware Default)'},
+    {'value': 'ccmp', 'label': 'CCMP (AES)'},
+    {'value': 'gcmp256', 'label': 'GCMP-256 (High Security)'},
+    {'value': 'gcmp128', 'label': 'GCMP-128'},
+    {'value': 'tkip', 'label': 'TKIP (Legacy)'},
+  ];
+
+  Future<bool> tryAutoLogin({BuildContext? context}) =>
+      _sessionController!.tryAutoLogin(context: context);
 
   /// Fetch all associated wireless MAC addresses from all wireless interfaces
   Future<Set<String>> fetchAllAssociatedWirelessMacs() async {
@@ -1996,7 +2265,8 @@ class AppState extends ChangeNotifier {
       });
 
       // Also include configured wireless maclist entries from dashboard data
-      final wirelessConfig = dashboardData?['uciWirelessConfig'] ?? dashboardData?['wireless'];
+      final wirelessConfig =
+          dashboardData?['uciWirelessConfig'] ?? dashboardData?['wireless'];
       if (wirelessConfig is Map<String, dynamic>) {
         wirelessConfig.forEach((k, v) {
           if (v is Map<String, dynamic>) {
@@ -2020,6 +2290,7 @@ class AppState extends ChangeNotifier {
   void dispose() {
     _throughputController?.dispose();
     _networkActionsController?.dispose();
+    _accessControlTimerLifecycleManager?.dispose();
     _throughputTimer?.cancel();
     _pollingTimer?.cancel();
     _pollAttempts = 0;
@@ -2050,19 +2321,25 @@ class AppState extends ChangeNotifier {
     final hostHints = data?['hostHints'] as Map<String, dynamic>? ?? {};
 
     // Extract raw leases supporting dhcpLeases (camelCase), dhcp_leases (snake_case), and leases
-    dynamic rawLeases = data?['dhcpLeases'] ?? data?['dhcp_leases'] ?? data?['leases'];
+    dynamic rawLeases =
+        data?['dhcpLeases'] ?? data?['dhcp_leases'] ?? data?['leases'];
     if (rawLeases is Map && rawLeases['dhcp_leases'] is List) {
       rawLeases = rawLeases['dhcp_leases'];
     }
 
     // Extract wireless MACs from wirelessStations map or knownWirelessMacs
-    final wirelessStations = data?['wirelessStations'] as Map<String, dynamic>? ?? {};
-    final wirelessMacs = <String>{...(_clientController?.knownWirelessMacs ?? {})};
+    final wirelessStations =
+        data?['wirelessStations'] as Map<String, dynamic>? ?? {};
+    final wirelessMacs = <String>{
+      ...(_clientController?.knownWirelessMacs ?? {}),
+    };
     wirelessStations.forEach((iface, list) {
       if (list is List) {
         for (final item in list) {
           if (item is Map && item['mac'] != null) {
-            wirelessMacs.add(item['mac'].toString().toUpperCase().replaceAll('-', ':'));
+            wirelessMacs.add(
+              item['mac'].toString().toUpperCase().replaceAll('-', ':'),
+            );
           } else if (item is String) {
             wirelessMacs.add(item.toUpperCase().replaceAll('-', ':'));
           }
@@ -2080,43 +2357,104 @@ class AppState extends ChangeNotifier {
           final staticName = hint?['staticLeaseName']?.toString();
           final isStatic = hint?['isStaticLease'] == true;
 
-          clientList.add(c.copyWith(
-            connectionType: isWireless
-                ? ConnectionType.wireless
-                : (c.connectionType == ConnectionType.unknown
-                    ? ConnectionType.wired
-                    : c.connectionType),
-            isConnected: true,
-            staticLeaseName: staticName,
-            isStaticLease: isStatic,
-          ));
+          clientList.add(
+            c.copyWith(
+              connectionType: isWireless
+                  ? ConnectionType.wireless
+                  : (c.connectionType == ConnectionType.unknown
+                        ? ConnectionType.wired
+                        : c.connectionType),
+              isConnected: true,
+              staticLeaseName: staticName,
+              isStaticLease: isStatic,
+            ),
+          );
         }
       }
     }
 
     hostHints.forEach((mac, info) {
       final normMac = mac.toUpperCase().replaceAll('-', ':');
-      if (!clientList.any((c) => c.macAddress.toUpperCase().replaceAll('-', ':') == normMac)) {
-        final hintName = info['name']?.toString() ?? info['staticLeaseName']?.toString() ?? normMac;
+      if (!clientList.any(
+        (c) => c.macAddress.toUpperCase().replaceAll('-', ':') == normMac,
+      )) {
+        final hintName =
+            info['name']?.toString() ??
+            info['staticLeaseName']?.toString() ??
+            normMac;
         final ipaddrs = info['ipaddrs'] as List?;
         final ip = (ipaddrs != null && ipaddrs.isNotEmpty)
             ? ipaddrs.first.toString()
             : (info['staticLeaseIp']?.toString() ?? 'N/A');
         final isStatic = info['isStaticLease'] == true;
         final isWireless = wirelessMacs.contains(normMac);
-        clientList.add(Client(
-          ipAddress: ip,
-          macAddress: normMac,
-          hostname: hintName,
-          isConnected: isWireless,
-          connectionType: isWireless ? ConnectionType.wireless : ConnectionType.unknown,
-          isStaticLease: isStatic,
-          staticLeaseName: info['staticLeaseName']?.toString(),
-        ));
+        clientList.add(
+          Client(
+            ipAddress: ip,
+            macAddress: normMac,
+            hostname: hintName,
+            isConnected: isWireless,
+            connectionType: isWireless
+                ? ConnectionType.wireless
+                : ConnectionType.unknown,
+            isStaticLease: isStatic,
+            staticLeaseName: info['staticLeaseName']?.toString(),
+          ),
+        );
       }
     });
 
     return clientList;
+  }
+
+  /// Finds a matching Client model by MAC address (case-insensitive & colon-normalized).
+  Client? findClientByMac(String macAddress) {
+    if (macAddress.trim().isEmpty) return null;
+    final norm = macAddress
+        .toUpperCase()
+        .replaceAll('-', ':')
+        .split(':')
+        .map((b) => b.length == 1 ? '0$b' : b)
+        .join(':');
+    for (final c in clients) {
+      final cNorm = c.macAddress
+          .toUpperCase()
+          .replaceAll('-', ':')
+          .split(':')
+          .map((b) => b.length == 1 ? '0$b' : b)
+          .join(':');
+      if (cNorm == norm) return c;
+    }
+    return null;
+  }
+
+  /// Finds a static DHCP lease mapping for the given MAC address, if configured on the router.
+  DhcpStaticMapping? findStaticLeaseByMac(String macAddress) {
+    if (macAddress.trim().isEmpty) return null;
+    final normMac = macAddress
+        .toUpperCase()
+        .replaceAll('-', ':')
+        .split(':')
+        .map((b) => b.length == 1 ? '0$b' : b)
+        .join(':');
+
+    final dhcpOverview = DhcpDnsOverview.fromDashboardData(
+      dashboardData,
+      isReviewerMode: reviewerModeEnabled,
+    );
+
+    for (final mapping in dhcpOverview.staticMappings) {
+      final macs = mapping.macAddress
+          .toUpperCase()
+          .replaceAll('-', ':')
+          .split(',')
+          .map((m) => m.trim())
+          .map((b) => b.split(':').map((part) => part.length == 1 ? '0$part' : part).join(':'));
+      if (macs.contains(normMac)) {
+        return mapping;
+      }
+    }
+    return null;
   }
 
   /// Returns a union set of associated wireless MAC addresses across all routers
@@ -2152,6 +2490,148 @@ class AppState extends ChangeNotifier {
   /// Restart a VPN service daemon by service name
   Future<bool> restartVpnService(String serviceName) =>
       _networkActionsController!.restartVpnService(serviceName);
+
+  String? get pendingSectionName => _networkActionsController?.pendingSectionName;
+  String? get pendingTargetType => _networkActionsController?.pendingTargetType;
+  dynamic get pendingTargetRadio => _networkActionsController?.pendingTargetRadio;
+  dynamic get pendingTargetInterface => _networkActionsController?.pendingTargetInterface;
+
+  /// Apply wireless interface configuration updates with staged rollback protection
+  Future<bool> applyWirelessInterfaceConfig({
+    required String sectionName,
+    required Map<String, String> newValues,
+    required Map<String, String> priorValuesSnapshot,
+    dynamic targetRadio,
+    dynamic targetInterface,
+    BuildContext? context,
+  }) => _networkActionsController!.applyWirelessInterfaceConfig(
+    sectionName: sectionName,
+    newValues: newValues,
+    priorValuesSnapshot: priorValuesSnapshot,
+    targetRadio: targetRadio,
+    targetInterface: targetInterface,
+    context: context,
+  );
+
+  /// Apply physical wireless radio configuration updates with staged rollback protection
+  Future<bool> applyWirelessRadioConfig({
+    required String sectionName,
+    required Map<String, String> newValues,
+    required Map<String, String> priorValuesSnapshot,
+    dynamic targetRadio,
+    BuildContext? context,
+  }) => _networkActionsController!.applyWirelessRadioConfig(
+    sectionName: sectionName,
+    newValues: newValues,
+    priorValuesSnapshot: priorValuesSnapshot,
+    targetRadio: targetRadio,
+    context: context,
+  );
+
+  /// Provision a new virtual SSID interface under a physical wireless radio
+  Future<bool> addWirelessInterface({
+    required String radioName,
+    required String ssid,
+    required String encryption,
+    required String key,
+    required String network,
+    BuildContext? context,
+  }) => _networkActionsController!.addWirelessInterface(
+    radioName: radioName,
+    ssid: ssid,
+    encryption: encryption,
+    key: key,
+    network: network,
+    context: context,
+  );
+
+  /// Delete a virtual SSID interface section from wireless configuration
+  Future<bool> deleteWirelessInterface({
+    required String sectionName,
+    BuildContext? context,
+  }) => _networkActionsController!.deleteWirelessInterface(
+    sectionName: sectionName,
+    context: context,
+  );
+
+  /// Provision isolated Guest Network spanning network, dhcp, firewall, and wireless configs
+  Future<bool> provisionGuestNetwork({
+    required String radioName,
+    required String ssid,
+    required String encryption,
+    required String key,
+    String guestIp = '192.168.2.1',
+    bool isolateClients = true,
+    String network = 'guest',
+    // Advanced radio settings
+    String? country,
+    String? channel,
+    String? htMode,
+    String? txPower,
+    // Fast roaming (802.11r/k/v)
+    bool ieee80211r = false,
+    bool ftOverDs = false,
+    bool ftPskGenerateLocal = false,
+    String? mobilityDomain,
+    // Wireless advanced settings
+    bool wmm = true,
+    bool hidden = false,
+    int? dtimPeriod,
+    int? gtkRekey,
+    int? inactivityLimit,
+    int? maxListenInterval,
+    bool disassocLowAck = true,
+    bool multicastToUnicast = false,
+    bool wds = false,
+    // MAC filtering
+    String? macfilter,
+    List<String>? maclist,
+    BuildContext? context,
+  }) => _networkActionsController!.provisionGuestNetwork(
+    radioName: radioName,
+    ssid: ssid,
+    encryption: encryption,
+    key: key,
+    guestIp: guestIp,
+    isolateClients: isolateClients,
+    network: network,
+    country: country,
+    channel: channel,
+    htMode: htMode,
+    txPower: txPower,
+    ieee80211r: ieee80211r,
+    ftOverDs: ftOverDs,
+    ftPskGenerateLocal: ftPskGenerateLocal,
+    mobilityDomain: mobilityDomain,
+    wmm: wmm,
+    hidden: hidden,
+    dtimPeriod: dtimPeriod,
+    gtkRekey: gtkRekey,
+    inactivityLimit: inactivityLimit,
+    maxListenInterval: maxListenInterval,
+    disassocLowAck: disassocLowAck,
+    multicastToUnicast: multicastToUnicast,
+    wds: wds,
+    macfilter: macfilter,
+    maclist: maclist,
+    context: context,
+  );
+
+  Future<List<String>> fetchNetworkInterfaces({BuildContext? context}) =>
+      _networkActionsController!.fetchNetworkInterfaces(context: context);
+
+  /// Active session username (e.g. 'root')
+  String get sessionUsername =>
+      _routerService?.selectedRouter?.username ?? 'root';
+
+  /// Returns true if logged in user has administrative privileges
+  bool get isAdministrativeUser {
+    if (capabilities != null) {
+      return capabilities!.hasUciWriteAccess;
+    }
+    final user = sessionUsername.trim().toLowerCase();
+    return user == 'root' || user == 'admin' || user.isNotEmpty;
+  }
 }
 
 /// Normalizes a MAC address string to uppercase colon-separated format
@@ -2198,10 +2678,9 @@ List<String> selectNeighborProbeTargets(
   }
 
   final missingWiredIps = candidateIps.where((ip) {
-    final Map<String, dynamic>? entry = neighClients.cast<Map<String, dynamic>?>().firstWhere(
-      (n) => n?['ipaddr'] == ip,
-      orElse: () => null,
-    );
+    final Map<String, dynamic>? entry = neighClients
+        .cast<Map<String, dynamic>?>()
+        .firstWhere((n) => n?['ipaddr'] == ip, orElse: () => null);
     if (entry == null) return true;
     final nud = (entry['nud_state']?.toString() ?? '').toUpperCase();
     return nud == 'INCOMPLETE' || nud == 'FAILED';

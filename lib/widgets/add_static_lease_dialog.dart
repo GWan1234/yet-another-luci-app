@@ -80,6 +80,8 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
     {'label': 'Custom Duration...', 'value': 'custom'},
   ];
 
+  DhcpStaticMapping? _detectedMapping;
+
   late final String _initialMacText;
   late final String _initialNameText;
   late final String _initialIpText;
@@ -87,7 +89,7 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
   late final String _initialCustomLeaseText;
 
   bool get _isEditing =>
-      widget.existingMapping != null || (widget.client != null && widget.client!.isStatic);
+      _detectedMapping != null || widget.existingMapping != null || (widget.client != null && widget.client!.isStatic);
 
   bool get _hasChanges {
     if (!_isEditing) return true;
@@ -141,16 +143,22 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
   @override
   void initState() {
     super.initState();
-    final mapping = widget.existingMapping;
     final client = widget.client;
 
     final initialMac = (widget.macAddress != null && widget.macAddress!.trim().isNotEmpty)
         ? widget.macAddress!.trim()
-        : ((mapping != null && mapping.macAddress.isNotEmpty)
-            ? mapping.macAddress.trim()
+        : ((widget.existingMapping != null && widget.existingMapping!.macAddress.isNotEmpty)
+            ? widget.existingMapping!.macAddress.trim()
             : ((client != null && client.macAddress.isNotEmpty)
                 ? client.macAddress.trim()
                 : ''));
+
+    if (widget.existingMapping != null) {
+      _detectedMapping = widget.existingMapping;
+    } else if (initialMac.isNotEmpty) {
+      _detectedMapping = AppState.instance.findStaticLeaseByMac(initialMac);
+    }
+    final mapping = _detectedMapping;
     _macController = TextEditingController(text: initialMac.toUpperCase());
 
     String cleanInitialName(String? raw) {
@@ -1169,6 +1177,7 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
                   initialValue: _selectedLeasePreset,
+                  isExpanded: true,
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.timer_outlined, size: 20),
                     filled: true,
@@ -1178,7 +1187,12 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
                   items: _leasePresets.map((preset) {
                     return DropdownMenuItem<String>(
                       value: preset['value'],
-                      child: Text(preset['label']!, style: const TextStyle(fontSize: 13)),
+                      child: Text(
+                        preset['label']!,
+                        style: const TextStyle(fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
                     );
                   }).toList(),
                   onChanged: (val) {
