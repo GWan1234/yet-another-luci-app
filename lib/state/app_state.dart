@@ -299,6 +299,17 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Generic secure storage read — used by feature modules (e.g. Parental Controls).
+  Future<String?> secureRead(String key) async {
+    return _secureStorageService.readValue(key);
+  }
+
+  /// Generic secure storage write — used by feature modules (e.g. Parental Controls).
+  Future<void> secureWrite(String key, String value) async {
+    await _secureStorageService.writeValue(key, value);
+  }
+
+
   Future<void> setThemeMode(ThemeMode mode) =>
       _sessionController!.setThemeMode(mode);
 
@@ -1094,6 +1105,10 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  void startThroughputTimer() {
+    _startThroughputTimer();
+  }
+
   void cancelThroughputTimer() {
     _throughputController?.cancelAndClear();
   }
@@ -1316,10 +1331,12 @@ class AppState extends ChangeNotifier {
   Future<bool> disconnectWirelessClient(
     String macAddress, {
     String? iface,
+    int banTimeSeconds = 300,
     BuildContext? context,
   }) => _networkActionsController!.disconnectWirelessClient(
     macAddress,
     iface: iface,
+    banTimeSeconds: banTimeSeconds,
     context: context,
   );
 
@@ -1424,10 +1441,12 @@ class AppState extends ChangeNotifier {
   Future<bool> banWirelessClient(
     String macAddress, {
     String? iface,
+    int banTimeSeconds = 300,
     BuildContext? context,
   }) => _networkActionsController!.banWirelessClient(
     macAddress,
     iface: iface,
+    banTimeSeconds: banTimeSeconds,
     context: context,
   );
 
@@ -1471,21 +1490,70 @@ class AppState extends ChangeNotifier {
       context: context,
     );
 
-    // Update local set of paused internet MACs and banned wireless MACs from live router response
-    if (data['restricted'] != null) {
-      final macs = data['restricted']!
-          .map((e) => e['mac']?.toString().toUpperCase() ?? '')
-          .where((m) => m.isNotEmpty)
-          .toSet();
-      _networkActionsController?.updatePausedInternetMacs(macs);
+    data['restricted'] ??= [];
+    data['banned'] ??= [];
+
+    // Ensure all locally tracked banned & paused MACs are included instantly
+    final bannedSet = data['banned']!
+        .map((e) => e['mac']?.toString().toUpperCase() ?? '')
+        .where((m) => m.isNotEmpty)
+        .toSet();
+
+    for (final mac in bannedWirelessMacs) {
+      if (!bannedSet.contains(mac)) {
+        bannedSet.add(mac);
+        data['banned']!.add({
+          'mac': mac,
+          'name': mac,
+          'ip': 'N/A',
+          'type': 'banned',
+          'source': 'Wi-Fi Access Control (Banned)',
+        });
+      }
     }
-    if (data['banned'] != null) {
-      final macs = data['banned']!
-          .map((e) => e['mac']?.toString().toUpperCase() ?? '')
-          .where((m) => m.isNotEmpty)
-          .toSet();
-      _networkActionsController?.updateBannedWirelessMacs(macs);
+
+    final restrictedSet = data['restricted']!
+        .map((e) => e['mac']?.toString().toUpperCase() ?? '')
+        .where((m) => m.isNotEmpty)
+        .toSet();
+
+    for (final mac in pausedInternetMacs) {
+      if (!restrictedSet.contains(mac)) {
+        restrictedSet.add(mac);
+        data['restricted']!.add({
+          'mac': mac,
+          'name': mac,
+          'ip': 'N/A',
+          'type': 'restricted',
+          'source': 'Internet Access Paused',
+        });
+      }
     }
+
+    // Enrich names and IP addresses from clients list
+    final clientMap = {
+      for (final c in clients)
+        c.macAddress.toUpperCase().replaceAll('-', ':'): c
+    };
+
+    for (final listKey in ['restricted', 'banned']) {
+      for (final item in data[listKey]!) {
+        final mac = item['mac']?.toString().toUpperCase().replaceAll('-', ':') ?? '';
+        final client = clientMap[mac];
+        if (client != null) {
+          if (item['name'] == null || item['name'] == mac) {
+            item['name'] = client.displayName;
+          }
+          if (item['ip'] == null || item['ip'] == 'N/A') {
+            item['ip'] = client.ipAddress;
+          }
+        }
+      }
+    }
+
+    _networkActionsController?.updatePausedInternetMacs(restrictedSet);
+    _networkActionsController?.updateBannedWirelessMacs(bannedSet);
+
     return data;
   }
 
@@ -2288,6 +2356,9 @@ class AppState extends ChangeNotifier {
 
   @override
   void dispose() {
+    if (identical(this, _instance)) {
+      return;
+    }
     _throughputController?.dispose();
     _networkActionsController?.dispose();
     _accessControlTimerLifecycleManager?.dispose();

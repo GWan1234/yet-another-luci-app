@@ -170,35 +170,73 @@ class OsPlatformIntegration {
   }) async {
     if (kIsWeb) return null;
 
+    // Tier 1: Public Downloads Directory (/storage/emulated/0/Download)
     try {
       Directory? targetDir = Directory('/storage/emulated/0/Download');
       if (!targetDir.existsSync()) {
-        targetDir = await getPublicDownloadsDirectory();
+        try {
+          targetDir.createSync(recursive: true);
+        } catch (_) {
+          targetDir = await getPublicDownloadsDirectory();
+        }
       }
-      targetDir ??= await getApplicationDocumentsDirectory();
+      targetDir ??= await getPublicDownloadsDirectory();
 
-      final file = File('${targetDir.path}/$fileName');
-      await file.writeAsBytes(bytes, flush: true);
-      return FileSaveResult(
-        filePath: file.path,
-        isPublicDownloads: true,
-        storageMethodLabel: 'Public Downloads Folder',
-      );
-    } catch (_) {
-      try {
-        final fallbackDir = Directory('/storage/emulated/0/Download');
-        if (!fallbackDir.existsSync()) fallbackDir.createSync(recursive: true);
-        final file = File('${fallbackDir.path}/$fileName');
+      if (targetDir != null && targetDir.existsSync()) {
+        final file = File('${targetDir.path}/$fileName');
         await file.writeAsBytes(bytes, flush: true);
         return FileSaveResult(
           filePath: file.path,
-          isPublicDownloads: true,
+          isPublicDownloads: isPathPublic(file.path),
           storageMethodLabel: 'Public Downloads Folder',
         );
-      } catch (_) {
-        return null;
       }
+    } catch (_) {
+      // Primary public storage threw permission or IO exception on older hardware
     }
+
+    // Tier 2: External App Storage Directory (/sdcard/Android/data/... or external files)
+    try {
+      final extDir = await getExternalStorageDirectory();
+      if (extDir != null) {
+        if (!extDir.existsSync()) extDir.createSync(recursive: true);
+        final file = File('${extDir.path}/$fileName');
+        await file.writeAsBytes(bytes, flush: true);
+        return FileSaveResult(
+          filePath: file.path,
+          isPublicDownloads: isPathPublic(file.path),
+          storageMethodLabel: 'External App Storage',
+        );
+      }
+    } catch (_) {}
+
+    // Tier 3: Application Documents Directory (Internal App Sandbox - 100% permission safe)
+    try {
+      final docsDir = await getApplicationDocumentsDirectory();
+      if (!docsDir.existsSync()) docsDir.createSync(recursive: true);
+      final file = File('${docsDir.path}/$fileName');
+      await file.writeAsBytes(bytes, flush: true);
+      return FileSaveResult(
+        filePath: file.path,
+        isPublicDownloads: false,
+        storageMethodLabel: 'App Storage (Sandbox)',
+      );
+    } catch (_) {}
+
+    // Tier 4: Temporary Directory
+    try {
+      final tempDir = await getTemporaryDirectory();
+      if (!tempDir.existsSync()) tempDir.createSync(recursive: true);
+      final file = File('${tempDir.path}/$fileName');
+      await file.writeAsBytes(bytes, flush: true);
+      return FileSaveResult(
+        filePath: file.path,
+        isPublicDownloads: false,
+        storageMethodLabel: 'Temporary Storage',
+      );
+    } catch (_) {}
+
+    return null;
   }
 
   /// Saves downloaded file bytes to public Downloads.

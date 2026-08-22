@@ -142,70 +142,9 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
               child: ListView(
                 padding: const EdgeInsets.all(16.0),
                 children: [
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _buildSectionHeader(context, 'Wireless Radios', Icons.cell_tower_outlined),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const GuestWifiManagementScreen(),
-                          ),
-                        );
-                      },
-                      icon: Icon(
-                        Icons.shield_moon_rounded,
-                        size: 16,
-                        color: hasGuestNetworks ? Colors.green : Colors.red,
-                      ),
-                      label: Text(
-                        'Guest Network Management',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: hasGuestNetworks ? Colors.green : Colors.red,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        side: BorderSide(
-                          color: hasGuestNetworks
-                              ? Colors.green.withValues(alpha: 0.5)
-                              : Colors.red.withValues(alpha: 0.5),
-                        ),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const WifiAccessControlScreen(),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.security_rounded, size: 16),
-                      label: const Text('Access Control', style: TextStyle(fontSize: 12)),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
+            // Top Summary Header & Action Bar
+            _buildWirelessHeaderCard(context, overview, hasGuestNetworks),
+            const SizedBox(height: 14),
             if (overview.radios.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 32.0),
@@ -230,7 +169,7 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
               onExpansionChanged: _toggleStationsExpansion,
               child: _buildStationsList(context, overview, appState),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 100),
           ],
         ),
       ),
@@ -241,30 +180,123 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
 );
   }
 
-
-
-  Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
+  Widget _buildWirelessHeaderCard(BuildContext context, WirelessOverview overview, bool hasGuestNetworks) {
     final theme = Theme.of(context);
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: theme.colorScheme.primary),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            title,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-            overflow: TextOverflow.ellipsis,
+    final isDarkMode = theme.brightness == Brightness.dark;
+
+    int totalSsidCount = 0;
+    for (final r in overview.radios) {
+      totalSsidCount += r.interfaces.length;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(Icons.cell_tower_outlined, size: 20, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Wireless Overview',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              // Mini Summary Metrics Badges
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${overview.radios.length} Radios • $totalSsidCount SSIDs',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const GuestWifiManagementScreen(),
+                      ),
+                    );
+                  },
+                  icon: Icon(
+                    Icons.shield_moon_rounded,
+                    size: 16,
+                    color: hasGuestNetworks ? Colors.amber.shade300 : theme.colorScheme.onSecondary,
+                  ),
+                  label: Text(
+                    'Guest Networks',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: hasGuestNetworks
+                        ? (isDarkMode ? Colors.amber.shade900.withValues(alpha: 0.8) : Colors.amber.shade800)
+                        : theme.colorScheme.secondary,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const WifiAccessControlScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.security_rounded, size: 16),
+                  label: const Text('Access Control', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
+  }
+
+  Color _getBandColor(String bandLabel) {
+    final lower = bandLabel.toLowerCase();
+    if (lower.contains('2.4')) return Colors.orange;
+    if (lower.contains('5')) return Colors.teal;
+    if (lower.contains('6')) return Colors.deepPurple;
+    return Colors.blue;
   }
 
   Widget _buildRadioCard(BuildContext context, WirelessRadio radio, WirelessOverview overview, AppState appState) {
     final theme = Theme.of(context);
-    final freqStr = radio.formattedFrequency ?? 'Channel ${radio.channel} (Freq Unreported)';
+    final isDarkMode = theme.brightness == Brightness.dark;
+    final freqStr = radio.formattedFrequency ?? 'Ch ${radio.channel}';
+    final bandColor = _getBandColor(radio.bandLabel);
 
     final regularIfaces = radio.interfaces
         .where((i) => !i.isGuestInterface(appState.customGuestSections, appState.excludedGuestSections))
@@ -278,30 +310,35 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
         : 'DISABLED • ${radio.bandLabel} • Ch ${radio.channel}';
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 14),
+      elevation: 1.5,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: Theme(
         data: theme.copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           initiallyExpanded: true,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          childrenPadding: const EdgeInsets.only(left: 14, right: 14, bottom: 14),
           leading: CircleAvatar(
-            backgroundColor: theme.colorScheme.primaryContainer,
-            child: Icon(Icons.wifi, color: theme.colorScheme.onPrimaryContainer),
+            backgroundColor: bandColor.withValues(alpha: 0.15),
+            child: Icon(Icons.wifi, color: bandColor),
           ),
           title: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: Text(
-                  radio.name.toUpperCase(),
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  overflow: TextOverflow.ellipsis,
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    radio.name.toUpperCase(),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
+                  ),
                 ),
               ),
+              const SizedBox(width: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: radio.isUp ? LuciStatusColors.connected.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
@@ -311,17 +348,17 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
                   style: TextStyle(
                     color: radio.isUp ? LuciStatusColors.connected : Colors.red,
                     fontWeight: FontWeight.bold,
-                    fontSize: 10,
+                    fontSize: 9.0,
                   ),
                 ),
               ),
             ],
           ),
           subtitle: Padding(
-            padding: const EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.only(top: 2),
             child: Text(
               minimalSummary,
-              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 12),
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11.5),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -329,25 +366,96 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
             mainAxisSize: MainAxisSize.min,
             children: [
               IconButton(
-                icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
+                icon: const Icon(Icons.add_circle_outline_rounded, size: 19),
                 tooltip: 'Add Virtual SSID Interface',
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
                 onPressed: () => _showAddSsidDialog(context, overview.radios, radio),
               ),
+              const SizedBox(width: 4),
               IconButton(
-                icon: const Icon(Icons.settings_outlined, size: 20),
+                icon: const Icon(Icons.settings_outlined, size: 19),
                 tooltip: 'Edit Physical Radio Settings',
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
                 onPressed: () => _showEditRadioDialog(context, radio),
               ),
             ],
           ),
           children: [
-            const Divider(height: 16),
-            _buildDetailRow(context, 'TX Power', '${radio.txPowerDbm ?? 20} dBm'),
-            _buildDetailRow(context, 'Frequency', freqStr),
-            _buildDetailRow(context, 'Country Code', radio.country),
+            const SizedBox(height: 4),
+            // Sleek Horizontal Radio Spec Pills
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildRadioMetricPill(
+                      context,
+                      'TX Power',
+                      '${radio.txPowerDbm ?? 20} dBm',
+                      Icons.bolt_rounded,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: _buildRadioMetricPill(
+                      context,
+                      'Frequency',
+                      freqStr,
+                      Icons.graphic_eq_rounded,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: _buildRadioMetricPill(
+                      context,
+                      'Country',
+                      radio.country,
+                      Icons.public_rounded,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 12),
             if (regularIfaces.isNotEmpty) ...[
-              const Text('Primary Interfaces / SSIDs', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              Row(
+                children: [
+                  Icon(Icons.wifi_rounded, size: 15, color: theme.colorScheme.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Primary Networks & SSIDs',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12.5,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${regularIfaces.length}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 6),
               ...regularIfaces.map(
                 (iface) => WirelessInterfaceCard(
@@ -358,28 +466,80 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
               ),
             ],
             if (guestIfaces.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              LuciCollapsibleCard(
-                title: 'Guest Networks & SSIDs',
-                icon: Icons.shield_moon_rounded,
-                count: guestIfaces.length,
-                initiallyExpanded: true,
-                child: Column(
-                  children: guestIfaces
-                      .map(
-                        (iface) => WirelessInterfaceCard(
-                          radio: radio,
-                          interface: iface,
-                          onToggleEnabled: (val) => _handleToggleSsid(context, radio, iface, val, appState),
-                        ),
-                      )
-                      .toList(),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(
+                    Icons.shield_moon_rounded,
+                    size: 15,
+                    color: isDarkMode ? Colors.amber.shade400 : Colors.amber.shade800,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Guest Networks & SSIDs',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12.5,
+                      color: isDarkMode ? Colors.amber.shade300 : Colors.amber.shade900,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade800.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${guestIfaces.length}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: isDarkMode ? Colors.amber.shade300 : Colors.amber.shade900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              ...guestIfaces.map(
+                (iface) => WirelessInterfaceCard(
+                  radio: radio,
+                  interface: iface,
+                  onToggleEnabled: (val) => _handleToggleSsid(context, radio, iface, val, appState),
                 ),
               ),
             ],
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildRadioMetricPill(BuildContext context, String label, String value, IconData icon) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: theme.colorScheme.primary),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(fontSize: 9.5, color: theme.colorScheme.onSurfaceVariant),
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(
+                value,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -755,29 +915,7 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
     return Colors.red;
   }
 
-  Widget _buildDetailRow(BuildContext context, String label, String value) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(label, style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: SelectableText(
-              value,
-              textAlign: TextAlign.end,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   void _showEditRadioDialog(BuildContext context, WirelessRadio radio) {
     showDialog<bool>(

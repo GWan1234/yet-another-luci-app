@@ -169,7 +169,7 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
               onRefresh: _loadPackages,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0),
                 children: [
                   // Search input
                   TextField(

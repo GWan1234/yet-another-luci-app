@@ -21,7 +21,7 @@ class MainScreen extends ConsumerStatefulWidget {
   ConsumerState<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends ConsumerState<MainScreen> {
+class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   String? _currentInterfaceToScroll;
   final Set<int> _activatedTabs = {0};
@@ -29,11 +29,31 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.initialTab != null) {
       _selectedIndex = widget.initialTab!.clamp(0, 4);
     }
     _activatedTabs.add(_selectedIndex);
     _currentInterfaceToScroll = widget.interfaceToScroll;
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    final appState = ref.read(appStateProvider);
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      appState.cancelThroughputTimer();
+    } else if (state == AppLifecycleState.resumed) {
+      appState.startThroughputTimer();
+    }
   }
 
   @override

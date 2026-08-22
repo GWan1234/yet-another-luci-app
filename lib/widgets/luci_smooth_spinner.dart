@@ -4,8 +4,8 @@
 import 'package:flutter/material.dart';
 
 /// A smooth, constant-speed 360° circular progress spinner for Yet Another LuCI App.
-/// Replaces standard indeterminate CircularProgressIndicator (which accelerates and decelerates
-/// giving a "boomerang" rubber-banding effect) with a fluid, continuous rotation.
+/// Uses wall-clock phase matching to ensure continuous, seamless rotation without resetting or restarting
+/// when rebuilt or recreated across dynamic toast and dialog state updates.
 class LuciSmoothSpinner extends StatefulWidget {
   final double size;
   final double strokeWidth;
@@ -31,8 +31,11 @@ class _LuciSmoothSpinnerState extends State<LuciSmoothSpinner>
   @override
   void initState() {
     super.initState();
+    // Compute current rotation phase (0.0 to 1.0) based on wall clock (1000ms loop)
+    final initialPhase = (DateTime.now().millisecondsSinceEpoch % 1000) / 1000.0;
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 900),
+      value: initialPhase,
+      duration: const Duration(milliseconds: 1000),
       vsync: this,
     )..repeat();
   }

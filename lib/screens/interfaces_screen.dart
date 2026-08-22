@@ -15,6 +15,7 @@ import 'package:yet_another_luci_app/design/luci_design_system.dart';
 import 'package:yet_another_luci_app/widgets/luci_loading_states.dart';
 import 'package:yet_another_luci_app/widgets/luci_refresh_components.dart';
 import 'package:yet_another_luci_app/widgets/luci_toast.dart';
+import 'package:yet_another_luci_app/state/app_state.dart';
 
 class InterfacesScreen extends ConsumerStatefulWidget {
   final String? scrollToInterface;
@@ -594,6 +595,7 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
   void dispose() {
     // Clear target interface when widget is disposed
     _targetInterface = null;
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -881,22 +883,76 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
                     );
                   }
 
+                  final wiredList = _getWiredInterfacesList(appState);
+                  final wirelessList = _getWirelessInterfacesList(appState);
+                  final topology = _getNetworkTopology(appState);
+
+                  final isWiredAvailable = wiredList.isNotEmpty;
+                  final isWirelessAvailable = wirelessList.isNotEmpty;
+                  final isTopologyAvailable = topology != null && topology.isAvailable && !topology.isZeroVlans;
+
+                  final routerIp = appState.currentRouterIp;
+
+                  final sections = <_SectionSpec>[
+                    _SectionSpec(
+                      defaultOrder: 0,
+                      isAvailable: isWiredAvailable,
+                      header: const LuciSectionHeader('Wired', icon: Icons.settings_ethernet),
+                      sliverOrWidget: isWiredAvailable
+                          ? _buildWiredSliverList(wiredList, routerIp)
+                          : _buildCompactUnavailableCard(
+                              icon: Icons.lan_outlined,
+                              title: 'Wired Interfaces Unavailable',
+                              subtitle: 'No active or configured ethernet network interfaces detected.',
+                            ),
+                      isSliver: isWiredAvailable,
+                    ),
+                    _SectionSpec(
+                      defaultOrder: 1,
+                      isAvailable: isTopologyAvailable,
+                      header: const LuciSectionHeader('Switch Topology & VLANs', icon: Icons.hub_outlined),
+                      sliverOrWidget: NetworkTopologyCard(
+                        topology: topology,
+                        onRetry: () => appState.redetectCapabilities(),
+                      ),
+                      isSliver: false,
+                    ),
+                    _SectionSpec(
+                      defaultOrder: 2,
+                      isAvailable: isWirelessAvailable,
+                      header: const LuciSectionHeader('Wireless', icon: Icons.wifi),
+                      sliverOrWidget: isWirelessAvailable
+                          ? _buildWirelessSliverList(wirelessList, routerIp)
+                          : _buildCompactUnavailableCard(
+                              icon: Icons.wifi_off_rounded,
+                              title: 'Wireless Interfaces Unavailable',
+                              subtitle: 'No wireless physical radios or SSIDs configured on this router.',
+                            ),
+                      isSliver: isWirelessAvailable,
+                    ),
+                  ];
+
+                  sections.sort((a, b) {
+                    if (a.isAvailable != b.isAvailable) {
+                      return a.isAvailable ? -1 : 1;
+                    }
+                    return a.defaultOrder.compareTo(b.defaultOrder);
+                  });
+
+                  final slivers = <Widget>[];
+                  for (final sec in sections) {
+                    slivers.add(SliverToBoxAdapter(child: sec.header));
+                    if (sec.isSliver) {
+                      slivers.add(sec.sliverOrWidget);
+                    } else {
+                      slivers.add(SliverToBoxAdapter(child: sec.sliverOrWidget));
+                    }
+                  }
+                  slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 100)));
+
                   return CustomScrollView(
                     controller: _scrollController,
-                    slivers: [
-                      SliverToBoxAdapter(child: LuciSectionHeader('Wired')),
-                      _buildWiredInterfacesList(),
-                      SliverToBoxAdapter(child: LuciSectionHeader('Switch Topology & VLANs')),
-                      SliverToBoxAdapter(child: _buildTopologySection()),
-                      SliverToBoxAdapter(child: LuciSectionHeader('Wireless')),
-                      _buildWirelessInterfacesList(),
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: EdgeInsets.only(bottom: 16),
-                          child: SizedBox.shrink(),
-                        ),
-                      ),
-                    ],
+                    slivers: slivers,
                   );
                 },
               ),
@@ -907,15 +963,83 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
     );
   }
 
-  Widget _buildTopologySection() {
-    final appState = ref.watch(appStateProvider);
+  Widget _buildCompactUnavailableCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    VoidCallback? onRetry,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+      shape: RoundedRectangleBorder(
+        borderRadius: LuciCardStyles.standardRadius,
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.2)),
+      ),
+      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: colorScheme.onSurfaceVariant, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (onRetry != null) ...[
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                tooltip: 'Retry',
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
+                color: colorScheme.primary,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  NetworkTopology? _getNetworkTopology(AppState appState) {
     final capabilities = appState.capabilities;
     final model = capabilities?.networkModel ?? NetworkModel.unknown;
 
     if (model == NetworkModel.unknown) {
-      return NetworkTopologyCard(
-        topology: NetworkTopology.unavailable(NetworkModel.unknown, 'Conservative fallback active — network model could not be verified automatically.'),
-        onRetry: () => appState.redetectCapabilities(),
+      return NetworkTopology.unavailable(
+        NetworkModel.unknown,
+        'Conservative fallback active — network model could not be verified automatically.',
       );
     }
 
@@ -925,21 +1049,20 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
       uciMap = Map<String, dynamic>.from(uciNetwork);
     }
 
-    NetworkTopology topology;
     if (model == NetworkModel.dsa) {
-      topology = DsaTopologyParser.parse(uciMap, appState.dashboardData?['networkDevices'] as Map<String, dynamic>?);
+      return DsaTopologyParser.parse(
+        uciMap,
+        appState.dashboardData?['networkDevices'] as Map<String, dynamic>?,
+      );
     } else {
-      topology = SwconfigTopologyParser.parse(uciMap, appState.dashboardData?['networkDevices'] as Map<String, dynamic>?);
+      return SwconfigTopologyParser.parse(
+        uciMap,
+        appState.dashboardData?['networkDevices'] as Map<String, dynamic>?,
+      );
     }
-
-    return NetworkTopologyCard(
-      topology: topology,
-      onRetry: () => appState.redetectCapabilities(),
-    );
   }
 
-  Widget _buildWiredInterfacesList() {
-    final appState = ref.watch(appStateProvider);
+  List<NetworkInterface> _getWiredInterfacesList(AppState appState) {
     final dynamic detailedData = appState.dashboardData?['interfaceDump'];
     final dynamic statsDataSource = appState.dashboardData?['networkDevices'];
     var interfacesList = <NetworkInterface>[];
@@ -987,10 +1110,10 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
       return a.name.compareTo(b.name);
     });
 
-    final interfaces = interfacesList;
-    if (interfaces.isEmpty) {
-      return const SliverToBoxAdapter(child: SizedBox.shrink());
-    }
+    return interfacesList;
+  }
+
+  Widget _buildWiredSliverList(List<NetworkInterface> interfaces, String? routerIp) {
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {
         final iface = interfaces[index];
@@ -1006,31 +1129,32 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
         final isAccess = _isWiredAccessInterface(iface, routerIp);
         final isWan = iface.name.toLowerCase().contains('wan') || iface.gateway != null;
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: _UnifiedNetworkCard(
-            key: key,
-            name: iface.name.toUpperCase(),
-            subtitle: _buildMinimalInterfaceSubtitle(iface),
-            isUp: currentEnabled,
-            icon: _getInterfaceIcon(iface.protocol),
-            details: _buildWiredDetails(context, iface),
-            initiallyExpanded: isTargetInterface || _expandedInterface == keyStr,
-            isAccessInterface: isAccess,
-            isWanInterface: isWan,
-            isStaged: isStaged,
-            currentEnabled: currentEnabled,
-            onToggle: (val) => _toggleWiredInterface(iface, val, routerIp),
-            onRestart: () => _restartWiredInterface(iface, routerIp),
-            isSaving: _isSaving,
+        return RepaintBoundary(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: _UnifiedNetworkCard(
+              key: key,
+              name: iface.name.toUpperCase(),
+              subtitle: _buildMinimalInterfaceSubtitle(iface),
+              isUp: currentEnabled,
+              icon: _getInterfaceIcon(iface.protocol),
+              details: _buildWiredDetails(context, iface),
+              initiallyExpanded: isTargetInterface || _expandedInterface == keyStr,
+              isAccessInterface: isAccess,
+              isWanInterface: isWan,
+              isStaged: isStaged,
+              currentEnabled: currentEnabled,
+              onToggle: (val) => _toggleWiredInterface(iface, val, routerIp),
+              onRestart: () => _restartWiredInterface(iface, routerIp),
+              isSaving: _isSaving,
+            ),
           ),
         );
       }, childCount: interfaces.length),
     );
   }
 
-  Widget _buildWirelessInterfacesList() {
-    final appState = ref.watch(appStateProvider);
+  List<Map<String, dynamic>> _getWirelessInterfacesList(AppState appState) {
     final dashboardData = appState.dashboardData;
     final wirelessData = dashboardData?['wireless'] as Map<String, dynamic>?;
     final uciWirelessConfig = dashboardData?['uciWirelessConfig'];
@@ -1138,8 +1262,6 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
       }
     });
 
-    final routerIp = appState.currentRouterIp;
-
     interfacesList.sort((a, b) {
       final sectionA = a['section'] as String?;
       final sectionB = b['section'] as String?;
@@ -1155,10 +1277,10 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
       return (a['name'] as String? ?? '').compareTo(b['name'] as String? ?? '');
     });
 
-    final interfaces = interfacesList;
-    if (interfaces.isEmpty) {
-      return const SliverToBoxAdapter(child: SizedBox.shrink());
-    }
+    return interfacesList;
+  }
+
+  Widget _buildWirelessSliverList(List<Map<String, dynamic>> interfaces, String? routerIp) {
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {
         final iface = interfaces[index];
@@ -1166,7 +1288,6 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
         final radioName = iface['radioName'] ?? '';
         final ssid = iface['ssid'] ?? '';
         final name = iface['interfaceName'] ?? '';
-        // Use the stored values for key generation
         final keyStr = _interfaceKeyForWireless(
           ssid: ssid,
           radioName: radioName,
@@ -1178,7 +1299,6 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
             ? ssid.toString()
             : deviceName.toString();
 
-        // Check if this is the target interface for expansion
         final isTargetInterface =
             _targetInterface != null &&
             (_normalizeInterfaceKey(ssid) ==
@@ -1198,23 +1318,25 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
         final isWan = iface['details']?['Network']?.toString().toLowerCase().contains('wan') == true ||
             displayName.toLowerCase().contains('wan');
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: _UnifiedNetworkCard(
-            key: key,
-            name: displayName,
-            subtitle: iface['subtitle'],
-            isUp: currentEnabled,
-            icon: Icons.wifi,
-            details: _buildGenericDetails(context, iface['details']),
-            initiallyExpanded: shouldExpand,
-            isAccessInterface: isAccess,
-            isWanInterface: isWan,
-            isStaged: isStaged,
-            currentEnabled: currentEnabled,
-            onToggle: (val) => _toggleWirelessInterface(sectionKey, displayName, originalEnabled, isAccess, val),
-            onRestart: () => _restartWirelessInterface(sectionKey, displayName, isAccess, isWan, radioName: radioName.toString()),
-            isSaving: _isSaving,
+        return RepaintBoundary(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: _UnifiedNetworkCard(
+              key: key,
+              name: displayName,
+              subtitle: iface['subtitle'],
+              isUp: currentEnabled,
+              icon: Icons.wifi,
+              details: _buildGenericDetails(context, iface['details']),
+              initiallyExpanded: shouldExpand,
+              isAccessInterface: isAccess,
+              isWanInterface: isWan,
+              isStaged: isStaged,
+              currentEnabled: currentEnabled,
+              onToggle: (val) => _toggleWirelessInterface(sectionKey, displayName, originalEnabled, isAccess, val),
+              onRestart: () => _restartWirelessInterface(sectionKey, displayName, isAccess, isWan, radioName: radioName.toString()),
+              isSaving: _isSaving,
+            ),
           ),
         );
       }, childCount: interfaces.length),
@@ -1503,18 +1625,19 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
     final colorScheme = theme.colorScheme;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(6),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 3.5),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             SizedBox(
-              width: 120,
+              width: 115,
               child: Text(
                 title,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurface,
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: 12.0,
                 ),
               ),
             ),
@@ -1527,22 +1650,20 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
                     child: SelectableText(
                       value,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
                         color: colorScheme.onSurface,
+                        fontSize: 12.5,
                       ),
                       textAlign: TextAlign.end,
                     ),
                   ),
                   if (onTap != null)
-                    GestureDetector(
-                      onTap: onTap,
-                      child: const Padding(
-                        padding: EdgeInsets.only(left: 8.0),
-                        child: Icon(
-                          Icons.copy_all_outlined,
-                          size: 16,
-                          color: Colors.grey,
-                        ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6.0),
+                      child: Icon(
+                        Icons.copy_all_outlined,
+                        size: 14,
+                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                       ),
                     ),
                 ],
@@ -1603,63 +1724,71 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
     }
 
     final theme = Theme.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _buildStatColumn(
-          context,
-          'Received',
-          formatBytes(stats['rx_bytes'] ?? 0),
-          Icons.arrow_downward,
-          theme.colorScheme.primary,
-        ),
-        _buildStatColumn(
-          context,
-          'Transmitted',
-          formatBytes(stats['tx_bytes'] ?? 0),
-          Icons.arrow_upward,
-          theme.colorScheme.secondary,
-        ),
-      ],
-    );
-  }
+    final rxStr = formatBytes(stats['rx_bytes'] ?? 0);
+    final txStr = formatBytes(stats['tx_bytes'] ?? 0);
 
-  Widget _buildStatColumn(
-    BuildContext context,
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    final theme = Theme.of(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurface,
-              ),
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.arrow_downward_rounded, size: 14, color: Colors.green),
+                const SizedBox(width: 6),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Received',
+                      style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                    Text(
+                      rxStr,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.bold,
           ),
-          textAlign: TextAlign.center,
-        ),
-      ],
+          Container(
+            height: 22,
+            width: 1,
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+          ),
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.arrow_upward_rounded, size: 14, color: Colors.orange),
+                const SizedBox(width: 6),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Transmitted',
+                      style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                    Text(
+                      txStr,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1697,21 +1826,47 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
   }
 }
 
+class _SectionSpec {
+  final int defaultOrder;
+  final bool isAvailable;
+  final Widget header;
+  final Widget sliverOrWidget;
+  final bool isSliver;
+
+  _SectionSpec({
+    required this.defaultOrder,
+    required this.isAvailable,
+    required this.header,
+    required this.sliverOrWidget,
+    required this.isSliver,
+  });
+}
+
 class LuciSectionHeader extends StatelessWidget {
   final String title;
-  const LuciSectionHeader(this.title, {super.key});
+  final IconData? icon;
+  const LuciSectionHeader(this.title, {this.icon, super.key});
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-      child: Text(
-        title,
-        style: theme.textTheme.titleMedium?.copyWith(
-          color: theme.colorScheme.onSurface,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.2,
-        ),
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 18, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+          ],
+          Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: theme.colorScheme.onSurface,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1833,8 +1988,8 @@ class _UnifiedNetworkCardState extends State<_UnifiedNetworkCard>
               borderRadius: LuciCardStyles.standardRadius,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: LuciSpacing.lg,
-                  vertical: 10.0,
+                  horizontal: 14.0,
+                  vertical: 8.0,
                 ),
                 child: Row(
                   children: [
@@ -1842,7 +1997,7 @@ class _UnifiedNetworkCardState extends State<_UnifiedNetworkCard>
                       alignment: Alignment.topRight,
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(8.0),
+                          padding: const EdgeInsets.all(7.0),
                           decoration: BoxDecoration(
                             color: colorScheme.primaryContainer.withValues(
                               alpha: 0.13,
@@ -1860,7 +2015,7 @@ class _UnifiedNetworkCardState extends State<_UnifiedNetworkCard>
                               color: effectiveEnabled
                                   ? colorScheme.primary
                                   : colorScheme.onSurface,
-                              size: 22,
+                              size: 20,
                               semanticLabel: 'Interface icon',
                             ),
                           ),
@@ -1879,112 +2034,115 @@ class _UnifiedNetworkCardState extends State<_UnifiedNetworkCard>
                         ),
                       ],
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Wrap(
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 6,
-                            runSpacing: 4,
+                          Row(
                             children: [
-                              Text(
-                                widget.name,
-                                style: LuciTextStyles.cardTitle(context),
-                                semanticsLabel: 'Interface name: ${widget.name}',
+                              Flexible(
+                                child: Text(
+                                  widget.name,
+                                  style: LuciTextStyles.cardTitle(context).copyWith(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  softWrap: false,
+                                  semanticsLabel: 'Interface name: ${widget.name}',
+                                ),
                               ),
-                              if (widget.isAccessInterface) ...[
-                                Tooltip(
-                                  message: 'Active management access interface',
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(color: Colors.red.shade400, width: 0.8),
-                                    ),
-                                    child: const Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.lock, size: 10, color: Colors.red),
-                                        SizedBox(width: 3),
-                                        Text(
-                                          'ACTIVE ACCESS',
-                                          style: TextStyle(
-                                            color: Colors.red,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 9,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              if (widget.isWanInterface) ...[
-                                Tooltip(
-                                  message: 'WAN / Gateway Interface',
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.indigo.shade800.withValues(alpha: 0.2),
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(color: Colors.indigo.shade400, width: 0.8),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.public, size: 10, color: Colors.indigo.shade300),
-                                        const SizedBox(width: 3),
-                                        Text(
-                                          'WAN / GATEWAY',
-                                          style: TextStyle(
-                                            color: Colors.indigo.shade200,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 9,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              if (widget.isStaged) ...[
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.amber.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: Colors.amber.shade700, width: 0.8),
-                                  ),
-                                  child: Text(
-                                    'STAGED',
-                                    style: TextStyle(
-                                      color: Colors.amber.shade900,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 9,
-                                    ),
-                                  ),
-                                ),
-                              ],
                             ],
                           ),
-                          const SizedBox(height: LuciSpacing.xs),
-                          Container(
-                            margin: const EdgeInsets.only(right: 32),
-                            child: Divider(
-                              color: colorScheme.surfaceContainerHighest
-                                  .withValues(alpha: 0.10),
-                              thickness: 1,
-                              height: 8,
+                          if (widget.isAccessInterface || widget.isWanInterface || widget.isStaged) ...[
+                            const SizedBox(height: 3),
+                            Wrap(
+                              spacing: 4,
+                              runSpacing: 3,
+                              children: [
+                                if (widget.isAccessInterface)
+                                  Tooltip(
+                                    message: 'Active management access interface',
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: Colors.red.shade400, width: 0.8),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.lock, size: 9, color: Colors.red),
+                                          SizedBox(width: 2),
+                                          Text(
+                                            'ACTIVE ACCESS',
+                                            style: TextStyle(
+                                              color: Colors.red,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 8.5,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                if (widget.isWanInterface)
+                                  Tooltip(
+                                    message: 'WAN / Gateway Interface',
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                      decoration: BoxDecoration(
+                                        color: Colors.indigo.shade800.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: Colors.indigo.shade400, width: 0.8),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.public, size: 9, color: Colors.indigo.shade300),
+                                          const SizedBox(width: 2),
+                                          Text(
+                                            'WAN / GATEWAY',
+                                            style: TextStyle(
+                                              color: Colors.indigo.shade200,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 8.5,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                if (widget.isStaged)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.withValues(alpha: 0.2),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: Colors.amber.shade700, width: 0.8),
+                                    ),
+                                    child: Text(
+                                      'STAGED',
+                                      style: TextStyle(
+                                        color: Colors.amber.shade900,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 8.5,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
-                          ),
+                          ],
+                          const SizedBox(height: 2),
                           Text(
                             widget.isStaged
                                 ? '${widget.subtitle} • Original: ${widget.isUp ? "UP" : "DOWN"}'
                                 : widget.subtitle,
-                            style: LuciTextStyles.cardSubtitle(context),
+                            style: LuciTextStyles.cardSubtitle(context).copyWith(
+                              fontSize: 12.0,
+                            ),
                             semanticsLabel:
                                 'Interface details: ${widget.subtitle}',
                           ),
@@ -1992,28 +2150,30 @@ class _UnifiedNetworkCardState extends State<_UnifiedNetworkCard>
                       ),
                     ),
                     if (widget.onRestart != null) ...[
+                      IconButton(
+                        icon: const Icon(Icons.refresh_rounded, size: 19),
+                        color: colorScheme.primary,
+                        tooltip: 'Restart Interface',
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.all(4),
+                        constraints: const BoxConstraints(),
+                        onPressed: widget.isSaving ? null : widget.onRestart,
+                      ),
                       const SizedBox(width: 4),
-                      Tooltip(
-                        message: 'Restart Interface',
-                        child: IconButton(
-                          icon: const Icon(Icons.refresh_rounded, size: 20),
-                          color: colorScheme.primary,
-                          onPressed: widget.isSaving ? null : widget.onRestart,
+                    ],
+                    if (widget.onToggle != null) ...[
+                      Transform.scale(
+                        scale: 0.82,
+                        child: Switch(
+                          value: effectiveEnabled,
+                          onChanged: widget.isSaving ? null : widget.onToggle,
                         ),
                       ),
                     ],
-                    if (widget.onToggle != null) ...[
-                      const SizedBox(width: 4),
-                      Switch.adaptive(
-                        value: effectiveEnabled,
-                        onChanged: widget.isSaving ? null : widget.onToggle,
-                      ),
-                    ],
-                    const SizedBox(width: 4),
                     Icon(
-                      _isExpanded ? Icons.expand_less : Icons.expand_more,
+                      _isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
                       color: colorScheme.onSurfaceVariant,
-                      size: 26,
+                      size: 22,
                       semanticLabel: _isExpanded
                           ? 'Collapse details'
                           : 'Expand details',
@@ -2025,8 +2185,9 @@ class _UnifiedNetworkCardState extends State<_UnifiedNetworkCard>
             if (_isExpanded)
               Column(
                 children: [
-                  const Divider(height: 1, indent: 18, endIndent: 18),
+                  const Divider(height: 1, indent: 14, endIndent: 14),
                   widget.details,
+                  const SizedBox(height: 6),
                 ],
               ),
           ],
@@ -2035,29 +2196,8 @@ class _UnifiedNetworkCardState extends State<_UnifiedNetworkCard>
     );
 
     if (!effectiveEnabled && !widget.isStaged) {
-      return ColorFiltered(
-        colorFilter: const ColorFilter.matrix([
-          0.2126,
-          0.7152,
-          0.0722,
-          0,
-          0,
-          0.2126,
-          0.7152,
-          0.0722,
-          0,
-          0,
-          0.2126,
-          0.7152,
-          0.0722,
-          0,
-          0,
-          0,
-          0,
-          0,
-          1,
-          0,
-        ]),
+      return Opacity(
+        opacity: 0.60,
         child: card,
       );
     }

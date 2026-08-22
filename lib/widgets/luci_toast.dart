@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:yet_another_luci_app/design/luci_design_system.dart';
@@ -361,22 +360,24 @@ class LuciToastManager {
     final sanitized = _sanitizeToastText(title, subtitle);
     title = sanitized.title;
     subtitle = sanitized.subtitle;
+    final normalizedActionKey = actionKey?.toLowerCase();
 
     // Replace and dismiss any active keyed loading toast for this action key
-    if (actionKey != null && _activeKeyedToasts.containsKey(actionKey)) {
-      final oldKeyed = _activeKeyedToasts.remove(actionKey);
+    if (normalizedActionKey != null && _activeKeyedToasts.containsKey(normalizedActionKey)) {
+      final oldKeyed = _activeKeyedToasts.remove(normalizedActionKey);
       oldKeyed?.timeoutTimer.cancel();
       oldKeyed?.toastItem.dismiss();
-    } else if (type != LuciToastType.loading && _activeKeyedToasts.isNotEmpty) {
+    }
+    if (type != LuciToastType.loading && _activeKeyedToasts.isNotEmpty) {
       // Automatically cancel and dismiss all lingering loading timers when any result toast arrives
       dismissAllLoading();
     }
 
     // 1. Guardrail & Rate Limiting Check on Action Key if provided
-    if (actionKey != null && actionCooldown != null) {
-      if (ActionRateLimiter.isRateLimited(actionKey, cooldown: actionCooldown)) {
-        final remaining = ActionRateLimiter.getRemainingCooldown(actionKey, cooldown: actionCooldown);
-        final count = ActionRateLimiter.getSuppressionCount(actionKey);
+    if (normalizedActionKey != null && actionCooldown != null) {
+      if (ActionRateLimiter.isRateLimited(normalizedActionKey, cooldown: actionCooldown)) {
+        final remaining = ActionRateLimiter.getRemainingCooldown(normalizedActionKey, cooldown: actionCooldown);
+        final count = ActionRateLimiter.getSuppressionCount(normalizedActionKey);
         showRateLimited(
           context,
           actionName: title,
@@ -470,7 +471,7 @@ class LuciToastManager {
 
     // Context-Aware loading auto-timeout registration
     if (type == LuciToastType.loading) {
-      final effectiveKey = actionKey ?? '$title:${subtitle ?? ''}';
+      final effectiveKey = normalizedActionKey ?? '$title:${subtitle ?? ''}'.toLowerCase();
       final timeoutTimer = Timer(duration, () {
         if (_activeKeyedToasts.containsKey(effectiveKey)) {
           final item = _activeKeyedToasts.remove(effectiveKey);
@@ -531,6 +532,75 @@ class LuciToastManager {
       duration: timeout,
       actionKey: actionKey,
       useNativeOs: useNativeOs,
+    );
+  }
+
+  /// Safe helper for loading toasts that dynamically resolves mounted context across async gaps.
+  static void safeShowLoading(
+    BuildContext? context,
+    String title, {
+    String? subtitle,
+    String? actionKey,
+    Duration timeout = const Duration(seconds: 60),
+    bool? useNativeOs,
+  }) {
+    final ctx = (context != null && context.mounted) ? context : navigatorKey.currentContext;
+    if (ctx == null) return;
+    showLoading(
+      ctx,
+      title,
+      subtitle: subtitle,
+      actionKey: actionKey,
+      timeout: timeout,
+      useNativeOs: useNativeOs,
+    );
+  }
+
+  /// Safe helper for success toasts that dynamically resolves mounted context across async gaps.
+  static void safeShowSuccess(
+    BuildContext? context,
+    String title, {
+    String? subtitle,
+    Duration duration = const Duration(seconds: 3),
+    String? actionKey,
+    bool? useNativeOs,
+    bool showProgressBar = true,
+  }) {
+    final ctx = (context != null && context.mounted) ? context : navigatorKey.currentContext;
+    if (ctx == null) return;
+    showSuccess(
+      ctx,
+      title,
+      subtitle: subtitle,
+      duration: duration,
+      actionKey: actionKey,
+      useNativeOs: useNativeOs,
+      showProgressBar: showProgressBar,
+    );
+  }
+
+  /// Safe helper for error toasts that dynamically resolves mounted context across async gaps.
+  static void safeShowError(
+    BuildContext? context,
+    String title, {
+    String? subtitle,
+    Duration duration = const Duration(seconds: 5),
+    VoidCallback? onRetry,
+    String? actionKey,
+    bool? useNativeOs,
+    bool showProgressBar = true,
+  }) {
+    final ctx = (context != null && context.mounted) ? context : navigatorKey.currentContext;
+    if (ctx == null) return;
+    showError(
+      ctx,
+      title,
+      subtitle: subtitle,
+      duration: duration,
+      onRetry: onRetry,
+      actionKey: actionKey,
+      useNativeOs: useNativeOs,
+      showProgressBar: showProgressBar,
     );
   }
 
@@ -877,28 +947,24 @@ class _LuciToastWidgetState extends State<_LuciToastWidget> with TickerProviderS
                       onDismissed: (_) => _dismissToast(),
                       child: Material(
                         color: Colors.transparent,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: style.background,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: style.accent.withValues(alpha: isDark ? 0.35 : 0.22),
-                                  width: 1.0,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: theme.shadowColor.withValues(alpha: isDark ? 0.35 : 0.08),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: style.background,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: style.accent.withValues(alpha: isDark ? 0.35 : 0.22),
+                              width: 1.0,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: theme.shadowColor.withValues(alpha: isDark ? 0.35 : 0.08),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
                               ),
-                              clipBehavior: Clip.antiAlias,
-                              child: Column(
+                            ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Padding(
@@ -955,52 +1021,50 @@ class _LuciToastWidgetState extends State<_LuciToastWidget> with TickerProviderS
                                             ],
                                           ),
                                         ),
-                                        if (widget.onAction != null && widget.actionLabel != null) ...[
-                                          const SizedBox(width: 6),
-                                          TextButton(
-                                            style: TextButton.styleFrom(
-                                              foregroundColor: style.accent,
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                              minimumSize: Size.zero,
-                                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                            ),
-                                            onPressed: () {
-                                              widget.onAction!();
-                                              _dismissToast();
-                                            },
-                                            child: Text(
-                                              widget.actionLabel!,
-                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5),
-                                            ),
-                                          ),
-                                        ],
-                                        IconButton(
-                                          icon: Icon(Icons.close, size: 14, color: subtitleColor),
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                                          onPressed: _dismissToast,
-                                          tooltip: 'Dismiss',
+                                    if (widget.onAction != null && widget.actionLabel != null) ...[
+                                      const SizedBox(width: 6),
+                                      TextButton(
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: style.accent,
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          minimumSize: Size.zero,
+                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                         ),
-                                      ],
+                                        onPressed: () {
+                                          widget.onAction!();
+                                          _dismissToast();
+                                        },
+                                        child: Text(
+                                          widget.actionLabel!,
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5),
+                                        ),
+                                      ),
+                                    ],
+                                    IconButton(
+                                      icon: Icon(Icons.close, size: 14, color: subtitleColor),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                                      onPressed: _dismissToast,
+                                      tooltip: 'Dismiss',
                                     ),
-                                  ),
-                                  if (widget.showProgressBar && widget.type != LuciToastType.loading)
-                                    AnimatedBuilder(
-                                      animation: _progressController,
-                                      builder: (context, child) {
-                                        return LinearProgressIndicator(
-                                          value: _progressController.value,
-                                          minHeight: 1.8,
-                                          backgroundColor: Colors.transparent,
-                                          valueColor: AlwaysStoppedAnimation<Color>(
-                                            style.accent.withValues(alpha: 0.75),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
+                              if (widget.showProgressBar && widget.type != LuciToastType.loading)
+                                AnimatedBuilder(
+                                  animation: _progressController,
+                                  builder: (context, child) {
+                                    return LinearProgressIndicator(
+                                      value: _progressController.value,
+                                      minHeight: 1.8,
+                                      backgroundColor: Colors.transparent,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        style.accent.withValues(alpha: 0.75),
+                                      ),
+                                    );
+                                  },
+                                ),
+                            ],
                           ),
                         ),
                       ),

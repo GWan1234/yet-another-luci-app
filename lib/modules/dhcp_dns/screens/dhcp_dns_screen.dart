@@ -38,7 +38,7 @@ class DhcpDnsScreen extends ConsumerWidget {
           await appState.fetchClientsForSelectedRouter();
         },
         child: ListView(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0),
           children: [
             _buildSectionHeader(context, 'DNS Forwarders & Dnsmasq Config', Icons.dns_outlined),
             const SizedBox(height: 8),

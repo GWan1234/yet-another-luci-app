@@ -98,18 +98,22 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
     final isExcluded = appState.isExcludedGuestSection(iface.sectionName);
     final hasWriteAccess = (appState.capabilities?.hasUciWriteAccess ?? true) && appState.isAdministrativeUser;
 
+    final isDarkMode = theme.brightness == Brightness.dark;
+    final guestCardBg = isDarkMode ? const Color(0xFF231E16) : const Color(0xFFFFF9EE);
+    final guestBorderColor = isDarkMode ? Colors.amber.shade700.withValues(alpha: 0.45) : Colors.amber.shade400.withValues(alpha: 0.7);
+
     return Card(
-      elevation: isGuest ? 1 : 0,
-      color: isGuest ? theme.colorScheme.surfaceTint.withValues(alpha: 0.03) : null,
+      elevation: isGuest ? 1.5 : 0,
+      color: isGuest ? guestCardBg : theme.colorScheme.surfaceContainerLow,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         side: BorderSide(
           color: isGuest
-              ? Colors.amber.withValues(alpha: 0.7)
+              ? guestBorderColor
               : (iface.isEnabled
-                  ? theme.colorScheme.outlineVariant
-                  : theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
-          width: isGuest ? 1.5 : 1.0,
+                  ? theme.colorScheme.outlineVariant.withValues(alpha: 0.6)
+                  : theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+          width: isGuest ? 1.2 : 1.0,
         ),
       ),
       margin: const EdgeInsets.symmetric(vertical: 5.0),
@@ -117,31 +121,31 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
         children: [
           // Primary Card Header & Controls
           Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top Row: Icon + Full Unobstructed SSID Title + Master Toggle Switch
+                // Top Row: Icon + Full SSID Title + Client Count Badge + Master Switch Toggle
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(7.5),
                       decoration: BoxDecoration(
                         color: isGuest
-                            ? Colors.amber.shade800.withValues(alpha: 0.12)
+                            ? Colors.amber.shade800.withValues(alpha: 0.15)
                             : (iface.isEnabled
-                                ? theme.colorScheme.primaryContainer.withValues(alpha: 0.5)
-                                : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4)),
+                                ? theme.colorScheme.primaryContainer.withValues(alpha: 0.6)
+                                : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         isGuest
                             ? Icons.shield_moon_rounded
                             : (iface.isEnabled ? Icons.wifi : Icons.wifi_off_rounded),
-                        size: 20,
+                        size: 19,
                         color: isGuest
-                            ? Colors.amber.shade800
+                            ? (isDarkMode ? Colors.amber.shade400 : Colors.amber.shade900)
                             : (iface.isEnabled
                                 ? theme.colorScheme.primary
                                 : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
@@ -149,33 +153,66 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(
-                        iface.ssid,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          height: 1.2,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              iface.ssid,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                height: 1.2,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: iface.stations.isNotEmpty
+                                  ? (isGuest
+                                      ? Colors.amber.shade800.withValues(alpha: 0.15)
+                                      : theme.colorScheme.primary.withValues(alpha: 0.12))
+                                  : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${iface.stations.length} ${iface.stations.length == 1 ? 'client' : 'clients'}',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: iface.stations.isNotEmpty
+                                    ? (isGuest
+                                        ? (isDarkMode ? Colors.amber.shade300 : Colors.amber.shade900)
+                                        : theme.colorScheme.primary)
+                                    : theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Switch(
-                      value: iface.isEnabled,
-                      onChanged: hasWriteAccess
-                          ? widget.onToggleEnabled
-                          : (val) {
-                              context.showToastError('Read-only session: Wireless interface toggle is disabled.');
-                            },
+                    const SizedBox(width: 6),
+                    Transform.scale(
+                      scale: 0.85,
+                      child: Switch(
+                        value: iface.isEnabled,
+                        onChanged: hasWriteAccess
+                            ? widget.onToggleEnabled
+                            : (val) {
+                                context.showToastError('Read-only session: Wireless interface toggle is disabled.');
+                              },
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 2),
 
                 // Subtitle Info Line
                 Text(
-                  'Section: ${iface.sectionName} (${iface.ifName}) • ${iface.stations.length} ${iface.stations.length == 1 ? 'client' : 'clients'} connected',
+                  'Section: ${iface.sectionName} (${iface.ifName})',
                   style: TextStyle(
                     fontSize: 11,
                     color: theme.colorScheme.onSurfaceVariant,
@@ -183,105 +220,105 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
 
-                // Responsive Badges & Actions Bar (Guaranteed No Overflow)
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
+                // Responsive Badges & Actions Bar (Compact Row)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     // Left Badges Group
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        if (!iface.isEnabled)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.red.withValues(alpha: 0.4)),
-                            ),
-                            child: const Text(
-                              'DISABLED',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.red,
+                    Expanded(
+                      child: Wrap(
+                        spacing: 5,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          if (!iface.isEnabled)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(5),
+                                border: Border.all(color: Colors.red.withValues(alpha: 0.4)),
+                              ),
+                              child: const Text(
+                                'DISABLED',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.red,
+                                ),
                               ),
                             ),
-                          ),
-                        if (isGuest)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.shade800.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.amber.shade800.withValues(alpha: 0.4)),
+                          if (isGuest)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.shade800.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(5),
+                                border: Border.all(color: Colors.amber.shade800.withValues(alpha: 0.4)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.shield_moon_rounded, size: 10, color: isDarkMode ? Colors.amber.shade300 : Colors.amber.shade900),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'Guest Network',
+                                    style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.amber.shade300 : Colors.amber.shade900),
+                                  ),
+                                ],
+                              ),
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.shield_moon_rounded, size: 11, color: Colors.amber.shade900),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Guest Network',
-                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
-                                ),
-                              ],
-                            ),
-                          ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                          decoration: BoxDecoration(
-                            color: iface.securityMode.badgeColor.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: iface.securityMode.badgeColor.withValues(alpha: 0.3)),
-                          ),
-                          child: Text(
-                            iface.securityMode.shortBadgeLabel,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: iface.securityMode.badgeColor,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.8),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            iface.mode,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSecondaryContainer,
-                            ),
-                          ),
-                        ),
-                        if (iface.isHidden)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.grey.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(4),
+                              color: iface.securityMode.badgeColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(5),
+                              border: Border.all(color: iface.securityMode.badgeColor.withValues(alpha: 0.3)),
                             ),
-                            child: const Text(
-                              'HIDDEN',
-                              style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.grey),
+                            child: Text(
+                              iface.securityMode.shortBadgeLabel,
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: iface.securityMode.badgeColor,
+                              ),
                             ),
                           ),
-                      ],
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.8),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              iface.mode,
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSecondaryContainer,
+                              ),
+                            ),
+                          ),
+                          if (iface.isHidden)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'HIDDEN',
+                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
 
-                    // Right Action Buttons Row
+                    // Right Action Buttons Row (Ultra-Compact)
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -289,12 +326,12 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                         IconButton(
                           icon: Icon(
                             Icons.edit_outlined,
-                            size: 18,
+                            size: 17,
                             color: hasWriteAccess ? null : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
                           ),
                           tooltip: hasWriteAccess ? 'Edit Security & Parameters' : 'Edit Restricted (Read-Only)',
                           visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.all(4),
+                          padding: const EdgeInsets.all(3),
                           constraints: const BoxConstraints(),
                           onPressed: () {
                             if (!hasWriteAccess) {
@@ -304,27 +341,27 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                             _showEditSsidDialog(context);
                           },
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 2),
                         // Quick QR Code Button
                         IconButton(
-                          icon: const Icon(Icons.qr_code_rounded, size: 18),
+                          icon: const Icon(Icons.qr_code_rounded, size: 17),
                           tooltip: 'Show Wi-Fi QR Code',
                           visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.all(4),
+                          padding: const EdgeInsets.all(3),
                           constraints: const BoxConstraints(),
                           onPressed: () => _showQrCodeDialog(context),
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 2),
                         // Delete Interface Button
                         IconButton(
                           icon: Icon(
                             Icons.delete_outline_rounded,
-                            size: 18,
+                            size: 17,
                             color: hasWriteAccess ? Colors.redAccent : Colors.grey,
                           ),
                           tooltip: hasWriteAccess ? 'Delete Virtual Interface' : 'Delete Restricted (Read-Only)',
                           visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.all(4),
+                          padding: const EdgeInsets.all(3),
                           constraints: const BoxConstraints(),
                           onPressed: () {
                             if (!hasWriteAccess) {
@@ -334,17 +371,19 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                             _confirmDeleteInterface();
                           },
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 2),
                         // Tagging & Override Popup Menu
                         PopupMenuButton<String>(
                           icon: Icon(
                             (isCustomTagged || isExcluded) ? Icons.bookmark_rounded : Icons.more_vert_rounded,
-                            size: 18,
+                            size: 17,
                             color: isCustomTagged
                                 ? Colors.amber.shade800
                                 : (isExcluded ? theme.colorScheme.primary : null),
                           ),
                           tooltip: 'More Options',
+                          padding: const EdgeInsets.all(3),
+                          constraints: const BoxConstraints(),
                           onSelected: (val) {
                             if (val == 'mark_guest') {
                               appState.markAsGuestSection(iface.sectionName);
@@ -393,15 +432,16 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                               ),
                           ],
                         ),
+                        const SizedBox(width: 2),
                         // Expand Details Toggle Button
                         IconButton(
                           icon: Icon(
                             _isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                            size: 20,
+                            size: 19,
                           ),
                           tooltip: _isExpanded ? 'Collapse Details' : 'Expand Details',
                           visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.all(4),
+                          padding: const EdgeInsets.all(3),
                           constraints: const BoxConstraints(),
                           onPressed: () => setState(() => _isExpanded = !_isExpanded),
                         ),

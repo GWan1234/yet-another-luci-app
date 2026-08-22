@@ -769,24 +769,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         children: [
           // Elegant Matte Network Topology Mesh Background Graphic
           Positioned.fill(
-            child: CustomPaint(
-              painter: _NetworkTopologyMeshPainter(meshColor: meshColor),
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: _NetworkTopologyMeshPainter(meshColor: meshColor),
+              ),
             ),
           ),
 
           SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final viewInsetsBottom = MediaQuery.of(context).viewInsets.bottom;
-                final isKeyboardOpen = viewInsetsBottom > 0;
-                final isConstrained = constraints.maxHeight < 580;
-                final shouldAllowScroll = isKeyboardOpen || isConstrained;
-
                 return SingleChildScrollView(
                   controller: _scrollController,
-                  physics: shouldAllowScroll
-                      ? const ClampingScrollPhysics()
-                      : const NeverScrollableScrollPhysics(),
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
                   keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
@@ -794,7 +791,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   ),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight - 36,
+                      minHeight: (constraints.maxHeight - 36).clamp(0.0, double.infinity),
                       maxWidth: 420,
                     ),
                     child: IntrinsicHeight(
@@ -860,27 +857,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                       width: 1,
                                     ),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        width: 6,
-                                        height: 6,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: primaryColor,
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 6,
+                                          height: 6,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: primaryColor,
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'DIRECT LAN CONNECTION',
-                                        style: theme.textTheme.labelSmall?.copyWith(
-                                          color: primaryColor,
-                                          fontWeight: FontWeight.w700,
-                                          letterSpacing: 0.6,
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'DIRECT LAN CONNECTION',
+                                          style: theme.textTheme.labelSmall?.copyWith(
+                                            color: primaryColor,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.6,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
 
@@ -997,8 +997,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                         controller: _ipController,
                                         focusNode: _ipFocusNode,
                                         keyboardType: TextInputType.url,
-                                        scrollPadding: EdgeInsets.only(
-                                          bottom: viewInsetsBottom + 120.0,
+                                        scrollPadding: const EdgeInsets.only(
+                                          bottom: 100.0,
                                           top: 20.0,
                                         ),
                                         autofillHints: _getRouterAddressAutofillHints(),
@@ -1128,8 +1128,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                         controller: _usernameController,
                                         focusNode: _usernameFocusNode,
                                         keyboardType: TextInputType.text,
-                                        scrollPadding: EdgeInsets.only(
-                                          bottom: viewInsetsBottom + 120.0,
+                                        scrollPadding: const EdgeInsets.only(
+                                          bottom: 100.0,
                                           top: 20.0,
                                         ),
                                         autofillHints: const [
@@ -1186,8 +1186,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                         focusNode: _passwordFocusNode,
                                         obscureText: !_passwordVisible,
                                         keyboardType: TextInputType.visiblePassword,
-                                        scrollPadding: EdgeInsets.only(
-                                          bottom: viewInsetsBottom + 120.0,
+                                        scrollPadding: const EdgeInsets.only(
+                                          bottom: 100.0,
                                           top: 20.0,
                                         ),
                                         autofillHints: const [
@@ -1317,23 +1317,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                                     strokeWidth: 2.5,
                                                     color: colorScheme.onPrimary,
                                                   )
-                                                : Row(
-                                                    mainAxisAlignment: MainAxisAlignment.center,
-                                                    children: const [
-                                                      Icon(
-                                                        Icons.arrow_forward_rounded,
-                                                        size: 18,
-                                                      ),
-                                                      SizedBox(width: 8),
-                                                      Text(
-                                                        'CONNECT TO ROUTER',
-                                                        style: TextStyle(
-                                                          fontSize: 15,
-                                                          fontWeight: FontWeight.bold,
-                                                          letterSpacing: 0.6,
+                                                : FittedBox(
+                                                    fit: BoxFit.scaleDown,
+                                                    child: Row(
+                                                      mainAxisAlignment: MainAxisAlignment.center,
+                                                      children: const [
+                                                        Icon(
+                                                          Icons.arrow_forward_rounded,
+                                                          size: 18,
                                                         ),
-                                                      ),
-                                                    ],
+                                                        SizedBox(width: 8),
+                                                        Text(
+                                                          'CONNECT TO ROUTER',
+                                                          style: TextStyle(
+                                                            fontSize: 15,
+                                                            fontWeight: FontWeight.bold,
+                                                            letterSpacing: 0.6,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
                                           ),
                                         );
@@ -1394,7 +1397,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             ),
                           ),
 
-                          const Spacer(),
+                          const SizedBox(height: 20),
                           const SizedBox(height: 14),
 
                           // Need Help Link

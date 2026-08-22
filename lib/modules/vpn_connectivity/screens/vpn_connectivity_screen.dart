@@ -182,7 +182,7 @@ class VpnConnectivityScreen extends ConsumerWidget {
           await appState.fetchDashboardData();
         },
         child: ListView(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0),
           children: children,
         ),
       ),

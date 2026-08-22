@@ -23,34 +23,60 @@ class NetworkTopologyCard extends StatelessWidget {
 
     if (topology == null || !topology!.isAvailable) {
       return Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
         shape: RoundedRectangleBorder(
           borderRadius: LuciCardStyles.standardRadius,
-          side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+          side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.2)),
         ),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
         child: Padding(
-          padding: const EdgeInsets.all(LuciSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+          child: Row(
             children: [
-              Icon(Icons.router_outlined, color: colorScheme.onSurfaceVariant, size: 36),
-              const SizedBox(height: LuciSpacing.xs),
-              Text(
-                'Switch Topology Unavailable',
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.hub_outlined, color: colorScheme.onSurfaceVariant, size: 18),
               ),
-              const SizedBox(height: 4),
-              Text(
-                topology?.errorMessage ?? 'The router capabilities profile does not support active switch/VLAN topology probing.',
-                style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                textAlign: TextAlign.center,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Switch Topology Unavailable',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      topology?.errorMessage ?? 'Configuration payload empty or probing unsupported.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
               if (onRetry != null) ...[
-                const SizedBox(height: LuciSpacing.xs),
-                TextButton.icon(
+                const SizedBox(width: 8),
+                IconButton(
                   onPressed: onRetry,
-                  icon: const Icon(Icons.refresh, size: 16),
-                  label: const Text('Re-probe Capabilities'),
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  tooltip: 'Re-probe Capabilities',
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.all(4),
+                  constraints: const BoxConstraints(),
+                  color: colorScheme.primary,
                 ),
               ],
             ],
@@ -61,27 +87,47 @@ class NetworkTopologyCard extends StatelessWidget {
 
     if (topology!.isZeroVlans) {
       return Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
         shape: RoundedRectangleBorder(
           borderRadius: LuciCardStyles.standardRadius,
-          side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+          side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.2)),
         ),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
         child: Padding(
-          padding: const EdgeInsets.all(LuciSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
+          child: Row(
             children: [
-              Icon(Icons.lan_outlined, color: colorScheme.primary, size: 36),
-              const SizedBox(height: LuciSpacing.xs),
-              Text(
-                'Flat Network (0 Configured VLANs)',
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.lan_outlined, color: colorScheme.primary, size: 18),
               ),
-              const SizedBox(height: 4),
-              Text(
-                'This router uses a single unsegmented ${topology!.modelType == NetworkModel.dsa ? "DSA bridge" : "switch"} interface.',
-                style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                textAlign: TextAlign.center,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Flat Network (0 Configured VLANs)',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Router uses a single unsegmented ${topology!.modelType == NetworkModel.dsa ? "DSA bridge" : "switch"} interface.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

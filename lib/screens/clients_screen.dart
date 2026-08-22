@@ -19,7 +19,8 @@ import 'package:yet_another_luci_app/utils/self_device_guard.dart';
 import 'package:yet_another_luci_app/utils/os_platform_integration.dart';
 import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 import 'package:yet_another_luci_app/widgets/add_static_lease_dialog.dart';
-import 'restricted_clients_screen.dart';
+import 'package:yet_another_luci_app/widgets/ban_wireless_client_dialog.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:yet_another_luci_app/modules/dhcp_dns/models/dhcp_dns_info.dart';
 import 'package:yet_another_luci_app/modules/wireless_management/models/wireless_info.dart';
 
@@ -49,6 +50,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
   dynamic _lastDashboardUpdated;
   bool _showOnlyActiveConnected = false;
   ClientCategoryFilter _categoryFilter = ClientCategoryFilter.all;
+  bool _hasSeenRestrictedTooltip = true;
 
   @override
   void initState() {
@@ -66,6 +68,29 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
     _lastDashboardUpdated = initState.dashboardData?['_lastUpdated'];
     _computeClientsFuture();
     _startAutoRefreshTimer();
+    _checkRestrictedTooltipState();
+  }
+
+  Future<void> _checkRestrictedTooltipState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final seen = prefs.getBool('has_seen_restricted_clients_tooltip') ?? false;
+      if (mounted) {
+        setState(() {
+          _hasSeenRestrictedTooltip = seen;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _dismissRestrictedTooltip() async {
+    setState(() {
+      _hasSeenRestrictedTooltip = true;
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('has_seen_restricted_clients_tooltip', true);
+    } catch (_) {}
   }
 
   void _startAutoRefreshTimer() {
@@ -152,26 +177,8 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
         }
         final aggregatedClients = (snapshot.hasData && snapshot.data != null) ? snapshot.data! : _cachedClients;
         return Scaffold(
-          appBar: LuciAppBar(
+          appBar: const LuciAppBar(
             title: 'Clients',
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.shield_outlined),
-                tooltip: 'Restricted & Banned Clients',
-                onPressed: () async {
-                  await Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const RestrictedClientsScreen(),
-                    ),
-                  );
-                  if (mounted) {
-                    setState(() {
-                      _computeClientsFuture();
-                    });
-                  }
-                },
-              ),
-            ],
           ),
           body: Stack(
             children: [
@@ -235,18 +242,50 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                     }
 
                     final clients = aggregatedClients;
-                    final filteredClients = clients.where((client) {
-                      if (_showOnlyActiveConnected && !client.isConnected) {
-                        return false;
+
+                    // Include synthetic client entries for banned/paused MACs that are not in aggregatedClients
+                    final allBannedMacs = <String>{...appState.bannedWirelessMacs, ...appState.pausedInternetMacs};
+                    final existingMacs = clients.map((c) => c.macAddress.toUpperCase().replaceAll('-', ':')).toSet();
+
+                    final extraBannedClients = <Client>[];
+                    for (final mac in allBannedMacs) {
+                      final normMac = mac.toUpperCase().replaceAll('-', ':');
+                      if (!existingMacs.contains(normMac)) {
+                        extraBannedClients.add(Client(
+                          ipAddress: 'N/A',
+                          macAddress: normMac,
+                          hostname: normMac,
+                          isConnected: false,
+                          connectionType: ConnectionType.wireless,
+                        ));
                       }
-                      if (_categoryFilter == ClientCategoryFilter.wired &&
-                          (!client.isConnected || client.connectionType != ConnectionType.wired)) {
-                        return false;
+                    }
+
+                    final allClientsForView = [...clients, ...extraBannedClients];
+
+                    final filteredClients = allClientsForView.where((client) {
+                      final normMac = client.macAddress.toUpperCase().replaceAll('-', ':');
+                      final isBannedOrPaused = appState.isWirelessBanned(normMac) || appState.isInternetPaused(normMac);
+
+                      if (_categoryFilter == ClientCategoryFilter.banned) {
+                        if (!isBannedOrPaused) return false;
+                      } else {
+                        // Exclude banned/paused clients from Total, Wired, Wireless options
+                        if (isBannedOrPaused) return false;
+
+                        if (_showOnlyActiveConnected && !client.isConnected) {
+                          return false;
+                        }
+                        if (_categoryFilter == ClientCategoryFilter.wired &&
+                            (!client.isConnected || client.connectionType != ConnectionType.wired)) {
+                          return false;
+                        }
+                        if (_categoryFilter == ClientCategoryFilter.wireless &&
+                            (!client.isConnected || client.connectionType != ConnectionType.wireless)) {
+                          return false;
+                        }
                       }
-                      if (_categoryFilter == ClientCategoryFilter.wireless &&
-                          (!client.isConnected || client.connectionType != ConnectionType.wireless)) {
-                        return false;
-                      }
+
                       final query = _searchQuery.toLowerCase();
                       return client.displayName.toLowerCase().contains(query) ||
                           client.hostname.toLowerCase().contains(query) ||
@@ -262,6 +301,64 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
 
                     return Column(
                       children: [
+                        if (!_hasSeenRestrictedTooltip)
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+                            padding: const EdgeInsets.all(12.0),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primaryContainer.withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(16.0),
+                              border: Border.all(
+                                color: colorScheme.primary.withValues(alpha: 0.3),
+                                width: 1.2,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primary.withValues(alpha: 0.15),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.shield_rounded,
+                                    color: colorScheme.primary,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Banned Clients Hub',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12.5,
+                                          color: colorScheme.onPrimaryContainer,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'All banned Wi-Fi devices and internet-paused clients are automatically moved to the Banned Clients section. Tap the "Banned" count in the summary bar to view and manage them.',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: colorScheme.onPrimaryContainer.withValues(alpha: 0.85),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close, size: 18),
+                                  onPressed: _dismissRestrictedTooltip,
+                                  tooltip: 'Dismiss hint',
+                                ),
+                              ],
+                            ),
+                          ),
                         Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 16.0,
@@ -351,16 +448,22 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                         Expanded(
                           child: filteredClients.isEmpty
                               ? LuciEmptyState(
-                                  title: _searchQuery.isEmpty
-                                      ? 'No Active Clients Found'
-                                      : 'No Matching Clients',
-                                  message: _searchQuery.isEmpty
-                                      ? 'No clients are currently connected to the router. Pull down to refresh the list.'
-                                      : 'No clients match your search criteria. Try a different search term.',
-                                  icon: Icons.people_outline,
+                                  title: _categoryFilter == ClientCategoryFilter.banned
+                                      ? 'No Banned Clients'
+                                      : (_searchQuery.isEmpty
+                                          ? 'No Active Clients Found'
+                                          : 'No Matching Clients'),
+                                  message: _categoryFilter == ClientCategoryFilter.banned
+                                      ? 'No clients are currently banned from Wi-Fi or internet access.'
+                                      : (_searchQuery.isEmpty
+                                          ? 'No clients are currently connected to the router. Pull down to refresh the list.'
+                                          : 'No clients match your search criteria. Try a different search term.'),
+                                  icon: _categoryFilter == ClientCategoryFilter.banned
+                                      ? Icons.shield_outlined
+                                      : Icons.people_outline,
                                 )
                               : ListView.separated(
-                                  padding: const EdgeInsets.only(bottom: 16),
+                                  padding: const EdgeInsets.only(bottom: 100),
                                   // ignore: deprecated_member_use
                                   cacheExtent: 500.0,
                                   keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -382,46 +485,48 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                                         .contains(client.macAddress);
 
                                     final isIpv6Expanded = _expandedIpv6Macs.contains(client.macAddress);
-                                    return Padding(
-                                      key: ValueKey<String>(client.macAddress),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 16.0,
-                                        vertical: 8.0,
-                                      ),
-                                      child: _UnifiedClientCard(
-                                        client: client,
-                                        isExpanded: isExpanded,
-                                        isIpv6Expanded: isIpv6Expanded,
-                                        allClients: clients,
-                                        onRefreshNeeded: () {
-                                          setState(() {
-                                            _computeClientsFuture();
-                                          });
-                                        },
-                                        onToggleIpv6: () {
-                                          setState(() {
-                                            if (isIpv6Expanded) {
-                                              _expandedIpv6Macs.remove(client.macAddress);
-                                            } else {
-                                              _expandedIpv6Macs.add(client.macAddress);
-                                            }
-                                          });
-                                        },
-                                        onTap: () {
-                                          setState(() {
-                                            if (isExpanded) {
-                                              _expandedClientMacs.remove(
-                                                client.macAddress,
-                                              );
-                                            } else {
-                                              _expandedClientMacs.add(
-                                                client.macAddress,
-                                              );
-                                            }
-                                          });
-                                        },
-                                      ),
-                                    );
+                                     return RepaintBoundary(
+                                       key: ValueKey<String>(client.macAddress),
+                                       child: Padding(
+                                         padding: const EdgeInsets.symmetric(
+                                           horizontal: 16.0,
+                                           vertical: 8.0,
+                                         ),
+                                         child: _UnifiedClientCard(
+                                           client: client,
+                                           isExpanded: isExpanded,
+                                           isIpv6Expanded: isIpv6Expanded,
+                                           allClients: clients,
+                                           onRefreshNeeded: () {
+                                             setState(() {
+                                               _computeClientsFuture();
+                                             });
+                                           },
+                                           onToggleIpv6: () {
+                                             setState(() {
+                                               if (isIpv6Expanded) {
+                                                 _expandedIpv6Macs.remove(client.macAddress);
+                                               } else {
+                                                 _expandedIpv6Macs.add(client.macAddress);
+                                               }
+                                             });
+                                           },
+                                           onTap: () {
+                                             setState(() {
+                                               if (isExpanded) {
+                                                 _expandedClientMacs.remove(
+                                                   client.macAddress,
+                                                 );
+                                               } else {
+                                                 _expandedClientMacs.add(
+                                                   client.macAddress,
+                                                 );
+                                               }
+                                             });
+                                           },
+                                         ),
+                                       ),
+                                     );
                                   },
                                 ),
                         ),
@@ -443,12 +548,19 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
     ColorScheme colorScheme,
     TextTheme textTheme,
   ) {
-    final totalCount = _showOnlyActiveConnected
-        ? clients.where((c) => c.isConnected).length
-        : clients.length;
+    final appState = ref.watch(appStateProvider);
+    final unbannedClients = clients.where((c) {
+      final normMac = c.macAddress.toUpperCase().replaceAll('-', ':');
+      return !appState.isWirelessBanned(normMac) && !appState.isInternetPaused(normMac);
+    }).toList();
 
-    final wiredCount = clients.where((c) => c.isConnected && c.connectionType == ConnectionType.wired).length;
-    final wirelessCount = clients.where((c) => c.isConnected && c.connectionType == ConnectionType.wireless).length;
+    final totalCount = _showOnlyActiveConnected
+        ? unbannedClients.where((c) => c.isConnected).length
+        : unbannedClients.length;
+
+    final wiredCount = unbannedClients.where((c) => c.isConnected && c.connectionType == ConnectionType.wired).length;
+    final wirelessCount = unbannedClients.where((c) => c.isConnected && c.connectionType == ConnectionType.wireless).length;
+    final bannedCount = appState.pausedInternetMacs.length + appState.bannedWirelessMacs.length;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
@@ -506,6 +618,22 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                 onTap: () {
                   setState(() {
                     _categoryFilter = ClientCategoryFilter.wireless;
+                  });
+                },
+                colorScheme: colorScheme,
+              ),
+            ),
+            Container(width: 1, height: 20, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+            Expanded(
+              child: _buildSummaryItem(
+                icon: Icons.block_rounded,
+                label: 'Banned',
+                count: bannedCount,
+                color: bannedCount > 0 ? Colors.red : colorScheme.onSurfaceVariant,
+                isSelected: _categoryFilter == ClientCategoryFilter.banned,
+                onTap: () {
+                  setState(() {
+                    _categoryFilter = ClientCategoryFilter.banned;
                   });
                 },
                 colorScheme: colorScheme,
@@ -1193,13 +1321,10 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                 final isPaused = appState.isInternetPaused(client.macAddress);
                 final isBanned = appState.isWirelessBanned(client.macAddress);
                 final canPause = client.isConnected || isPaused;
-                final isWireless = client.connectionType == ConnectionType.wireless ||
-                    (client.ssid != null && client.ssid!.isNotEmpty) ||
-                    (client.wirelessIface != null && client.wirelessIface!.isNotEmpty);
 
                 final actionButtons = <Widget>[];
 
-                // 0. Unban Client (if currently banned)
+                // 0. Unban & Edit Ban Controls (if currently banned)
                 if (isBanned) {
                   actionButtons.add(
                     OutlinedButton.icon(
@@ -1218,6 +1343,27 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                         minimumSize: const Size(0, 32),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         side: BorderSide(color: Colors.blue.shade400, width: 0.9),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  );
+                  actionButtons.add(
+                    OutlinedButton.icon(
+                      onPressed: () => _banWirelessClient(context, client),
+                      icon: const Icon(Icons.timer_outlined, size: 14, color: Colors.orange),
+                      label: const Text(
+                        'Edit Ban',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: const Size(0, 32),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        side: BorderSide(color: Colors.orange.shade400, width: 0.9),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                     ),
@@ -1256,14 +1402,14 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                   );
                 }
 
-                // 2. Disconnect / Kick Wireless Client
-                if (isWireless && !isBanned) {
+                // 2. Ban Client (Available for all active & DHCP clients)
+                if (!isBanned) {
                   actionButtons.add(
                     OutlinedButton.icon(
-                      onPressed: () => _kickWirelessClient(context, client),
-                      icon: const Icon(Icons.wifi_off_rounded, size: 14, color: Colors.orange),
+                      onPressed: () => _banWirelessClient(context, client),
+                      icon: const Icon(Icons.block_rounded, size: 14, color: Colors.orange),
                       label: const Text(
-                        'Kick Client',
+                        'Ban Client',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -1517,124 +1663,97 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
       context: context,
     );
 
-    if (!context.mounted) return;
-
     if (success) {
-      context.showToastSuccess(
-        'Internet ${pause ? "Paused" : "Restored"}',
-        subtitle: 'Target: ${client.displayName}',
-        actionKey: actionKey,
-      );
-    } else {
-      context.showToastError(
-        'Failed to ${pause ? "pause" : "resume"} internet',
-        subtitle: 'Target: ${client.displayName}',
-        actionKey: actionKey,
-      );
-    }
-    setState(() {});
-  }
-
-  Future<void> _kickWirelessClient(BuildContext context, Client client) async {
-    final safe = await SelfDeviceGuard.checkSelfActionGuardrail(
-      context,
-      actionName: 'Disconnect / Kick Wireless Client',
-      targetMac: client.macAddress,
-      targetIp: client.ipAddress,
-      targetHostname: client.displayName,
-    );
-    if (!safe || !context.mounted) return;
-
-    final actionKey = 'kick_client_${client.macAddress}';
-    if (ActionRateLimiter.isRateLimited(actionKey, cooldown: const Duration(seconds: 2))) {
-      final remaining = ActionRateLimiter.getRemainingCooldown(actionKey, cooldown: const Duration(seconds: 2));
-      context.showToastRateLimited('Kick Client (${client.displayName})', remaining);
-      return;
-    }
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.wifi_off_rounded, color: Colors.orange, size: 24),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Disconnect Wireless Device?',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          'Are you sure you want to disconnect "${client.displayName}" (${client.macAddress}) from Wi-Fi${client.ssid != null && client.ssid!.isNotEmpty ? " '${client.ssid}'" : ""}? Device will be deauthenticated from the router.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton.icon(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            icon: const Icon(Icons.wifi_off_rounded, size: 16),
-            label: const Text('Disconnect Device'),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.orange.shade800,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && context.mounted) {
-      context.showToastLoading(
-        'Disconnecting ${client.displayName}...',
-        subtitle: 'Target SSID: ${client.ssid ?? "Wireless"}',
-        actionKey: actionKey,
-      );
-
-      final appState = AppState.instance;
-      final success = await appState.disconnectWirelessClient(
-        client.macAddress,
-        iface: client.wirelessIface,
-        context: context,
-      );
-
-      if (!context.mounted) return;
-
-      if (success) {
-        context.showToastSuccess(
-          'Disconnected ${client.displayName}',
-          subtitle: 'Deauthenticated from Wi-Fi',
+      if (context.mounted) {
+        LuciToastManager.safeShowSuccess(
+          context,
+          'Internet ${pause ? "Paused" : "Restored"}',
+          subtitle: 'Target: ${client.displayName}',
           actionKey: actionKey,
         );
-        widget.onRefreshNeeded();
-      } else {
-        context.showToastError(
-          'Failed to disconnect ${client.displayName}',
-          subtitle: 'Target MAC: ${client.macAddress}',
+      }
+    } else {
+      if (context.mounted) {
+        LuciToastManager.safeShowError(
+          context,
+          'Failed to ${pause ? "pause" : "resume"} internet',
+          subtitle: 'Target: ${client.displayName}',
           actionKey: actionKey,
         );
       }
     }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _banWirelessClient(BuildContext context, Client client) async {
+    final isBanned = AppState.instance.isWirelessBanned(client.macAddress);
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => BanWirelessClientDialog(
+        macAddress: client.macAddress,
+        displayName: client.displayName,
+        ipAddress: client.ipAddress,
+        ssid: client.ssid,
+        iface: client.wirelessIface,
+        isAlreadyBanned: isBanned,
+        onUnbanConfirmed: () async {
+          await _unbanWirelessClient(context, client);
+        },
+        onBanConfirmed: (int banTimeSeconds) async {
+          final actionKey = 'ban_client_${client.macAddress}';
+          if (ActionRateLimiter.isRateLimited(actionKey, cooldown: const Duration(seconds: 2))) {
+            final remaining = ActionRateLimiter.getRemainingCooldown(actionKey, cooldown: const Duration(seconds: 2));
+            if (context.mounted) context.showToastRateLimited('Ban Client (${client.displayName})', remaining);
+            return;
+          }
+
+          if (context.mounted) {
+            context.showToastLoading(
+              'Banning ${client.displayName}...',
+              subtitle: 'Setting hostapd ban for ${(banTimeSeconds / 60).round()} mins',
+              actionKey: actionKey,
+            );
+          }
+
+          final appState = AppState.instance;
+          final success = await appState.banWirelessClient(
+            client.macAddress,
+            iface: client.wirelessIface,
+            banTimeSeconds: banTimeSeconds,
+            context: context.mounted ? context : null,
+          );
+
+          if (success) {
+            if (context.mounted) {
+              LuciToastManager.safeShowSuccess(
+                context,
+                'Banned ${client.displayName}',
+                subtitle: 'Deauthenticated & blocked from Wi-Fi association',
+                actionKey: actionKey,
+              );
+              widget.onRefreshNeeded();
+            }
+          } else {
+            if (context.mounted) {
+              LuciToastManager.safeShowError(
+                context,
+                'Failed to ban ${client.displayName}',
+                subtitle: 'Target MAC: ${client.macAddress}',
+                actionKey: actionKey,
+              );
+            }
+          }
+        },
+      ),
+    );
   }
 
   Future<void> _unbanWirelessClient(BuildContext context, Client client) async {
     final actionKey = 'unban_client_${client.macAddress}';
     if (ActionRateLimiter.isRateLimited(actionKey, cooldown: const Duration(seconds: 2))) {
       final remaining = ActionRateLimiter.getRemainingCooldown(actionKey, cooldown: const Duration(seconds: 2));
-      context.showToastRateLimited('Unban Client (${client.displayName})', remaining);
+      if (context.mounted) context.showToastRateLimited('Unban Client (${client.displayName})', remaining);
       return;
     }
 
@@ -1683,28 +1802,33 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
       ),
     );
 
-    if (confirmed != true || !context.mounted) return;
+    if (confirmed != true) return;
 
     final appState = AppState.instance;
-    context.showToastLoading(
-      'Unbanning ${client.displayName}...',
-      actionKey: actionKey,
-    );
+    if (context.mounted) {
+      LuciToastManager.safeShowLoading(
+        context,
+        'Unbanning ${client.displayName}...',
+        actionKey: actionKey,
+      );
+    }
 
     final success = await appState.unbanWirelessClient(
       client.macAddress,
-      context: context,
+      context: context.mounted ? context : null,
     );
-
-    if (!context.mounted) return;
 
     if (success) {
       unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
-      context.showToastSuccess('${client.displayName} unbanned successfully.', actionKey: actionKey);
-      widget.onRefreshNeeded();
+      if (context.mounted) {
+        LuciToastManager.safeShowSuccess(context, '${client.displayName} unbanned successfully.', actionKey: actionKey);
+        widget.onRefreshNeeded();
+      }
     } else {
       unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
-      context.showToastError('Failed to unban ${client.displayName}.', actionKey: actionKey);
+      if (context.mounted) {
+        LuciToastManager.safeShowError(context, 'Failed to unban ${client.displayName}.', actionKey: actionKey);
+      }
     }
   }
 

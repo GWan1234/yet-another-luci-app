@@ -1,7 +1,7 @@
 // Copyright 2026 Tuhin Garai. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-enum ClientCategoryFilter { all, wired, wireless }
+enum ClientCategoryFilter { all, wired, wireless, banned }
 
 enum ConnectionType { wired, wireless, unknown }
 

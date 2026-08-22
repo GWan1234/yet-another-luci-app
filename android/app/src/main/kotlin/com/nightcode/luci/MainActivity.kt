@@ -17,6 +17,18 @@ class MainActivity : FlutterActivity() {
         setupEdgeToEdge()
     }
 
+    override fun onResume() {
+        super.onResume()
+        unlockHighRefreshRate()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            unlockHighRefreshRate()
+        }
+    }
+
     private fun unlockHighRefreshRate() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {

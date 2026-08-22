@@ -12,7 +12,6 @@ import 'package:yet_another_luci_app/modules/services_system/models/ddns_info.da
 import 'package:yet_another_luci_app/services/interfaces/api_service_interface.dart';
 import '../utils/http_client_manager.dart';
 import '../utils/logger.dart';
-import '../widgets/luci_toast.dart';
 
 class LoginResult {
   final String? token;
@@ -995,6 +994,25 @@ class RealApiService implements IApiService {
   }
 
   @override
+  Future<dynamic> uciRevert(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String config,
+    BuildContext? context,
+  }) async {
+    return await callWithContext(
+      ipAddress,
+      sysauth,
+      useHttps,
+      object: 'uci',
+      method: 'revert',
+      params: {'config': config},
+      context: context,
+    );
+  }
+
+  @override
   Future<List<String>> fetchNetworkInterfaces({
     required String ipAddress,
     required String sysauth,
@@ -1022,10 +1040,8 @@ class RealApiService implements IApiService {
         });
         return interfaces;
       }
-      return ['lan', 'wan', 'guest'];
-    } catch (e) {
-      return ['lan', 'wan', 'guest'];
-    }
+    } catch (_) {}
+    return ['lan', 'wan', 'guest'];
   }
 
   @override
@@ -1083,6 +1099,7 @@ class RealApiService implements IApiService {
     BuildContext? context,
   }) async {
     try {
+      final mCtx = mountedContext(context);
       final setRes = await uciSet(
         ipAddress,
         sysauth,
@@ -1090,9 +1107,10 @@ class RealApiService implements IApiService {
         config: 'wireless',
         section: ifaceSection,
         values: {'disabled': enabled ? '0' : '1'},
-        context: context,
+        context: mCtx,
       );
       if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) {
+        await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
         return false;
       }
 
@@ -1101,9 +1119,10 @@ class RealApiService implements IApiService {
         sysauth,
         useHttps,
         config: 'wireless',
-        context: mountedContext(context),
+        context: mCtx,
       );
       if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0) {
+        await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
         return false;
       }
 
@@ -1118,11 +1137,12 @@ class RealApiService implements IApiService {
           'command': '/sbin/wifi',
           'params': ['reload'],
         },
-        context: mountedContext(context),
+        context: mCtx,
       );
       return _execSucceeded(reloadRes);
     } catch (e, stack) {
       Logger.exception('setSsidEnabled failed for $ifaceSection', e, stack);
+      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
       return false;
     }
   }
@@ -1136,6 +1156,7 @@ class RealApiService implements IApiService {
     required Map<String, String> values,
     BuildContext? context,
   }) async {
+    final mCtx = mountedContext(context);
     try {
       final setRes = await callWithContext(
         ipAddress,
@@ -1144,9 +1165,10 @@ class RealApiService implements IApiService {
         object: 'uci',
         method: 'set',
         params: {'config': 'wireless', 'section': sectionName, 'values': values},
-        context: mountedContext(context),
+        context: mCtx,
       );
       if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) {
+        await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
         return false;
       }
 
@@ -1157,7 +1179,7 @@ class RealApiService implements IApiService {
         object: 'uci',
         method: 'apply',
         params: {'rollback': false},
-        context: mountedContext(context),
+        context: mCtx,
       );
       if (applyRes is List && applyRes.isNotEmpty && applyRes[0] == 0) {
         await callWithContext(
@@ -1166,13 +1188,17 @@ class RealApiService implements IApiService {
           useHttps,
           object: 'uci',
           method: 'confirm',
-          context: mountedContext(context),
+          context: mCtx,
         );
         return true;
       }
+
+      // Atomic Rollback on Apply Failure
+      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
       return false;
     } catch (e, stack) {
       Logger.exception('updateWirelessInterfaceConfig failed for $sectionName', e, stack);
+      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
       return false;
     }
   }
@@ -1239,6 +1265,7 @@ class RealApiService implements IApiService {
     required Map<String, String> values,
     BuildContext? context,
   }) async {
+    final mCtx = mountedContext(context);
     try {
       final setRes = await callWithContext(
         ipAddress,
@@ -1247,9 +1274,10 @@ class RealApiService implements IApiService {
         object: 'uci',
         method: 'set',
         params: {'config': 'wireless', 'section': sectionName, 'values': values},
-        context: mountedContext(context),
+        context: mCtx,
       );
       if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) {
+        await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
         return false;
       }
 
@@ -1260,7 +1288,7 @@ class RealApiService implements IApiService {
         object: 'uci',
         method: 'apply',
         params: {'rollback': false},
-        context: mountedContext(context),
+        context: mCtx,
       );
       if (applyRes is List && applyRes.isNotEmpty && applyRes[0] == 0) {
         await callWithContext(
@@ -1269,13 +1297,17 @@ class RealApiService implements IApiService {
           useHttps,
           object: 'uci',
           method: 'confirm',
-          context: mountedContext(context),
+          context: mCtx,
         );
         return true;
       }
+
+      // Atomic Rollback on Apply Failure
+      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
       return false;
     } catch (e, stack) {
       Logger.exception('updateWirelessRadioConfig failed for $sectionName', e, stack);
+      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
       return false;
     }
   }
@@ -1863,6 +1895,7 @@ class RealApiService implements IApiService {
       );
 
       if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) {
+        await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
         return false;
       }
 
@@ -1886,9 +1919,11 @@ class RealApiService implements IApiService {
         );
         return true;
       }
+      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
       return false;
     } catch (e, stack) {
       Logger.exception('addWirelessInterface failed for radio $radioName', e, stack);
+      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
       return false;
     }
   }
@@ -1913,6 +1948,7 @@ class RealApiService implements IApiService {
       );
 
       if (delRes is List && delRes.isNotEmpty && delRes[0] != 0) {
+        await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
         return false;
       }
 
@@ -1936,9 +1972,43 @@ class RealApiService implements IApiService {
         );
         return true;
       }
+      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
       return false;
     } catch (e, stack) {
       Logger.exception('deleteWirelessInterface failed for $sectionName', e, stack);
+      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
+      return false;
+    }
+  }
+
+  Future<bool> _ensureUciSection(
+    String ipAddress,
+    String sysauth,
+    bool useHttps,
+    String config,
+    String section,
+    String type,
+    Map<String, dynamic> values, {
+    BuildContext? context,
+  }) async {
+    try {
+      final setRes = await callWithContext(
+        ipAddress, sysauth, useHttps,
+        object: 'uci', method: 'set',
+        params: {'config': config, 'section': section, 'values': values},
+        context: context,
+      );
+      if (setRes is List && setRes.isNotEmpty && setRes[0] == 0) {
+        return true;
+      }
+      final addRes = await callWithContext(
+        ipAddress, sysauth, useHttps,
+        object: 'uci', method: 'add',
+        params: {'config': config, 'type': type, 'name': section, 'values': values},
+        context: context,
+      );
+      return addRes is List && addRes.isNotEmpty && addRes[0] == 0;
+    } catch (_) {
       return false;
     }
   }
@@ -1987,66 +2057,80 @@ class RealApiService implements IApiService {
       // If using a different network, assume it already exists with proper DHCP/firewall config
       if (network == 'guest') {
         // Configure /etc/config/network interface 'guest'
-        await callWithContext(
+        await _ensureUciSection(
           ipAddress, sysauth, useHttps,
-          object: 'uci', method: 'set',
-          params: {
-            'config': 'network',
-            'section': 'guest',
-            'values': {
-              'proto': 'static',
-              'ipaddr': guestIp,
-              'netmask': '255.255.255.0',
-            },
+          'network', 'guest', 'interface',
+          {
+            'proto': 'static',
+            'ipaddr': guestIp,
+            'netmask': '255.255.255.0',
           },
           context: mCtx,
         );
 
         // Configure /etc/config/dhcp section 'guest'
-        await callWithContext(
+        await _ensureUciSection(
           ipAddress, sysauth, useHttps,
-          object: 'uci', method: 'set',
-          params: {
-            'config': 'dhcp',
-            'section': 'guest',
-            'values': {
-              'interface': 'guest',
-              'start': '100',
-              'limit': '150',
-              'leasetime': '12h',
-            },
+          'dhcp', 'guest', 'dhcp',
+          {
+            'interface': 'guest',
+            'start': '100',
+            'limit': '150',
+            'leasetime': '12h',
           },
           context: mCtx,
         );
 
         // Step 3: Configure /etc/config/firewall zone and forwarding for guest
-        await callWithContext(
+        // Use REJECT for input to prevent guests from accessing router gateway / LuCI / SSH
+        await _ensureUciSection(
           ipAddress, sysauth, useHttps,
-          object: 'uci', method: 'set',
-          params: {
-            'config': 'firewall',
-            'section': 'zone_guest',
-            'values': {
-              'name': 'guest',
-              'network': ['guest'],
-              'input': 'ACCEPT',
-              'output': 'ACCEPT',
-              'forward': 'REJECT',
-            },
+          'firewall', 'zone_guest', 'zone',
+          {
+            'name': 'guest',
+            'network': ['guest'],
+            'input': 'REJECT',
+            'output': 'ACCEPT',
+            'forward': 'REJECT',
           },
           context: mCtx,
         );
 
-        await callWithContext(
+        // Allow essential DHCP (UDP 67) for guest devices
+        await _ensureUciSection(
           ipAddress, sysauth, useHttps,
-          object: 'uci', method: 'set',
-          params: {
-            'config': 'firewall',
-            'section': 'fwd_guest_wan',
-            'values': {
-              'src': 'guest',
-              'dest': 'wan',
-            },
+          'firewall', 'rule_guest_dhcp', 'rule',
+          {
+            'name': 'Allow-Guest-DHCP',
+            'src': 'guest',
+            'proto': 'udp',
+            'dest_port': '67',
+            'target': 'ACCEPT',
+          },
+          context: mCtx,
+        );
+
+        // Allow essential DNS (UDP/TCP 53) for guest devices
+        await _ensureUciSection(
+          ipAddress, sysauth, useHttps,
+          'firewall', 'rule_guest_dns', 'rule',
+          {
+            'name': 'Allow-Guest-DNS',
+            'src': 'guest',
+            'proto': 'tcpudp',
+            'dest_port': '53',
+            'target': 'ACCEPT',
+          },
+          context: mCtx,
+        );
+
+        // Forward guest traffic to WAN for internet access
+        await _ensureUciSection(
+          ipAddress, sysauth, useHttps,
+          'firewall', 'fwd_guest_wan', 'forwarding',
+          {
+            'src': 'guest',
+            'dest': 'wan',
           },
           context: mCtx,
         );
@@ -2181,9 +2265,17 @@ class RealApiService implements IApiService {
         );
         return true;
       }
+
+      // Revert staged changes across modified configs on failure
+      for (final cfg in ['wireless', 'firewall', 'dhcp', 'network']) {
+        await uciRevert(ipAddress, sysauth, useHttps, config: cfg, context: mCtx);
+      }
       return false;
     } catch (e, stack) {
       Logger.exception('provisionGuestNetwork failed for radio $radioName', e, stack);
+      for (final cfg in ['wireless', 'firewall', 'dhcp', 'network']) {
+        await uciRevert(ipAddress, sysauth, useHttps, config: cfg, context: mountedContext(context));
+      }
       return false;
     }
   }
@@ -2197,6 +2289,7 @@ class RealApiService implements IApiService {
     required Map<String, String> macfilterByIface,
     BuildContext? context,
   }) async {
+    final mCtx = mountedContext(context);
     try {
       final allSections = {...maclistByIface.keys, ...macfilterByIface.keys};
       for (final section in allSections) {
@@ -2215,9 +2308,10 @@ class RealApiService implements IApiService {
           object: 'uci',
           method: 'set',
           params: {'config': 'wireless', 'section': section, 'values': values},
-          context: mountedContext(context),
+          context: mCtx,
         );
         if (res is List && res.isNotEmpty && res[0] != 0) {
+          await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
           return false;
         }
       }
@@ -2229,11 +2323,16 @@ class RealApiService implements IApiService {
         object: 'uci',
         method: 'apply',
         params: {'rollback': false},
-        context: mountedContext(context),
+        context: mCtx,
       );
-      return applyRes is List && applyRes.isNotEmpty && applyRes[0] == 0;
+      if (applyRes is List && applyRes.isNotEmpty && applyRes[0] == 0) {
+        return true;
+      }
+      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
+      return false;
     } catch (e, stack) {
       Logger.exception('setWifiAccessControl failed', e, stack);
+      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
       return false;
     }
   }
@@ -2623,13 +2722,8 @@ exit 0
       context: mountedContext(context),
     );
 
-    // If used for the FIRST time (rule didn't exist before), notify the user as requested
-    if (!ruleExisted && context != null && context.mounted) {
-      context.showToastInfo(
-        'Firewall Rule Created',
-        subtitle: 'Created firewall rule "$ruleName" to restrict client $macUpper',
-        duration: const Duration(seconds: 4),
-      );
+    if (!ruleExisted) {
+      Logger.info('Created firewall rule "$ruleName" to restrict client $macUpper');
     }
 
     return true;
@@ -2925,95 +3019,58 @@ exit 0
     bool useHttps, {
     required String macAddress,
     String? iface,
+    int banTimeSeconds = 300,
     BuildContext? context,
   }) async {
     try {
-      final macUpper = macAddress.toUpperCase();
+      final macUpper = macAddress.toUpperCase().replaceAll('-', ':');
       final macLower = macAddress.toLowerCase();
-
-      // 1. Enforce firewall block rule first (and notify if created for first time)
-      await _enforceFirewallBlock(
-        ipAddress: ipAddress,
-        sysauth: sysauth,
-        useHttps: useHttps,
-        macAddress: macAddress,
-        rulePrefix: 'Ban_Client_',
-        context: context,
-      );
-
-      // 2. Perform immediate Wi-Fi deauth / client disconnection
-      if (iface != null && iface.isNotEmpty) {
-        for (final mac in [macUpper, macLower]) {
-          try {
-            await callWithContext(
-              ipAddress,
-              sysauth,
-              useHttps,
-              object: 'hostapd.$iface',
-              method: 'del_client',
-              params: {'addr': mac, 'reason': 1, 'deauth': true, 'ban_time': 0},
-              context: mountedContext(context),
-            );
-          } catch (_) {}
-        }
-      }
-
-      try {
-        final listRes = await callWithContext(
-          ipAddress,
-          sysauth,
-          useHttps,
-          object: 'rpc',
-          method: 'list',
-          params: {},
-          context: mountedContext(context),
-        );
-        if (listRes is List && listRes.length > 1 && listRes[0] == 0 && listRes[1] is Map) {
-          final objects = (listRes[1] as Map).keys.where((k) => k.toString().startsWith('hostapd.')).toList();
-          for (final obj in objects) {
-            final objName = obj.toString();
-            for (final mac in [macUpper, macLower]) {
-              try {
-                await callWithContext(
-                  ipAddress,
-                  sysauth,
-                  useHttps,
-                  object: objName,
-                  method: 'del_client',
-                  params: {'addr': mac, 'reason': 1, 'deauth': true, 'ban_time': 0},
-                  context: mountedContext(context),
-                );
-              } catch (_) {}
-            }
-          }
-        }
-      } catch (_) {}
-
+      final int banTimeMs = (banTimeSeconds <= 0 ? 0 : banTimeSeconds) * 1000;
       final targetIface = (iface != null && iface.isNotEmpty) ? iface : '';
+
       final cmdScript = '''
 MAC_U="$macUpper"
 MAC_L="$macLower"
 IFACE="$targetIface"
+BAN_MS="$banTimeMs"
 
-if [ -n "\$IFACE" ]; then
-  /usr/sbin/hostapd_cli -i "\$IFACE" deauth "\$MAC_U" 2>/dev/null || true
-  ubus call "hostapd.\$IFACE" del_client '{"addr":"'"\$MAC_U"'","reason":1,"deauth":true}' 2>/dev/null || true
-fi
-for s in /var/run/hostapd/* /var/run/hostapd-*/*; do
-  if [ -S "\$s" ]; then
-    s_dir="\${s%/*}"
-    s_if="\${s##*/}"
-    /usr/sbin/hostapd_cli -p "\$s_dir" -i "\$s_if" deauth "\$MAC_U" 2>/dev/null || true
+(
+  if [ -n "\$IFACE" ]; then
+    /usr/sbin/hostapd_cli -i "\$IFACE" deny_acl ADD "\$MAC_U" 2>/dev/null || true
+    /usr/sbin/hostapd_cli -i "\$IFACE" deauth "\$MAC_U" 2>/dev/null || true
+    ubus call "hostapd.\$IFACE" del_client '{"addr":"'"\$MAC_U"'","reason":1,"deauth":true,"ban_time":'\$BAN_MS'}' 2>/dev/null || true
   fi
-done
-for obj in \$(ubus list 'hostapd.*' 2>/dev/null); do
-  ubus call "\$obj" del_client '{"addr":"'"\$MAC_U"'","reason":1,"deauth":true}' 2>/dev/null || true
-  ubus call "\$obj" del_client '{"addr":"'"\$MAC_L"'","reason":1,"deauth":true}' 2>/dev/null || true
-done
-for dev in \$(iw dev 2>/dev/null | awk '\$1=="Interface"{print \$2}'); do
-  iw dev "\$dev" station del "\$MAC_L" 2>/dev/null || true
-  iw dev "\$dev" station del "\$MAC_U" 2>/dev/null || true
-done
+
+  for s in /var/run/hostapd/* /var/run/hostapd-*/*; do
+    if [ -S "\$s" ]; then
+      s_dir="\${s%/*}"
+      s_if="\${s##*/}"
+      /usr/sbin/hostapd_cli -p "\$s_dir" -i "\$s_if" deny_acl ADD "\$MAC_U" 2>/dev/null || true
+      /usr/sbin/hostapd_cli -p "\$s_dir" -i "\$s_if" deauth "\$MAC_U" 2>/dev/null || true
+    fi
+  done
+
+  nft insert rule inet fw4 input mac saddr "\$MAC_U" drop 2>/dev/null || true
+  nft insert rule inet fw4 forward mac saddr "\$MAC_U" drop 2>/dev/null || true
+  nft insert rule inet fw4 input mac saddr "\$MAC_L" drop 2>/dev/null || true
+  nft insert rule inet fw4 forward mac saddr "\$MAC_L" drop 2>/dev/null || true
+
+  iptables -I INPUT -m mac --mac-source "\$MAC_U" -j DROP 2>/dev/null || true
+  iptables -I FORWARD -m mac --mac-source "\$MAC_U" -j DROP 2>/dev/null || true
+  iptables -I INPUT -m mac --mac-source "\$MAC_L" -j DROP 2>/dev/null || true
+  iptables -I FORWARD -m mac --mac-source "\$MAC_L" -j DROP 2>/dev/null || true
+  ebtables -I INPUT -s "\$MAC_U" -j DROP 2>/dev/null || true
+  ebtables -I FORWARD -s "\$MAC_U" -j DROP 2>/dev/null || true
+
+  for obj in \$(ubus list 'hostapd.*' 2>/dev/null); do
+    ubus call "\$obj" del_client '{"addr":"'"\$MAC_U"'","reason":1,"deauth":true,"ban_time":'\$BAN_MS'}' 2>/dev/null || true
+    ubus call "\$obj" del_client '{"addr":"'"\$MAC_L"'","reason":1,"deauth":true,"ban_time":'\$BAN_MS'}' 2>/dev/null || true
+  done
+  for dev in \$(iw dev 2>/dev/null | awk '\$1=="Interface"{print \$2}'); do
+    iw dev "\$dev" station del "\$MAC_L" 2>/dev/null || true
+    iw dev "\$dev" station del "\$MAC_U" 2>/dev/null || true
+  done
+) &
 exit 0
 ''';
 
@@ -3070,6 +3127,7 @@ exit 0
     bool useHttps, {
     required String macAddress,
     String? iface,
+    int banTimeSeconds = 300,
     BuildContext? context,
   }) async {
     return disconnectWirelessClient(
@@ -3078,6 +3136,7 @@ exit 0
       useHttps,
       macAddress: macAddress,
       iface: iface,
+      banTimeSeconds: banTimeSeconds,
       context: context,
     );
   }
@@ -3090,6 +3149,52 @@ exit 0
     required String macAddress,
     BuildContext? context,
   }) async {
+    final macUpper = macAddress.toUpperCase().replaceAll('-', ':');
+    final macLower = macAddress.toLowerCase();
+
+    final unbanScript = '''
+MAC_U="$macUpper"
+MAC_L="$macLower"
+
+(
+  for s in /var/run/hostapd/* /var/run/hostapd-*/*; do
+    if [ -S "\$s" ]; then
+      s_dir="\${s%/*}"
+      s_if="\${s##*/}"
+      /usr/sbin/hostapd_cli -p "\$s_dir" -i "\$s_if" deny_acl REMOVE "\$MAC_U" 2>/dev/null || true
+      /usr/sbin/hostapd_cli -p "\$s_dir" -i "\$s_if" deny_acl REMOVE "\$MAC_L" 2>/dev/null || true
+    fi
+  done
+
+  nft delete rule inet fw4 input mac saddr "\$MAC_U" drop 2>/dev/null || true
+  nft delete rule inet fw4 forward mac saddr "\$MAC_U" drop 2>/dev/null || true
+  nft delete rule inet fw4 input mac saddr "\$MAC_L" drop 2>/dev/null || true
+  nft delete rule inet fw4 forward mac saddr "\$MAC_L" drop 2>/dev/null || true
+
+  iptables -D INPUT -m mac --mac-source "\$MAC_U" -j DROP 2>/dev/null || true
+  iptables -D FORWARD -m mac --mac-source "\$MAC_U" -j DROP 2>/dev/null || true
+  iptables -D INPUT -m mac --mac-source "\$MAC_L" -j DROP 2>/dev/null || true
+  iptables -D FORWARD -m mac --mac-source "\$MAC_L" -j DROP 2>/dev/null || true
+  ebtables -D INPUT -s "\$MAC_U" -j DROP 2>/dev/null || true
+  ebtables -D FORWARD -s "\$MAC_U" -j DROP 2>/dev/null || true
+) &
+exit 0
+''';
+
+    try {
+      await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'file',
+        method: 'exec',
+        params: fileExecParams('/bin/sh', ['-c', unbanScript]),
+        context: mountedContext(context),
+      );
+    } catch (e) {
+      Logger.warning('unbanWirelessClient script error: $e');
+    }
+
     final fwOk = await _removeFirewallBlock(
       ipAddress: ipAddress,
       sysauth: sysauth,
@@ -3116,20 +3221,26 @@ exit 0
   }) async {
     try {
       final script = '''
-RESTRICTED_MACS=\$(uci show firewall 2>/dev/null | grep -iE "(src_mac|dest_mac|target|name)" -B 5 -A 5 | grep -iE "src_mac|dest_mac" | grep -oE "([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}" || true)
-NFT_MACS=\$(nft list chain inet fw4 forward 2>/dev/null | grep -iE "drop|reject" | grep -oE "([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}" || true)
-IPT_MACS=\$(iptables -L FORWARD -v -n 2>/dev/null | grep -iE "DROP|REJECT" | grep -oE "([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}" || true)
+DENY_MACS=""
+for s in /var/run/hostapd/* /var/run/hostapd-*/*; do
+  if [ -S "\$s" ]; then
+    s_dir="\${s%/*}"
+    s_if="\${s##*/}"
+    DENY_MACS="\$DENY_MACS \$(/usr/sbin/hostapd_cli -p "\$s_dir" -i "\$s_if" deny_acl SHOW 2>/dev/null | grep -oE "([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}" || true)"
+  fi
+done
 
-ALL_RESTRICTED=\$(echo "\$RESTRICTED_MACS \$NFT_MACS \$IPT_MACS" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^FF:FF:FF:FF:FF:FF\$" | sort -u | grep -v "^\$")
+WIFI_UCI=\$(uci show wireless 2>/dev/null | grep -iE "maclist" | grep -oE "([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}" || true)
 
-BANNED_MACS=\$(uci show wireless 2>/dev/null | grep -iE "macfilter=['"]*(deny|2)['"]*" -A 10 | grep -i "maclist" | grep -oE "([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}" || true)
-
-ALL_BANNED=\$(echo "\$BANNED_MACS" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^FF:FF:FF:FF:FF:FF\$" | sort -u | grep -v "^\$")
+FW_UCI=\$(uci show firewall 2>/dev/null | grep -iE "(src_mac|dest_mac)" | grep -oE "([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}" || true)
+NFT_MACS=\$(nft list chain inet fw4 input 2>/dev/null; nft list chain inet fw4 forward 2>/dev/null | grep -iE "drop|reject" | grep -oE "([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}" || true)
+IPT_MACS=\$(iptables -L INPUT -v -n 2>/dev/null; iptables -L FORWARD -v -n 2>/dev/null | grep -iE "DROP|REJECT" | grep -oE "([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}" || true)
 
 echo "RESTRICTED:"
-echo "\$ALL_RESTRICTED"
+echo "\$FW_UCI \$NFT_MACS \$IPT_MACS" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^FF:FF:FF:FF:FF:FF\$" | sort -u | grep -v "^\$"
+
 echo "BANNED:"
-echo "\$ALL_BANNED"
+echo "\$DENY_MACS \$WIFI_UCI" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^FF:FF:FF:FF:FF:FF\$" | sort -u | grep -v "^\$"
 ''';
 
       final res = await callWithContext(
@@ -3149,19 +3260,6 @@ echo "\$ALL_BANNED"
         'restricted': [],
         'banned': [],
       };
-
-      Map<String, dynamic>? cachedHostHints;
-      Future<Map<String, dynamic>> getHostHints() async {
-        cachedHostHints ??= await fetchHostHintsWithContext(
-          ipAddress: ipAddress,
-          sysauth: sysauth,
-          useHttps: useHttps,
-          context: mountedContext(context),
-        );
-        return cachedHostHints!;
-      }
-
-      final hostHints = await getHostHints();
 
       if (res is List && res.length > 1 && res[0] == 0) {
         final resMap = res[1] as Map<String, dynamic>?;
@@ -3183,20 +3281,13 @@ echo "\$ALL_BANNED"
             if (macUpper == '00:00:00:00:00:00' || macUpper == 'FF:FF:FF:FF:FF:FF') {
               continue;
             }
-            final macLower = macUpper.toLowerCase();
-            final macHyphen = macUpper.replaceAll(':', '-');
-            final rawHint = hostHints[macUpper] ?? hostHints[macLower] ?? hostHints[macHyphen];
-            final hint = rawHint is Map<String, dynamic> ? rawHint : <String, dynamic>{};
-            final name = hint['name']?.toString() ?? hint['staticLeaseName']?.toString() ?? macUpper;
-            final ips = hint['ipaddrs'] as List?;
-            final ip = (ips != null && ips.isNotEmpty) ? ips.first.toString() : 'N/A';
 
             final entry = {
               'mac': macUpper,
-              'name': name,
-              'ip': ip,
+              'name': macUpper,
+              'ip': 'N/A',
               'type': currentSection,
-              'source': currentSection == 'restricted' ? 'Firewall / Traffic Rule' : 'Wireless MAC Filter',
+              'source': currentSection == 'restricted' ? 'Internet Access Paused' : 'Wi-Fi Access Control (Banned)',
             };
 
             if (currentSection == 'restricted' && !result['restricted']!.any((e) => e['mac'] == macUpper)) {
@@ -3206,134 +3297,6 @@ echo "\$ALL_BANNED"
             }
           }
         }
-      }
-
-      // ALWAYS perform structured UCI parsing to discover manual LuCI Web UI rules and rule names!
-      try {
-        final wirelessRes = await callWithContext(
-          ipAddress,
-          sysauth,
-          useHttps,
-          object: 'uci',
-          method: 'get',
-          params: {'config': 'wireless'},
-          context: mountedContext(context),
-        );
-        if (wirelessRes is List && wirelessRes.length > 1 && wirelessRes[0] == 0) {
-          final values = (wirelessRes[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>?;
-          if (values != null) {
-            for (final sec in values.values) {
-              if (sec is Map<String, dynamic>) {
-                final macfilter = sec['macfilter']?.toString().toLowerCase();
-                if (macfilter == 'deny' || macfilter == '2') {
-                  final maclist = sec['maclist'];
-                  final macs = maclist is List ? maclist : (maclist != null ? [maclist] : []);
-                  final ssid = sec['ssid']?.toString();
-                  for (final m in macs) {
-                    final mStr = m.toString();
-                    if (mStr.isNotEmpty && (mStr.contains(':') || mStr.contains('-'))) {
-                      final macUpper = mStr.toUpperCase().replaceAll('-', ':');
-                      if (macUpper != '00:00:00:00:00:00' && macUpper != 'FF:FF:FF:FF:FF:FF') {
-                        final rawHint = hostHints[macUpper] ?? hostHints[macUpper.toLowerCase()];
-                        final hint = rawHint is Map<String, dynamic> ? rawHint : <String, dynamic>{};
-                        final name = hint['name']?.toString() ?? hint['staticLeaseName']?.toString() ?? macUpper;
-                        final existing = result['banned']!.firstWhere(
-                          (e) => e['mac'] == macUpper,
-                          orElse: () => <String, dynamic>{},
-                        );
-                        if (existing.isEmpty) {
-                          result['banned']!.add({
-                            'mac': macUpper,
-                            'name': name,
-                            'ip': 'N/A',
-                            'type': 'banned',
-                            'source': ssid != null && ssid.isNotEmpty ? 'Wi-Fi MAC Filter ($ssid)' : 'Wireless MAC Filter',
-                          });
-                        } else if (ssid != null && ssid.isNotEmpty) {
-                          existing['source'] = 'Wi-Fi MAC Filter ($ssid)';
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        final firewallRes = await callWithContext(
-          ipAddress,
-          sysauth,
-          useHttps,
-          object: 'uci',
-          method: 'get',
-          params: {'config': 'firewall'},
-          context: mountedContext(context),
-        );
-        if (firewallRes is List && firewallRes.length > 1 && firewallRes[0] == 0) {
-          final values = (firewallRes[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>?;
-          if (values != null) {
-            for (final sec in values.values) {
-              if (sec is Map<String, dynamic>) {
-                final target = sec['target']?.toString().toUpperCase();
-                final ruleName = sec['name']?.toString();
-                final isDropOrReject = target == 'DROP' || target == 'REJECT' || target == 'STOP';
-                final isAppRule = ruleName != null && (ruleName.startsWith('Pause_Internet_') || ruleName.startsWith('Ban_Client_') || ruleName.startsWith('Kick_Client_') || ruleName == 'nointernet_wireless_clients');
-
-                if (isDropOrReject || isAppRule) {
-                  final srcMac = sec['src_mac'];
-                  final destMac = sec['dest_mac'];
-                  final macs = <dynamic>[];
-                  if (srcMac is List) {
-                    macs.addAll(srcMac);
-                  } else if (srcMac != null) {
-                    macs.add(srcMac);
-                  }
-                  if (destMac is List) {
-                    macs.addAll(destMac);
-                  } else if (destMac != null) {
-                    macs.add(destMac);
-                  }
-
-                  final sourceLabel = ruleName != null && ruleName.isNotEmpty
-                      ? (isAppRule ? 'Internet Access Paused' : 'LuCI Firewall Rule "$ruleName"')
-                      : 'Firewall Block Rule';
-
-                  for (final m in macs) {
-                    final mStr = m.toString();
-                    if (mStr.isNotEmpty && (mStr.contains(':') || mStr.contains('-'))) {
-                      final macUpper = mStr.toUpperCase().replaceAll('-', ':');
-                      if (macUpper != '00:00:00:00:00:00' && macUpper != 'FF:FF:FF:FF:FF:FF') {
-                        final rawHint = hostHints[macUpper] ?? hostHints[macUpper.toLowerCase()];
-                        final hint = rawHint is Map<String, dynamic> ? rawHint : <String, dynamic>{};
-                        final name = hint['name']?.toString() ?? hint['staticLeaseName']?.toString() ?? macUpper;
-                        final existing = result['restricted']!.firstWhere(
-                          (e) => e['mac'] == macUpper,
-                          orElse: () => <String, dynamic>{},
-                        );
-                        if (existing.isEmpty) {
-                          result['restricted']!.add({
-                            'mac': macUpper,
-                            'name': name,
-                            'ip': 'N/A',
-                            'type': 'restricted',
-                            'ruleName': ruleName ?? '',
-                            'source': sourceLabel,
-                          });
-                        } else {
-                          existing['ruleName'] = ruleName ?? '';
-                          existing['source'] = sourceLabel;
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      } catch (e) {
-        Logger.warning('UCI fallback in fetchRestrictedAndBannedClientsLive encountered issue: $e');
       }
 
       return result;

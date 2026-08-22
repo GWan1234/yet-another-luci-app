@@ -32,10 +32,11 @@ class SecureStorageService {
 
   Future<Map<String, String?>> getCredentials() async {
     try {
-      final ipAddress = await _storage.read(key: 'ipAddress');
-      final username = await _storage.read(key: 'username');
-      final password = await _storage.read(key: 'password');
-      final useHttps = await _storage.read(key: 'useHttps');
+      final all = await _storage.readAll();
+      final ipAddress = all['ipAddress'];
+      final username = all['username'];
+      final password = all['password'];
+      final useHttps = all['useHttps'];
       if (ipAddress != null && ipAddress.isNotEmpty && username != null && password != null) {
         return {
           'ipAddress': ipAddress,
@@ -47,7 +48,7 @@ class SecureStorageService {
       final routers = await getRouters();
       if (routers.isNotEmpty) {
         // Prefer the explicitly selected router; fall back to first in list
-        final selectedId = await getSelectedRouterId();
+        final selectedId = all[_selectedRouterKey];
         final router = selectedId != null
             ? routers.firstWhere(
                 (r) => r.id == selectedId,

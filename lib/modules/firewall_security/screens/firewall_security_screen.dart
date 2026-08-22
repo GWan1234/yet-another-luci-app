@@ -203,7 +203,7 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
           child: !overview.isAvailable
               ? _buildUnavailableView(context, ref, overview)
               : ListView(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0),
                   children: [
                     _buildSectionHeader(context, 'Global Default Policies', Icons.shield_outlined),
                     const SizedBox(height: 8),

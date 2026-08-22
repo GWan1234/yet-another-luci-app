@@ -100,15 +100,18 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
     }
 
     final success = await appState.unbanWirelessClient(mac, context: context);
-    if (!mounted) return;
 
     if (success) {
       unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
-      context.showToastSuccess('Client $name unbanned successfully.', actionKey: actionKey);
-      await _fetchLiveData();
+      if (mounted) {
+        LuciToastManager.safeShowSuccess(context, 'Client $name unbanned successfully.', actionKey: actionKey);
+        await _fetchLiveData();
+      }
     } else {
       unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
-      context.showToastError('Failed to unban client $name.', actionKey: actionKey);
+      if (mounted) {
+        LuciToastManager.safeShowError(context, 'Failed to unban client $name.', actionKey: actionKey);
+      }
     }
   }
 
@@ -121,7 +124,7 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Restricted & Banned Clients'),
+        title: const Text('Banned Clients'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -137,7 +140,7 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
                 children: [
                   CircularProgressIndicator(),
                   SizedBox(height: 16),
-                  Text('Fetching live restrictions directly from router...'),
+                  Text('Fetching live banned clients directly from router...'),
                 ],
               ),
             )
@@ -155,7 +158,7 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'No Restricted or Banned Clients',
+                          'No Banned Clients',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
@@ -163,7 +166,7 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'All connected devices have full network and Wi-Fi access. Restricted or banned devices will appear here in real-time.',
+                          'All connected devices have full network and Wi-Fi access. Any banned devices will appear here in real-time.',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
@@ -172,7 +175,7 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
                       ],
                     )
                   : ListView(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                       children: [
                         if (restrictedList.isNotEmpty) ...[
                           _buildSectionHeader(

@@ -378,6 +378,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 100),
           ],
         ),
       ),

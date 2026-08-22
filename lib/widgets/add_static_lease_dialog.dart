@@ -872,8 +872,33 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
         }
       }
     }
-    return AlertDialog(
-      backgroundColor: colorScheme.surface,
+    return PopScope(
+      canPop: !_hasChanges,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Discard Unsaved Lease?'),
+            content: const Text('You have unsaved changes to this static lease reservation. Are you sure you want to discard them?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Keep Editing'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Discard'),
+              ),
+            ],
+          ),
+        );
+        if (confirm == true && context.mounted) {
+          Navigator.pop(context);
+        }
+      },
+      child: AlertDialog(
+        backgroundColor: colorScheme.surface,
       surfaceTintColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -1259,6 +1284,7 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
           ),
         ),
       ],
+    ),
     );
   }
 }

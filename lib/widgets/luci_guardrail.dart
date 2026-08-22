@@ -93,7 +93,9 @@ class LuciGuardrail {
       builder: (ctx) => AlertDialog(
         icon: Icon(icon, color: effectiveIconColor, size: 32),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        content: customContent ?? (subtitle != null ? Text(subtitle, style: const TextStyle(fontSize: 13.5)) : null),
+        content: customContent != null
+            ? SingleChildScrollView(child: customContent)
+            : (subtitle != null ? SingleChildScrollView(child: Text(subtitle, style: const TextStyle(fontSize: 13.5))) : null),
         actions: [
           OutlinedButton(
             onPressed: () => Navigator.pop(ctx, false),

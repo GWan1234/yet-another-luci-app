@@ -3,6 +3,7 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:yet_another_luci_app/utils/client_naming_helper.dart';
 import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 import 'package:yet_another_luci_app/widgets/luci_guardrail.dart';
 
@@ -42,7 +43,7 @@ class SelfDeviceGuard {
 
   /// Normalizes MAC address string for comparison (e.g., 'AA:BB:CC:DD:EE:FF')
   static String normalizeMac(String mac) {
-    return mac.toUpperCase().replaceAll('-', ':').trim();
+    return ClientNamingHelper.normalizeMac(mac);
   }
 
   /// Checks if target MAC or target IP belongs to the current device running this app.

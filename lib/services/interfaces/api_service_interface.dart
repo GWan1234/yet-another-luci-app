@@ -90,6 +90,13 @@ abstract class IApiService {
     required String config,
     BuildContext? context,
   });
+  Future<dynamic> uciRevert(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String config,
+    BuildContext? context,
+  });
   Future<dynamic> systemExec(
     String ipAddress,
     String sysauth,
@@ -104,6 +111,7 @@ abstract class IApiService {
     bool useHttps, {
     required String macAddress,
     String? iface,
+    int banTimeSeconds = 300,
     BuildContext? context,
   });
   Future<bool> setSsidEnabled(
@@ -255,6 +263,7 @@ abstract class IApiService {
     bool useHttps, {
     required String macAddress,
     String? iface,
+    int banTimeSeconds = 300,
     BuildContext? context,
   });
   Future<bool> unbanWirelessClient(

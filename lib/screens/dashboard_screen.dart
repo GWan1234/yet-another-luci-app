@@ -1899,7 +1899,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     _buildInterfaceStatusCards(appState),
                     _buildSectionHeader(context, 'System Modules & Storage', Icons.storage),
                     ..._buildModuleDashboardWidgets(context),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 100),
                   ],
                 ),
               ),

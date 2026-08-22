@@ -686,8 +686,8 @@ heal_dns() {
 
     if (success) {
       startAccessControlAutoRevertTimer(initialSeconds: 25);
-      await _refreshDashboard();
     }
+    await _refreshDashboard();
     return success;
   }
 
@@ -720,8 +720,8 @@ heal_dns() {
 
     if (success) {
       startAccessControlAutoRevertTimer(initialSeconds: 25);
-      await _refreshDashboard();
     }
+    await _refreshDashboard();
     return success;
   }
 
@@ -752,8 +752,8 @@ heal_dns() {
 
     if (success) {
       startAccessControlAutoRevertTimer(initialSeconds: 25);
-      await _refreshDashboard();
     }
+    await _refreshDashboard();
     return success;
   }
 
@@ -776,8 +776,8 @@ heal_dns() {
 
     if (success) {
       startAccessControlAutoRevertTimer(initialSeconds: 25);
-      await _refreshDashboard();
     }
+    await _refreshDashboard();
     return success;
   }
 
@@ -854,8 +854,8 @@ heal_dns() {
 
     if (success) {
       startAccessControlAutoRevertTimer(initialSeconds: 25);
-      await _refreshDashboard();
     }
+    await _refreshDashboard();
     return success;
   }
 
@@ -903,8 +903,8 @@ heal_dns() {
 
     if (success) {
       startAccessControlAutoRevertTimer(initialSeconds: 25);
-      await _refreshDashboard();
     }
+    await _refreshDashboard();
     return success;
   }
 
@@ -1043,11 +1043,15 @@ heal_dns() {
   Future<bool> disconnectWirelessClient(
     String macAddress, {
     String? iface,
+    int banTimeSeconds = 300,
     BuildContext? context,
   }) async {
+    final macUpper = macAddress.toUpperCase().replaceAll('-', ':');
     if (_isReviewerMode) {
       await Future.delayed(const Duration(milliseconds: 300));
-      await _refreshDashboard();
+      if (banTimeSeconds > 0) _bannedWirelessMacs.add(macUpper);
+      _notifyListeners();
+      unawaited(_refreshDashboard());
       return true;
     }
     final ip = _ip;
@@ -1058,10 +1062,15 @@ heal_dns() {
       ip, sysauth, _useHttps,
       macAddress: macAddress,
       iface: iface,
+      banTimeSeconds: banTimeSeconds,
       context: context,
     );
     if (res) {
-      await _refreshDashboard();
+      if (banTimeSeconds > 0) {
+        _bannedWirelessMacs.add(macUpper);
+      }
+      _notifyListeners();
+      unawaited(_refreshDashboard());
     }
     return res;
   }
@@ -1428,11 +1437,15 @@ heal_dns() {
   Future<bool> banWirelessClient(
     String macAddress, {
     String? iface,
+    int banTimeSeconds = 300,
     BuildContext? context,
   }) async {
+    final macUpper = macAddress.toUpperCase().replaceAll('-', ':');
     if (_isReviewerMode) {
       await Future.delayed(const Duration(milliseconds: 300));
-      await _refreshDashboard();
+      if (banTimeSeconds > 0) _bannedWirelessMacs.add(macUpper);
+      _notifyListeners();
+      unawaited(_refreshDashboard());
       return true;
     }
     final ip = _ip;
@@ -1443,10 +1456,15 @@ heal_dns() {
       ip, sysauth, _useHttps,
       macAddress: macAddress,
       iface: iface,
+      banTimeSeconds: banTimeSeconds,
       context: context,
     );
     if (res) {
-      await _refreshDashboard();
+      if (banTimeSeconds > 0) {
+        _bannedWirelessMacs.add(macUpper);
+      }
+      _notifyListeners();
+      unawaited(_refreshDashboard());
     }
     return res;
   }
@@ -1461,7 +1479,7 @@ heal_dns() {
       _bannedWirelessMacs.remove(macUpper);
       _pausedInternetMacs.remove(macUpper);
       _notifyListeners();
-      await _refreshDashboard();
+      unawaited(_refreshDashboard());
       return true;
     }
     final ip = _ip;
@@ -1477,7 +1495,7 @@ heal_dns() {
       _bannedWirelessMacs.remove(macUpper);
       _pausedInternetMacs.remove(macUpper);
       _notifyListeners();
-      await _refreshDashboard();
+      unawaited(_refreshDashboard());
     }
     return res;
   }

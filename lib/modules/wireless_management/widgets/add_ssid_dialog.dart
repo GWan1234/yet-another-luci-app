@@ -191,6 +191,51 @@ class _AddSsidDialogState extends ConsumerState<AddSsidDialog> {
     return null;
   }
 
+  bool _isFormValid() {
+    if (_isSubmitting || _isLoadingCapabilities) return false;
+
+    final ssid = _ssidController.text.trim();
+    if (ssid.isEmpty) return false;
+    if (utf8.encode(ssid).length > 32) return false;
+
+    final isDuplicate = _selectedRadio.interfaces
+        .where((i) => i.mode.toLowerCase() == 'ap')
+        .any((i) => i.ssid.trim().toLowerCase() == ssid.toLowerCase());
+    if (isDuplicate) return false;
+
+    if (_requiresPassphrase()) {
+      final pass = _passphraseController.text.trim();
+      if (pass.isEmpty || pass.length < 8 || pass.length > 63) return false;
+    }
+
+    if (_ieee80211r) {
+      final mob = _mobilityDomainController.text.trim();
+      if (mob.isEmpty || mob.length > 4) return false;
+    }
+
+    if (_dtimPeriodController.text.trim().isNotEmpty) {
+      final dtim = int.tryParse(_dtimPeriodController.text.trim());
+      if (dtim == null || dtim < 1 || dtim > 255) return false;
+    }
+
+    if (_gtkRekeyController.text.trim().isNotEmpty) {
+      final rekey = int.tryParse(_gtkRekeyController.text.trim());
+      if (rekey == null || rekey < 0) return false;
+    }
+
+    if (_inactivityLimitController.text.trim().isNotEmpty) {
+      final inact = int.tryParse(_inactivityLimitController.text.trim());
+      if (inact == null || inact < 0) return false;
+    }
+
+    if (_maxListenIntervalController.text.trim().isNotEmpty) {
+      final listen = int.tryParse(_maxListenIntervalController.text.trim());
+      if (listen == null || listen < 0) return false;
+    }
+
+    return true;
+  }
+
   Future<void> _submitAddSsid() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSubmitting = true);
@@ -438,11 +483,13 @@ class _AddSsidDialogState extends ConsumerState<AddSsidDialog> {
                         children: [
                           Icon(Icons.tune_rounded, size: 18, color: theme.colorScheme.primary),
                           const SizedBox(width: 8),
-                          Text(
-                            'Advanced Options',
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: theme.colorScheme.primary,
+                          Expanded(
+                            child: Text(
+                              'Advanced Options',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: theme.colorScheme.primary,
+                              ),
                             ),
                           ),
                         ],
@@ -507,6 +554,7 @@ class _AddSsidDialogState extends ConsumerState<AddSsidDialog> {
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _mobilityDomainController,
+                            onChanged: (_) => setState(() {}),
                             decoration: const InputDecoration(
                               labelText: 'Mobility Domain ID',
                               hintText: '4f4b',
@@ -561,6 +609,7 @@ class _AddSsidDialogState extends ConsumerState<AddSsidDialog> {
                             Expanded(
                               child: TextFormField(
                                 controller: _dtimPeriodController,
+                                onChanged: (_) => setState(() {}),
                                 decoration: const InputDecoration(
                                   labelText: 'DTIM Period',
                                   border: OutlineInputBorder(),
@@ -573,6 +622,7 @@ class _AddSsidDialogState extends ConsumerState<AddSsidDialog> {
                             Expanded(
                               child: TextFormField(
                                 controller: _gtkRekeyController,
+                                onChanged: (_) => setState(() {}),
                                 decoration: const InputDecoration(
                                   labelText: 'GTK Rekey (s)',
                                   border: OutlineInputBorder(),
@@ -589,6 +639,7 @@ class _AddSsidDialogState extends ConsumerState<AddSsidDialog> {
                             Expanded(
                               child: TextFormField(
                                 controller: _inactivityLimitController,
+                                onChanged: (_) => setState(() {}),
                                 decoration: const InputDecoration(
                                   labelText: 'Inactivity Limit (s)',
                                   border: OutlineInputBorder(),
@@ -601,6 +652,7 @@ class _AddSsidDialogState extends ConsumerState<AddSsidDialog> {
                             Expanded(
                               child: TextFormField(
                                 controller: _maxListenIntervalController,
+                                onChanged: (_) => setState(() {}),
                                 decoration: const InputDecoration(
                                   labelText: 'Max Listen Int.',
                                   border: OutlineInputBorder(),
@@ -638,6 +690,7 @@ class _AddSsidDialogState extends ConsumerState<AddSsidDialog> {
                           TextFormField(
                             controller: _maclistController,
                             maxLines: 3,
+                            onChanged: (_) => setState(() {}),
                             decoration: const InputDecoration(
                               labelText: 'MAC Address List',
                               hintText: 'AA:BB:CC:DD:EE:FF\n11:22:33:44:55:66',
@@ -662,7 +715,7 @@ class _AddSsidDialogState extends ConsumerState<AddSsidDialog> {
             child: const Text('Cancel'),
           ),
           ElevatedButton.icon(
-            onPressed: _isSubmitting ? null : _submitAddSsid,
+            onPressed: _isFormValid() ? _submitAddSsid : null,
             icon: _isSubmitting
                 ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.add_rounded, size: 18),

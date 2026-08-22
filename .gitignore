@@ -16,6 +16,7 @@ AGENTS.md
 .agents
 .github/agents
 .claude
+AUDIT_TRACKER.md
 
 # IntelliJ related
 *.iml

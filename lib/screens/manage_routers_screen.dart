@@ -247,8 +247,7 @@ class _ManageRoutersScreenState extends ConsumerState<ManageRoutersScreen> {
                                             content: ConstrainedBox(
                                               constraints: const BoxConstraints(
                                                 maxWidth: 400,
-                                                minWidth: 320,
-                                                minHeight: 380,
+                                                minWidth: 280,
                                               ),
                                               child: AutofillGroup(
                                                 child: Form(
@@ -643,7 +642,7 @@ class _ManageRoutersScreenState extends ConsumerState<ManageRoutersScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 100),
                       ],
                     ),
             ),

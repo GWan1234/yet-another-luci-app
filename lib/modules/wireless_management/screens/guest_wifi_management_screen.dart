@@ -9,6 +9,7 @@ import 'package:yet_another_luci_app/utils/client_naming_helper.dart';
 import 'package:yet_another_luci_app/widgets/add_static_lease_dialog.dart';
 import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 import 'package:yet_another_luci_app/widgets/luci_guardrail.dart';
+import 'package:yet_another_luci_app/widgets/ban_wireless_client_dialog.dart';
 import '../models/wireless_info.dart';
 import '../widgets/wireless_interface_card.dart';
 import '../widgets/provision_guest_network_dialog.dart';
@@ -87,7 +88,7 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                   await appState.fetchDashboardData();
                 },
                 child: ListView(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0),
                   children: [
                     // Top Summary & Master Control Card
                     _buildMasterControlHeader(
@@ -175,13 +176,15 @@ class GuestWifiManagementScreen extends ConsumerWidget {
     bool allEnabled,
     bool hasWriteAccess,
   ) {
+    final isDarkMode = theme.brightness == Brightness.dark;
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: Colors.amber.shade700.withValues(alpha: 0.6), width: 1.5),
+        side: BorderSide(color: isDarkMode ? Colors.amber.shade700.withValues(alpha: 0.45) : Colors.amber.shade400.withValues(alpha: 0.7), width: 1.2),
       ),
-      color: Colors.amber.shade700.withValues(alpha: 0.08),
+      color: isDarkMode ? const Color(0xFF231E16) : const Color(0xFFFFF9EE),
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
@@ -192,10 +195,10 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.amber.shade800.withValues(alpha: 0.2),
+                    color: Colors.amber.shade800.withValues(alpha: 0.18),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.shield_moon_rounded, color: Colors.amber.shade900, size: 28),
+                  child: Icon(Icons.shield_moon_rounded, color: isDarkMode ? Colors.amber.shade400 : Colors.amber.shade900, size: 28),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -564,47 +567,39 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                           ),
                         ),
 
-                        // 2. Disconnect / Kick Guest Device
+                        // 2. Ban Guest Client
                         OutlinedButton.icon(
                           onPressed: hasWriteAccess
-                              ? () async {
-                                  final confirm = await showDialog<bool>(
+                              ? () {
+                                  showDialog(
                                     context: context,
-                                    builder: (ctx) => AlertDialog(
-                                      title: const Text('Disconnect Guest Device?'),
-                                      content: Text('Are you sure you want to disconnect $displayName ($macNorm) from Guest Wi-Fi SSID "${iface.ssid}"?'),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(ctx, false),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        FilledButton(
-                                          onPressed: () => Navigator.pop(ctx, true),
-                                          style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                                          child: const Text('Disconnect'),
-                                        ),
-                                      ],
+                                    builder: (ctx) => BanWirelessClientDialog(
+                                      macAddress: macNorm,
+                                      displayName: displayName,
+                                      ipAddress: ipAddress,
+                                      ssid: iface.ssid,
+                                      iface: iface.sectionName,
+                                      isAlreadyBanned: appState.isWirelessBanned(macNorm),
+                                      onBanConfirmed: (int banTimeSeconds) async {
+                                        context.showToastLoading('Banning $displayName...', actionKey: 'ban_$macNorm');
+                                        final res = await appState.banWirelessClient(
+                                          macNorm,
+                                          iface: iface.sectionName,
+                                          banTimeSeconds: banTimeSeconds,
+                                          context: context,
+                                        );
+                                         if (res) {
+                                           if (context.mounted) LuciToastManager.safeShowSuccess(context, 'Banned $displayName from ${iface.ssid}', actionKey: 'ban_$macNorm');
+                                         } else {
+                                           if (context.mounted) LuciToastManager.safeShowError(context, 'Failed to ban $displayName', actionKey: 'ban_$macNorm');
+                                         }
+                                      },
                                     ),
                                   );
-                                  if (confirm == true && context.mounted) {
-                                    context.showToastLoading('Disconnecting $displayName...', actionKey: 'kick_$macNorm');
-                                    final res = await appState.disconnectWirelessClient(
-                                      macNorm,
-                                      iface: iface.sectionName,
-                                      context: context,
-                                    );
-                                    if (context.mounted) {
-                                      if (res) {
-                                        context.showToastSuccess('Disconnected $displayName from ${iface.ssid}', actionKey: 'kick_$macNorm');
-                                      } else {
-                                        context.showToastError('Failed to disconnect $displayName', actionKey: 'kick_$macNorm');
-                                      }
-                                    }
-                                  }
                                 }
                               : null,
-                          icon: const Icon(Icons.wifi_off_rounded, size: 16, color: Colors.orange),
-                          label: const Text('Kick Client', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange)),
+                          icon: const Icon(Icons.block_rounded, size: 16, color: Colors.orange),
+                          label: const Text('Ban Client', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange)),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                             minimumSize: const Size(0, 36),

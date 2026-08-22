@@ -25,12 +25,9 @@ import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart' hide AppState;
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
+  final binding = WidgetsFlutterBinding.ensureInitialized();
 
-  // Enable native ScrollCapture & Accessibility Semantics for OS long/autoscrolling screenshots
-  SemanticsBinding.instance.ensureSemantics();
-
-  // Low-RAM Hardware Optimization: Cap image memory cache (30MB max, 100 entries max)
+  // Low-RAM & Smooth Scrolling Optimization: Cap image memory cache (30MB max, 100 entries max)
   PaintingBinding.instance.imageCache.maximumSizeBytes = 30 * 1024 * 1024;
   PaintingBinding.instance.imageCache.maximumSize = 100;
 
@@ -42,12 +39,13 @@ void main() {
     ),
   );
 
-  // Defer non-critical SDK initializations post-first-frame to eliminate startup latency & prevent cold start ANRs
-  if (AppConfig.isAdsEnabled) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+  // Defer secondary bindings & SDK initializations post-first-frame to eliminate startup latency
+  binding.addPostFrameCallback((_) {
+    SemanticsBinding.instance.ensureSemantics();
+    if (AppConfig.isAdsEnabled) {
       _initDeferredAds();
-    });
-  }
+    }
+  });
 }
 
 /// Standardized scroll behavior ensuring native long/autoscroll screenshot engine compatibility

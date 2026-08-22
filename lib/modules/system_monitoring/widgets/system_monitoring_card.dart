@@ -44,47 +44,69 @@ class SystemMonitoringCard extends ConsumerWidget {
                 ],
               ),
             ),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildMetricTile(
-                    context,
-                    label: 'CPU Load',
-                    value: '${metrics.cpuUsagePercent.toStringAsFixed(0)}%',
-                    icon: Icons.memory_outlined,
-                    color: Colors.orange,
-                  ),
-                ),
-                Expanded(
-                  child: _buildMetricTile(
-                    context,
-                    label: 'RAM Usage',
-                    value: metrics.totalMemoryBytes > 0
-                        ? '${metrics.memoryUsagePercent.toStringAsFixed(0)}%'
-                        : 'N/A',
-                    icon: Icons.pie_chart_outline,
-                    color: Colors.blue,
-                  ),
-                ),
-                Expanded(
-                  child: _buildMetricTile(
-                    context,
-                    label: 'Load Avg',
-                    value: metrics.load1m.toStringAsFixed(2),
-                    icon: Icons.speed_outlined,
-                    color: Colors.purple,
-                  ),
-                ),
-                Expanded(
-                  child: _buildMetricTile(
-                    context,
-                    label: 'Uptime',
-                    value: metrics.formattedUptime,
-                    icon: Icons.timer_outlined,
-                    color: Colors.green,
-                  ),
-                ),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 340 || MediaQuery.textScalerOf(context).scale(14) > 17;
+                final cpuTile = _buildMetricTile(
+                  context,
+                  label: 'CPU Load',
+                  value: '${metrics.cpuUsagePercent.toStringAsFixed(0)}%',
+                  icon: Icons.memory_outlined,
+                  color: Colors.orange,
+                );
+                final ramTile = _buildMetricTile(
+                  context,
+                  label: 'RAM Usage',
+                  value: metrics.totalMemoryBytes > 0
+                      ? '${metrics.memoryUsagePercent.toStringAsFixed(0)}%'
+                      : 'N/A',
+                  icon: Icons.pie_chart_outline,
+                  color: Colors.blue,
+                );
+                final loadTile = _buildMetricTile(
+                  context,
+                  label: 'Load Avg',
+                  value: metrics.load1m.toStringAsFixed(2),
+                  icon: Icons.speed_outlined,
+                  color: Colors.purple,
+                );
+                final uptimeTile = _buildMetricTile(
+                  context,
+                  label: 'Uptime',
+                  value: metrics.formattedUptime,
+                  icon: Icons.timer_outlined,
+                  color: Colors.green,
+                );
+
+                if (isNarrow) {
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: cpuTile),
+                          Expanded(child: ramTile),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(child: loadTile),
+                          Expanded(child: uptimeTile),
+                        ],
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: cpuTile),
+                    Expanded(child: ramTile),
+                    Expanded(child: loadTile),
+                    Expanded(child: uptimeTile),
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -103,25 +125,30 @@ class SystemMonitoringCard extends ConsumerWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 22, color: color),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-            fontSize: 11,
+        Icon(icon, size: 20, color: color),
+        const SizedBox(height: 4),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+              fontSize: 11,
+            ),
+            textAlign: TextAlign.center,
           ),
-          textAlign: TextAlign.center,
         ),
         const SizedBox(height: 2),
-        Text(
-          value,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+            textAlign: TextAlign.center,
           ),
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
         ),
       ],
     );

@@ -15,6 +15,7 @@ import 'package:yet_another_luci_app/design/luci_design_system.dart';
 import 'package:yet_another_luci_app/modules/dhcp_dns/models/dhcp_dns_info.dart';
 import 'package:yet_another_luci_app/widgets/luci_guardrail.dart';
 import 'package:yet_another_luci_app/widgets/add_static_lease_dialog.dart';
+import 'package:yet_another_luci_app/utils/self_device_guard.dart';
 import '../models/wireless_info.dart';
 import '../widgets/wireless_rollback_banner.dart';
 
@@ -27,18 +28,13 @@ class WifiAccessControlScreen extends ConsumerStatefulWidget {
 
 class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScreen> {
   final TextEditingController _macController = TextEditingController();
-  Client? _selectedClient;
-  String _selectedMac = '';
   List<Client> _availableClients = [];
+  Client? _selectedClient;
   bool _isLoadingClients = true;
 
-  // Selected per-interface settings: ifaceSection -> isAllowed
-  final Map<String, bool> _selectedIfaceAllows = {};
-
-  // Snapshot of initial per-interface settings from router: ifaceSection -> isAllowed
+  String _selectedMac = '';
   final Map<String, bool> _initialIfaceAllows = {};
-
-  // Current session phone MAC detection
+  final Map<String, bool> _selectedIfaceAllows = {};
   String? _phoneMac;
 
   @override
@@ -59,18 +55,24 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
   Future<void> _loadClients() async {
     final appState = ref.read(appStateProvider);
     try {
+      final localAddresses = await SelfDeviceGuard.getLocalDeviceAddresses();
       final clients = await appState.fetchAggregatedClients();
       if (!mounted) return;
       setState(() {
         _availableClients = clients;
         _isLoadingClients = false;
-        // Attempt to auto-detect phone MAC if connected
+        // Attempt to auto-detect phone MAC by matching local network interface addresses
         for (final c in clients) {
+          final normMac = _normalizeMac(c.macAddress);
+          final normIp = c.ipAddress.toLowerCase().trim();
+          if (localAddresses.contains(normIp) || localAddresses.any((a) => SelfDeviceGuard.normalizeMac(a) == normMac)) {
+            _phoneMac = normMac;
+            break;
+          }
           if (c.isConnected && c.connectionType == ConnectionType.wireless) {
-            _phoneMac ??= _normalizeMac(c.macAddress);
+            _phoneMac ??= normMac;
           }
         }
-        // Do NOT auto-select the first MAC address; leave unselected by default
       });
     } catch (_) {
       if (!mounted) return;
@@ -284,7 +286,7 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
             const WirelessRollbackBanner(),
             Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -970,13 +972,16 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
         context: context,
       );
 
-      if (!context.mounted) return;
       if (success) {
         unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
-        context.showToastSuccess('Access Control applied.', subtitle: 'Wi-Fi access rules updated successfully.', actionKey: actionKey);
+        if (context.mounted) {
+          LuciToastManager.safeShowSuccess(context, 'Access Control applied.', subtitle: 'Wi-Fi access rules updated successfully.', actionKey: actionKey);
+        }
       } else {
         unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
-        context.showToastError('Failed to apply Wi-Fi Access Control rules.', actionKey: actionKey);
+        if (context.mounted) {
+          LuciToastManager.safeShowError(context, 'Failed to apply Wi-Fi Access Control rules.', actionKey: actionKey);
+        }
       }
     }
     }

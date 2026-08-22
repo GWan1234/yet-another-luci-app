@@ -42,19 +42,20 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _checkReviewerMode() async {
-    await Future.delayed(const Duration(milliseconds: 1800));
+    // Run storage check concurrently with logo animation for instant cold boot speed
+    final storageFuture = SecureStorageService().readValue(
+      AppConfig.reviewerModeKey,
+    );
+    final minDelayFuture = Future.delayed(const Duration(milliseconds: 500));
+
+    final results = await Future.wait([storageFuture, minDelayFuture]);
+    final reviewerModeEnabled = results[0];
 
     if (!mounted) return;
 
-    // Check if reviewer mode is enabled
-    final secureStorage = SecureStorageService();
-    final reviewerModeEnabled = await secureStorage.readValue(
-      AppConfig.reviewerModeKey,
-    );
-
-    if (reviewerModeEnabled == 'true' && mounted) {
+    if (reviewerModeEnabled == 'true') {
       _navigateToMainScreen();
-    } else if (mounted) {
+    } else {
       _navigateToLoginScreen();
     }
   }
@@ -138,8 +139,10 @@ class _SplashScreenState extends State<SplashScreen>
         children: [
           // Subtle Network Topology Mesh Background Graphic
           Positioned.fill(
-            child: CustomPaint(
-              painter: _NetworkTopologyMeshPainter(meshColor: meshColor),
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: _NetworkTopologyMeshPainter(meshColor: meshColor),
+              ),
             ),
           ),
 

@@ -107,8 +107,38 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
       _selectedPmf = '0';
     }
 
+    _captureBaseline();
     _fetchAvailableNetworks();
     _prefetchLiveUciConfig();
+  }
+
+  Map<String, dynamic> _initialBaseline = {};
+
+  void _captureBaseline() {
+    _initialBaseline = {
+      'ssid': _ssidController.text.trim(),
+      'passphrase': _passphraseController.text,
+      'encryption': _selectedEncryption,
+      'cipher': _selectedCipher,
+      'pmf': _selectedPmf,
+      'isolate': _isolateClients,
+      'hidden': _isHidden,
+      'network': _selectedNetwork,
+      'ieee80211r': _ieee80211r,
+      'ftOverDs': _ftOverDs,
+      'ftPskGenerateLocal': _ftPskGenerateLocal,
+      'mobilityDomain': _mobilityDomainController.text.trim(),
+      'wmm': _wmmEnabled,
+      'disassocLowAck': _disassocLowAck,
+      'multicastToUnicast': _multicastToUnicast,
+      'wds': _wds,
+      'dtimPeriod': _dtimPeriodController.text.trim(),
+      'gtkRekey': _gtkRekeyController.text.trim(),
+      'inactivityLimit': _inactivityLimitController.text.trim(),
+      'maxListenInterval': _maxListenIntervalController.text.trim(),
+      'macfilter': _macfilter,
+      'maclist': _maclistController.text.trim(),
+    };
   }
 
   @override
@@ -237,6 +267,7 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
     } catch (_) {
     } finally {
       if (mounted) {
+        _captureBaseline();
         setState(() => _isPrefetching = false);
       }
     }
@@ -431,38 +462,73 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
   }
 
   bool _hasChanges() {
-    if (_ssidController.text.trim() != widget.interface.ssid) return true;
-    final initialEnc = _mapEncryptionToUci(widget.interface.securityMode, widget.interface.encryption);
-    if (_selectedEncryption != initialEnc) return true;
-    if (_selectedCipher != _sanitizeCipher(widget.interface.cipher)) return true;
-    final initialPmf = widget.interface.pmfState == PmfState.required ? '2' : (widget.interface.pmfState == PmfState.optional ? '1' : '0');
-    if (_selectedPmf != initialPmf) return true;
-    if (_passphraseController.text.trim().isNotEmpty && _passphraseController.text.trim() != _initialPassphrase) return true;
-    if (_isolateClients != widget.interface.isolateClients) return true;
-    if (_isHidden != widget.interface.isHidden) return true;
-    final initNet = (widget.interface.networkBridge ?? '').isNotEmpty ? widget.interface.networkBridge! : 'lan';
-    if (_selectedNetwork != initNet) return true;
-    if (_ieee80211r != widget.interface.fastTransitionEnabled) return true;
-    if (_ftOverDs != widget.interface.ftOverDs) return true;
-    if (_ftPskGenerateLocal != widget.interface.ftPskGenerateLocal) return true;
-    if (_mobilityDomainController.text.trim() != (widget.interface.mobilityDomain ?? '')) return true;
-    final initWmm = widget.interface.rawConfig['wmm'] == null ? true : (widget.interface.rawConfig['wmm'].toString() == '1' || widget.interface.rawConfig['wmm'].toString() == 'true');
-    if (_wmmEnabled != initWmm) return true;
-    if (_disassocLowAck != widget.interface.disassocLowAck) return true;
-    if (_multicastToUnicast != widget.interface.multiToUnicast) return true;
-    final initWds = widget.interface.rawConfig['wds'] != null && (widget.interface.rawConfig['wds'].toString() == '1' || widget.interface.rawConfig['wds'].toString() == 'true');
-    if (_wds != initWds) return true;
-    if (_dtimPeriodController.text.trim() != (widget.interface.dtimPeriod?.toString() ?? '')) return true;
-    if (_gtkRekeyController.text.trim() != (widget.interface.gtkRekey?.toString() ?? '')) return true;
-    if (_inactivityLimitController.text.trim() != (widget.interface.inactivityLimit?.toString() ?? '')) return true;
-    if (_maxListenIntervalController.text.trim() != (widget.interface.maxListenInterval?.toString() ?? '')) return true;
-    final rawMacFilter = widget.interface.rawConfig['macfilter']?.toString() ?? 'disable';
-    final initialMacFilter = (rawMacFilter.isEmpty || rawMacFilter == 'none') ? 'disable' : rawMacFilter;
-    if (_macfilter != initialMacFilter) return true;
-    final rawMacList = widget.interface.rawConfig['maclist'];
-    final String initialMacList = rawMacList is List ? rawMacList.join('\n').trim() : (rawMacList?.toString().trim() ?? '');
-    if (_maclistController.text.trim() != initialMacList) return true;
+    if (_initialBaseline.isEmpty) return false;
+    if (_ssidController.text.trim() != _initialBaseline['ssid']) return true;
+    if (_passphraseController.text != _initialBaseline['passphrase']) return true;
+    if (_selectedEncryption != _initialBaseline['encryption']) return true;
+    if (_selectedCipher != _initialBaseline['cipher']) return true;
+    if (_selectedPmf != _initialBaseline['pmf']) return true;
+    if (_isolateClients != _initialBaseline['isolate']) return true;
+    if (_isHidden != _initialBaseline['hidden']) return true;
+    if (_selectedNetwork != _initialBaseline['network']) return true;
+    if (_ieee80211r != _initialBaseline['ieee80211r']) return true;
+    if (_ftOverDs != _initialBaseline['ftOverDs']) return true;
+    if (_ftPskGenerateLocal != _initialBaseline['ftPskGenerateLocal']) return true;
+    if (_mobilityDomainController.text.trim() != _initialBaseline['mobilityDomain']) return true;
+    if (_wmmEnabled != _initialBaseline['wmm']) return true;
+    if (_disassocLowAck != _initialBaseline['disassocLowAck']) return true;
+    if (_multicastToUnicast != _initialBaseline['multicastToUnicast']) return true;
+    if (_wds != _initialBaseline['wds']) return true;
+    if (_dtimPeriodController.text.trim() != _initialBaseline['dtimPeriod']) return true;
+    if (_gtkRekeyController.text.trim() != _initialBaseline['gtkRekey']) return true;
+    if (_inactivityLimitController.text.trim() != _initialBaseline['inactivityLimit']) return true;
+    if (_maxListenIntervalController.text.trim() != _initialBaseline['maxListenInterval']) return true;
+    if (_macfilter != _initialBaseline['macfilter']) return true;
+    if (_maclistController.text.trim() != _initialBaseline['maclist']) return true;
     return false;
+  }
+
+  bool _isFormValid() {
+    final ssid = _ssidController.text.trim();
+    if (ssid.isEmpty) return false;
+    if (utf8.encode(ssid).length > 32) return false;
+
+    if (!isNone) {
+      final pass = _passphraseController.text;
+      if (pass.isNotEmpty) {
+        if (pass.length < 8 || pass.length > 64) return false;
+      } else {
+        final String initPass = _initialBaseline['passphrase'] ?? _initialPassphrase;
+        if (initPass.isEmpty) return false;
+      }
+    }
+
+    if (_ieee80211r) {
+      final mob = _mobilityDomainController.text.trim();
+      if (mob.isEmpty || mob.length > 4) return false;
+    }
+
+    if (_dtimPeriodController.text.trim().isNotEmpty) {
+      final dtim = int.tryParse(_dtimPeriodController.text.trim());
+      if (dtim == null || dtim < 1 || dtim > 255) return false;
+    }
+
+    if (_gtkRekeyController.text.trim().isNotEmpty) {
+      final rekey = int.tryParse(_gtkRekeyController.text.trim());
+      if (rekey == null || rekey < 0) return false;
+    }
+
+    if (_inactivityLimitController.text.trim().isNotEmpty) {
+      final inact = int.tryParse(_inactivityLimitController.text.trim());
+      if (inact == null || inact < 0) return false;
+    }
+
+    if (_maxListenIntervalController.text.trim().isNotEmpty) {
+      final listen = int.tryParse(_maxListenIntervalController.text.trim());
+      if (listen == null || listen < 0) return false;
+    }
+
+    return true;
   }
 
   bool _isSecurityDowngrade() {
@@ -760,9 +826,11 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                                 children: [
                                   Icon(Icons.tune_rounded, size: 18, color: theme.colorScheme.primary),
                                   const SizedBox(width: 8),
-                                  Text(
-                                    'Advanced Network & Roaming Settings',
-                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                                  Expanded(
+                                    child: Text(
+                                      'Advanced Network & Roaming Settings',
+                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -983,12 +1051,17 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                       child: const Text('Cancel'),
                     ),
                     const SizedBox(width: 8),
-                    ElevatedButton.icon(
-                      onPressed: (_isSubmitting || !_hasChanges()) ? null : _submitChanges,
-                      icon: _isSubmitting
-                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.save_rounded, size: 18),
-                      label: Text(hasWriteAccess ? 'Save & Apply' : 'Save (Non-Root)'),
+                    Builder(
+                      builder: (context) {
+                        final canSave = !_isSubmitting && !_isPrefetching && _hasChanges() && _isFormValid();
+                        return ElevatedButton.icon(
+                          onPressed: canSave ? _submitChanges : null,
+                          icon: _isSubmitting
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.save_rounded, size: 18),
+                          label: Text(hasWriteAccess ? 'Save & Apply' : 'Save (Non-Root)'),
+                        );
+                      },
                     ),
                   ],
                 ),

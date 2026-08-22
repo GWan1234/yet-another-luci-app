@@ -1102,6 +1102,18 @@ class MockApiService implements IApiService {
   }
 
   @override
+  Future<dynamic> uciRevert(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String config,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 100));
+    return [0, 'success'];
+  }
+
+  @override
   Future<List<String>> fetchNetworkInterfaces({
     required String ipAddress,
     required String sysauth,
@@ -1192,6 +1204,7 @@ class MockApiService implements IApiService {
     bool useHttps, {
     required String macAddress,
     String? iface,
+    int banTimeSeconds = 300,
     BuildContext? context,
   }) async {
     await Future.delayed(const Duration(milliseconds: 200));
@@ -1301,6 +1314,7 @@ class MockApiService implements IApiService {
     bool useHttps, {
     required String macAddress,
     String? iface,
+    int banTimeSeconds = 300,
     BuildContext? context,
   }) async {
     await Future.delayed(const Duration(milliseconds: 200));

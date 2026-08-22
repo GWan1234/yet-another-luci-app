@@ -222,16 +222,45 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
   }
 
   Future<Uint8List?> _readRouterFileAsBytes(AppState appState, String filePath) async {
-    // Strategy 0: Native LuCI RPC file.read with base64 (0 shell processes, 100% ubus ACL compliant)
+    // Strategy 0: Native LuCI RPC chunked file.read with base64 (0 shell processes, 100% ubus ACL compliant)
     try {
-      final res = await appState.callRpc('file', 'read', {
-        'path': filePath,
-        'base64': true,
-      });
-      final dataStr = _extractDataStringFromRpcResult(res);
-      final bytes = _parseRawOutputToBytes(dataStr);
-      if (bytes != null && bytes.isNotEmpty) return bytes;
-    } catch (_) {}
+      final List<int> accumulatedBytes = [];
+      const chunkSize = 32768; // 32 KB per chunk
+      int offset = 0;
+      int emptyCount = 0;
+
+      while (offset < 50 * 1024 * 1024) { // Cap at 50 MB
+        final res = await appState.callRpc('file', 'read', {
+          'path': filePath,
+          'offset': offset,
+          'length': chunkSize,
+          'base64': true,
+        });
+
+        final dataStr = _extractDataStringFromRpcResult(res);
+        final chunkBytes = _parseRawOutputToBytes(dataStr);
+        if (chunkBytes != null && chunkBytes.isNotEmpty) {
+          accumulatedBytes.addAll(chunkBytes);
+          offset += chunkBytes.length;
+          emptyCount = 0;
+          if (chunkBytes.length < chunkSize) {
+            break; // Reached EOF
+          }
+          continue;
+        }
+
+        emptyCount++;
+        if (emptyCount >= 2) break;
+        offset += chunkSize;
+      }
+
+      if (accumulatedBytes.isNotEmpty) {
+        Logger.info('Read $filePath via chunked file.read RPC: ${accumulatedBytes.length} bytes');
+        return Uint8List.fromList(accumulatedBytes);
+      }
+    } catch (e) {
+      Logger.warning('Strategy 0 chunked file.read RPC failed for $filePath: $e');
+    }
 
     // Method 1: Single base64 shell command
     String? b64Str = await appState.executeRouterCommandOutput('base64', [filePath]);
@@ -396,41 +425,52 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
     try {
       Uint8List? bytes;
 
-      // Strategy 1: Direct single-command generation + Base64 piping to stdout
-      Logger.info('Backup Strategy 1: Single-command stream to base64...');
-      final directB64 = await appState.executeRouterCommandOutput('sh', [
+      // Strategy 1: Create backup archive on router & read via chunked RPC file.read
+      Logger.info('Backup Strategy 1: Creating /tmp/app_backup.tar.gz and reading via chunked RPC...');
+      await appState.executeRouterCommand('sh', [
         '-c',
-        'sysupgrade -b - 2>/dev/null | base64 || (sysupgrade -b /tmp/b.tgz 2>/dev/null && base64 /tmp/b.tgz && rm -f /tmp/b.tgz) || tar -czf - -C / etc/config etc/passwd etc/shadow etc/dropbear etc/uhttpd etc/dnsmasq.conf etc/sysupgrade.conf etc/uci-defaults 2>/dev/null | base64'
+        'sysupgrade -b /tmp/app_backup.tar.gz 2>/dev/null || tar -czf /tmp/app_backup.tar.gz -C / etc/config etc/passwd etc/shadow etc/dropbear etc/uhttpd etc/dnsmasq.conf etc/sysupgrade.conf etc/uci-defaults 2>/dev/null'
       ]);
+      bytes = await _readRouterFileAsBytes(appState, '/tmp/app_backup.tar.gz');
+      unawaited(appState.executeRouterCommand('rm', ['-f', '/tmp/app_backup.tar.gz']));
 
-      if (directB64 != null && directB64.trim().isNotEmpty) {
-        try {
-          final cleanB64 = directB64.replaceAll('\n', '').replaceAll('\r', '').replaceAll(' ', '').trim();
-          final decoded = base64Decode(cleanB64);
-          if (decoded.isNotEmpty) {
-            bytes = decoded;
-            Logger.info('Backup Strategy 1 succeeded: ${bytes.length} bytes downloaded');
-          }
-        } catch (e) {
-          Logger.warning('Backup Strategy 1 decode error: $e');
+      if (bytes != null && bytes.isNotEmpty) {
+        if (_validateBackupArchiveBytes(bytes)) {
+          Logger.info('Backup Strategy 1 succeeded: ${bytes.length} bytes downloaded');
+        } else {
+          Logger.warning('Backup Strategy 1 generated invalid/corrupt payload. Retrying with next strategy...');
+          bytes = null;
         }
       }
 
-      // Strategy 2: Multi-step file creation & reading via _readRouterFileAsBytes
+      // Strategy 2: Direct single-command generation + Base64 piping to stdout
       if (bytes == null || bytes.isEmpty) {
-        Logger.info('Backup Strategy 2: Creating /tmp/backup.tar.gz and reading...');
-        await appState.executeRouterCommand('sh', ['-c', 'sysupgrade -b /tmp/backup.tar.gz || tar -czf /tmp/backup.tar.gz -C / etc/config etc/passwd etc/shadow etc/dropbear etc/uhttpd etc/dnsmasq.conf 2>/dev/null']);
-        bytes = await _readRouterFileAsBytes(appState, '/tmp/backup.tar.gz');
-        if (bytes != null && bytes.isNotEmpty) {
-          Logger.info('Backup Strategy 2 succeeded: ${bytes.length} bytes downloaded');
+        Logger.info('Backup Strategy 2: Single-command stream to base64...');
+        final directB64 = await appState.executeRouterCommandOutput('sh', [
+          '-c',
+          'sysupgrade -b - 2>/dev/null | base64 || (sysupgrade -b /tmp/b.tgz 2>/dev/null && base64 /tmp/b.tgz && rm -f /tmp/b.tgz) || tar -czf - -C / etc/config etc/passwd etc/shadow etc/dropbear etc/uhttpd etc/dnsmasq.conf etc/sysupgrade.conf etc/uci-defaults 2>/dev/null | base64'
+        ]);
+
+        if (directB64 != null && directB64.trim().isNotEmpty) {
+          try {
+            final cleanB64 = directB64.replaceAll('\n', '').replaceAll('\r', '').replaceAll(' ', '').trim();
+            final decoded = base64Decode(cleanB64);
+            if (decoded.isNotEmpty && _validateBackupArchiveBytes(decoded)) {
+              bytes = decoded;
+              Logger.info('Backup Strategy 2 succeeded: ${bytes.length} bytes downloaded');
+            }
+          } catch (e) {
+            Logger.warning('Backup Strategy 2 decode error: $e');
+          }
         }
       }
 
       // Strategy 3: Direct HTTP/HTTPS download from LuCI backup endpoints
       if (bytes == null || bytes.isEmpty) {
         Logger.info('Backup Strategy 3: Downloading via LuCI HTTP endpoints...');
-        bytes = await _downloadBackupViaHttp(appState);
-        if (bytes != null && bytes.isNotEmpty) {
+        final httpBytes = await _downloadBackupViaHttp(appState);
+        if (httpBytes != null && httpBytes.isNotEmpty && _validateBackupArchiveBytes(httpBytes)) {
+          bytes = httpBytes;
           Logger.info('Backup Strategy 3 succeeded: ${bytes.length} bytes downloaded');
         }
       }
@@ -510,6 +550,53 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
     }
   }
 
+  /// Verifies that chosen backup bytes are a valid OpenWrt backup archive (gzip / tar magic bytes & structure).
+  bool _validateBackupArchiveBytes(Uint8List bytes) {
+    if (bytes.length < 10) return false;
+
+    // Check 1: Gzip Magic Bytes (0x1F, 0x8B)
+    final isGzip = bytes[0] == 0x1F && bytes[1] == 0x8B;
+
+    // Check 2: Tar Magic Bytes at offset 257 (ustar)
+    bool isTar = false;
+    if (bytes.length >= 262) {
+      final magic = String.fromCharCodes(bytes.sublist(257, 262));
+      if (magic == 'ustar') isTar = true;
+    }
+
+    if (!isGzip && !isTar) {
+      return false;
+    }
+
+    // Check 3: If Gzip, attempt decompression to verify payload integrity
+    if (isGzip) {
+      try {
+        final decompressed = GZipCodec().decode(bytes);
+        if (decompressed.isEmpty) return false;
+        if (decompressed.length >= 262) {
+          final decompMagic = String.fromCharCodes(decompressed.sublist(257, 262));
+          if (decompMagic.startsWith('ustar')) return true;
+        }
+        final text = latin1.decode(
+          decompressed.sublist(0, decompressed.length > 2048 ? 2048 : decompressed.length),
+          allowInvalid: true,
+        );
+        if (text.contains('etc/') ||
+            text.contains('config') ||
+            text.contains('passwd') ||
+            text.contains('sysupgrade')) {
+          return true;
+        }
+        return true;
+      } catch (e) {
+        Logger.warning('GZip decompression validation failed for archive: $e');
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   Future<void> _handleUploadArchive() async {
     try {
       final pickedFiles = await FilePicker.pickFiles(
@@ -522,15 +609,15 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
       final fileNameLower = pickedFile.name.toLowerCase();
 
       // Extension Validation Guardrail: Ensure file is a valid OpenWrt backup archive
-      final isValidArchive = fileNameLower.endsWith('.tar.gz') ||
+      final isValidExtension = fileNameLower.endsWith('.tar.gz') ||
           fileNameLower.endsWith('.tgz') ||
           fileNameLower.endsWith('.tar') ||
           fileNameLower.endsWith('.gz');
 
-      if (!isValidArchive) {
+      if (!isValidExtension) {
         if (mounted) {
           context.showToastError(
-            'Invalid Archive Format',
+            'Invalid Archive Extension',
             subtitle: 'Please select a valid OpenWrt backup archive (.tar.gz, .tgz, .tar, or .gz).',
           );
         }
@@ -552,6 +639,18 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         throw Exception('Could not read chosen archive file.');
       }
 
+      // Pre-Restore Integrity Validation Guardrail: Inspect archive byte headers BEFORE uploading to router
+      final isValidPayload = _validateBackupArchiveBytes(fileBytes);
+      if (!isValidPayload) {
+        if (mounted) {
+          context.showToastError(
+            'Corrupt or Invalid Archive Payload',
+            subtitle: 'The selected file is corrupt or not a valid gzipped tarball. Pre-restore validation aborted to prevent router configuration corruption.',
+          );
+        }
+        return;
+      }
+
       setState(() {
         _isProcessing = true;
         _uploadProgress = 0.0;
@@ -561,7 +660,7 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
       final appState = ref.read(appStateProvider);
       final b64Str = base64Encode(fileBytes);
 
-      const chunkSize = 30000;
+      const chunkSize = 8000;
       await appState.executeRouterCommand('sh', ['-c', 'rm -f /tmp/uploaded_backup.tar.gz.b64 /tmp/uploaded_backup.tar.gz']);
       for (var i = 0; i < b64Str.length; i += chunkSize) {
         final end = (i + chunkSize < b64Str.length) ? i + chunkSize : b64Str.length;
@@ -574,7 +673,10 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         }
       }
 
-      await appState.executeRouterCommand('sh', ['-c', 'base64 -d /tmp/uploaded_backup.tar.gz.b64 > /tmp/uploaded_backup.tar.gz && rm -f /tmp/uploaded_backup.tar.gz.b64']);
+      await appState.executeRouterCommand('sh', [
+        '-c',
+        'base64 -d /tmp/uploaded_backup.tar.gz.b64 > /tmp/uploaded_backup.tar.gz 2>/dev/null || openssl base64 -d -in /tmp/uploaded_backup.tar.gz.b64 -out /tmp/uploaded_backup.tar.gz 2>/dev/null || uudecode -o /tmp/uploaded_backup.tar.gz /tmp/uploaded_backup.tar.gz.b64 2>/dev/null && rm -f /tmp/uploaded_backup.tar.gz.b64'
+      ]);
 
       setState(() {
         _statusMessage = 'Restoring backup configuration...';
@@ -584,10 +686,14 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
       final restoreSuccess = await appState.executeRouterCommand('sysupgrade', ['-r', '/tmp/uploaded_backup.tar.gz']);
       final fallbackSuccess = !restoreSuccess ? await appState.executeRouterCommand('tar', ['-xzf', '/tmp/uploaded_backup.tar.gz', '-C', '/']) : true;
 
+      // Reload config daemons so restored /etc/config settings take effect on running services
+      await appState.executeRouterCommand('sh', ['-c', '/sbin/reload_config 2>/dev/null || /etc/init.d/luci reload 2>/dev/null || true']);
+
       if (!mounted) return;
       if (restoreSuccess || fallbackSuccess) {
         unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
         context.showToastSuccess('Configuration restored successfully from archive.');
+        _showPostRestoreRebootDialog();
       } else {
         context.showToastError('Failed to restore backup configuration.');
       }
@@ -599,6 +705,38 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         setState(() => _isProcessing = false);
       }
     }
+  }
+
+  void _showPostRestoreRebootDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restore Complete'),
+        content: const Text(
+          'Configuration files have been restored to the router.\n\n'
+          'Would you like to reboot the router now to ensure all restored daemons and network interfaces initialize cleanly?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Later'),
+          ),
+          FilledButton.icon(
+            icon: const Icon(Icons.restart_alt_rounded),
+            label: const Text('Reboot Router'),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final appState = ref.read(appStateProvider);
+              await appState.executeRouterCommand('reboot', []);
+              if (mounted) {
+                context.showToastWarning('Rebooting router...');
+                _showRebootCountdownDialog();
+              }
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _handleFactoryReset() async {
