@@ -1,34 +1,64 @@
-Take full control of your OpenWrt router with Yet Another LuCI App by Tuhin Garai. Our app offers a modern, intuitive interface to securely manage your home network from anywhere.
+Manage your OpenWrt and OpenWrt-based router directly from Android with a modern, high-performance native interface built for everyday administration, wireless monitoring, and advanced network control.
 
-Designed for both power users and network enthusiasts, Yet Another LuCI App simplifies router management without sacrificing functionality.
+Yet Another LuCI for OpenWrt is a privacy-first mobile client that connects directly to your router via standard LuCI HTTP/HTTPS and ubus JSON-RPC APIs. Designed for speed, it provides a touch-friendly alternative to mobile browsers without depending on cloud servers, external accounts, or remote telemetry.
 
-<b>Key Features:</b>
+COMPATIBLE FIRMWARES & ROUTERS
+Works with stock OpenWrt, ImmortalWrt, Turris OS, GL.iNet (GL-MT3000 Beryl AX, Slate, Flint, etc.), Gargoyle, LEDE, X-WRT, FriendlyWrt, and custom OpenWrt builds on TP-Link, Netgear, Linksys, Xiaomi, and Asus routers equipped with LuCI/ubus access.
 
-* <b>Multiple Router Management:</b> Add, switch, and manage any number of OpenWrt routers. Each router’s data is kept separate and secure.
-* <b>Real-Time Dashboard:</b> Instantly view system status, performance metrics, and uptime with interactive charts.
-* <b>Complete Network Management:</b> Monitor all wired and wireless interfaces, track bandwidth usage, and check IP configurations.
-* <b>Detailed Client Oversight:</b> See a live list of all connected devices with their IP/MAC addresses, hostnames, and active connection times.
-* <b>Powerful System Control:</b> Remotely reboot your router with a single tap.
-* <b>Secure & Flexible Connection:</b> Connect via HTTP or HTTPS, with support for self-signed certificates and secure credential storage.
-* <b>Modern UI:</b> Enjoy a clean experience with Material Design 3, including full support for light and dark themes.
+KEY FEATURES & CAPABILITIES
 
------
+PARENTAL CONTROLS & SCHEDULES
+• Group devices into customizable parental profiles with custom icons and colors
+• Set time-based internet access schedules with automatic background enforcement
+• One-tap internet pause and resume for individual client devices
+• Unrestricted bypass mode for temporary scheduling overrides
+• Detailed activity logs and usage duration metrics
 
-<b>Requirements:</b>
+ISOLATED GUEST WI-FI MANAGEMENT
+• 1-tap provisioning of dedicated guest Wi-Fi networks
+• Automatic firewall rules isolating guest devices from your LAN gateway while allowing WAN internet access
+• Built-in L2 client isolation (ap_isolate) to prevent guest-to-guest communication
+• Quick QR code generation for fast guest onboarding
 
-This app requires an OpenWrt router with the LuCI web interface enabled. For remote access, ensure your router's firewall is configured correctly.
+REAL-TIME MONITORING & DIAGNOSTICS
+• Real-time CPU, RAM, swap, storage, load average, and uptime telemetry
+• Interactive network throughput graphs and interface traffic stats
+• Built-in Ping, Traceroute, and NSLookup diagnostic tools
+• Monitor system services, daemons, and system log events
 
------
+CONNECTED DEVICES & CLIENTS
+• Live view of active wired, wireless, and DHCP lease clients
+• Filter clients by hostname, MAC address, or IP address
+• Configure static DHCP leases with hostnames and custom IP allocations
+• One-tap MAC access control (allow list / ban list)
+• Clear IPv4 & IPv6 classification with SSID connection details
 
-<b>Support & Source Code:</b>
+WIRELESS NETWORK MANAGEMENT
+• Tri-band support for 2.4 GHz, 5 GHz, and 6 GHz (Wi-Fi 6E / Wi-Fi 7) radios
+• Monitor associated stations, signal strength (dBm), channel, and noise floor
+• Configure SSID visibility, TX power, and security modes (WPA2, WPA3 Personal/Enterprise)
 
-Yet Another LuCI App is an open-source project by Tuhin Garai (nightcodex7). For support, to report issues, or to view the source code, please visit our GitHub repository:
+FIREWALL, ROUTING & NETWORKING
+• Supports both iptables (fw3) and modern nftables (fw4) firewall systems
+• Enable, disable, or reorder firewall rules, zones, and port forwards
+• Inspect network interfaces, physical device bindings, and DSA / legacy switch topology
 
-https://github.com/nightcodex7/yet-another-luci-app
+VPN, DNS & ENCRYPTED TUNNELS
+• Monitor and control WireGuard, OpenVPN, and Tailscale interfaces
+• Monitor secured tunnel status and packet statistics
+• Manage DNS settings (dnsmasq), domain aliases, and upstream resolvers
 
-Author: Tuhin Garai (nightcodex7)
-Email: tuhingarai.dev+support@gmail.com
+PACKAGES & SERVICE MANAGEMENT
+• Universal package manager supporting legacy opkg and modern OpenWrt 24.10+ apk
+• Discover, install, update, or remove router packages and LuCI extensions
+• Start, stop, restart, or toggle autostart for system services
+• View and edit cron scheduled tasks
 
------
+SECURITY & SAFETY GUARDRAILS
+• Active self-device guard prevents accidental management lockout
+• Atomic UCI commits with automatic rollback on network error
+• Pre-upload archive header checks (GZip/Tar) for safe system backup restores
+• 100% Cloud-Free: Direct local HTTP/HTTPS connection with zero ads, tracking, or telemetry
 
-<b>Disclaimer:</b> This is an independent, third-party application licensed under the Apache License 2.0 and is not officially affiliated with the OpenWrt project.
+DISCLAIMER
+Yet Another LuCI for OpenWrt is an independent third-party application and is not affiliated with or endorsed by the OpenWrt Project or GL.iNet. OpenWrt, LuCI, and brand names are trademarks of their respective owners.
