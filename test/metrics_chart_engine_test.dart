@@ -7,7 +7,10 @@ import 'package:yet_another_luci_app/modules/charting/services/metrics_chart_eng
 void main() {
   group('MetricsChartEngine Tests', () {
     test('Decouples time window from polling interval correctly', () {
-      final engine = MetricsChartEngine(timeWindowSeconds: 60, intervalSeconds: 2);
+      final engine = MetricsChartEngine(
+        timeWindowSeconds: 60,
+        intervalSeconds: 2,
+      );
 
       // Default: 60s window @ 2s poll rate = 30 max points
       expect(engine.state.timeWindowSeconds, 60);
@@ -26,7 +29,10 @@ void main() {
     });
 
     test('Buffers and trims samples maintaining calculated maxPoints', () {
-      final engine = MetricsChartEngine(timeWindowSeconds: 30, intervalSeconds: 5);
+      final engine = MetricsChartEngine(
+        timeWindowSeconds: 30,
+        intervalSeconds: 5,
+      );
       // 30s / 5s = 6 max points
       expect(engine.state.maxPoints, 6);
 

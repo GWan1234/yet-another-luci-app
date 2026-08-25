@@ -17,7 +17,9 @@ import 'package:yet_another_luci_app/state/controllers/package_controller.dart';
 import 'package:yet_another_luci_app/state/controllers/network_actions_controller.dart';
 import 'package:yet_another_luci_app/state/controllers/client_controller.dart';
 import 'package:yet_another_luci_app/state/controllers/session_controller.dart';
+import 'package:yet_another_luci_app/models/rpc_result.dart';
 import 'package:yet_another_luci_app/models/client.dart';
+import 'package:yet_another_luci_app/modules/parental_controls/models/parental_profile.dart';
 import 'package:yet_another_luci_app/models/router.dart' as model;
 import 'package:yet_another_luci_app/models/dashboard_preferences.dart';
 import 'package:yet_another_luci_app/services/interfaces/auth_service_interface.dart';
@@ -27,7 +29,6 @@ import 'package:yet_another_luci_app/utils/http_client_manager.dart';
 import 'package:yet_another_luci_app/utils/logger.dart';
 import 'package:yet_another_luci_app/modules/package_manager/models/package_info.dart';
 import 'package:yet_another_luci_app/models/router_capabilities.dart';
-import 'package:yet_another_luci_app/models/rpc_result.dart';
 import 'package:yet_another_luci_app/models/network_topology.dart';
 import 'package:yet_another_luci_app/modules/firewall_security/models/firewall_info.dart';
 import 'package:yet_another_luci_app/modules/services_system/models/ddns_info.dart';
@@ -126,10 +127,13 @@ class AppState extends ChangeNotifier {
   final Set<String> _excludedGuestSections = {};
 
   Set<String> get customGuestSections => Set.unmodifiable(_customGuestSections);
-  Set<String> get excludedGuestSections => Set.unmodifiable(_excludedGuestSections);
+  Set<String> get excludedGuestSections =>
+      Set.unmodifiable(_excludedGuestSections);
 
-  bool isCustomGuestSection(String sectionName) => _customGuestSections.contains(sectionName);
-  bool isExcludedGuestSection(String sectionName) => _excludedGuestSections.contains(sectionName);
+  bool isCustomGuestSection(String sectionName) =>
+      _customGuestSections.contains(sectionName);
+  bool isExcludedGuestSection(String sectionName) =>
+      _excludedGuestSections.contains(sectionName);
 
   void markAsGuestSection(String sectionName) {
     _excludedGuestSections.remove(sectionName);
@@ -175,7 +179,9 @@ class AppState extends ChangeNotifier {
         .createSecureStorageService();
     _initializeServices();
     await _sessionController?.loadReviewerMode(_secureStorageService);
-    _initializeServices();
+    if (_sessionController?.reviewerModeEnabled == true) {
+      _initializeServices();
+    }
     await _sessionController?.loadThemeMode();
     await loadRouters(); // Load routers on app start (sets selectedRouter)
     await _sessionController
@@ -309,7 +315,6 @@ class AppState extends ChangeNotifier {
     await _secureStorageService.writeValue(key, value);
   }
 
-
   Future<void> setThemeMode(ThemeMode mode) =>
       _sessionController!.setThemeMode(mode);
 
@@ -323,6 +328,7 @@ class AppState extends ChangeNotifier {
       _sessionController!.saveDashboardPreferences(prefs);
 
   String? get sysauth => _sessionController?.sysauth;
+  bool get isAuthenticated => sysauth != null && sysauth!.isNotEmpty;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -707,20 +713,7 @@ class AppState extends ChangeNotifier {
   }
 
   bool _isSuccessResponse(dynamic res) {
-    if (res == null) return false;
-    if (res is List && res.isNotEmpty) {
-      if (res.length > 1 && res[1] is Map) {
-        final map = res[1] as Map;
-        if (map['code'] is int) return map['code'] == 0;
-        return res[0] == 0 &&
-            (map.containsKey('stdout') || map.containsKey('data'));
-      }
-      if (res[0] == 0) return true;
-    } else if (res is Map) {
-      if (res['code'] is int) return res['code'] == 0;
-      return res.containsKey('stdout') || res.containsKey('data');
-    }
-    return false;
+    return RpcResult.fromUbusResponse<dynamic>(res, (data) => data).isSuccess;
   }
 
   String? _extractStdout(dynamic res) {
@@ -1350,6 +1343,38 @@ class AppState extends ChangeNotifier {
     context: context,
   );
 
+  Future<bool> applyParentalProfileDns({
+    required String profileId,
+    required List<String> macAddresses,
+    required List<String>? dnsServers,
+    BuildContext? context,
+  }) => _networkActionsController!.applyParentalProfileDns(
+    profileId: profileId,
+    macAddresses: macAddresses,
+    dnsServers: dnsServers,
+    context: context,
+  );
+
+  Future<List<ParentalProfile>?> fetchParentalProfiles({
+    BuildContext? context,
+  }) => _networkActionsController!.fetchParentalProfiles(context: context);
+
+  Future<bool> saveParentalProfile({
+    required ParentalProfile profile,
+    BuildContext? context,
+  }) => _networkActionsController!.saveParentalProfile(
+    profile: profile,
+    context: context,
+  );
+
+  Future<bool> deleteParentalProfile({
+    required String profileId,
+    BuildContext? context,
+  }) => _networkActionsController!.deleteParentalProfile(
+    profileId: profileId,
+    context: context,
+  );
+
   Future<bool> addStaticLease({
     required String macAddress,
     required String targetIp,
@@ -1533,12 +1558,13 @@ class AppState extends ChangeNotifier {
     // Enrich names and IP addresses from clients list
     final clientMap = {
       for (final c in clients)
-        c.macAddress.toUpperCase().replaceAll('-', ':'): c
+        c.macAddress.toUpperCase().replaceAll('-', ':'): c,
     };
 
     for (final listKey in ['restricted', 'banned']) {
       for (final item in data[listKey]!) {
-        final mac = item['mac']?.toString().toUpperCase().replaceAll('-', ':') ?? '';
+        final mac =
+            item['mac']?.toString().toUpperCase().replaceAll('-', ':') ?? '';
         final client = clientMap[mac];
         if (client != null) {
           if (item['name'] == null || item['name'] == mac) {
@@ -2520,7 +2546,12 @@ class AppState extends ChangeNotifier {
           .replaceAll('-', ':')
           .split(',')
           .map((m) => m.trim())
-          .map((b) => b.split(':').map((part) => part.length == 1 ? '0$part' : part).join(':'));
+          .map(
+            (b) => b
+                .split(':')
+                .map((part) => part.length == 1 ? '0$part' : part)
+                .join(':'),
+          );
       if (macs.contains(normMac)) {
         return mapping;
       }
@@ -2562,10 +2593,13 @@ class AppState extends ChangeNotifier {
   Future<bool> restartVpnService(String serviceName) =>
       _networkActionsController!.restartVpnService(serviceName);
 
-  String? get pendingSectionName => _networkActionsController?.pendingSectionName;
+  String? get pendingSectionName =>
+      _networkActionsController?.pendingSectionName;
   String? get pendingTargetType => _networkActionsController?.pendingTargetType;
-  dynamic get pendingTargetRadio => _networkActionsController?.pendingTargetRadio;
-  dynamic get pendingTargetInterface => _networkActionsController?.pendingTargetInterface;
+  dynamic get pendingTargetRadio =>
+      _networkActionsController?.pendingTargetRadio;
+  dynamic get pendingTargetInterface =>
+      _networkActionsController?.pendingTargetInterface;
 
   /// Apply wireless interface configuration updates with staged rollback protection
   Future<bool> applyWirelessInterfaceConfig({

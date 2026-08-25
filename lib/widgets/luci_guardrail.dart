@@ -24,9 +24,10 @@ class LuciGuardrail {
     if (!appState.isAccessControlPendingConfirmation) return true;
 
     final remaining = appState.accessControlCountdownSeconds;
-    final message = subtitle ??
+    final message =
+        subtitle ??
         'You have staged high-risk wireless configuration changes counting down '
-        '(${remaining}s remaining).\n\nWhat would you like to do before leaving this screen?';
+            '(${remaining}s remaining).\n\nWhat would you like to do before leaving this screen?';
 
     await OsPlatformIntegration.triggerHaptic(OsHapticType.heavy);
     if (!context.mounted) return false;
@@ -35,7 +36,11 @@ class LuciGuardrail {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 36),
+        icon: const Icon(
+          Icons.warning_amber_rounded,
+          color: Colors.amber,
+          size: 36,
+        ),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         content: Text(message),
         actions: [
@@ -85,17 +90,29 @@ class LuciGuardrail {
     if (!context.mounted) return false;
 
     final theme = Theme.of(context);
-    final effectiveIconColor = iconColor ?? (isDestructive ? theme.colorScheme.error : theme.colorScheme.primary);
+    final effectiveIconColor =
+        iconColor ??
+        (isDestructive ? theme.colorScheme.error : theme.colorScheme.primary);
 
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: barrierDismissible,
       builder: (ctx) => AlertDialog(
         icon: Icon(icon, color: effectiveIconColor, size: 32),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
         content: customContent != null
             ? SingleChildScrollView(child: customContent)
-            : (subtitle != null ? SingleChildScrollView(child: Text(subtitle, style: const TextStyle(fontSize: 13.5))) : null),
+            : (subtitle != null
+                  ? SingleChildScrollView(
+                      child: Text(
+                        subtitle,
+                        style: const TextStyle(fontSize: 13.5),
+                      ),
+                    )
+                  : null),
         actions: [
           OutlinedButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -126,7 +143,8 @@ class LuciGuardrail {
     bool showAsDialog = false,
   }) {
     final username = appState.sessionUsername;
-    final message = "Account '$username' lacks UCI write access authorization required for $actionName.";
+    final message =
+        "Account '$username' lacks UCI write access authorization required for $actionName.";
 
     if (showAsDialog) {
       showConfirmation(
@@ -149,11 +167,14 @@ class LuciGuardrail {
     required String actionDescription,
     String? connectedMac,
   }) async {
-    final macInfo = connectedMac != null ? '\n\nActive device MAC: $connectedMac' : '';
+    final macInfo = connectedMac != null
+        ? '\n\nActive device MAC: $connectedMac'
+        : '';
     return showConfirmation(
       context,
       title: 'Self-Device Safety Warning',
-      subtitle: 'Changing $actionDescription may disconnect your current mobile device from the router Wi-Fi network.$macInfo\n\n'
+      subtitle:
+          'Changing $actionDescription may disconnect your current mobile device from the router Wi-Fi network.$macInfo\n\n'
           'Changes will be applied directly to the router.',
       confirmLabel: 'Proceed with Caution',
       cancelLabel: 'Cancel',
@@ -172,7 +193,8 @@ class LuciGuardrail {
     String title = 'Unsaved Changes',
     String? customSubtitle,
   }) async {
-    final subtitle = customSubtitle ??
+    final subtitle =
+        customSubtitle ??
         'You have $unsavedCount unsaved $itemLabel. Discarding will undo all staged modifications.';
 
     return showConfirmation(
@@ -203,14 +225,22 @@ class LuciGuardrail {
     if (!context.mounted) return null;
 
     final theme = Theme.of(context);
-    final message = subtitle ??
+    final message =
+        subtitle ??
         'You have $count unsaved $itemLabel. Would you like to save them before leaving?';
 
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: Icon(Icons.edit_note_rounded, color: theme.colorScheme.primary, size: 32),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        icon: Icon(
+          Icons.edit_note_rounded,
+          color: theme.colorScheme.primary,
+          size: 32,
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
         content: Text(message, style: const TextStyle(fontSize: 13.5)),
         actions: [
           TextButton(

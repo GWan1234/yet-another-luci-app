@@ -41,29 +41,68 @@ String? parseFlexibleMacAddress(String input) {
 void main() {
   group('Flexible MAC Address Copy-Paste Parsing Tests', () {
     test('Standard colon format is preserved and upper-cased', () {
-      expect(parseFlexibleMacAddress('aa:bb:cc:dd:ee:ff'), equals('AA:BB:CC:DD:EE:FF'));
-      expect(parseFlexibleMacAddress('AA:BB:CC:DD:EE:FF'), equals('AA:BB:CC:DD:EE:FF'));
+      expect(
+        parseFlexibleMacAddress('aa:bb:cc:dd:ee:ff'),
+        equals('AA:BB:CC:DD:EE:FF'),
+      );
+      expect(
+        parseFlexibleMacAddress('AA:BB:CC:DD:EE:FF'),
+        equals('AA:BB:CC:DD:EE:FF'),
+      );
     });
 
     test('Hyphen-separated format is converted to colon format', () {
-      expect(parseFlexibleMacAddress('aa-bb-cc-dd-ee-ff'), equals('AA:BB:CC:DD:EE:FF'));
-      expect(parseFlexibleMacAddress('AA-BB-CC-DD-EE-FF'), equals('AA:BB:CC:DD:EE:FF'));
+      expect(
+        parseFlexibleMacAddress('aa-bb-cc-dd-ee-ff'),
+        equals('AA:BB:CC:DD:EE:FF'),
+      );
+      expect(
+        parseFlexibleMacAddress('AA-BB-CC-DD-EE-FF'),
+        equals('AA:BB:CC:DD:EE:FF'),
+      );
     });
 
-    test('Cisco dot-separated format (aabb.ccdd.eeff) is converted to colon format', () {
-      expect(parseFlexibleMacAddress('aabb.ccdd.eeff'), equals('AA:BB:CC:DD:EE:FF'));
-      expect(parseFlexibleMacAddress('AABB.CCDD.EEFF'), equals('AA:BB:CC:DD:EE:FF'));
-    });
+    test(
+      'Cisco dot-separated format (aabb.ccdd.eeff) is converted to colon format',
+      () {
+        expect(
+          parseFlexibleMacAddress('aabb.ccdd.eeff'),
+          equals('AA:BB:CC:DD:EE:FF'),
+        );
+        expect(
+          parseFlexibleMacAddress('AABB.CCDD.EEFF'),
+          equals('AA:BB:CC:DD:EE:FF'),
+        );
+      },
+    );
 
-    test('Raw 12-character hex string (aabbccddeeff) is converted to colon format', () {
-      expect(parseFlexibleMacAddress('aabbccddeeff'), equals('AA:BB:CC:DD:EE:FF'));
-      expect(parseFlexibleMacAddress('AABBCCDDEEFF'), equals('AA:BB:CC:DD:EE:FF'));
-    });
+    test(
+      'Raw 12-character hex string (aabbccddeeff) is converted to colon format',
+      () {
+        expect(
+          parseFlexibleMacAddress('aabbccddeeff'),
+          equals('AA:BB:CC:DD:EE:FF'),
+        );
+        expect(
+          parseFlexibleMacAddress('AABBCCDDEEFF'),
+          equals('AA:BB:CC:DD:EE:FF'),
+        );
+      },
+    );
 
-    test('Space-separated and bracketed MAC strings are converted correctly', () {
-      expect(parseFlexibleMacAddress('[AA:BB:CC:DD:EE:FF]'), equals('AA:BB:CC:DD:EE:FF'));
-      expect(parseFlexibleMacAddress('mac: aabbccddeeff (eth0)'), equals('AA:BB:CC:DD:EE:FF'));
-    });
+    test(
+      'Space-separated and bracketed MAC strings are converted correctly',
+      () {
+        expect(
+          parseFlexibleMacAddress('[AA:BB:CC:DD:EE:FF]'),
+          equals('AA:BB:CC:DD:EE:FF'),
+        );
+        expect(
+          parseFlexibleMacAddress('mac: aabbccddeeff (eth0)'),
+          equals('AA:BB:CC:DD:EE:FF'),
+        );
+      },
+    );
 
     test('Invalid MAC strings return null', () {
       expect(parseFlexibleMacAddress('invalid_mac'), isNull);

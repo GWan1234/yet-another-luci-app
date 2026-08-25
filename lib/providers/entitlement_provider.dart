@@ -94,18 +94,20 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
   final InAppPurchase _iap;
   StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
 
-  EntitlementNotifier({
-    FlutterSecureStorage? secureStorage,
-    InAppPurchase? iap,
-  })  : _secureStorage = secureStorage ?? const FlutterSecureStorage(),
-        _iap = iap ?? (AppConfig.isMonetizationEnabled ? InAppPurchase.instance : _DisabledInAppPurchase()),
-        super(
-          EntitlementState(
-            tier: AppConfig.isMonetizationEnabled
-                ? EntitlementTier.free
-                : EntitlementTier.lifetime,
-          ),
-        ) {
+  EntitlementNotifier({FlutterSecureStorage? secureStorage, InAppPurchase? iap})
+    : _secureStorage = secureStorage ?? const FlutterSecureStorage(),
+      _iap =
+          iap ??
+          (AppConfig.isMonetizationEnabled
+              ? InAppPurchase.instance
+              : _DisabledInAppPurchase()),
+      super(
+        EntitlementState(
+          tier: AppConfig.isMonetizationEnabled
+              ? EntitlementTier.free
+              : EntitlementTier.lifetime,
+        ),
+      ) {
     if (AppConfig.isMonetizationEnabled) {
       _init();
     }
@@ -155,7 +157,9 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
       if (!isAvailable) {
         return;
       }
-      final response = await _iap.queryProductDetails(PlayBillingProducts.allProductIds);
+      final response = await _iap.queryProductDetails(
+        PlayBillingProducts.allProductIds,
+      );
       if (response.error == null) {
         state = state.copyWith(availableProducts: response.productDetails);
       } else {
@@ -180,7 +184,9 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
     );
   }
 
-  Future<void> _handlePurchaseUpdates(List<PurchaseDetails> purchaseDetailsList) async {
+  Future<void> _handlePurchaseUpdates(
+    List<PurchaseDetails> purchaseDetailsList,
+  ) async {
     for (final purchaseDetails in purchaseDetailsList) {
       if (purchaseDetails.status == PurchaseStatus.pending) {
         state = state.copyWith(isLoading: true);
@@ -192,7 +198,9 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
           );
         } else if (purchaseDetails.status == PurchaseStatus.purchased ||
             purchaseDetails.status == PurchaseStatus.restored) {
-          final verifiedTier = _verifyAndMapProductToTier(purchaseDetails.productID);
+          final verifiedTier = _verifyAndMapProductToTier(
+            purchaseDetails.productID,
+          );
           if (verifiedTier != null) {
             // Update entitlement synchronously before returning control
             await updateEntitlement(verifiedTier);
@@ -224,11 +232,16 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
   Future<void> buyProduct(ProductDetails productDetails) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final PurchaseParam purchaseParam = PurchaseParam(productDetails: productDetails);
+      final PurchaseParam purchaseParam = PurchaseParam(
+        productDetails: productDetails,
+      );
       if (productDetails.id == PlayBillingProducts.lifetimeUnlimited) {
         await _iap.buyNonConsumable(purchaseParam: purchaseParam);
       } else {
-        await _iap.buyConsumable(purchaseParam: purchaseParam, autoConsume: false);
+        await _iap.buyConsumable(
+          purchaseParam: purchaseParam,
+          autoConsume: false,
+        );
       }
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
@@ -255,9 +268,10 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
 }
 
 /// Global Riverpod Provider for Entitlement State.
-final entitlementProvider = StateNotifierProvider<EntitlementNotifier, EntitlementState>(
-  (ref) => EntitlementNotifier(),
-);
+final entitlementProvider =
+    StateNotifierProvider<EntitlementNotifier, EntitlementState>(
+      (ref) => EntitlementNotifier(),
+    );
 
 /// No-op dummy InAppPurchase implementation used for Community build flavor
 /// to ensure zero billing SDK calls or platform channel bindings.
@@ -269,15 +283,24 @@ class _DisabledInAppPurchase implements InAppPurchase {
   Future<bool> isAvailable() async => false;
 
   @override
-  Future<ProductDetailsResponse> queryProductDetails(Set<String> identifiers) async {
-    return ProductDetailsResponse(productDetails: [], notFoundIDs: identifiers.toList());
+  Future<ProductDetailsResponse> queryProductDetails(
+    Set<String> identifiers,
+  ) async {
+    return ProductDetailsResponse(
+      productDetails: [],
+      notFoundIDs: identifiers.toList(),
+    );
   }
 
   @override
-  Future<bool> buyNonConsumable({required PurchaseParam purchaseParam}) async => false;
+  Future<bool> buyNonConsumable({required PurchaseParam purchaseParam}) async =>
+      false;
 
   @override
-  Future<bool> buyConsumable({required PurchaseParam purchaseParam, bool autoConsume = true}) async => false;
+  Future<bool> buyConsumable({
+    required PurchaseParam purchaseParam,
+    bool autoConsume = true,
+  }) async => false;
 
   @override
   Future<void> completePurchase(PurchaseDetails purchase) async {}
@@ -290,6 +313,8 @@ class _DisabledInAppPurchase implements InAppPurchase {
 
   @override
   T getPlatformAddition<T extends InAppPurchasePlatformAddition?>() {
-    throw UnimplementedError('Play Billing platform additions unavailable in Community build flavor.');
+    throw UnimplementedError(
+      'Play Billing platform additions unavailable in Community build flavor.',
+    );
   }
 }

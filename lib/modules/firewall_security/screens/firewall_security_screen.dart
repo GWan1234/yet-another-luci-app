@@ -15,10 +15,12 @@ class FirewallSecurityScreen extends ConsumerStatefulWidget {
   const FirewallSecurityScreen({super.key});
 
   @override
-  ConsumerState<FirewallSecurityScreen> createState() => _FirewallSecurityScreenState();
+  ConsumerState<FirewallSecurityScreen> createState() =>
+      _FirewallSecurityScreenState();
 }
 
-class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen> {
+class _FirewallSecurityScreenState
+    extends ConsumerState<FirewallSecurityScreen> {
   /// Stores staged enable/disable toggles for modified custom firewall rules.
   /// Format: {sectionKey: desiredEnabledStatus}
   final Map<String, bool> _stagedCustomRuleStates = {};
@@ -41,7 +43,10 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
       _stagedCustomRuleStates.clear();
     });
     if (mounted) {
-      context.showToastInfo('Changes Discarded', subtitle: 'Discarded all unsaved firewall custom rule changes.');
+      context.showToastInfo(
+        'Changes Discarded',
+        subtitle: 'Discarded all unsaved firewall custom rule changes.',
+      );
     }
   }
 
@@ -76,7 +81,8 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
     if (mounted) {
       context.showToastLoading(
         'Saving Changes',
-        subtitle: 'Saving ${modifiedEntries.length} firewall custom rule change(s)...',
+        subtitle:
+            'Saving ${modifiedEntries.length} firewall custom rule change(s)...',
         actionKey: actionKey,
       );
     }
@@ -112,7 +118,8 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
     if (failedRules.isEmpty) {
       context.showToastSuccess(
         'Firewall Saved',
-        subtitle: 'Successfully updated ${succeededRules.length} firewall custom rule(s).',
+        subtitle:
+            'Successfully updated ${succeededRules.length} firewall custom rule(s).',
         actionKey: actionKey,
       );
       return true;
@@ -180,7 +187,9 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Firewall & Security (${backend == FirewallBackend.fw4 ? "fw4 / nftables" : "fw3 / iptables"})'),
+          title: Text(
+            'Firewall & Security (${backend == FirewallBackend.fw4 ? "fw4 / nftables" : "fw3 / iptables"})',
+          ),
           actions: [
             if (_hasUnsavedChanges)
               IconButton(
@@ -205,30 +214,48 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0),
                   children: [
-                    _buildSectionHeader(context, 'Global Default Policies', Icons.shield_outlined),
+                    _buildSectionHeader(
+                      context,
+                      'Global Default Policies',
+                      Icons.shield_outlined,
+                    ),
                     const SizedBox(height: 8),
                     _buildDefaultPoliciesCard(context, overview.defaultPolicy),
                     const SizedBox(height: 16),
-                    _buildSectionHeader(context, 'Firewall Zones Overview', Icons.layers_outlined),
+                    _buildSectionHeader(
+                      context,
+                      'Firewall Zones Overview',
+                      Icons.layers_outlined,
+                    ),
                     const SizedBox(height: 8),
-                    ...overview.zones.map((zone) => _buildZoneCard(context, zone)),
+                    ...overview.zones.map(
+                      (zone) => _buildZoneCard(context, zone),
+                    ),
                     const SizedBox(height: 16),
                     LuciCollapsibleCard(
                       title: 'Inter-Zone Forwarding Rules',
                       count: overview.forwardings.length,
-                      subtitle: '${overview.forwardings.length} inter-zone policies',
+                      subtitle:
+                          '${overview.forwardings.length} inter-zone policies',
                       icon: Icons.alt_route_outlined,
                       iconColor: Colors.blue,
-                      child: _buildForwardingsCard(context, overview.forwardings),
+                      child: _buildForwardingsCard(
+                        context,
+                        overview.forwardings,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     LuciCollapsibleCard(
                       title: 'Port Forwarding / Redirects',
                       count: overview.portForwards.length,
-                      subtitle: '${overview.portForwards.length} port forward rules',
+                      subtitle:
+                          '${overview.portForwards.length} port forward rules',
                       icon: Icons.import_export_outlined,
                       iconColor: Colors.orange,
-                      child: _buildPortForwardingsList(context, overview.portForwards),
+                      child: _buildPortForwardingsList(
+                        context,
+                        overview.portForwards,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     LuciCollapsibleCard(
@@ -237,18 +264,27 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
                       subtitle: '${overview.customRules.length} custom rules',
                       icon: Icons.rule_outlined,
                       iconColor: Colors.teal,
-                      child: _buildCustomRulesList(context, overview.customRules),
+                      child: _buildCustomRulesList(
+                        context,
+                        overview.customRules,
+                      ),
                     ),
                     const SizedBox(height: 80),
                   ],
                 ),
         ),
-        bottomNavigationBar: _hasUnsavedChanges ? _buildUnsavedChangesBottomBar(context) : null,
+        bottomNavigationBar: _hasUnsavedChanges
+            ? _buildUnsavedChangesBottomBar(context)
+            : null,
       ),
     );
   }
 
-  Widget _buildUnavailableView(BuildContext context, WidgetRef ref, FirewallOverview overview) {
+  Widget _buildUnavailableView(
+    BuildContext context,
+    WidgetRef ref,
+    FirewallOverview overview,
+  ) {
     final theme = Theme.of(context);
     final appState = ref.watch(appStateProvider);
 
@@ -258,17 +294,26 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.shield_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.shield_outlined,
+              size: 48,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(height: 12),
             Text(
               'Firewall Configuration Unavailable',
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
-              overview.errorMessage ?? 'The firewall configuration could not be loaded or parsed.',
+              overview.errorMessage ??
+                  'The firewall configuration could not be loaded or parsed.',
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
@@ -282,7 +327,11 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
+  Widget _buildSectionHeader(
+    BuildContext context,
+    String title,
+    IconData icon,
+  ) {
     final theme = Theme.of(context);
     return Row(
       children: [
@@ -298,7 +347,10 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
     );
   }
 
-  Widget _buildDefaultPoliciesCard(BuildContext context, FirewallDefaultPolicy def) {
+  Widget _buildDefaultPoliciesCard(
+    BuildContext context,
+    FirewallDefaultPolicy def,
+  ) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -312,7 +364,10 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
             const Divider(),
             _buildPolicyRow('Default Forward', def.forward),
             const Divider(),
-            _buildPolicyRow('SYN Flood Protection', def.synFlood ? 'ENABLED' : 'DISABLED'),
+            _buildPolicyRow(
+              'SYN Flood Protection',
+              def.synFlood ? 'ENABLED' : 'DISABLED',
+            ),
           ],
         ),
       ),
@@ -345,23 +400,39 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
                     const SizedBox(width: 8),
                     Text(
                       'Zone: ${zone.name.toUpperCase()}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                   ],
                 ),
                 if (zone.masquerade)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.blue.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Text('MASQUERADE (NAT)', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 10)),
+                    child: const Text(
+                      'MASQUERADE (NAT)',
+                      style: TextStyle(
+                        color: Colors.blue,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10,
+                      ),
+                    ),
                   ),
               ],
             ),
             const SizedBox(height: 8),
-            Text('Covered Networks: ${zone.networks.join(", ")}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Text(
+              'Covered Networks: ${zone.networks.join(", ")}',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
             const Divider(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -377,10 +448,16 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
     );
   }
 
-  Widget _buildForwardingsCard(BuildContext context, List<FirewallForwarding> forwardings) {
+  Widget _buildForwardingsCard(
+    BuildContext context,
+    List<FirewallForwarding> forwardings,
+  ) {
     if (forwardings.isEmpty) {
       return const Card(
-        child: Padding(padding: EdgeInsets.all(16.0), child: Text('No zone forwarding rules configured.')),
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text('No zone forwarding rules configured.'),
+        ),
       );
     }
 
@@ -396,12 +473,31 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Chip(label: Text(fwd.srcZone.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
+                  Chip(
+                    label: Text(
+                      fwd.srcZone.toUpperCase(),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 12.0),
-                    child: Icon(Icons.arrow_forward_rounded, color: Colors.grey),
+                    child: Icon(
+                      Icons.arrow_forward_rounded,
+                      color: Colors.grey,
+                    ),
                   ),
-                  Chip(label: Text(fwd.destZone.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11))),
+                  Chip(
+                    label: Text(
+                      fwd.destZone.toUpperCase(),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             );
@@ -411,10 +507,16 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
     );
   }
 
-  Widget _buildPortForwardingsList(BuildContext context, List<FirewallPortForwarding> pfs) {
+  Widget _buildPortForwardingsList(
+    BuildContext context,
+    List<FirewallPortForwarding> pfs,
+  ) {
     if (pfs.isEmpty) {
       return const Card(
-        child: Padding(padding: EdgeInsets.all(16.0), child: Text('No port forwarding rules active.')),
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text('No port forwarding rules active.'),
+        ),
       );
     }
 
@@ -423,25 +525,35 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
           elevation: 1,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           child: ListTile(
-            leading: const CircleAvatar(
-              child: Icon(Icons.compare_arrows),
+            leading: const CircleAvatar(child: Icon(Icons.compare_arrows)),
+            title: Text(
+              pf.name,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            title: Text(pf.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('${pf.srcZone.toUpperCase()}:${pf.srcPort} ➔ ${pf.destIp}:${pf.destPort} (${pf.proto.toUpperCase()})'),
+            subtitle: Text(
+              '${pf.srcZone.toUpperCase()}:${pf.srcPort} ➔ ${pf.destIp}:${pf.destPort} (${pf.proto.toUpperCase()})',
+            ),
           ),
         );
       }).toList(),
     );
   }
 
-  Widget _buildCustomRulesList(BuildContext context, List<FirewallCustomRule> rules) {
+  Widget _buildCustomRulesList(
+    BuildContext context,
+    List<FirewallCustomRule> rules,
+  ) {
     if (rules.isEmpty) {
       return const Card(
         child: Padding(
           padding: EdgeInsets.all(16.0),
-          child: Text('No custom security rules defined (default zone policies active).'),
+          child: Text(
+            'No custom security rules defined (default zone policies active).',
+          ),
         ),
       );
     }
@@ -451,16 +563,21 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
     return Column(
       children: rules.map((r) {
         final isStaged = _stagedCustomRuleStates.containsKey(r.sectionKey);
-        final currentEnabled = _stagedCustomRuleStates[r.sectionKey] ?? r.enabled;
+        final currentEnabled =
+            _stagedCustomRuleStates[r.sectionKey] ?? r.enabled;
         final policyColor = _getPolicyColor(r.target);
 
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
           elevation: 1,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           child: Container(
             decoration: BoxDecoration(
-              color: isStaged ? theme.colorScheme.primaryContainer.withValues(alpha: 0.12) : null,
+              color: isStaged
+                  ? theme.colorScheme.primaryContainer.withValues(alpha: 0.12)
+                  : null,
               borderRadius: BorderRadius.circular(14),
               border: isStaged
                   ? Border.all(color: theme.colorScheme.primary, width: 1.5)
@@ -469,7 +586,9 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
             child: ListTile(
               leading: Icon(
                 currentEnabled ? Icons.check_circle : Icons.pause_circle_filled,
-                color: currentEnabled ? LuciStatusColors.connected : Colors.grey,
+                color: currentEnabled
+                    ? LuciStatusColors.connected
+                    : Colors.grey,
               ),
               title: Row(
                 children: [
@@ -483,11 +602,17 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
                   if (isStaged) ...[
                     const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 1,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.amber.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: Colors.amber.shade700, width: 0.8),
+                        border: Border.all(
+                          color: Colors.amber.shade700,
+                          width: 0.8,
+                        ),
                       ),
                       child: Text(
                         'STAGED',
@@ -510,7 +635,10 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: policyColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(6),
@@ -522,13 +650,19 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (r.isUnrecognizedTarget) ...[
-                          Icon(Icons.warning_amber_rounded, size: 12, color: Colors.amber.shade700),
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            size: 12,
+                            color: Colors.amber.shade700,
+                          ),
                           const SizedBox(width: 4),
                         ],
                         Text(
                           r.target,
                           style: TextStyle(
-                            color: r.isUnrecognizedTarget ? Colors.amber.shade800 : policyColor,
+                            color: r.isUnrecognizedTarget
+                                ? Colors.amber.shade800
+                                : policyColor,
                             fontWeight: FontWeight.bold,
                             fontSize: 11,
                           ),
@@ -568,7 +702,11 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
             ),
             child: Text(
               policy,
-              style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11),
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+              ),
             ),
           ),
         ],
@@ -582,7 +720,14 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
       children: [
         Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
         const SizedBox(height: 2),
-        Text(policy, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 12)),
+        Text(
+          policy,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: color,
+            fontSize: 12,
+          ),
+        ),
       ],
     );
   }
@@ -640,7 +785,10 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
                   ? const SizedBox(
                       width: 14,
                       height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Icon(Icons.check, size: 18),
               label: const Text('Save'),
@@ -651,4 +799,3 @@ class _FirewallSecurityScreenState extends ConsumerState<FirewallSecurityScreen>
     );
   }
 }
-

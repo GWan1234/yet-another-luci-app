@@ -31,13 +31,7 @@ void main() {
   PaintingBinding.instance.imageCache.maximumSizeBytes = 30 * 1024 * 1024;
   PaintingBinding.instance.imageCache.maximumSize = 100;
 
-  registerBuiltInModules();
-
-  runApp(
-    const ProviderScope(
-      child: LuCIApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: LuCIApp()));
 
   // Defer secondary bindings & SDK initializations post-first-frame to eliminate startup latency
   binding.addPostFrameCallback((_) {
@@ -55,13 +49,13 @@ class LuciScrollBehavior extends MaterialScrollBehavior {
 
   @override
   Set<PointerDeviceKind> get dragDevices => {
-        PointerDeviceKind.touch,
-        PointerDeviceKind.mouse,
-        PointerDeviceKind.stylus,
-        PointerDeviceKind.invertedStylus,
-        PointerDeviceKind.trackpad,
-        PointerDeviceKind.unknown,
-      };
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.stylus,
+    PointerDeviceKind.invertedStylus,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.unknown,
+  };
 
   @override
   ScrollPhysics getScrollPhysics(BuildContext context) {
@@ -96,7 +90,7 @@ class LuCIApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final appState = ref.watch(appStateProvider);
+    final themeMode = ref.watch(appStateProvider.select((s) => s.themeMode));
 
     // Official nightcode Brand Accent Palette (Orange #F97316 & Amber #FB923C)
     const orangePrimary = Color(0xFFF97316);
@@ -230,7 +224,7 @@ class LuCIApp extends ConsumerWidget {
           ),
         ),
       ),
-      themeMode: appState.themeMode,
+      themeMode: themeMode,
       initialRoute: '/splash',
       routes: {
         '/splash': (context) => const SplashScreen(),

@@ -14,7 +14,8 @@ class NetworkMonitoringModule extends LuciModule {
   String get name => 'Network Monitoring';
 
   @override
-  String get description => 'Network interfaces list, tabular RX/TX throughput metrics, IPv4/IPv6 addresses, and Gateway status';
+  String get description =>
+      'Network interfaces list, tabular RX/TX throughput metrics, IPv4/IPv6 addresses, and Gateway status';
 
   @override
   IconData get icon => Icons.hub_outlined;

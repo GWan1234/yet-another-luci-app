@@ -10,7 +10,8 @@ import 'parental_profile.dart';
 /// Serialized to/from SecureStorage as a single JSON blob.
 class ParentalControlsStore extends ChangeNotifier {
   static ParentalControlsStore? _instance;
-  static ParentalControlsStore get instance => _instance ??= ParentalControlsStore._();
+  static ParentalControlsStore get instance =>
+      _instance ??= ParentalControlsStore._();
   ParentalControlsStore._();
 
   static const int _maxActivityLogEntries = 100;
@@ -41,7 +42,10 @@ class ParentalControlsStore extends ChangeNotifier {
     try {
       final json = Map<String, dynamic>.from(jsonDecode(raw) as Map);
       _profiles = ((json['profiles'] as List?) ?? [])
-          .map((e) => ParentalProfile.fromJson(Map<String, dynamic>.from(e as Map)))
+          .map(
+            (e) =>
+                ParentalProfile.fromJson(Map<String, dynamic>.from(e as Map)),
+          )
           .toList();
 
       _dailyMinutesUsed = Map<String, int>.from(
@@ -52,10 +56,16 @@ class ParentalControlsStore extends ChangeNotifier {
       );
 
       final lastResetStr = json['last_reset_date']?.toString();
-      _lastResetDate = lastResetStr != null ? DateTime.tryParse(lastResetStr)?.toUtc() : null;
+      _lastResetDate = lastResetStr != null
+          ? DateTime.tryParse(lastResetStr)?.toUtc()
+          : null;
 
       _activityLog = ((json['activity_log'] as List?) ?? [])
-          .map((e) => ParentalActivityLog.fromJson(Map<String, dynamic>.from(e as Map)))
+          .map(
+            (e) => ParentalActivityLog.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ),
+          )
           .toList();
     } catch (e) {
       debugPrint('ParentalControlsStore: load error — $e');
@@ -69,8 +79,12 @@ class ParentalControlsStore extends ChangeNotifier {
     return jsonEncode({
       'profiles': _profiles.map((p) => p.toJson()).toList(),
       'daily_minutes_used': _dailyMinutesUsed,
-      'last_reset_date': (_lastResetDate ?? DateTime.now().toUtc()).toIso8601String(),
-      'activity_log': _activityLog.take(_maxActivityLogEntries).map((e) => e.toJson()).toList(),
+      'last_reset_date': (_lastResetDate ?? DateTime.now().toUtc())
+          .toIso8601String(),
+      'activity_log': _activityLog
+          .take(_maxActivityLogEntries)
+          .map((e) => e.toJson())
+          .toList(),
     });
   }
 
@@ -101,17 +115,22 @@ class ParentalControlsStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── Profile Management ─────────────────────────────────────────────────────
+  void setProfiles(List<ParentalProfile> profiles) {
+    _profiles = List.from(profiles);
+    notifyListeners();
+  }
 
   /// Creates a new profile and returns its id.
   String addProfile(ParentalProfile profile) {
     _profiles.add(profile);
-    _logEvent(ParentalActivityLog(
-      profileId: profile.id,
-      profileName: profile.name,
-      eventType: ParentalEventType.profileCreated,
-      timestamp: DateTime.now().toUtc(),
-    ));
+    _logEvent(
+      ParentalActivityLog(
+        profileId: profile.id,
+        profileName: profile.name,
+        eventType: ParentalEventType.profileCreated,
+        timestamp: DateTime.now().toUtc(),
+      ),
+    );
     notifyListeners();
     return profile.id;
   }
@@ -120,27 +139,38 @@ class ParentalControlsStore extends ChangeNotifier {
     final idx = _profiles.indexWhere((p) => p.id == updated.id);
     if (idx < 0) return;
     _profiles[idx] = updated;
-    _logEvent(ParentalActivityLog(
-      profileId: updated.id,
-      profileName: updated.name,
-      eventType: ParentalEventType.profileUpdated,
-      timestamp: DateTime.now().toUtc(),
-    ));
+    _logEvent(
+      ParentalActivityLog(
+        profileId: updated.id,
+        profileName: updated.name,
+        eventType: ParentalEventType.profileUpdated,
+        timestamp: DateTime.now().toUtc(),
+      ),
+    );
     notifyListeners();
   }
 
   void deleteProfile(String id) {
-    final profile = _profiles.firstWhere((p) => p.id == id, orElse: () => const ParentalProfile(
-      id: '', name: '', icon: '', color: '', macAddresses: [],
-    ));
+    final profile = _profiles.firstWhere(
+      (p) => p.id == id,
+      orElse: () => const ParentalProfile(
+        id: '',
+        name: '',
+        icon: '',
+        color: '',
+        macAddresses: [],
+      ),
+    );
     _profiles.removeWhere((p) => p.id == id);
     if (profile.id.isNotEmpty) {
-      _logEvent(ParentalActivityLog(
-        profileId: id,
-        profileName: profile.name,
-        eventType: ParentalEventType.profileDeleted,
-        timestamp: DateTime.now().toUtc(),
-      ));
+      _logEvent(
+        ParentalActivityLog(
+          profileId: id,
+          profileName: profile.name,
+          eventType: ParentalEventType.profileDeleted,
+          timestamp: DateTime.now().toUtc(),
+        ),
+      );
     }
     notifyListeners();
   }
@@ -161,13 +191,17 @@ class ParentalControlsStore extends ChangeNotifier {
       isPaused: true,
       pauseExpiresAt: expiresAt,
     );
-    _logEvent(ParentalActivityLog(
-      profileId: id,
-      profileName: _profiles[idx].name,
-      eventType: ParentalEventType.paused,
-      timestamp: DateTime.now().toUtc(),
-      detail: expiresAt != null ? 'Until ${_formatTime(expiresAt)}' : 'Indefinite',
-    ));
+    _logEvent(
+      ParentalActivityLog(
+        profileId: id,
+        profileName: _profiles[idx].name,
+        eventType: ParentalEventType.paused,
+        timestamp: DateTime.now().toUtc(),
+        detail: expiresAt != null
+            ? 'Until ${_formatTime(expiresAt)}'
+            : 'Indefinite',
+      ),
+    );
     notifyListeners();
   }
 
@@ -178,12 +212,14 @@ class ParentalControlsStore extends ChangeNotifier {
       isPaused: false,
       pauseExpiresAt: null,
     );
-    _logEvent(ParentalActivityLog(
-      profileId: id,
-      profileName: _profiles[idx].name,
-      eventType: ParentalEventType.resumed,
-      timestamp: DateTime.now().toUtc(),
-    ));
+    _logEvent(
+      ParentalActivityLog(
+        profileId: id,
+        profileName: _profiles[idx].name,
+        eventType: ParentalEventType.resumed,
+        timestamp: DateTime.now().toUtc(),
+      ),
+    );
     notifyListeners();
   }
 
@@ -229,13 +265,15 @@ class ParentalControlsStore extends ChangeNotifier {
     if (idx < 0) return;
     final newEnabled = enabled ?? !_profiles[idx].isEnabled;
     _profiles[idx] = _profiles[idx].copyWith(isEnabled: newEnabled);
-    _logEvent(ParentalActivityLog(
-      profileId: id,
-      profileName: _profiles[idx].name,
-      eventType: ParentalEventType.profileUpdated,
-      timestamp: DateTime.now().toUtc(),
-      detail: newEnabled ? 'Rules Enabled' : 'Rules Bypassed (Unrestricted)',
-    ));
+    _logEvent(
+      ParentalActivityLog(
+        profileId: id,
+        profileName: _profiles[idx].name,
+        eventType: ParentalEventType.profileUpdated,
+        timestamp: DateTime.now().toUtc(),
+        detail: newEnabled ? 'Rules Enabled' : 'Rules Bypassed (Unrestricted)',
+      ),
+    );
     notifyListeners();
   }
 

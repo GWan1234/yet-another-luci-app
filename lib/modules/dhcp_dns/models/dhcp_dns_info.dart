@@ -39,7 +39,9 @@ class DhcpLease {
 
     var ip4 = json['ipaddr']?.toString() ?? json['ip']?.toString() ?? '';
     var ip6 = json['ip6addr']?.toString() ?? json['ip6']?.toString() ?? '';
-    if (ip6.isEmpty && json['ip6addrs'] is List && (json['ip6addrs'] as List).isNotEmpty) {
+    if (ip6.isEmpty &&
+        json['ip6addrs'] is List &&
+        (json['ip6addrs'] as List).isNotEmpty) {
       ip6 = (json['ip6addrs'] as List).first.toString();
     }
 
@@ -72,7 +74,10 @@ class DhcpLease {
     }
 
     return DhcpLease(
-      hostname: json['hostname']?.toString() ?? json['name']?.toString() ?? 'Anonymous Device',
+      hostname:
+          json['hostname']?.toString() ??
+          json['name']?.toString() ??
+          'Anonymous Device',
       ipAddress: mainIp,
       ip6Address: ip6,
       macAddress: mac.toUpperCase(),
@@ -85,7 +90,8 @@ class DhcpLease {
 
   String get formattedExpiry {
     if (isStatic) {
-      if (staticLeaseTime.isNotEmpty && staticLeaseTime.toLowerCase() != 'infinite') {
+      if (staticLeaseTime.isNotEmpty &&
+          staticLeaseTime.toLowerCase() != 'infinite') {
         return 'Static ($staticLeaseTime)';
       }
       return 'Static (Unlimited)';
@@ -143,7 +149,11 @@ class Dhcp6Lease {
         ? parseSec(expRaw)
         : (ltRaw != null && ltRaw is! bool ? parseSec(ltRaw) : 0);
 
-    var ip6 = json['ip6addr']?.toString() ?? json['ip6']?.toString() ?? json['ip']?.toString() ?? '';
+    var ip6 =
+        json['ip6addr']?.toString() ??
+        json['ip6']?.toString() ??
+        json['ip']?.toString() ??
+        '';
     final v6List = <String>[];
     if (json['ip6addrs'] is List) {
       for (final a in json['ip6addrs']) {
@@ -157,11 +167,15 @@ class Dhcp6Lease {
     }
 
     final mac = json['macaddr']?.toString() ?? json['mac']?.toString() ?? 'N/A';
-    final duidStr = json['duid']?.toString() ?? json['host_id']?.toString() ?? 'N/A';
+    final duidStr =
+        json['duid']?.toString() ?? json['host_id']?.toString() ?? 'N/A';
     final iaidStr = json['iaid']?.toString() ?? '';
 
     return Dhcp6Lease(
-      hostname: json['hostname']?.toString() ?? json['name']?.toString() ?? 'Anonymous IPv6 Host',
+      hostname:
+          json['hostname']?.toString() ??
+          json['name']?.toString() ??
+          'Anonymous IPv6 Host',
       ip6Address: ip6.isNotEmpty ? ip6 : 'N/A',
       ipv6Addresses: v6List,
       macAddress: mac.toUpperCase(),
@@ -218,12 +232,16 @@ class DhcpStaticMapping {
       macStr = macVal.toString();
     }
 
-    final lt = json['leasetime']?.toString() ?? json['lease_time']?.toString() ?? '';
+    final lt =
+        json['leasetime']?.toString() ?? json['lease_time']?.toString() ?? '';
     final ip6 = json['ip6addr']?.toString() ?? json['hostid']?.toString() ?? '';
     final duidStr = json['duid']?.toString() ?? '';
 
     return DhcpStaticMapping(
-      hostname: json['name']?.toString() ?? json['hostname']?.toString() ?? 'Unnamed Host',
+      hostname:
+          json['name']?.toString() ??
+          json['hostname']?.toString() ??
+          'Unnamed Host',
       ipAddress: json['ip']?.toString() ?? json['ipaddr']?.toString() ?? 'N/A',
       ip6Address: ip6,
       macAddress: macStr.toUpperCase(),
@@ -251,8 +269,13 @@ class SubnetInfo {
 
   static int? _ipToInt(String ip) {
     final parts = ip.trim().split('.').map(int.tryParse).toList();
-    if (parts.length != 4 || parts.any((p) => p == null || p < 0 || p > 255)) return null;
-    return ((parts[0]! << 24) | (parts[1]! << 16) | (parts[2]! << 8) | parts[3]!) & 0xFFFFFFFF;
+    if (parts.length != 4 || parts.any((p) => p == null || p < 0 || p > 255))
+      return null;
+    return ((parts[0]! << 24) |
+            (parts[1]! << 16) |
+            (parts[2]! << 8) |
+            parts[3]!) &
+        0xFFFFFFFF;
   }
 
   static int _netmaskToInt(String mask) {
@@ -341,10 +364,14 @@ class DnsmasqConfig {
     }
     return DnsmasqConfig(
       localDomain: json['domain']?.toString() ?? 'lan',
-      upstreamDnsServers: servers.isNotEmpty ? servers : const ['ISP Default (Dynamic DNS)'],
-      rebindProtection: json['rebind_protection'] == '1' || json['rebind_protection'] == true,
+      upstreamDnsServers: servers.isNotEmpty
+          ? servers
+          : const ['ISP Default (Dynamic DNS)'],
+      rebindProtection:
+          json['rebind_protection'] == '1' || json['rebind_protection'] == true,
       domainNeeded: json['domainneeded'] == '1' || json['domainneeded'] == true,
-      authoritative: json['authoritative'] == '1' || json['authoritative'] == true,
+      authoritative:
+          json['authoritative'] == '1' || json['authoritative'] == true,
     );
   }
 }
@@ -365,7 +392,10 @@ class DhcpDnsOverview {
     required this.configuredSubnets,
   });
 
-  factory DhcpDnsOverview.fromDashboardData(Map<String, dynamic>? data, {bool isReviewerMode = false}) {
+  factory DhcpDnsOverview.fromDashboardData(
+    Map<String, dynamic>? data, {
+    bool isReviewerMode = false,
+  }) {
     final leaseList = <DhcpLease>[];
     final dhcp6List = <Dhcp6Lease>[];
     final staticList = <DhcpStaticMapping>[];
@@ -426,12 +456,14 @@ class DhcpDnsOverview {
             final hostname = parts[3] == '*' ? 'Anonymous Device' : parts[3];
 
             if (macAddress.isNotEmpty && macAddress != 'N/A') {
-              leaseList.add(DhcpLease(
-                hostname: hostname,
-                ipAddress: ipAddress,
-                macAddress: macAddress.toUpperCase(),
-                expirySeconds: timestamp,
-              ));
+              leaseList.add(
+                DhcpLease(
+                  hostname: hostname,
+                  ipAddress: ipAddress,
+                  macAddress: macAddress.toUpperCase(),
+                  expirySeconds: timestamp,
+                ),
+              );
             }
           }
         }
@@ -452,12 +484,20 @@ class DhcpDnsOverview {
             addLeasesFromList(item);
           }
         } else if (raw is Map) {
-          if (raw.containsKey('dhcp_leases') || raw.containsKey('dhcpLeases') || raw.containsKey('leases')) {
-            addLeasesFromList(raw['dhcp_leases'] ?? raw['dhcpLeases'] ?? raw['leases']);
-          } else if (raw.containsKey('ipaddr') || raw.containsKey('ip') || raw.containsKey('macaddr') || raw.containsKey('mac')) {
+          if (raw.containsKey('dhcp_leases') ||
+              raw.containsKey('dhcpLeases') ||
+              raw.containsKey('leases')) {
+            addLeasesFromList(
+              raw['dhcp_leases'] ?? raw['dhcpLeases'] ?? raw['leases'],
+            );
+          } else if (raw.containsKey('ipaddr') ||
+              raw.containsKey('ip') ||
+              raw.containsKey('macaddr') ||
+              raw.containsKey('mac')) {
             processLeaseItem(raw);
           } else if (raw['data'] != null || raw['stdout'] != null) {
-            final str = raw['data']?.toString() ?? raw['stdout']?.toString() ?? '';
+            final str =
+                raw['data']?.toString() ?? raw['stdout']?.toString() ?? '';
             processRawLeaseString(str);
           } else {
             raw.forEach((key, val) {
@@ -489,9 +529,13 @@ class DhcpDnsOverview {
             addDhcp6LeasesFromList(item);
           }
         } else if (raw is Map) {
-          if (raw.containsKey('dhcp6_leases') || raw.containsKey('dhcp6Leases')) {
+          if (raw.containsKey('dhcp6_leases') ||
+              raw.containsKey('dhcp6Leases')) {
             addDhcp6LeasesFromList(raw['dhcp6_leases'] ?? raw['dhcp6Leases']);
-          } else if (raw.containsKey('ip6addr') || raw.containsKey('ip6') || raw.containsKey('duid') || raw.containsKey('iaid')) {
+          } else if (raw.containsKey('ip6addr') ||
+              raw.containsKey('ip6') ||
+              raw.containsKey('duid') ||
+              raw.containsKey('iaid')) {
             processDhcp6Item(raw);
           } else {
             raw.forEach((key, val) {
@@ -507,8 +551,16 @@ class DhcpDnsOverview {
       if (clientsRaw is List) {
         for (final c in clientsRaw) {
           if (c is Map) {
-            final mac = (c['macAddress'] ?? c['macaddr'] ?? c['mac'])?.toString().toUpperCase().replaceAll('-', ':') ?? '';
-            final isOnline = c['isConnected'] == true || c['isOnline'] == true || c['connected'] == true;
+            final mac =
+                (c['macAddress'] ?? c['macaddr'] ?? c['mac'])
+                    ?.toString()
+                    .toUpperCase()
+                    .replaceAll('-', ':') ??
+                '';
+            final isOnline =
+                c['isConnected'] == true ||
+                c['isOnline'] == true ||
+                c['connected'] == true;
             final isStatic = c['isStaticLease'] == true;
             if (mac.isNotEmpty && mac != 'N/A') {
               if (isOnline) {
@@ -517,16 +569,27 @@ class DhcpDnsOverview {
                 offlineMacSet.add(mac);
               }
             }
-            final ip = (c['ipAddress'] ?? c['ipaddr'] ?? c['ip'])?.toString() ?? '';
-            if (mac.isNotEmpty && mac != 'N/A' && ip.isNotEmpty && ip != 'N/A' && !isStatic) {
-              final exists = leaseList.any((l) => l.macAddress.toUpperCase().replaceAll('-', ':') == mac);
+            final ip =
+                (c['ipAddress'] ?? c['ipaddr'] ?? c['ip'])?.toString() ?? '';
+            if (mac.isNotEmpty &&
+                mac != 'N/A' &&
+                ip.isNotEmpty &&
+                ip != 'N/A' &&
+                !isStatic) {
+              final exists = leaseList.any(
+                (l) => l.macAddress.toUpperCase().replaceAll('-', ':') == mac,
+              );
               if (!exists && isOnline) {
-                leaseList.add(DhcpLease(
-                  hostname: (c['name'] ?? c['hostname'])?.toString() ?? 'Connected Client',
-                  ipAddress: ip,
-                  macAddress: mac,
-                  expirySeconds: 0,
-                ));
+                leaseList.add(
+                  DhcpLease(
+                    hostname:
+                        (c['name'] ?? c['hostname'])?.toString() ??
+                        'Connected Client',
+                    ipAddress: ip,
+                    macAddress: mac,
+                    expirySeconds: 0,
+                  ),
+                );
               }
             }
           }
@@ -597,22 +660,41 @@ class DhcpDnsOverview {
       if (hostHints is Map) {
         hostHints.forEach((macKey, hintVal) {
           if (hintVal is Map) {
-            final isStatic = hintVal['isStaticLease'] == true || hintVal['staticLeaseIp'] != null;
+            final isStatic =
+                hintVal['isStaticLease'] == true ||
+                hintVal['staticLeaseIp'] != null;
             if (isStatic) {
-              final normMac = macKey.toString().toUpperCase().replaceAll('-', ':');
-              if (uciDhcp != null && uciMacs.isNotEmpty && !uciMacs.contains(normMac)) {
+              final normMac = macKey.toString().toUpperCase().replaceAll(
+                '-',
+                ':',
+              );
+              if (uciDhcp != null &&
+                  uciMacs.isNotEmpty &&
+                  !uciMacs.contains(normMac)) {
                 // Was removed from UCI config, don't re-add from stale hostHints
                 return;
               }
               final ipList = hintVal['ipaddrs'];
               final ip = (ipList is List && ipList.isNotEmpty)
                   ? ipList.first.toString()
-                  : (hintVal['staticLeaseIp']?.toString() ?? hintVal['ip']?.toString() ?? '');
-              final name = hintVal['staticLeaseName']?.toString() ?? hintVal['name']?.toString() ?? '';
-              final lt = hintVal['leasetime']?.toString() ?? hintVal['staticLeaseTime']?.toString() ?? '';
+                  : (hintVal['staticLeaseIp']?.toString() ??
+                        hintVal['ip']?.toString() ??
+                        '');
+              final name =
+                  hintVal['staticLeaseName']?.toString() ??
+                  hintVal['name']?.toString() ??
+                  '';
+              final lt =
+                  hintVal['leasetime']?.toString() ??
+                  hintVal['staticLeaseTime']?.toString() ??
+                  '';
 
               final existingIndex = staticList.indexWhere((s) {
-                final sMacs = s.macAddress.toUpperCase().replaceAll('-', ':').split(',').map((e) => e.trim());
+                final sMacs = s.macAddress
+                    .toUpperCase()
+                    .replaceAll('-', ':')
+                    .split(',')
+                    .map((e) => e.trim());
                 return sMacs.contains(normMac);
               });
 
@@ -624,13 +706,18 @@ class DhcpDnsOverview {
                   macAddress: existing.macAddress,
                   leaseTime: lt.isNotEmpty ? lt : existing.leaseTime,
                 );
-              } else if (normMac.isNotEmpty && ip.isNotEmpty && isValidIPv4(ip) && isValidMac(normMac)) {
-                staticList.add(DhcpStaticMapping(
-                  hostname: name.isNotEmpty ? name : 'Static Client',
-                  ipAddress: ip,
-                  macAddress: normMac,
-                  leaseTime: lt,
-                ));
+              } else if (normMac.isNotEmpty &&
+                  ip.isNotEmpty &&
+                  isValidIPv4(ip) &&
+                  isValidMac(normMac)) {
+                staticList.add(
+                  DhcpStaticMapping(
+                    hostname: name.isNotEmpty ? name : 'Static Client',
+                    ipAddress: ip,
+                    macAddress: normMac,
+                    leaseTime: lt,
+                  ),
+                );
               }
             }
           }
@@ -650,9 +737,13 @@ class DhcpDnsOverview {
         final rawValues = rawUciDhcp['values'] ?? rawUciDhcp;
         void inspectDhcpSec(dynamic valMap) {
           if (valMap is Map) {
-            final type = valMap['.type']?.toString() ?? valMap['type']?.toString();
+            final type =
+                valMap['.type']?.toString() ?? valMap['type']?.toString();
             if (type == 'dhcp') {
-              final ifc = valMap['interface']?.toString() ?? valMap['.name']?.toString() ?? '';
+              final ifc =
+                  valMap['interface']?.toString() ??
+                  valMap['.name']?.toString() ??
+                  '';
               final start = int.tryParse(valMap['start']?.toString() ?? '');
               final limit = int.tryParse(valMap['limit']?.toString() ?? '');
               if (ifc.isNotEmpty && start != null && limit != null) {
@@ -673,24 +764,30 @@ class DhcpDnsOverview {
         final rawValues = rawUciNetwork['values'] ?? rawUciNetwork;
         void inspectNetSec(dynamic key, dynamic valMap) {
           if (valMap is Map) {
-            final type = valMap['.type']?.toString() ?? valMap['type']?.toString();
+            final type =
+                valMap['.type']?.toString() ?? valMap['type']?.toString();
             if (type == 'interface') {
-              final ifcName = valMap['.name']?.toString() ?? key?.toString() ?? '';
+              final ifcName =
+                  valMap['.name']?.toString() ?? key?.toString() ?? '';
               var ipaddr = valMap['ipaddr']?.toString() ?? '';
               if (ipaddr.contains('/')) {
                 ipaddr = ipaddr.split('/').first;
               }
               final netmask = valMap['netmask']?.toString() ?? '255.255.255.0';
 
-              if (ipaddr.isNotEmpty && ipaddr != '127.0.0.1' && !ipaddr.startsWith('169.254')) {
+              if (ipaddr.isNotEmpty &&
+                  ipaddr != '127.0.0.1' &&
+                  !ipaddr.startsWith('169.254')) {
                 final poolInfo = dhcpPoolMap[ifcName];
-                subnetsList.add(SubnetInfo(
-                  interfaceName: ifcName,
-                  gatewayIp: ipaddr,
-                  netmask: netmask,
-                  poolStart: poolInfo?['start'],
-                  poolLimit: poolInfo?['limit'],
-                ));
+                subnetsList.add(
+                  SubnetInfo(
+                    interfaceName: ifcName,
+                    gatewayIp: ipaddr,
+                    netmask: netmask,
+                    poolStart: poolInfo?['start'],
+                    poolLimit: poolInfo?['limit'],
+                  ),
+                );
               }
             }
           }
@@ -719,31 +816,36 @@ class DhcpDnsOverview {
       if (!subnetsList.any((s) => s.containsIp(ip))) {
         final parts = ip.split('.');
         final gwIp = '${parts[0]}.${parts[1]}.${parts[2]}.1';
-        subnetsList.add(SubnetInfo(
-          interfaceName: 'lan',
-          gatewayIp: gwIp,
-          netmask: '255.255.255.0',
-          poolStart: 100,
-          poolLimit: 150,
-        ));
+        subnetsList.add(
+          SubnetInfo(
+            interfaceName: 'lan',
+            gatewayIp: gwIp,
+            netmask: '255.255.255.0',
+            poolStart: 100,
+            poolLimit: 150,
+          ),
+        );
       }
     }
 
     if (subnetsList.isEmpty) {
-      subnetsList.add(const SubnetInfo(
-        interfaceName: 'lan',
-        gatewayIp: '192.168.1.1',
-        netmask: '255.255.255.0',
-        poolStart: 100,
-        poolLimit: 150,
-      ));
+      subnetsList.add(
+        const SubnetInfo(
+          interfaceName: 'lan',
+          gatewayIp: '192.168.1.1',
+          netmask: '255.255.255.0',
+          poolStart: 100,
+          poolLimit: 150,
+        ),
+      );
     }
 
     // Cross-reference active leases with static host entries to accurately reflect static status
     final staticMacSet = <String>{};
     final staticMacToMapping = <String, DhcpStaticMapping>{};
     for (final s in staticList) {
-      for (final m in s.macAddress.toUpperCase().replaceAll('-', ':').split(',')) {
+      for (final m
+          in s.macAddress.toUpperCase().replaceAll('-', ':').split(',')) {
         final trimmed = m.trim();
         if (trimmed.isNotEmpty) {
           staticMacSet.add(trimmed);
@@ -759,7 +861,8 @@ class DhcpDnsOverview {
     for (final lease in leaseList) {
       final normMac = lease.macAddress.toUpperCase().replaceAll('-', ':');
       final staticMapping = staticMacToMapping[normMac];
-      final isStatic = staticMacSet.contains(normMac) ||
+      final isStatic =
+          staticMacSet.contains(normMac) ||
           (hostHints is Map &&
               hostHints[normMac] is Map &&
               (hostHints[normMac]['isStaticLease'] == true ||
@@ -767,32 +870,41 @@ class DhcpDnsOverview {
 
       if (isStatic) {
         final sLt = staticMapping?.leaseTime ?? '';
-        final sName = (staticMapping != null &&
+        final sName =
+            (staticMapping != null &&
                 staticMapping.hostname.isNotEmpty &&
                 staticMapping.hostname != 'Unnamed Host' &&
                 staticMapping.hostname != 'Static Client')
             ? staticMapping.hostname
             : lease.hostname;
-        final sIp = (staticMapping != null &&
+        final sIp =
+            (staticMapping != null &&
                 staticMapping.ipAddress.isNotEmpty &&
                 staticMapping.ipAddress != 'N/A')
             ? staticMapping.ipAddress
             : lease.ipAddress;
 
-        finalLeaseList.add(DhcpLease(
-          hostname: sName,
-          ipAddress: sIp,
-          ip6Address: lease.ip6Address,
-          macAddress: lease.macAddress,
-          duid: lease.duid,
-          expirySeconds: lease.expirySeconds,
-          isStatic: true,
-          staticLeaseTime: sLt,
-        ));
+        finalLeaseList.add(
+          DhcpLease(
+            hostname: sName,
+            ipAddress: sIp,
+            ip6Address: lease.ip6Address,
+            macAddress: lease.macAddress,
+            duid: lease.duid,
+            expirySeconds: lease.expirySeconds,
+            isStatic: true,
+            staticLeaseTime: sLt,
+          ),
+        );
       } else {
-        final forcePurged = data?['forcePurged'] == true || (data?['forcePurgedAt'] != null && data!['forcePurgedAt'] > 0);
-        if (forcePurged || (offlineMacSet.contains(normMac) && !onlineMacSet.contains(normMac))) {
-          if (offlineMacSet.contains(normMac) && !onlineMacSet.contains(normMac)) {
+        final forcePurged =
+            data?['forcePurged'] == true ||
+            (data?['forcePurgedAt'] != null && data!['forcePurgedAt'] > 0);
+        if (forcePurged ||
+            (offlineMacSet.contains(normMac) &&
+                !onlineMacSet.contains(normMac))) {
+          if (offlineMacSet.contains(normMac) &&
+              !onlineMacSet.contains(normMac)) {
             continue;
           }
         }
@@ -804,9 +916,24 @@ class DhcpDnsOverview {
     if (isReviewerMode) {
       if (finalLeaseList.isEmpty) {
         finalLeaseList.addAll([
-          const DhcpLease(hostname: 'Android-Phone', ipAddress: '192.168.1.105', macAddress: 'DC:F5:05:12:34:56', expirySeconds: 38400),
-          const DhcpLease(hostname: 'Linux-Workstation', ipAddress: '192.168.1.110', macAddress: '48:21:0B:78:90:AB', expirySeconds: 41200),
-          const DhcpLease(hostname: 'Smart-TV', ipAddress: '192.168.1.115', macAddress: '70:B3:D5:CD:EF:01', expirySeconds: 21600),
+          const DhcpLease(
+            hostname: 'Android-Phone',
+            ipAddress: '192.168.1.105',
+            macAddress: 'DC:F5:05:12:34:56',
+            expirySeconds: 38400,
+          ),
+          const DhcpLease(
+            hostname: 'Linux-Workstation',
+            ipAddress: '192.168.1.110',
+            macAddress: '48:21:0B:78:90:AB',
+            expirySeconds: 41200,
+          ),
+          const DhcpLease(
+            hostname: 'Smart-TV',
+            ipAddress: '192.168.1.115',
+            macAddress: '70:B3:D5:CD:EF:01',
+            expirySeconds: 21600,
+          ),
           const DhcpLease(
             hostname: 'IPv6-Gateway-Node',
             ipAddress: '2405:201:12:3456::88',
@@ -838,8 +965,18 @@ class DhcpDnsOverview {
       }
       if (staticList.isEmpty) {
         staticList.addAll([
-          const DhcpStaticMapping(hostname: 'Home-NAS', ipAddress: '192.168.1.200', macAddress: '00:11:22:33:44:55', leaseTime: '12h'),
-          const DhcpStaticMapping(hostname: 'Printer-Office', ipAddress: '192.168.1.201', macAddress: '66:77:88:99:AA:BB', leaseTime: '24h'),
+          const DhcpStaticMapping(
+            hostname: 'Home-NAS',
+            ipAddress: '192.168.1.200',
+            macAddress: '00:11:22:33:44:55',
+            leaseTime: '12h',
+          ),
+          const DhcpStaticMapping(
+            hostname: 'Printer-Office',
+            ipAddress: '192.168.1.201',
+            macAddress: '66:77:88:99:AA:BB',
+            leaseTime: '24h',
+          ),
         ]);
       }
     }

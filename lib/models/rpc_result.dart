@@ -29,10 +29,7 @@ class RpcResult<T> {
   bool get isPermissionDenied => status == RpcCallStatus.permissionDenied;
 
   factory RpcResult.success(T data) {
-    return RpcResult(
-      status: RpcCallStatus.success,
-      data: data,
-    );
+    return RpcResult(status: RpcCallStatus.success, data: data);
   }
 
   factory RpcResult.methodNotFound(String message) {
@@ -68,14 +65,19 @@ class RpcResult<T> {
   }
 
   /// Evaluates standard ubus response arrays `[0, data]` or `[errCode, msg]`.
-  static RpcResult<T> fromUbusResponse<T>(dynamic rawResponse, T Function(dynamic data) parseData) {
+  static RpcResult<T> fromUbusResponse<T>(
+    dynamic rawResponse,
+    T Function(dynamic data) parseData,
+  ) {
     if (rawResponse == null) {
       return RpcResult.methodNotFound('RPC response was null');
     }
     if (rawResponse is List && rawResponse.isNotEmpty) {
       final code = rawResponse[0];
       if (code is int && code != 0) {
-        final msg = rawResponse.length > 1 ? rawResponse[1].toString() : 'ubus status code $code';
+        final msg = rawResponse.length > 1
+            ? rawResponse[1].toString()
+            : 'ubus status code $code';
         if (code == 6 || msg.toLowerCase().contains('permission denied')) {
           return RpcResult.permissionDenied('Permission denied ($msg)');
         }
@@ -97,21 +99,32 @@ class RpcResult<T> {
 
   /// Classifies a 2-level result from a `file.exec` RPC call.
   /// Evaluates both the ubus RPC transport status and the underlying shell command's exit code + stderr.
-  static RpcResult<T> classifyExecResult<T>(dynamic rawRpcResponse, T Function(dynamic data) parseData) {
+  static RpcResult<T> classifyExecResult<T>(
+    dynamic rawRpcResponse,
+    T Function(dynamic data) parseData,
+  ) {
     if (rawRpcResponse == null) {
-      return RpcResult.methodNotFound('RPC method or command execution unavailable');
+      return RpcResult.methodNotFound(
+        'RPC method or command execution unavailable',
+      );
     }
 
     // 1. Transport Level: Check standard ubus response code array [err_code, data_or_msg]
     if (rawRpcResponse is List && rawRpcResponse.isNotEmpty) {
       final code = rawRpcResponse[0];
       if (code is int && code != 0) {
-        final msg = rawRpcResponse.length > 1 ? rawRpcResponse[1].toString() : 'ubus status code $code';
+        final msg = rawRpcResponse.length > 1
+            ? rawRpcResponse[1].toString()
+            : 'ubus status code $code';
         if (code == 6 || msg.toLowerCase().contains('permission denied')) {
-          return RpcResult.permissionDenied('RPC transport permission denied ($msg)');
+          return RpcResult.permissionDenied(
+            'RPC transport permission denied ($msg)',
+          );
         }
         if (code == 2 || code == 3 || msg.toLowerCase().contains('not found')) {
-          return RpcResult.methodNotFound('RPC object or method not found ($msg)');
+          return RpcResult.methodNotFound(
+            'RPC object or method not found ($msg)',
+          );
         }
         return RpcResult.failed('RPC transport error: $msg', code: code);
       }
@@ -119,7 +132,9 @@ class RpcResult<T> {
 
     // 2. Command Level: Evaluate shell execution output (exit code + stderr)
     dynamic execData;
-    if (rawRpcResponse is List && rawRpcResponse.length > 1 && rawRpcResponse[0] == 0) {
+    if (rawRpcResponse is List &&
+        rawRpcResponse.length > 1 &&
+        rawRpcResponse[0] == 0) {
       execData = rawRpcResponse[1];
     } else if (rawRpcResponse is Map) {
       execData = rawRpcResponse;
@@ -135,15 +150,22 @@ class RpcResult<T> {
 
       // Command level exit-code / stderr classification
       if (code == 127 || combined.contains('command not found')) {
-        return RpcResult.methodNotFound('Package manager binary not found on router (exit code 127)');
+        return RpcResult.methodNotFound(
+          'Package manager binary not found on router (exit code 127)',
+        );
       }
-      if (code == 126 || combined.contains('permission denied') || combined.contains('access denied')) {
-        return RpcResult.permissionDenied('Permission denied executing command on router (exit code 126)');
+      if (code == 126 ||
+          combined.contains('permission denied') ||
+          combined.contains('access denied')) {
+        return RpcResult.permissionDenied(
+          'Permission denied executing command on router (exit code 126)',
+        );
       }
 
       // Check if parseData can extract valid non-empty output from stdout (e.g. apk info returning exit code 1 due to repo cache warnings)
       final parsed = parseData(execData);
-      final isValidParsed = parsed != null &&
+      final isValidParsed =
+          parsed != null &&
           (parsed is! String || parsed.trim().isNotEmpty) &&
           (parsed is! List || parsed.isNotEmpty) &&
           (parsed is! Map || parsed.isNotEmpty);
@@ -153,11 +175,17 @@ class RpcResult<T> {
       }
 
       if (code != 0) {
-        final errorDetail = stderr.trim().isNotEmpty ? stderr.trim() : (stdout.trim().isNotEmpty ? stdout.trim() : 'Command exited with code $code');
+        final errorDetail = stderr.trim().isNotEmpty
+            ? stderr.trim()
+            : (stdout.trim().isNotEmpty
+                  ? stdout.trim()
+                  : 'Command exited with code $code');
         return RpcResult.failed(errorDetail, code: code);
       }
 
-      return RpcResult.failed('Command succeeded but returned no usable package output');
+      return RpcResult.failed(
+        'Command succeeded but returned no usable package output',
+      );
     }
 
     return RpcResult.failed('Unexpected payload format from exec RPC');

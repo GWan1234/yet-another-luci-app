@@ -235,7 +235,10 @@ class LuciChartSkeleton extends StatelessWidget {
                           right: LuciSpacing.md,
                           bottom: LuciSpacing.md + (index * (height - 80) / 5),
                         ),
-                        child: const LuciSkeleton(width: double.infinity, height: 2),
+                        child: const LuciSkeleton(
+                          width: double.infinity,
+                          height: 2,
+                        ),
                       ),
                     );
                   }),

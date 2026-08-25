@@ -36,28 +36,31 @@ void main() {
       expect(updated.macAddress, '48:EF:1C:23:B8:7C');
     });
 
-    test('MockApiService disconnectWirelessClient succeeds with physical interface or SSID', () async {
-      final mockApi = MockApiService();
+    test(
+      'MockApiService disconnectWirelessClient succeeds with physical interface or SSID',
+      () async {
+        final mockApi = MockApiService();
 
-      final resultIface = await mockApi.disconnectWirelessClient(
-        '10.0.0.1',
-        'sysauth_token',
-        false,
-        macAddress: '48:EF:1C:23:B8:7C',
-        iface: 'phy1-ap0',
-      );
+        final resultIface = await mockApi.disconnectWirelessClient(
+          '10.0.0.1',
+          'sysauth_token',
+          false,
+          macAddress: '48:EF:1C:23:B8:7C',
+          iface: 'phy1-ap0',
+        );
 
-      expect(resultIface, isTrue);
+        expect(resultIface, isTrue);
 
-      final resultFallback = await mockApi.disconnectWirelessClient(
-        '10.0.0.1',
-        'sysauth_token',
-        false,
-        macAddress: '48:EF:1C:23:B8:7C',
-        iface: 'Titanic',
-      );
+        final resultFallback = await mockApi.disconnectWirelessClient(
+          '10.0.0.1',
+          'sysauth_token',
+          false,
+          macAddress: '48:EF:1C:23:B8:7C',
+          iface: 'Titanic',
+        );
 
-      expect(resultFallback, isTrue);
-    });
+        expect(resultFallback, isTrue);
+      },
+    );
   });
 }

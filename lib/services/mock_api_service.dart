@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:yet_another_luci_app/modules/parental_controls/models/parental_profile.dart';
 import 'package:yet_another_luci_app/modules/services_system/models/ddns_info.dart';
 import 'package:yet_another_luci_app/services/interfaces/api_service_interface.dart';
 import 'package:yet_another_luci_app/config/app_config.dart';
@@ -27,6 +28,21 @@ class MockApiService implements IApiService {
   static final Set<String> _mockBannedMacs = {'99:88:77:66:55:44'};
 
   @override
+  Future<AuthResult> authenticate(
+    String ipAddress,
+    String username,
+    String password,
+    bool useHttps, {
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return AuthResult.success(
+      'mock_sysauth_token_12345',
+      actualUseHttps: useHttps,
+    );
+  }
+
+  @override
   Future<String> login(
     String ipAddress,
     String username,
@@ -34,11 +50,14 @@ class MockApiService implements IApiService {
     bool useHttps, {
     BuildContext? context,
   }) async {
-    // Simulate a short delay for realism
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    // Always return a mock sysauth token
-    return 'mock_sysauth_token_12345';
+    final res = await authenticate(
+      ipAddress,
+      username,
+      password,
+      useHttps,
+      context: context,
+    );
+    return res.token ?? 'mock_sysauth_token_12345';
   }
 
   @override
@@ -134,16 +153,28 @@ class MockApiService implements IApiService {
         final path = params['path']?.toString() ?? '';
         if (path == '/etc/apk') {
           if (mockPackageEngine == PackageManagerEngine.apk) {
-            return [0, {'type': 'directory', 'path': '/etc/apk'}];
+            return [
+              0,
+              {'type': 'directory', 'path': '/etc/apk'},
+            ];
           } else {
-            return [1, {'error': 'No such file or directory'}];
+            return [
+              1,
+              {'error': 'No such file or directory'},
+            ];
           }
         }
         if (path == '/etc/opkg') {
           if (mockPackageEngine == PackageManagerEngine.opkg) {
-            return [0, {'type': 'directory', 'path': '/etc/opkg'}];
+            return [
+              0,
+              {'type': 'directory', 'path': '/etc/opkg'},
+            ];
           } else {
-            return [1, {'error': 'No such file or directory'}];
+            return [
+              1,
+              {'error': 'No such file or directory'},
+            ];
           }
         }
       }
@@ -152,16 +183,38 @@ class MockApiService implements IApiService {
         final cmd = params['command']?.toString() ?? '';
         if (cmd == 'opkg') {
           if (mockPackageEngine == PackageManagerEngine.opkg) {
-            return [0, {'code': 0, 'stdout': 'luci-base - git-23.330\nwireguard-tools - 1.0.20210914-1\n', 'stderr': ''}];
+            return [
+              0,
+              {
+                'code': 0,
+                'stdout':
+                    'luci-base - git-23.330\nwireguard-tools - 1.0.20210914-1\n',
+                'stderr': '',
+              },
+            ];
           } else {
-            return [0, {'code': 127, 'stdout': '', 'stderr': 'opkg: not found'}];
+            return [
+              0,
+              {'code': 127, 'stdout': '', 'stderr': 'opkg: not found'},
+            ];
           }
         }
         if (cmd == 'apk') {
           if (mockPackageEngine == PackageManagerEngine.apk) {
-            return [0, {'code': 0, 'stdout': 'luci-base-git-23.330\nwireguard-tools-1.0.20210914-1\n', 'stderr': ''}];
+            return [
+              0,
+              {
+                'code': 0,
+                'stdout':
+                    'luci-base-git-23.330\nwireguard-tools-1.0.20210914-1\n',
+                'stderr': '',
+              },
+            ];
           } else {
-            return [0, {'code': 127, 'stdout': '', 'stderr': 'apk: not found'}];
+            return [
+              0,
+              {'code': 127, 'stdout': '', 'stderr': 'apk: not found'},
+            ];
           }
         }
       }
@@ -750,7 +803,7 @@ class MockApiService implements IApiService {
             'wireguard': {'running': true, 'enabled': true},
             'nextdns': {'running': true, 'enabled': true, 'pid': 2110},
             'cron': {'running': true, 'enabled': true, 'pid': 780},
-          }
+          },
         ];
 
       case 'rc.list':
@@ -766,15 +819,16 @@ class MockApiService implements IApiService {
             'uhttpd': {'enabled': true, 'running': true, 'index': 80},
             'tailscale': {'enabled': true, 'running': true, 'index': 90},
             'cron': {'enabled': true, 'running': true, 'index': 95},
-          }
+          },
         ];
 
       case 'file.read':
         return [
           0,
           {
-            'data': '0 4 * * * /sbin/reboot\n*/15 * * * * /usr/bin/ping-check.sh\n'
-          }
+            'data':
+                '0 4 * * * /sbin/reboot\n*/15 * * * * /usr/bin/ping-check.sh\n',
+          },
         ];
 
       case 'uci.get':
@@ -1186,13 +1240,13 @@ class MockApiService implements IApiService {
         'isStaticLease': true,
         'vendor': 'Google LLC',
         'ipaddrs': ['192.168.1.100'],
-        'ip6addrs': ['2409:4060:2e81:a102::100', 'fe80::aabb:ccff:fe11:2233']
+        'ip6addrs': ['2409:4060:2e81:a102::100', 'fe80::aabb:ccff:fe11:2233'],
       },
       'AA:BB:CC:44:55:66': {
         'name': 'MacBook-Pro-16',
         'vendor': 'Apple Inc.',
         'ipaddrs': ['192.168.1.101'],
-        'ip6addrs': ['2409:4060:2e81:a102::101', 'fe80::aabb:ccff:fe44:5566']
+        'ip6addrs': ['2409:4060:2e81:a102::101', 'fe80::aabb:ccff:fe44:5566'],
       },
     };
   }
@@ -1337,7 +1391,8 @@ class MockApiService implements IApiService {
   }
 
   @override
-  Future<Map<String, List<Map<String, dynamic>>>> fetchRestrictedAndBannedClientsLive(
+  Future<Map<String, List<Map<String, dynamic>>>>
+  fetchRestrictedAndBannedClientsLive(
     String ipAddress,
     String sysauth,
     bool useHttps, {
@@ -1345,20 +1400,28 @@ class MockApiService implements IApiService {
   }) async {
     await Future.delayed(const Duration(milliseconds: 300));
     return {
-      'restricted': _mockRestrictedMacs.map((m) => {
-        'mac': m,
-        'name': 'Restricted-Tablet',
-        'ip': '192.168.1.150',
-        'type': 'restricted',
-        'source': 'LuCI Firewall Rule "Pause_Internet_112233445566"',
-      }).toList(),
-      'banned': _mockBannedMacs.map((m) => {
-        'mac': m,
-        'name': 'Banned-Guest-Phone',
-        'ip': 'N/A',
-        'type': 'banned',
-        'source': 'Wi-Fi Access Control (macfilter=deny)',
-      }).toList(),
+      'restricted': _mockRestrictedMacs
+          .map(
+            (m) => {
+              'mac': m,
+              'name': 'Restricted-Tablet',
+              'ip': '192.168.1.150',
+              'type': 'restricted',
+              'source': 'LuCI Firewall Rule "Pause_Internet_112233445566"',
+            },
+          )
+          .toList(),
+      'banned': _mockBannedMacs
+          .map(
+            (m) => {
+              'mac': m,
+              'name': 'Banned-Guest-Phone',
+              'ip': 'N/A',
+              'type': 'banned',
+              'source': 'Wi-Fi Access Control (macfilter=deny)',
+            },
+          )
+          .toList(),
     };
   }
 
@@ -1423,10 +1486,7 @@ class MockApiService implements IApiService {
     BuildContext? context,
   }) async {
     await Future.delayed(const Duration(milliseconds: 300));
-    return {
-      'ipv4': '203.0.113.195',
-      'ipv6': '2001:db8:85a3::8a2e:0370:7334',
-    };
+    return {'ipv4': '203.0.113.195', 'ipv6': '2001:db8:85a3::8a2e:0370:7334'};
   }
 
   @override
@@ -1485,14 +1545,16 @@ class MockApiService implements IApiService {
     BuildContext? context,
   }) async {
     await Future.delayed(const Duration(milliseconds: 400));
-    if (instance.lookupHost.contains('error') || instance.domain.contains('invalid')) {
+    if (instance.lookupHost.contains('error') ||
+        instance.domain.contains('invalid')) {
       return DdnsValidationResult.failure(
         'Host lookup failed for ${instance.lookupHost}. Host unreachable or unregistered.',
         testOutput: 'nslookup: cant resolve ${instance.lookupHost}',
       );
     }
     return DdnsValidationResult.success(
-      testOutput: 'DNS Lookup Output:\nName: ${instance.lookupHost.isEmpty ? instance.domain : instance.lookupHost}\nAddress: 198.51.100.24 (Public Router IP)',
+      testOutput:
+          'DNS Lookup Output:\nName: ${instance.lookupHost.isEmpty ? instance.domain : instance.lookupHost}\nAddress: 198.51.100.24 (Public Router IP)',
     );
   }
 
@@ -1630,7 +1692,8 @@ class MockApiService implements IApiService {
   }
 
   @override
-  Future<Map<String, List<Map<String, String>>>> fetchWirelessHardwareCapabilities({
+  Future<Map<String, List<Map<String, String>>>>
+  fetchWirelessHardwareCapabilities({
     required String sectionName,
     String? radioName,
     required String ipAddress,
@@ -1679,8 +1742,30 @@ class MockApiService implements IApiService {
         {'code': 'CA', 'label': 'CA — Canada'},
         {'code': 'AU', 'label': 'AU — Australia'},
       ],
-      'channels': ['auto', '1', '6', '11', '36', '40', '44', '48', '149', '153', '157', '161'],
-      'htModes': ['HT20', 'HT40', 'VHT20', 'VHT40', 'VHT80', 'HE20', 'HE40', 'HE80'],
+      'channels': [
+        'auto',
+        '1',
+        '6',
+        '11',
+        '36',
+        '40',
+        '44',
+        '48',
+        '149',
+        '153',
+        '157',
+        '161',
+      ],
+      'htModes': [
+        'HT20',
+        'HT40',
+        'VHT20',
+        'VHT40',
+        'VHT80',
+        'HE20',
+        'HE40',
+        'HE80',
+      ],
       'txPowers': ['auto', '30', '23', '20', '17', '14', '10'],
     };
   }
@@ -1694,5 +1779,63 @@ class MockApiService implements IApiService {
   }) async {
     // No anonymous sections exist in mock data — always clean
     return 0;
+  }
+
+  @override
+  Future<bool> applyParentalProfileDns(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String profileId,
+    required List<String> macAddresses,
+    required List<String>? dnsServers,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return true;
+  }
+
+  @override
+  Future<List<ParentalProfile>?> fetchParentalProfiles(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    return [
+      const ParentalProfile(
+        id: 'profile_1',
+        name: 'Profile 1',
+        icon: '👦',
+        color: '#F97316',
+        macAddresses: ['AA:BB:CC:11:22:33'],
+        contentFilter: ContentFilterDns.openDnsFamilyShield,
+      ),
+    ];
+  }
+
+  @override
+  Future<bool> saveParentalProfile(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required ParentalProfile profile,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    return true;
+  }
+
+  @override
+  Future<bool> deleteParentalProfile(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String profileId,
+    BuildContext? context,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    return true;
   }
 }

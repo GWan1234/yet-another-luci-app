@@ -6,7 +6,9 @@ import 'luci_module.dart';
 import 'luci_module_registry.dart';
 
 /// Provider for accessing the singleton [LuciModuleRegistry].
-final moduleRegistryProvider = ChangeNotifierProvider<LuciModuleRegistry>((ref) {
+final moduleRegistryProvider = ChangeNotifierProvider<LuciModuleRegistry>((
+  ref,
+) {
   return LuciModuleRegistry.instance;
 });
 

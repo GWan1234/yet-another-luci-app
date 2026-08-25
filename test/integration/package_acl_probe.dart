@@ -13,29 +13,43 @@ Future<String?> login() async {
 
   final req = await c.postUrl(base.replace(path: '/cgi-bin/luci/'));
   req.headers.set('Content-Type', 'application/x-www-form-urlencoded');
-  req.write('luci_username=${Uri.encodeComponent(user)}&luci_password=${Uri.encodeComponent(pass)}');
+  req.write(
+    'luci_username=${Uri.encodeComponent(user)}&luci_password=${Uri.encodeComponent(pass)}',
+  );
   final resp = await req.close();
   await resp.drain<void>();
   for (final cookie in resp.cookies) {
-    if (cookie.name == 'sysauth' && cookie.value.isNotEmpty) return cookie.value;
+    if (cookie.name == 'sysauth' && cookie.value.isNotEmpty)
+      return cookie.value;
   }
 
   // ubus session.login fallback (OpenWrt 24.10+)
   final ubusReq = await c.postUrl(base.replace(path: '/ubus'));
   ubusReq.headers.set('Content-Type', 'application/json');
-  ubusReq.write(jsonEncode({
-    'jsonrpc': '2.0',
-    'id': 1,
-    'method': 'call',
-    'params': ['00000000000000000000000000000000', 'session', 'login', {'username': user, 'password': pass}],
-  }));
+  ubusReq.write(
+    jsonEncode({
+      'jsonrpc': '2.0',
+      'id': 1,
+      'method': 'call',
+      'params': [
+        '00000000000000000000000000000000',
+        'session',
+        'login',
+        {'username': user, 'password': pass},
+      ],
+    }),
+  );
   final ubusResp = await ubusReq.close();
   final body = await ubusResp.transform(utf8.decoder).join();
   try {
     final decoded = jsonDecode(body);
-    if (decoded is Map && decoded['result'] is List && decoded['result'].length >= 2) {
+    if (decoded is Map &&
+        decoded['result'] is List &&
+        decoded['result'].length >= 2) {
       final data = decoded['result'][1];
-      if (decoded['result'][0] == 0 && data is Map && data['ubus_rpc_session'] != null) {
+      if (decoded['result'][0] == 0 &&
+          data is Map &&
+          data['ubus_rpc_session'] != null) {
         return data['ubus_rpc_session'] as String;
       }
     }
@@ -45,17 +59,29 @@ Future<String?> login() async {
   return null;
 }
 
-Future<void> ubusCall(String token, String object, String method, Map params, String label) async {
+Future<void> ubusCall(
+  String token,
+  String object,
+  String method,
+  Map params,
+  String label,
+) async {
   final c = HttpClient()..badCertificateCallback = (_, _, _) => true;
-  final req = await c.postUrl(Uri.parse('http://${Platform.environment['ROUTER_IP'] ?? '192.168.1.1'}/ubus'));
+  final req = await c.postUrl(
+    Uri.parse(
+      'http://${Platform.environment['ROUTER_IP'] ?? '192.168.1.1'}/ubus',
+    ),
+  );
   req.headers.set('Content-Type', 'application/json');
   req.cookies.add(Cookie('sysauth', token));
-  req.write(jsonEncode({
-    'jsonrpc': '2.0',
-    'id': 1,
-    'method': 'call',
-    'params': [token, object, method, params],
-  }));
+  req.write(
+    jsonEncode({
+      'jsonrpc': '2.0',
+      'id': 1,
+      'method': 'call',
+      'params': [token, object, method, params],
+    }),
+  );
   final resp = await req.close();
   final body = await resp.transform(utf8.decoder).join();
   try {
@@ -68,7 +94,8 @@ Future<void> ubusCall(String token, String object, String method, Map params, St
         final m = result[1] as Map;
         final stdout = m['stdout']?.toString() ?? m['data']?.toString() ?? '';
         detail += ' stdout_len=${stdout.length} code=${m['code']}';
-        if (stdout.length > 40) detail += ' head=${stdout.substring(0, 40).replaceAll('\n', ' ')}';
+        if (stdout.length > 40)
+          detail += ' head=${stdout.substring(0, 40).replaceAll('\n', ' ')}';
       }
       stdout.writeln('$label: $detail');
     } else {
@@ -88,7 +115,9 @@ void main() async {
   }
   stdout.writeln('LOGIN OK');
 
-  await ubusCall(token, 'session', 'get', {'ubus_rpc_session': token}, 'session.get');
+  await ubusCall(token, 'session', 'get', {
+    'ubus_rpc_session': token,
+  }, 'session.get');
   await ubusCall(token, 'file', 'exec', {
     'command': '/usr/libexec/package-manager-call',
     'params': ['list-installed'],
@@ -97,8 +126,12 @@ void main() async {
   await ubusCall(token, 'file', 'exec', {
     'command': '/usr/libexec/package-manager-call list-installed',
   }, 'pm-call full cmd');
-  await ubusCall(token, 'file', 'read', {'path': '/etc/apk/world'}, 'read apk world');
-  await ubusCall(token, 'file', 'read', {'path': '/lib/apk/db/installed'}, 'read apk db');
+  await ubusCall(token, 'file', 'read', {
+    'path': '/etc/apk/world',
+  }, 'read apk world');
+  await ubusCall(token, 'file', 'read', {
+    'path': '/lib/apk/db/installed',
+  }, 'read apk db');
   await ubusCall(token, 'file', 'exec', {
     'command': 'sh',
     'params': ['-c', 'cat /etc/apk/world'],

@@ -11,18 +11,14 @@ void main() {
     test('DsaTopologyParser correctly parses bridge-vlan sections', () {
       final mockUciNetwork = {
         'values': {
-          'br0': {
-            '.type': 'device',
-            'name': 'br-lan',
-            'type': 'bridge',
-          },
+          'br0': {'.type': 'device', 'name': 'br-lan', 'type': 'bridge'},
           'vlan10': {
             '.type': 'bridge-vlan',
             'device': 'br-lan',
             'vlan': '10',
             'ports': ['lan1:u', 'lan2:u', 'lan3:t'],
           },
-        }
+        },
       };
 
       final topology = DsaTopologyParser.parse(mockUciNetwork, null);
@@ -39,17 +35,14 @@ void main() {
     test('SwconfigTopologyParser correctly parses switch_vlan sections', () {
       final mockUciNetwork = {
         'values': {
-          'sw0': {
-            '.type': 'switch',
-            'name': 'switch0',
-          },
+          'sw0': {'.type': 'switch', 'name': 'switch0'},
           'vlan1': {
             '.type': 'switch_vlan',
             'device': 'switch0',
             'vlan': '1',
             'ports': '1 2 3 5t',
           },
-        }
+        },
       };
 
       final topology = SwconfigTopologyParser.parse(mockUciNetwork, null);
@@ -65,11 +58,8 @@ void main() {
     test('Parser produces distinct empty states: zeroVlans vs unavailable', () {
       final validFlatNetworkUci = {
         'values': {
-          'lan': {
-            '.type': 'interface',
-            'device': 'br-lan',
-          },
-        }
+          'lan': {'.type': 'interface', 'device': 'br-lan'},
+        },
       };
       final emptyPayloadUci = {'values': {}};
 
@@ -85,39 +75,54 @@ void main() {
       expect(emptyParse.isZeroVlans, isFalse);
 
       // 3. Capability unavailable state (e.g. unknown network model / conservative fallback)
-      final unavailable = NetworkTopology.unavailable(NetworkModel.unknown, 'Conservative mode');
+      final unavailable = NetworkTopology.unavailable(
+        NetworkModel.unknown,
+        'Conservative mode',
+      );
       expect(unavailable.isAvailable, isFalse);
       expect(unavailable.isZeroVlans, isFalse);
       expect(unavailable.errorMessage, contains('Conservative mode'));
     });
 
-    test('WanProtocol correctly parses standard and unrecognized protocols', () {
-      expect(WanProtocol.parse('dhcp'), equals(WanProtocol.dhcp));
-      expect(WanProtocol.parse('static'), equals(WanProtocol.static));
-      expect(WanProtocol.parse('pppoe'), equals(WanProtocol.pppoe));
-      expect(WanProtocol.parse('map'), equals(WanProtocol.map));
-      expect(WanProtocol.parse('dslite'), equals(WanProtocol.dslite));
-      expect(WanProtocol.parse('6in4'), equals(WanProtocol.sixInFour));
-      expect(WanProtocol.parse('wireguard'), equals(WanProtocol.wireguard));
+    test(
+      'WanProtocol correctly parses standard and unrecognized protocols',
+      () {
+        expect(WanProtocol.parse('dhcp'), equals(WanProtocol.dhcp));
+        expect(WanProtocol.parse('static'), equals(WanProtocol.static));
+        expect(WanProtocol.parse('pppoe'), equals(WanProtocol.pppoe));
+        expect(WanProtocol.parse('map'), equals(WanProtocol.map));
+        expect(WanProtocol.parse('dslite'), equals(WanProtocol.dslite));
+        expect(WanProtocol.parse('6in4'), equals(WanProtocol.sixInFour));
+        expect(WanProtocol.parse('wireguard'), equals(WanProtocol.wireguard));
 
-      // Unrecognized proto fallback test
-      final unknown = WanProtocol.parse('custom_proto_xyz');
-      expect(unknown, equals(WanProtocol.unknown));
-      expect(unknown.displayName, equals('Unrecognized Protocol'));
-    });
+        // Unrecognized proto fallback test
+        final unknown = WanProtocol.parse('custom_proto_xyz');
+        expect(unknown, equals(WanProtocol.unknown));
+        expect(unknown.displayName, equals('Unrecognized Protocol'));
+      },
+    );
 
-    test('RpcResult classification handles transport and ubus status branches', () {
-      final successRpc = [0, {'code': 0, 'stdout': 'lan1 lan2'}];
-      final resSuccess = RpcResult.classifyExecResult(successRpc, (d) => d);
-      expect(resSuccess.isSuccess, isTrue);
+    test(
+      'RpcResult classification handles transport and ubus status branches',
+      () {
+        final successRpc = [
+          0,
+          {'code': 0, 'stdout': 'lan1 lan2'},
+        ];
+        final resSuccess = RpcResult.classifyExecResult(successRpc, (d) => d);
+        expect(resSuccess.isSuccess, isTrue);
 
-      final notFoundRpc = [3, 'Object not found'];
-      final resNotFound = RpcResult.fromUbusResponse(notFoundRpc, (d) => d);
-      expect(resNotFound.isMethodNotFound, isTrue);
+        final notFoundRpc = [3, 'Object not found'];
+        final resNotFound = RpcResult.fromUbusResponse(notFoundRpc, (d) => d);
+        expect(resNotFound.isMethodNotFound, isTrue);
 
-      final permDeniedRpc = [6, 'Permission denied'];
-      final resPermDenied = RpcResult.fromUbusResponse(permDeniedRpc, (d) => d);
-      expect(resPermDenied.isPermissionDenied, isTrue);
-    });
+        final permDeniedRpc = [6, 'Permission denied'];
+        final resPermDenied = RpcResult.fromUbusResponse(
+          permDeniedRpc,
+          (d) => d,
+        );
+        expect(resPermDenied.isPermissionDenied, isTrue);
+      },
+    );
   });
 }

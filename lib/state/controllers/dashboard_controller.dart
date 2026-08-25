@@ -18,11 +18,7 @@ import 'package:yet_another_luci_app/utils/http_client_manager.dart';
 import 'package:yet_another_luci_app/utils/logger.dart';
 
 /// Enum matching AppState connection status for reporting connection failures.
-enum DashboardConnectionStatus {
-  connected,
-  reconnecting,
-  disconnected,
-}
+enum DashboardConnectionStatus { connected, reconnecting, disconnected }
 
 /// Encapsulates central dashboard data aggregation, capability probing/caching,
 /// router hardware capabilities detection, and multi-RPC parallel fetching.
@@ -41,27 +37,27 @@ class DashboardController {
     required Future<void> Function() fetchPublicIps,
     required void Function(String v4, String v6) setPublicIps,
     required void Function(DashboardConnectionStatus status)
-        setConnectionStatus,
+    setConnectionStatus,
     required void Function() startThroughputTimer,
     required void Function() updateThroughputOnly,
     required Map<String, dynamic> Function(Map<String, dynamic> rawDhcpData)
-        processDhcpLeases,
+    processDhcpLeases,
     required VoidCallback notifyListeners,
-  })  : _apiServiceRef = apiServiceRef,
-        _authServiceRef = authServiceRef,
-        _routerServiceRef = routerServiceRef,
-        _secureStorageServiceRef = secureStorageServiceRef,
-        _throughputControllerRef = throughputControllerRef,
-        _dashboardPreferencesRef = dashboardPreferencesRef,
-        _reviewerModeRef = reviewerModeRef,
-        _tryAutoLogin = tryAutoLogin,
-        _fetchPublicIps = fetchPublicIps,
-        _setPublicIps = setPublicIps,
-        _setConnectionStatus = setConnectionStatus,
-        _startThroughputTimer = startThroughputTimer,
-        _updateThroughputOnly = updateThroughputOnly,
-        _processDhcpLeases = processDhcpLeases,
-        _notifyListeners = notifyListeners;
+  }) : _apiServiceRef = apiServiceRef,
+       _authServiceRef = authServiceRef,
+       _routerServiceRef = routerServiceRef,
+       _secureStorageServiceRef = secureStorageServiceRef,
+       _throughputControllerRef = throughputControllerRef,
+       _dashboardPreferencesRef = dashboardPreferencesRef,
+       _reviewerModeRef = reviewerModeRef,
+       _tryAutoLogin = tryAutoLogin,
+       _fetchPublicIps = fetchPublicIps,
+       _setPublicIps = setPublicIps,
+       _setConnectionStatus = setConnectionStatus,
+       _startThroughputTimer = startThroughputTimer,
+       _updateThroughputOnly = updateThroughputOnly,
+       _processDhcpLeases = processDhcpLeases,
+       _notifyListeners = notifyListeners;
 
   final IApiService? Function() _apiServiceRef;
   final IAuthService? Function() _authServiceRef;
@@ -77,13 +73,14 @@ class DashboardController {
   final void Function() _startThroughputTimer;
   final void Function() _updateThroughputOnly;
   final Map<String, dynamic> Function(Map<String, dynamic> rawDhcpData)
-      _processDhcpLeases;
+  _processDhcpLeases;
   final VoidCallback _notifyListeners;
 
   Map<String, dynamic>? _dashboardData;
   bool _isDashboardLoading = false;
   String? _dashboardError;
   RouterCapabilities? _capabilities;
+  Future<void>? _activeFetchFuture;
 
   Map<String, dynamic>? get dashboardData => _dashboardData;
   bool get isDashboardLoading => _isDashboardLoading;
@@ -93,12 +90,9 @@ class DashboardController {
   IApiService? get _apiService => _apiServiceRef();
   IAuthService? get _authService => _authServiceRef();
   RouterService? get _routerService => _routerServiceRef();
-  SecureStorageService get _secureStorageService =>
-      _secureStorageServiceRef();
-  ThroughputController? get _throughputController =>
-      _throughputControllerRef();
-  DashboardPreferences get _dashboardPreferences =>
-      _dashboardPreferencesRef();
+  SecureStorageService get _secureStorageService => _secureStorageServiceRef();
+  ThroughputController? get _throughputController => _throughputControllerRef();
+  DashboardPreferences get _dashboardPreferences => _dashboardPreferencesRef();
   bool get _isReviewerMode => _reviewerModeRef();
 
   /// Resets cached dashboard state and capabilities (e.g. on logout/router change).
@@ -121,8 +115,9 @@ class DashboardController {
   }
 
   /// Probe and cache actual ubus objects, methods, package manager engine, firewall backend, and network model.
-  Future<RouterCapabilities> probeRouterCapabilities(
-      {bool forceRefresh = false}) async {
+  Future<RouterCapabilities> probeRouterCapabilities({
+    bool forceRefresh = false,
+  }) async {
     if (_isReviewerMode) {
       _capabilities = RouterCapabilities.mock();
       _notifyListeners();
@@ -158,11 +153,17 @@ class DashboardController {
     }
 
     final ip = _routerService!.selectedRouter!.ipAddress;
-    final sysauth = _authService!.sysauth!;
+    final String sysauth = _authService?.sysauth ?? '';
+    if (sysauth.isEmpty && !_isReviewerMode) {
+      return _capabilities ??
+          RouterCapabilities.conservative('unauthenticated');
+    }
     final useHttps = _routerService!.selectedRouter!.useHttps;
 
     // Silently ensure ACL rules exist on router in the background without prompting user
-    unawaited(_apiService!.ensureSilentPermissions(ip, sysauth, useHttps));
+    if (sysauth.isNotEmpty) {
+      unawaited(_apiService!.ensureSilentPermissions(ip, sysauth, useHttps));
+    }
 
     final ubusObjects = <String>{};
     final ubusMethods = <String, List<String>>{};
@@ -178,17 +179,37 @@ class DashboardController {
     try {
       // 1. Probe available ubus objects and methods via direct lightweight RPC queries
       try {
-        final sysInfo = await _apiService!.call(ip, sysauth, useHttps, object: 'system', method: 'info');
+        final sysInfo = await _apiService!.call(
+          ip,
+          sysauth,
+          useHttps,
+          object: 'system',
+          method: 'info',
+        );
         if (sysInfo != null) ubusObjects.add('system');
       } catch (_) {}
 
       try {
-        final uciRes = await _apiService!.call(ip, sysauth, useHttps, object: 'uci', method: 'get', params: {'config': 'system'});
+        final uciRes = await _apiService!.call(
+          ip,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'get',
+          params: {'config': 'system'},
+        );
         if (uciRes != null) ubusObjects.add('uci');
       } catch (_) {}
 
       try {
-        final fileRes = await _apiService!.call(ip, sysauth, useHttps, object: 'file', method: 'exec', params: {'command': 'true'});
+        final fileRes = await _apiService!.call(
+          ip,
+          sysauth,
+          useHttps,
+          object: 'file',
+          method: 'exec',
+          params: {'command': 'true'},
+        );
         if (fileRes is List && fileRes.isNotEmpty && fileRes[0] == 0) {
           ubusObjects.add('file');
           ubusMethods['file'] = ['exec', 'read', 'stat'];
@@ -196,7 +217,13 @@ class DashboardController {
       } catch (_) {}
 
       try {
-        final iwinfoRes = await _apiService!.call(ip, sysauth, useHttps, object: 'iwinfo', method: 'devices');
+        final iwinfoRes = await _apiService!.call(
+          ip,
+          sysauth,
+          useHttps,
+          object: 'iwinfo',
+          method: 'devices',
+        );
         if (iwinfoRes != null) {
           ubusObjects.add('iwinfo');
           ubusObjects.add('luci-rpc');
@@ -204,17 +231,27 @@ class DashboardController {
       } catch (_) {}
 
       try {
-        final rcRes = await _apiService!.call(ip, sysauth, useHttps, object: 'rc', method: 'list');
+        final rcRes = await _apiService!.call(
+          ip,
+          sysauth,
+          useHttps,
+          object: 'rc',
+          method: 'list',
+        );
         if (rcRes != null) ubusObjects.add('rc');
       } catch (_) {}
 
       try {
         final featuresRes = await _apiService!.call(
-          ip, sysauth, useHttps,
+          ip,
+          sysauth,
+          useHttps,
           object: 'luci',
           method: 'getFeatures',
         );
-        if (featuresRes is List && featuresRes.length > 1 && featuresRes[0] == 0) {
+        if (featuresRes is List &&
+            featuresRes.length > 1 &&
+            featuresRes[0] == 0) {
           ubusObjects.add('luci');
           final data = featuresRes[1];
           if (data is Map) {
@@ -324,7 +361,8 @@ class DashboardController {
         );
         if (boardRes is List && boardRes.length > 1 && boardRes[0] == 0) {
           final bData = boardRes[1] as Map<String, dynamic>?;
-          board = bData?['model']?.toString() ??
+          board =
+              bData?['model']?.toString() ??
               bData?['hostname']?.toString() ??
               '';
           final release = bData?['release'] as Map<String, dynamic>?;
@@ -367,7 +405,17 @@ class DashboardController {
   }
 
   /// Central method to fetch all dashboard data concurrently
-  Future<void> fetchDashboardData() async {
+  Future<void> fetchDashboardData() {
+    if (_activeFetchFuture != null) {
+      return _activeFetchFuture!;
+    }
+    _activeFetchFuture = _fetchDashboardDataInternal();
+    return _activeFetchFuture!.whenComplete(() {
+      _activeFetchFuture = null;
+    });
+  }
+
+  Future<void> _fetchDashboardDataInternal() async {
     if (_isReviewerMode) {
       _isDashboardLoading = true;
       _dashboardError = null;
@@ -402,7 +450,9 @@ class DashboardController {
             useHttps: false,
             interface: 'wg0',
           ),
-          _apiService!.callSimple('file', 'read', {'path': '/etc/crontabs/root'}),
+          _apiService!.callSimple('file', 'read', {
+            'path': '/etc/crontabs/root',
+          }),
         ]);
 
         dynamic getResData(dynamic res) {
@@ -411,8 +461,10 @@ class DashboardController {
           return null;
         }
 
-        final interfaceDump = getResData(results[3]) as Map<String, dynamic>? ?? {};
-        final rawDhcpData = getResData(results[5]) as Map<String, dynamic>? ?? {};
+        final interfaceDump =
+            getResData(results[3]) as Map<String, dynamic>? ?? {};
+        final rawDhcpData =
+            getResData(results[5]) as Map<String, dynamic>? ?? {};
         final processedDhcpData = _processDhcpLeases(rawDhcpData);
         final wirelessStations = results[16] as Map<String, Set<String>>? ?? {};
         final wireguardData = results[17] as Map<String, dynamic>? ?? {};
@@ -482,8 +534,9 @@ class DashboardController {
           String? specificInterface;
           if (!prefs.showAllThroughput &&
               prefs.primaryThroughputInterface != null) {
-            specificInterface =
-                getDeviceNameForInterface(prefs.primaryThroughputInterface!);
+            specificInterface = getDeviceNameForInterface(
+              prefs.primaryThroughputInterface!,
+            );
           }
 
           _throughputController!.updateThroughput(
@@ -522,6 +575,10 @@ class DashboardController {
 
     await probeRouterCapabilities();
 
+    // Yield to the event loop so the UI has a chance to render the loading state
+    // and avoid dropping Choreographer frames when firing 20+ parallel requests.
+    await Future.delayed(const Duration(milliseconds: 100));
+
     final ip = _routerService!.selectedRouter!.ipAddress;
     final useHttps = _routerService!.selectedRouter!.useHttps;
 
@@ -532,17 +589,27 @@ class DashboardController {
         Map<String, dynamic>? params,
       }) async {
         try {
+          final currentSysauth = _authService?.sysauth;
+          if (currentSysauth == null || currentSysauth.isEmpty) {
+            if (!_isReviewerMode) return null;
+          }
           return await _apiService!.call(
             ip,
-            _authService!.sysauth!,
+            currentSysauth ?? '',
             useHttps,
             object: object,
             method: method,
             params: params,
           );
         } catch (e, stack) {
-          Logger.warning('Optional RPC $object.$method failed: $e');
-          Logger.debug('Optional RPC $object.$method stack: $stack');
+          final errStr = e.toString();
+          if (errStr.contains('Access denied') ||
+              errStr.contains('Permission denied')) {
+            Logger.debug('Optional RPC $object.$method denied by ACL: $e');
+          } else {
+            Logger.warning('Optional RPC $object.$method failed: $e');
+            Logger.debug('Optional RPC $object.$method stack: $stack');
+          }
           return null;
         }
       }
@@ -552,8 +619,9 @@ class DashboardController {
           if (result[0] == 0) {
             return result[1];
           } else {
-            final errorMessage =
-                result[1] is String ? result[1] : 'Unknown API Error';
+            final errorMessage = result[1] is String
+                ? result[1]
+                : 'Unknown API Error';
             throw Exception(errorMessage);
           }
         }
@@ -713,7 +781,11 @@ class DashboardController {
           final res2 = await callOptionalRpc(
             object: 'file',
             method: 'exec',
-            params: {'command': 'crontab', 'params': ['-l'], 'args': ['-l']},
+            params: {
+              'command': 'crontab',
+              'params': ['-l'],
+              'args': ['-l'],
+            },
           );
           final data2 = getOptionalData(res2, 'file.exec.cron');
           if (data2 is Map && data2['stdout'] != null) {
@@ -729,7 +801,8 @@ class DashboardController {
             if (data == null) return false;
             if (data is List) return data.isNotEmpty;
             if (data is Map) {
-              final leases = data['dhcp_leases'] ?? data['dhcpLeases'] ?? data['leases'];
+              final leases =
+                  data['dhcp_leases'] ?? data['dhcpLeases'] ?? data['leases'];
               if (leases is List) return leases.isNotEmpty;
               if (data['data'] != null || data['stdout'] != null) {
                 final str = (data['data'] ?? data['stdout']).toString().trim();
@@ -762,7 +835,9 @@ class DashboardController {
             );
             final dataFile = getOptionalData(resFile, 'file.read.$path');
             if (dataFile is Map && dataFile['data'] != null) {
-              final processed = _processDhcpLeases(Map<String, dynamic>.from(dataFile));
+              final processed = _processDhcpLeases(
+                Map<String, dynamic>.from(dataFile),
+              );
               if (hasLeases(processed)) return processed;
             }
           }
@@ -822,7 +897,7 @@ class DashboardController {
           final procMountPaths = [
             '/proc/mounts',
             '/proc/self/mounts',
-            '/etc/mtab'
+            '/etc/mtab',
           ];
           for (final mountPath in procMountPaths) {
             final resProc = await callOptionalRpc(
@@ -846,22 +921,46 @@ class DashboardController {
           if (hasValidMounts(data4)) return data4;
 
           final dfVariations = [
-            {'command': 'df', 'params': ['-k'], 'args': ['-k']},
-            {'command': '/bin/df', 'params': ['-k'], 'args': ['-k']},
-            {'command': '/usr/bin/df', 'params': ['-k'], 'args': ['-k']},
-            {'command': 'df', 'params': ['-h'], 'args': ['-h']},
-            {'command': 'df', 'params': ['-P'], 'args': ['-P']},
+            {
+              'command': 'df',
+              'params': ['-k'],
+              'args': ['-k'],
+            },
+            {
+              'command': '/bin/df',
+              'params': ['-k'],
+              'args': ['-k'],
+            },
+            {
+              'command': '/usr/bin/df',
+              'params': ['-k'],
+              'args': ['-k'],
+            },
+            {
+              'command': 'df',
+              'params': ['-h'],
+              'args': ['-h'],
+            },
+            {
+              'command': 'df',
+              'params': ['-P'],
+              'args': ['-P'],
+            },
             {'command': 'df', 'params': <String>[], 'args': <String>[]},
-            {'command': 'sh', 'params': ['-c', 'df -k'], 'args': ['-c', 'df -k']},
+            {
+              'command': 'sh',
+              'params': ['-c', 'df -k'],
+              'args': ['-c', 'df -k'],
+            },
             {
               'command': '/bin/sh',
               'params': ['-c', 'df -k'],
-              'args': ['-c', 'df -k']
+              'args': ['-c', 'df -k'],
             },
             {
               'command': 'cat',
               'params': ['/proc/mounts'],
-              'args': ['/proc/mounts']
+              'args': ['/proc/mounts'],
             },
           ];
 
@@ -894,8 +993,10 @@ class DashboardController {
             method: 'read',
             params: {'path': '/proc/self/mounts'},
           );
-          final dataSelfProc =
-              getOptionalData(resSelfProc, 'file.read.selfmounts');
+          final dataSelfProc = getOptionalData(
+            resSelfProc,
+            'file.read.selfmounts',
+          );
           if (dataSelfProc is Map) {
             final fileData = dataSelfProc['data']?.toString();
             if (hasValidMounts(fileData)) return fileData;
@@ -919,45 +1020,40 @@ class DashboardController {
 
       final mountPointsFuture = fetchStorageData();
 
+      final currentSysauth = _authService?.sysauth;
+      if (currentSysauth == null || currentSysauth.isEmpty) {
+        if (!_isReviewerMode) {
+          Logger.warning(
+            'fetchDashboardData aborted: no sysauth session token available',
+          );
+          return;
+        }
+      }
+      final activeSysauth = currentSysauth ?? '';
+
       final results = await Future.wait([
-        _apiService!.call(
-          ip,
-          _authService!.sysauth!,
-          useHttps,
-          object: 'system',
-          method: 'board',
-          params: {},
-        ),
-        _apiService!.call(
-          ip,
-          _authService!.sysauth!,
-          useHttps,
-          object: 'system',
-          method: 'info',
-          params: {},
-        ),
-        _apiService!.call(
-          ip,
-          _authService!.sysauth!,
-          useHttps,
+        callOptionalRpc(object: 'system', method: 'board', params: {}),
+        callOptionalRpc(object: 'system', method: 'info', params: {}),
+        callOptionalRpc(
           object: 'luci-rpc',
           method: 'getNetworkDevices',
           params: {},
         ),
-        _apiService!.call(
-          ip,
-          _authService!.sysauth!,
-          useHttps,
+        callOptionalRpc(
           object: 'network.interface',
           method: 'dump',
           params: {},
         ),
       ]);
 
-      final boardInfoData = getData(results[0]);
-      final sysInfoData = getData(results[1]);
-      final networkData = getData(results[2]) as Map<String, dynamic>?;
-      final interfaceDump = getData(results[3]) as Map<String, dynamic>?;
+      final boardInfoData = getOptionalData(results[0], 'system.board');
+      final sysInfoData = getOptionalData(results[1], 'system.info');
+      final networkData =
+          getOptionalData(results[2], 'luci-rpc.getNetworkDevices')
+              as Map<String, dynamic>?;
+      final interfaceDump =
+          getOptionalData(results[3], 'network.interface.dump')
+              as Map<String, dynamic>?;
 
       final optionalResults = await Future.wait([
         wirelessFuture,
@@ -994,8 +1090,10 @@ class DashboardController {
 
       Map<String, dynamic>? wirelessData;
       if (wirelessRaw != null) {
-        final parsedWireless =
-            getOptionalData(wirelessRaw, 'luci-rpc.getWirelessDevices');
+        final parsedWireless = getOptionalData(
+          wirelessRaw,
+          'luci-rpc.getWirelessDevices',
+        );
         if (parsedWireless is Map<String, dynamic>) {
           wirelessData = parsedWireless;
         }
@@ -1003,8 +1101,7 @@ class DashboardController {
 
       dynamic uciWirelessConfig;
       if (uciWirelessRaw != null) {
-        uciWirelessConfig =
-            getOptionalData(uciWirelessRaw, 'uci.get wireless');
+        uciWirelessConfig = getOptionalData(uciWirelessRaw, 'uci.get wireless');
       }
 
       dynamic uciDhcpConfig;
@@ -1014,14 +1111,12 @@ class DashboardController {
 
       dynamic uciFirewallConfig;
       if (uciFirewallRaw != null) {
-        uciFirewallConfig =
-            getOptionalData(uciFirewallRaw, 'uci.get firewall');
+        uciFirewallConfig = getOptionalData(uciFirewallRaw, 'uci.get firewall');
       }
 
       Map<String, dynamic>? openvpnData;
       if (uciOpenvpnRaw != null) {
-        final parsedOpenvpn =
-            getOptionalData(uciOpenvpnRaw, 'uci.get openvpn');
+        final parsedOpenvpn = getOptionalData(uciOpenvpnRaw, 'uci.get openvpn');
         if (parsedOpenvpn is Map<String, dynamic>) {
           final values = parsedOpenvpn['values'] is Map<String, dynamic>
               ? parsedOpenvpn['values'] as Map<String, dynamic>
@@ -1057,8 +1152,8 @@ class DashboardController {
         final parsedExec = tailscaleExecRaw is Map<String, dynamic>
             ? tailscaleExecRaw
             : (tailscaleExecRaw is Map
-                ? Map<String, dynamic>.from(tailscaleExecRaw)
-                : getOptionalData(tailscaleExecRaw, 'file.exec.tailscale'));
+                  ? Map<String, dynamic>.from(tailscaleExecRaw)
+                  : getOptionalData(tailscaleExecRaw, 'file.exec.tailscale'));
 
         if (parsedExec is Map<String, dynamic> &&
             parsedExec['stdout'] is String) {
@@ -1066,7 +1161,8 @@ class DashboardController {
           if (stdoutStr.isNotEmpty) {
             if (stdoutStr.startsWith('{')) {
               try {
-                final jsonStatus = jsonDecode(stdoutStr) as Map<String, dynamic>;
+                final jsonStatus =
+                    jsonDecode(stdoutStr) as Map<String, dynamic>;
                 cliState = jsonStatus['BackendState']?.toString();
                 if (cliState != null && cliState.isNotEmpty) {
                   cliConfigured = true;
@@ -1074,9 +1170,11 @@ class DashboardController {
                 }
                 final selfObj = jsonStatus['Self'] as Map<String, dynamic>?;
                 if (selfObj != null) {
-                  cliNodeName = selfObj['HostName']?.toString() ??
+                  cliNodeName =
+                      selfObj['HostName']?.toString() ??
                       selfObj['DNSName']?.toString();
-                  cliIsExitNode = selfObj['ExitNode'] == true ||
+                  cliIsExitNode =
+                      selfObj['ExitNode'] == true ||
                       selfObj['ExitNodeOption'] == true;
                 }
                 cliMagicDns = jsonStatus['MagicDNSSuffix']?.toString();
@@ -1119,8 +1217,9 @@ class DashboardController {
         if (sObj is Map && sObj['instances'] is Map) {
           final instances = sObj['instances'] as Map;
           if (instances.isNotEmpty) {
-            serviceIsRunning = instances.values.any((i) =>
-                i is Map && (i['running'] == true || i['running'] == 1));
+            serviceIsRunning = instances.values.any(
+              (i) => i is Map && (i['running'] == true || i['running'] == 1),
+            );
           }
         } else if (sObj is Map && sObj.containsKey('running')) {
           serviceIsRunning = sObj['running'] == true || sObj['running'] == 1;
@@ -1147,8 +1246,10 @@ class DashboardController {
       bool uciConfigured = false;
       bool uciEnabled = false;
       if (uciTailscaleRaw != null) {
-        final parsedTailscale =
-            getOptionalData(uciTailscaleRaw, 'uci.get tailscale');
+        final parsedTailscale = getOptionalData(
+          uciTailscaleRaw,
+          'uci.get tailscale',
+        );
         if (parsedTailscale is Map<String, dynamic>) {
           final values = parsedTailscale['values'] is Map<String, dynamic>
               ? parsedTailscale['values'] as Map<String, dynamic>
@@ -1156,15 +1257,16 @@ class DashboardController {
           if (values.containsKey('settings')) {
             uciSec = values['settings'] as Map<String, dynamic>?;
           } else if (values.isNotEmpty) {
-            uciSec = values.values.firstWhere(
-              (v) => v is Map<String, dynamic>,
-              orElse: () => null,
-            ) as Map<String, dynamic>?;
+            uciSec =
+                values.values.firstWhere(
+                      (v) => v is Map<String, dynamic>,
+                      orElse: () => null,
+                    )
+                    as Map<String, dynamic>?;
           }
           if (uciSec != null) {
             uciConfigured = true;
-            uciEnabled =
-                uciSec['enabled'] == '1' || uciSec['enabled'] == true;
+            uciEnabled = uciSec['enabled'] == '1' || uciSec['enabled'] == true;
           }
         }
       }
@@ -1177,15 +1279,16 @@ class DashboardController {
         final finalNodeName = (cliNodeName != null && cliNodeName.isNotEmpty)
             ? cliNodeName
             : (uciSec?['hostname']?.toString() ??
-                uciSec?['node_name']?.toString() ??
-                sysInfoData?['hostname']?.toString() ??
-                'OpenWrt-Router');
+                  uciSec?['node_name']?.toString() ??
+                  sysInfoData?['hostname']?.toString() ??
+                  'OpenWrt-Router');
 
         final finalIp = (cliTailscaleIp != null && cliTailscaleIp.isNotEmpty)
             ? cliTailscaleIp
             : (uciSec?['ip']?.toString() ?? '');
 
-        final finalState = cliState ??
+        final finalState =
+            cliState ??
             (isTailscaleRunning
                 ? 'Running'
                 : (uciEnabled ? 'Starting' : 'Stopped'));
@@ -1206,8 +1309,7 @@ class DashboardController {
 
       Map<String, dynamic>? nextdnsData;
       if (uciNextdnsRaw != null) {
-        final parsedNextdns =
-            getOptionalData(uciNextdnsRaw, 'uci.get nextdns');
+        final parsedNextdns = getOptionalData(uciNextdnsRaw, 'uci.get nextdns');
         if (parsedNextdns is Map<String, dynamic>) {
           final values = parsedNextdns['values'] is Map<String, dynamic>
               ? parsedNextdns['values'] as Map<String, dynamic>
@@ -1216,8 +1318,12 @@ class DashboardController {
           if (values.containsKey('main')) {
             sec = values['main'] as Map<String, dynamic>?;
           } else if (values.isNotEmpty) {
-            sec = values.values.firstWhere((v) => v is Map<String, dynamic>,
-                orElse: () => null) as Map<String, dynamic>?;
+            sec =
+                values.values.firstWhere(
+                      (v) => v is Map<String, dynamic>,
+                      orElse: () => null,
+                    )
+                    as Map<String, dynamic>?;
           }
           if (sec != null) {
             final isEnabled = sec['enabled'] == '1' || sec['enabled'] == true;
@@ -1236,8 +1342,10 @@ class DashboardController {
               if (sObj is Map && sObj['instances'] is Map) {
                 final instances = sObj['instances'] as Map;
                 if (instances.isNotEmpty) {
-                  isRunning = instances.values.any((i) =>
-                      i is Map && (i['running'] == true || i['running'] == 1));
+                  isRunning = instances.values.any(
+                    (i) =>
+                        i is Map && (i['running'] == true || i['running'] == 1),
+                  );
                 } else {
                   isRunning = false;
                 }
@@ -1256,10 +1364,12 @@ class DashboardController {
               'configured': true,
               'enabled': isEnabled,
               'running': isRunning,
-              'profile': sec['profile']?.toString() ??
+              'profile':
+                  sec['profile']?.toString() ??
                   sec['profile_id']?.toString() ??
                   '',
-              'report_client_info': sec['report_client_info'] == '1' ||
+              'report_client_info':
+                  sec['report_client_info'] == '1' ||
                   sec['report_client_info'] == true,
             };
           }
@@ -1268,8 +1378,10 @@ class DashboardController {
 
       Map<String, dynamic>? cloudflaredData;
       if (uciCloudflaredRaw != null) {
-        final parsedCf =
-            getOptionalData(uciCloudflaredRaw, 'uci.get cloudflared');
+        final parsedCf = getOptionalData(
+          uciCloudflaredRaw,
+          'uci.get cloudflared',
+        );
         if (parsedCf is Map<String, dynamic>) {
           final values = parsedCf['values'] is Map<String, dynamic>
               ? parsedCf['values'] as Map<String, dynamic>
@@ -1285,7 +1397,8 @@ class DashboardController {
             final secMap = Map<String, dynamic>.from(entry.value as Map);
             secMap['.name'] = entry.key;
 
-            final secEnabled = secMap['enabled'] == '1' ||
+            final secEnabled =
+                secMap['enabled'] == '1' ||
                 secMap['enabled'] == true ||
                 secMap['enable'] == '1' ||
                 secMap['enable'] == true;
@@ -1296,7 +1409,8 @@ class DashboardController {
               foundTunnelId = secTunnelId;
             }
 
-            final secName = secMap['tunnel_name']?.toString() ??
+            final secName =
+                secMap['tunnel_name']?.toString() ??
                 secMap['name']?.toString() ??
                 secMap['tunnel']?.toString() ??
                 '';
@@ -1308,7 +1422,8 @@ class DashboardController {
               foundTunnelName = secName;
             }
 
-            final secToken = secMap['token']?.toString() ??
+            final secToken =
+                secMap['token']?.toString() ??
                 secMap['tunnel_token']?.toString() ??
                 '';
             if (secToken.isNotEmpty) {
@@ -1331,8 +1446,10 @@ class DashboardController {
               if (sObj is Map && sObj['instances'] is Map) {
                 final instances = sObj['instances'] as Map;
                 if (instances.isNotEmpty) {
-                  isRunning = instances.values.any((i) =>
-                      i is Map && (i['running'] == true || i['running'] == 1));
+                  isRunning = instances.values.any(
+                    (i) =>
+                        i is Map && (i['running'] == true || i['running'] == 1),
+                  );
                 } else {
                   isRunning = false;
                 }
@@ -1355,8 +1472,8 @@ class DashboardController {
               'tunnel_name': foundTunnelName.isNotEmpty
                   ? foundTunnelName
                   : ((foundTunnelId.isNotEmpty && foundTunnelId != 'N/A')
-                      ? 'Cloudflare Tunnel'
-                      : ''),
+                        ? 'Cloudflare Tunnel'
+                        : ''),
               'token': foundToken,
               'connections': isRunning ? 4 : 0,
             };
@@ -1380,8 +1497,9 @@ class DashboardController {
 
       final wireguardData = <String, dynamic>{};
       if (interfaceDump != null && interfaceDump['interface'] is List) {
-        final hasWireGuardInterfaces =
-            interfaceDump['interface'].any((interface) {
+        final hasWireGuardInterfaces = interfaceDump['interface'].any((
+          interface,
+        ) {
           if (interface is Map<String, dynamic>) {
             final proto = interface['proto'] as String?;
             return proto == 'wireguard';
@@ -1392,7 +1510,7 @@ class DashboardController {
         if (hasWireGuardInterfaces) {
           final allWireGuardData = await _apiService!.fetchWireGuardPeers(
             ipAddress: ip,
-            sysauth: _authService!.sysauth!,
+            sysauth: activeSysauth,
             useHttps: useHttps,
             interface: '',
           );
@@ -1437,8 +1555,9 @@ class DashboardController {
       String? specificInterface;
       if (!prefs.showAllThroughput &&
           prefs.primaryThroughputInterface != null) {
-        specificInterface =
-            getDeviceNameForInterface(prefs.primaryThroughputInterface!);
+        specificInterface = getDeviceNameForInterface(
+          prefs.primaryThroughputInterface!,
+        );
       }
 
       _throughputController?.updateThroughput(
@@ -1448,7 +1567,8 @@ class DashboardController {
       );
 
       final wirelessStationsMap = <String, dynamic>{};
-      final wirelessDevs = wirelessData ??
+      final wirelessDevs =
+          wirelessData ??
           (uciWirelessConfig is Map<String, dynamic>
               ? uciWirelessConfig
               : null);
@@ -1517,7 +1637,9 @@ class DashboardController {
               params: {'device': ifname},
             );
             return MapEntry(
-                ifname, getOptionalData(res, 'iwinfo.assoclist.$ifname'));
+              ifname,
+              getOptionalData(res, 'iwinfo.assoclist.$ifname'),
+            );
           } catch (_) {
             return MapEntry(ifname, null);
           }
@@ -1614,8 +1736,7 @@ class DashboardController {
       _setConnectionStatus(DashboardConnectionStatus.disconnected);
       final errorMessage = e.toString();
       if (errorMessage.contains('Access denied')) {
-        _dashboardError =
-            'Access Denied: Check RPC permissions for this user.';
+        _dashboardError = 'Access Denied: Check RPC permissions for this user.';
       } else {
         _dashboardError = 'Failed to fetch dashboard data: $e';
       }
@@ -1649,7 +1770,9 @@ class DashboardController {
     return interfaceName;
   }
 
-  static Map<String, dynamic>? extractWanData(Map<String, dynamic>? interfaceDump) {
+  static Map<String, dynamic>? extractWanData(
+    Map<String, dynamic>? interfaceDump,
+  ) {
     if (interfaceDump == null || interfaceDump['interface'] == null) {
       return null;
     }

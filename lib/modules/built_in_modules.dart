@@ -153,20 +153,22 @@ class MoreModule extends LuciModule {
 /// Initializes and registers all default built-in core modules.
 void registerBuiltInModules() {
   final registry = LuciModuleRegistry.instance;
-  registry.registerModule(DashboardModule());
-  registry.registerModule(SystemMonitoringModule());
-  registry.registerModule(StorageMonitoringModule());
-  registry.registerModule(NetworkMonitoringModule());
-  registry.registerModule(ChartingModule());
-  registry.registerModule(WirelessManagementModule());
-  registry.registerModule(FirewallSecurityModule());
-  registry.registerModule(DhcpDnsModule());
-  registry.registerModule(ServicesSystemModule());
-  registry.registerModule(VpnConnectivityModule());
-  registry.registerModule(PackageManagerModule());
-  registry.registerModule(SystemBackupUpgradeModule());
-  registry.registerModule(ParentalControlsModule());
-  registry.registerModule(ClientsModule());
-  registry.registerModule(InterfacesModule());
-  registry.registerModule(MoreModule());
+  registry.registerModules([
+    DashboardModule(),
+    SystemMonitoringModule(),
+    StorageMonitoringModule(),
+    NetworkMonitoringModule(),
+    ChartingModule(),
+    WirelessManagementModule(),
+    FirewallSecurityModule(),
+    DhcpDnsModule(),
+    ServicesSystemModule(),
+    VpnConnectivityModule(),
+    PackageManagerModule(),
+    SystemBackupUpgradeModule(),
+    ParentalControlsModule(),
+    ClientsModule(),
+    InterfacesModule(),
+    MoreModule(),
+  ]);
 }

@@ -14,7 +14,8 @@ class DhcpDnsModule extends LuciModule {
   String get name => 'DHCP & DNS';
 
   @override
-  String get description => 'Active DHCP leases, static IP reservations, Dnsmasq configuration, and upstream DNS forwarders';
+  String get description =>
+      'Active DHCP leases, static IP reservations, Dnsmasq configuration, and upstream DNS forwarders';
 
   @override
   IconData get icon => Icons.dns_outlined;

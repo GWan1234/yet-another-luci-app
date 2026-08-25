@@ -52,6 +52,12 @@ class RouterService {
     _selectedRouter = router;
     await _secureStorageService.saveRouters(_routers);
     await _secureStorageService.saveSelectedRouterId(router.id);
+    await _secureStorageService.saveCredentials(
+      ipAddress: router.ipAddress,
+      username: router.username,
+      password: router.password,
+      useHttps: router.useHttps,
+    );
   }
 
   Future<void> clearAllRouters() async {
@@ -59,6 +65,7 @@ class RouterService {
     _selectedRouter = null;
     await _secureStorageService.saveRouters([]);
     await _secureStorageService.saveSelectedRouterId(null);
+    await _secureStorageService.clearCredentials();
   }
 
   Future<bool> removeRouter(String id) async {
@@ -66,6 +73,7 @@ class RouterService {
     _selectedRouter = null;
     await _secureStorageService.saveRouters([]);
     await _secureStorageService.saveSelectedRouterId(null);
+    await _secureStorageService.clearCredentials();
     return false;
   }
 
@@ -80,6 +88,12 @@ class RouterService {
     _selectedRouter = router;
     await _secureStorageService.saveRouters(_routers);
     await _secureStorageService.saveSelectedRouterId(router.id);
+    await _secureStorageService.saveCredentials(
+      ipAddress: router.ipAddress,
+      username: router.username,
+      password: router.password,
+      useHttps: router.useHttps,
+    );
   }
 
   Future<void> updateSelectedRouterHostname(String hostname) async {

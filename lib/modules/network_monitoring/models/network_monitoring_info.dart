@@ -47,10 +47,7 @@ class NetworkMonitoringInfo {
       }
     }
 
-    return NetworkMonitoringInfo(
-      interfaces: list,
-      deviceStats: statsMap,
-    );
+    return NetworkMonitoringInfo(interfaces: list, deviceStats: statsMap);
   }
 
   int get upCount => interfaces.where((i) => i.isUp).length;
@@ -58,7 +55,9 @@ class NetworkMonitoringInfo {
 
   model.NetworkInterface? get defaultGatewayInterface {
     try {
-      return interfaces.firstWhere((i) => i.gateway != null && i.gateway!.isNotEmpty);
+      return interfaces.firstWhere(
+        (i) => i.gateway != null && i.gateway!.isNotEmpty,
+      );
     } catch (_) {
       return null;
     }
@@ -70,7 +69,9 @@ class NetworkMonitoringInfo {
       return gw.ipAddress;
     }
     for (final iface in interfaces) {
-      if (iface.name.toLowerCase().startsWith('wan') && iface.ipAddress != null && iface.ipAddress!.trim().isNotEmpty) {
+      if (iface.name.toLowerCase().startsWith('wan') &&
+          iface.ipAddress != null &&
+          iface.ipAddress!.trim().isNotEmpty) {
         return iface.ipAddress;
       }
     }
@@ -90,7 +91,8 @@ class NetworkMonitoringInfo {
 
     // 2. Check wan6 / WAN-related interfaces
     for (final iface in interfaces) {
-      if (iface.name.toLowerCase().contains('wan') && iface.ipv6Addresses != null) {
+      if (iface.name.toLowerCase().contains('wan') &&
+          iface.ipv6Addresses != null) {
         final globalV6 = iface.ipv6Addresses!.firstWhere(
           (addr) => _isGlobalIpv6(addr),
           orElse: () => '',
@@ -115,7 +117,10 @@ class NetworkMonitoringInfo {
 
   static bool _isGlobalIpv6(String addr) {
     final clean = addr.toLowerCase().trim();
-    return !clean.startsWith('fe80') && !clean.startsWith('fd') && !clean.startsWith('fc') && clean.contains(':');
+    return !clean.startsWith('fe80') &&
+        !clean.startsWith('fd') &&
+        !clean.startsWith('fc') &&
+        clean.contains(':');
   }
 
   num get totalRxBytes {

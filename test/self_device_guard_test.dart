@@ -7,14 +7,23 @@ import 'package:yet_another_luci_app/utils/self_device_guard.dart';
 void main() {
   group('SelfDeviceGuard Tests', () {
     test('normalizeMac formats MAC address consistently', () {
-      expect(SelfDeviceGuard.normalizeMac('aa-bb-cc-dd-ee-ff'), equals('AA:BB:CC:DD:EE:FF'));
-      expect(SelfDeviceGuard.normalizeMac('AA:BB:CC:DD:EE:FF'), equals('AA:BB:CC:DD:EE:FF'));
+      expect(
+        SelfDeviceGuard.normalizeMac('aa-bb-cc-dd-ee-ff'),
+        equals('AA:BB:CC:DD:EE:FF'),
+      );
+      expect(
+        SelfDeviceGuard.normalizeMac('AA:BB:CC:DD:EE:FF'),
+        equals('AA:BB:CC:DD:EE:FF'),
+      );
     });
 
-    test('getLocalDeviceAddresses returns a non-null set of strings without throwing', () async {
-      final addrs = await SelfDeviceGuard.getLocalDeviceAddresses();
-      expect(addrs, isA<Set<String>>());
-    });
+    test(
+      'getLocalDeviceAddresses returns a non-null set of strings without throwing',
+      () async {
+        final addrs = await SelfDeviceGuard.getLocalDeviceAddresses();
+        expect(addrs, isA<Set<String>>());
+      },
+    );
 
     test('isSelfDevice handles null or invalid inputs gracefully', () async {
       expect(await SelfDeviceGuard.isSelfDevice(null, null), isFalse);

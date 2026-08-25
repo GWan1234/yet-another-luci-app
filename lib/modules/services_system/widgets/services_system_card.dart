@@ -48,7 +48,9 @@ class ServicesSystemCard extends ConsumerWidget {
                 Text(
                   '${overview.runningServicesCount} Active / ${overview.services.length} Total',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
               ],

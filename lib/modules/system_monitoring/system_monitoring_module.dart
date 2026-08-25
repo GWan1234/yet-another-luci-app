@@ -13,7 +13,8 @@ class SystemMonitoringModule extends LuciModule {
   String get name => 'System Monitoring';
 
   @override
-  String get description => 'Real-time CPU, RAM memory, Load Average, and system Uptime stats';
+  String get description =>
+      'Real-time CPU, RAM memory, Load Average, and system Uptime stats';
 
   @override
   IconData get icon => Icons.monitor_heart_outlined;

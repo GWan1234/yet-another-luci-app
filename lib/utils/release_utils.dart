@@ -148,10 +148,14 @@ FirmwareReleaseInfo deriveDistributionInfo(
 
   final distRaw = (releaseMap['distribution'] ?? '').toString().trim();
   final versionRaw = (releaseMap['version'] ?? '').toString().trim();
-  final descRaw = (descriptionOverride ?? releaseMap['description'] ?? rawString).toString().trim();
+  final descRaw =
+      (descriptionOverride ?? releaseMap['description'] ?? rawString)
+          .toString()
+          .trim();
   final modelRaw = (model ?? '').trim();
 
-  final combinedSearch = '$distRaw $versionRaw $descRaw $modelRaw'.toLowerCase();
+  final combinedSearch = '$distRaw $versionRaw $descRaw $modelRaw'
+      .toLowerCase();
 
   RouterDistribution dist = RouterDistribution.openWrt;
   String distName = 'OpenWrt';
@@ -168,15 +172,20 @@ FirmwareReleaseInfo deriveDistributionInfo(
   } else if (combinedSearch.contains('istoreos')) {
     dist = RouterDistribution.iStoreOS;
     distName = 'iStoreOS';
-  } else if (combinedSearch.contains('x-wrt') || combinedSearch.contains('xwrt')) {
+  } else if (combinedSearch.contains('x-wrt') ||
+      combinedSearch.contains('xwrt')) {
     dist = RouterDistribution.xWrt;
     distName = 'X-WRT';
-  } else if (combinedSearch.contains('dd-wrt') || combinedSearch.contains('ddwrt')) {
+  } else if (combinedSearch.contains('dd-wrt') ||
+      combinedSearch.contains('ddwrt')) {
     dist = RouterDistribution.ddWrt;
     distName = 'DD-WRT';
-  } else if (combinedSearch.contains('freshtomato') || combinedSearch.contains('tomato')) {
+  } else if (combinedSearch.contains('freshtomato') ||
+      combinedSearch.contains('tomato')) {
     dist = RouterDistribution.tomato;
-    distName = combinedSearch.contains('freshtomato') ? 'FreshTomato' : 'Tomato';
+    distName = combinedSearch.contains('freshtomato')
+        ? 'FreshTomato'
+        : 'Tomato';
   } else if (combinedSearch.contains('pandorabox')) {
     dist = RouterDistribution.pandoraBox;
     distName = 'PandoraBox';
@@ -190,15 +199,19 @@ FirmwareReleaseInfo deriveDistributionInfo(
 
   // Extract base OpenWrt version if embedded in GL.iNet / derivative descriptions
   String? baseOpenWrt;
-  final baseMatch = RegExp(r'OpenWrt\s+(\d+\.\d+(?:\.\d+)?)', caseSensitive: false)
-      .firstMatch(descRaw);
+  final baseMatch = RegExp(
+    r'OpenWrt\s+(\d+\.\d+(?:\.\d+)?)',
+    caseSensitive: false,
+  ).firstMatch(descRaw);
   if (baseMatch != null && dist != RouterDistribution.openWrt) {
     baseOpenWrt = 'OpenWrt ${baseMatch.group(1)}';
   }
 
   String finalVersion = versionRaw.isNotEmpty ? versionRaw : 'N/A';
   if (finalVersion == 'N/A' && rawString.isNotEmpty) {
-    final vMatch = RegExp(r'\b\d+\.\d+(?:\.\d+)?(?:-[\w.-]+)?').firstMatch(rawString);
+    final vMatch = RegExp(
+      r'\b\d+\.\d+(?:\.\d+)?(?:-[\w.-]+)?',
+    ).firstMatch(rawString);
     if (vMatch != null) {
       finalVersion = vMatch.group(0)!;
     } else {
@@ -206,7 +219,9 @@ FirmwareReleaseInfo deriveDistributionInfo(
     }
   }
 
-  final channel = deriveReleaseChannel(releaseMap.isNotEmpty ? releaseMap : descRaw);
+  final channel = deriveReleaseChannel(
+    releaseMap.isNotEmpty ? releaseMap : descRaw,
+  );
 
   return FirmwareReleaseInfo(
     distribution: dist,

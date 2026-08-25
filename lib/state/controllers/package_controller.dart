@@ -26,13 +26,13 @@ class PackageController {
     required bool Function() reviewerModeRef,
     required Future<void> Function() refreshDashboard,
     required Future<void> Function() redetectCapabilities,
-  })  : _apiServiceRef = apiServiceRef,
-        _authServiceRef = authServiceRef,
-        _routerServiceRef = routerServiceRef,
-        _capabilitiesRef = capabilitiesRef,
-        _reviewerModeRef = reviewerModeRef,
-        _refreshDashboard = refreshDashboard,
-        _redetectCapabilities = redetectCapabilities;
+  }) : _apiServiceRef = apiServiceRef,
+       _authServiceRef = authServiceRef,
+       _routerServiceRef = routerServiceRef,
+       _capabilitiesRef = capabilitiesRef,
+       _reviewerModeRef = reviewerModeRef,
+       _refreshDashboard = refreshDashboard,
+       _redetectCapabilities = redetectCapabilities;
 
   // Accessor closures — avoid holding stale references after router switch
   final IApiService? Function() _apiServiceRef;
@@ -65,14 +65,17 @@ class PackageController {
       return RpcResult.success(overview.installedPackages);
     }
     if (_isReviewerMode) {
-      final overview =
-          PackageManagerOverview.fromDashboardData(null, isReviewerMode: true);
+      final overview = PackageManagerOverview.fromDashboardData(
+        null,
+        isReviewerMode: true,
+      );
       return RpcResult.success(overview.installedPackages);
     }
     return RpcResult(
       status: result.status,
       errorMessage:
-          result.errorMessage ?? 'Failed to read installed packages from router.',
+          result.errorMessage ??
+          'Failed to read installed packages from router.',
       errorCode: result.errorCode,
     );
   }
@@ -111,7 +114,8 @@ class PackageController {
               (rpcData['result'] as List).length > 1 &&
               (rpcData['result'] as List)[1] is Map) {
             return Map<String, dynamic>.from(
-                (rpcData['result'] as List)[1] as Map);
+              (rpcData['result'] as List)[1] as Map,
+            );
           }
           if (rpcData['result'] is Map) {
             return Map<String, dynamic>.from(rpcData['result'] as Map);
@@ -124,7 +128,9 @@ class PackageController {
       List<String> configsToQuery = [];
       try {
         final configsRpc = await api.call(
-          ip, sysauth, useHttps,
+          ip,
+          sysauth,
+          useHttps,
           object: 'uci',
           method: 'configs',
           params: <String, dynamic>{},
@@ -138,15 +144,26 @@ class PackageController {
       // Fallback config list if uci.configs is unavailable or blocked
       if (configsToQuery.isEmpty) {
         configsToQuery = [
-          'ucitrack', 'luci', 'system', 'network', 'firewall',
-          'dhcp', 'wireless', 'dropbear', 'sqm', 'ddns', 'tailscale',
+          'ucitrack',
+          'luci',
+          'system',
+          'network',
+          'firewall',
+          'dhcp',
+          'wireless',
+          'dropbear',
+          'sqm',
+          'ddns',
+          'tailscale',
         ];
       }
 
       for (final cfg in configsToQuery) {
         try {
           final res = await api.call(
-            ip, sysauth, useHttps,
+            ip,
+            sysauth,
+            useHttps,
             object: 'uci',
             method: 'get',
             params: {'config': cfg},
@@ -181,7 +198,9 @@ class PackageController {
       // 2. Query system board details dynamically for system base info
       try {
         final boardRpc = await api.call(
-          ip, sysauth, useHttps,
+          ip,
+          sysauth,
+          useHttps,
           object: 'system',
           method: 'board',
           params: <String, dynamic>{},
@@ -229,7 +248,9 @@ class PackageController {
 
     try {
       final helperRpc = await api.call(
-        ip, sysauth, useHttps,
+        ip,
+        sysauth,
+        useHttps,
         object: 'file',
         method: 'exec',
         params: {
@@ -238,8 +259,9 @@ class PackageController {
         },
       );
 
-      final helperResult =
-          RpcResult.classifyExecResult<dynamic>(helperRpc, (data) {
+      final helperResult = RpcResult.classifyExecResult<dynamic>(helperRpc, (
+        data,
+      ) {
         if (data is Map &&
             data['stdout'] != null &&
             (data['stdout'] as String).trim().isNotEmpty) {
@@ -253,14 +275,18 @@ class PackageController {
       }
 
       final rawRpc = await api.call(
-        ip, sysauth, useHttps,
+        ip,
+        sysauth,
+        useHttps,
         object: 'file',
         method: 'exec',
-        params: {'command': cmd, 'params': ['list']},
+        params: {
+          'command': cmd,
+          'params': ['list'],
+        },
       );
 
-      final execResult =
-          RpcResult.classifyExecResult<dynamic>(rawRpc, (data) {
+      final execResult = RpcResult.classifyExecResult<dynamic>(rawRpc, (data) {
         if (data is Map &&
             data['stdout'] != null &&
             (data['stdout'] as String).trim().isNotEmpty) {
@@ -276,7 +302,8 @@ class PackageController {
       return execResult;
     } catch (e) {
       return RpcResult.networkError(
-          'Network error fetching available packages: $e');
+        'Network error fetching available packages: $e',
+      );
     }
   }
 
@@ -292,7 +319,8 @@ class PackageController {
     final engine = _engine;
     if (engine == PackageManagerEngine.none) {
       return RpcResult.methodNotFound(
-          'No package manager detected on this router');
+        'No package manager detected on this router',
+      );
     }
 
     final api = _apiServiceRef()!;
@@ -316,11 +344,13 @@ class PackageController {
     try {
       final helperArgs =
           action == 'install' || action == 'remove' || action == 'upgrade'
-              ? (packageName.trim().isEmpty ? [action] : [action, packageName])
-              : [action];
+          ? (packageName.trim().isEmpty ? [action] : [action, packageName])
+          : [action];
 
       final helperRpc = await api.call(
-        ip, sysauth, useHttps,
+        ip,
+        sysauth,
+        useHttps,
         object: 'file',
         method: 'exec',
         params: {
@@ -329,8 +359,9 @@ class PackageController {
         },
       );
 
-      final helperResult =
-          RpcResult.classifyExecResult<String>(helperRpc, (data) {
+      final helperResult = RpcResult.classifyExecResult<String>(helperRpc, (
+        data,
+      ) {
         if (data is Map && data['stdout'] != null) {
           return data['stdout'].toString();
         }
@@ -343,7 +374,9 @@ class PackageController {
       }
 
       final rawRpc = await api.call(
-        ip, sysauth, useHttps,
+        ip,
+        sysauth,
+        useHttps,
         object: 'file',
         method: 'exec',
         params: {'command': cmd, 'params': args},
@@ -359,7 +392,8 @@ class PackageController {
       // Trigger background re-probe on capability mismatch
       if (result.status == RpcCallStatus.methodNotFound) {
         Logger.warning(
-            'Package action returned methodNotFound. Triggering background capability re-probe.');
+          'Package action returned methodNotFound. Triggering background capability re-probe.',
+        );
         unawaited(_redetectCapabilities());
       }
 
@@ -371,7 +405,8 @@ class PackageController {
     } catch (e) {
       Logger.error('Failed package action $action for $packageName: $e');
       return RpcResult.networkError(
-          'Network error executing package action: $e');
+        'Network error executing package action: $e',
+      );
     }
   }
 
@@ -380,13 +415,16 @@ class PackageController {
     required String packageName,
     required String action,
   }) async {
-    final res =
-        await managePackageResult(packageName: packageName, action: action);
+    final res = await managePackageResult(
+      packageName: packageName,
+      action: action,
+    );
     return res.isSuccess;
   }
 
   /// Check and fetch upgradable packages returning classified RpcResult
-  Future<RpcResult<List<OpenWrtPackage>>> fetchUpgradablePackagesResult() async {
+  Future<RpcResult<List<OpenWrtPackage>>>
+  fetchUpgradablePackagesResult() async {
     if (_isReviewerMode) {
       return RpcResult.success([
         OpenWrtPackage(
@@ -409,7 +447,8 @@ class PackageController {
     final engine = _engine;
     if (engine == PackageManagerEngine.none) {
       return RpcResult.methodNotFound(
-          'No package manager detected on this router');
+        'No package manager detected on this router',
+      );
     }
 
     if (_ip == null || _sysauth == null) {
@@ -426,7 +465,9 @@ class PackageController {
 
     try {
       await api.call(
-        ip, sysauth, useHttps,
+        ip,
+        sysauth,
+        useHttps,
         object: 'file',
         method: 'exec',
         params: {
@@ -436,62 +477,69 @@ class PackageController {
       );
 
       final rawRpc = await api.call(
-        ip, sysauth, useHttps,
+        ip,
+        sysauth,
+        useHttps,
         object: 'file',
         method: 'exec',
         params: {'command': cmd, 'params': listArgs},
       );
 
       final result = RpcResult.classifyExecResult<List<OpenWrtPackage>>(
-          rawRpc, (data) {
-        final output =
-            data is Map ? (data['stdout']?.toString() ?? '') : '';
-        if (output.trim().isEmpty) return <OpenWrtPackage>[];
+        rawRpc,
+        (data) {
+          final output = data is Map ? (data['stdout']?.toString() ?? '') : '';
+          if (output.trim().isEmpty) return <OpenWrtPackage>[];
 
-        final upgradable = <OpenWrtPackage>[];
-        for (final line in output.split('\n')) {
-          final trimmed = line.trim();
-          if (trimmed.isEmpty ||
-              trimmed.startsWith('WARNING') ||
-              trimmed.startsWith('#')) {
-            continue;
-          }
+          final upgradable = <OpenWrtPackage>[];
+          for (final line in output.split('\n')) {
+            final trimmed = line.trim();
+            if (trimmed.isEmpty ||
+                trimmed.startsWith('WARNING') ||
+                trimmed.startsWith('#')) {
+              continue;
+            }
 
-          if (trimmed.contains(' - ')) {
-            final parts = trimmed.split(' - ');
-            final name = parts[0].trim();
-            final oldVer = parts.length > 1 ? parts[1].trim() : '';
-            final newVer = parts.length > 2 ? parts[2].trim() : '';
-            upgradable.add(OpenWrtPackage(
-              name: name,
-              version: oldVer.isNotEmpty && newVer.isNotEmpty
-                  ? '$oldVer ➔ $newVer'
-                  : (newVer.isNotEmpty ? newVer : oldVer),
-              description: 'Upgradable package ($name)',
-              isInstalled: true,
-              managerType: engine,
-            ));
-          } else {
-            final parts = trimmed.split(RegExp(r'\s+'));
-            if (parts.isNotEmpty) {
+            if (trimmed.contains(' - ')) {
+              final parts = trimmed.split(' - ');
               final name = parts[0].trim();
-              upgradable.add(OpenWrtPackage(
-                name: name,
-                version:
-                    parts.length > 1 ? parts[1] : 'update available',
-                description: 'Upgradable package ($name)',
-                isInstalled: true,
-                managerType: engine,
-              ));
+              final oldVer = parts.length > 1 ? parts[1].trim() : '';
+              final newVer = parts.length > 2 ? parts[2].trim() : '';
+              upgradable.add(
+                OpenWrtPackage(
+                  name: name,
+                  version: oldVer.isNotEmpty && newVer.isNotEmpty
+                      ? '$oldVer ➔ $newVer'
+                      : (newVer.isNotEmpty ? newVer : oldVer),
+                  description: 'Upgradable package ($name)',
+                  isInstalled: true,
+                  managerType: engine,
+                ),
+              );
+            } else {
+              final parts = trimmed.split(RegExp(r'\s+'));
+              if (parts.isNotEmpty) {
+                final name = parts[0].trim();
+                upgradable.add(
+                  OpenWrtPackage(
+                    name: name,
+                    version: parts.length > 1 ? parts[1] : 'update available',
+                    description: 'Upgradable package ($name)',
+                    isInstalled: true,
+                    managerType: engine,
+                  ),
+                );
+              }
             }
           }
-        }
-        return upgradable;
-      });
+          return upgradable;
+        },
+      );
 
       if (result.status == RpcCallStatus.methodNotFound) {
         Logger.warning(
-            'Upgradable query returned methodNotFound. Triggering background capability re-probe.');
+          'Upgradable query returned methodNotFound. Triggering background capability re-probe.',
+        );
         unawaited(_redetectCapabilities());
       }
 
@@ -499,7 +547,8 @@ class PackageController {
     } catch (e) {
       Logger.error('Failed to fetch upgradable packages: $e');
       return RpcResult.networkError(
-          'Network error checking package upgrades: $e');
+        'Network error checking package upgrades: $e',
+      );
     }
   }
 

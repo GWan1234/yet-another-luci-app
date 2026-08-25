@@ -23,10 +23,12 @@ class SystemBackupUpgradeScreen extends ConsumerStatefulWidget {
   const SystemBackupUpgradeScreen({super.key});
 
   @override
-  ConsumerState<SystemBackupUpgradeScreen> createState() => _SystemBackupUpgradeScreenState();
+  ConsumerState<SystemBackupUpgradeScreen> createState() =>
+      _SystemBackupUpgradeScreenState();
 }
 
-class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeScreen> {
+class _SystemBackupUpgradeScreenState
+    extends ConsumerState<SystemBackupUpgradeScreen> {
   bool _keepSettings = true;
   bool _forceSysupgrade = false;
   bool _isProcessing = false;
@@ -55,14 +57,31 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
   Future<void> _loadRouterSysInfo() async {
     final appState = ref.read(appStateProvider);
     try {
-      final modelStr = await appState.executeRouterCommandOutput('cat', ['/tmp/sysinfo/model']);
-      final boardStr = await appState.executeRouterCommandOutput('cat', ['/tmp/sysinfo/board_name']);
-      final relStr = await appState.executeRouterCommandOutput('cat', ['/etc/openwrt_release']);
-      final osRelStr = await appState.executeRouterCommandOutput('cat', ['/etc/os-release']);
-      final glVerStr = await appState.executeRouterCommandOutput('cat', ['/etc/glversion']);
-      final gargoyleStr = await appState.executeRouterCommandOutput('cat', ['/etc/gargoyle_release']);
-      final immortalStr = await appState.executeRouterCommandOutput('cat', ['/etc/immortalwrt_release']);
-      final dfStr = await appState.executeRouterCommandOutput('sh', ['-c', 'df -k /tmp | tail -n 1']);
+      final modelStr = await appState.executeRouterCommandOutput('cat', [
+        '/tmp/sysinfo/model',
+      ]);
+      final boardStr = await appState.executeRouterCommandOutput('cat', [
+        '/tmp/sysinfo/board_name',
+      ]);
+      final relStr = await appState.executeRouterCommandOutput('cat', [
+        '/etc/openwrt_release',
+      ]);
+      final osRelStr = await appState.executeRouterCommandOutput('cat', [
+        '/etc/os-release',
+      ]);
+      final glVerStr = await appState.executeRouterCommandOutput('cat', [
+        '/etc/glversion',
+      ]);
+      final gargoyleStr = await appState.executeRouterCommandOutput('cat', [
+        '/etc/gargoyle_release',
+      ]);
+      final immortalStr = await appState.executeRouterCommandOutput('cat', [
+        '/etc/immortalwrt_release',
+      ]);
+      final dfStr = await appState.executeRouterCommandOutput('sh', [
+        '-c',
+        'df -k /tmp | tail -n 1',
+      ]);
 
       String flavor = 'OpenWrt';
       if (immortalStr != null && immortalStr.trim().isNotEmpty) {
@@ -77,7 +96,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
 
       String? version;
       if (relStr != null && relStr.isNotEmpty) {
-        final match = RegExp('DISTRIB_DESCRIPTION=["\']?([^"\']+)["\']?').firstMatch(relStr);
+        final match = RegExp(
+          'DISTRIB_DESCRIPTION=["\']?([^"\']+)["\']?',
+        ).firstMatch(relStr);
         if (match != null) {
           version = match.group(1);
         }
@@ -100,8 +121,12 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
 
       if (mounted) {
         setState(() {
-          _routerModel = (modelStr != null && modelStr.trim().isNotEmpty) ? modelStr.trim() : 'OpenWrt / Compatible Router';
-          _targetArch = (boardStr != null && boardStr.trim().isNotEmpty) ? boardStr.trim() : 'Generic Architecture';
+          _routerModel = (modelStr != null && modelStr.trim().isNotEmpty)
+              ? modelStr.trim()
+              : 'OpenWrt / Compatible Router';
+          _targetArch = (boardStr != null && boardStr.trim().isNotEmpty)
+              ? boardStr.trim()
+              : 'Generic Architecture';
           _firmwareVersion = version ?? 'OpenWrt Linux';
           _romFlavor = flavor;
           _tmpAvailableSpace = freeTmpLabel;
@@ -124,7 +149,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
   Future<void> _loadMtdBlocks() async {
     final appState = ref.read(appStateProvider);
     try {
-      final mtdOutput = await appState.executeRouterCommandOutput('cat', ['/proc/mtd']);
+      final mtdOutput = await appState.executeRouterCommandOutput('cat', [
+        '/proc/mtd',
+      ]);
       if (mtdOutput != null && mtdOutput.isNotEmpty) {
         final lines = mtdOutput.split('\n');
         final parsed = <Map<String, String>>[];
@@ -136,9 +163,15 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
             final nameMatch = RegExp(r'"([^"]+)"').firstMatch(rest);
             final name = nameMatch != null ? nameMatch.group(1)! : dev;
             final sizeHexMatch = RegExp(r'^([0-9a-fA-F]+)').firstMatch(rest);
-            final sizeInBytes = sizeHexMatch != null ? int.tryParse(sizeHexMatch.group(1)!, radix: 16) : null;
-            final sizeStr = sizeInBytes != null ? _formatByteSize(sizeInBytes) : '';
-            final displayName = sizeStr.isNotEmpty ? '$name ($dev, $sizeStr)' : '$name ($dev)';
+            final sizeInBytes = sizeHexMatch != null
+                ? int.tryParse(sizeHexMatch.group(1)!, radix: 16)
+                : null;
+            final sizeStr = sizeInBytes != null
+                ? _formatByteSize(sizeInBytes)
+                : '';
+            final displayName = sizeStr.isNotEmpty
+                ? '$name ($dev, $sizeStr)'
+                : '$name ($dev)';
             parsed.add({
               'device': '/dev/$dev',
               'name': displayName,
@@ -178,15 +211,24 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
     });
 
     final appState = ref.read(appStateProvider);
-    String? fileList = await appState.executeRouterCommandOutput('sh', ['-c', 'sysupgrade -l']);
+    String? fileList = await appState.executeRouterCommandOutput('sh', [
+      '-c',
+      'sysupgrade -l',
+    ]);
     if (fileList == null || fileList.trim().isEmpty) {
-      fileList = await appState.executeRouterCommandOutput('sysupgrade', ['-l']);
+      fileList = await appState.executeRouterCommandOutput('sysupgrade', [
+        '-l',
+      ]);
     }
     if (fileList == null || fileList.trim().isEmpty) {
-      fileList = await appState.executeRouterCommandOutput('/sbin/sysupgrade', ['-l']);
+      fileList = await appState.executeRouterCommandOutput('/sbin/sysupgrade', [
+        '-l',
+      ]);
     }
 
-    String? confContent = await appState.executeRouterCommandOutput('cat', ['/etc/sysupgrade.conf']);
+    String? confContent = await appState.executeRouterCommandOutput('cat', [
+      '/etc/sysupgrade.conf',
+    ]);
 
     setState(() => _isProcessing = false);
 
@@ -221,7 +263,10 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
     return null;
   }
 
-  Future<Uint8List?> _readRouterFileAsBytes(AppState appState, String filePath) async {
+  Future<Uint8List?> _readRouterFileAsBytes(
+    AppState appState,
+    String filePath,
+  ) async {
     // Strategy 0: Native LuCI RPC chunked file.read with base64 (0 shell processes, 100% ubus ACL compliant)
     try {
       final List<int> accumulatedBytes = [];
@@ -229,7 +274,8 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
       int offset = 0;
       int emptyCount = 0;
 
-      while (offset < 50 * 1024 * 1024) { // Cap at 50 MB
+      while (offset < 50 * 1024 * 1024) {
+        // Cap at 50 MB
         final res = await appState.callRpc('file', 'read', {
           'path': filePath,
           'offset': offset,
@@ -255,25 +301,35 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
       }
 
       if (accumulatedBytes.isNotEmpty) {
-        Logger.info('Read $filePath via chunked file.read RPC: ${accumulatedBytes.length} bytes');
+        Logger.info(
+          'Read $filePath via chunked file.read RPC: ${accumulatedBytes.length} bytes',
+        );
         return Uint8List.fromList(accumulatedBytes);
       }
     } catch (e) {
-      Logger.warning('Strategy 0 chunked file.read RPC failed for $filePath: $e');
+      Logger.warning(
+        'Strategy 0 chunked file.read RPC failed for $filePath: $e',
+      );
     }
 
     // Method 1: Single base64 shell command
-    String? b64Str = await appState.executeRouterCommandOutput('base64', [filePath]);
+    String? b64Str = await appState.executeRouterCommandOutput('base64', [
+      filePath,
+    ]);
     if (b64Str == null || b64Str.trim().isEmpty) {
-      b64Str = await appState.executeRouterCommandOutput(
-        'sh',
-        ['-c', 'base64 "$filePath" 2>/dev/null || openssl base64 -in "$filePath" 2>/dev/null || uuencode -m "$filePath" - 2>/dev/null'],
-      );
+      b64Str = await appState.executeRouterCommandOutput('sh', [
+        '-c',
+        'base64 "$filePath" 2>/dev/null || openssl base64 -in "$filePath" 2>/dev/null || uuencode -m "$filePath" - 2>/dev/null',
+      ]);
     }
 
     if (b64Str != null && b64Str.trim().isNotEmpty) {
       try {
-        final cleanB64 = b64Str.replaceAll('\n', '').replaceAll('\r', '').replaceAll(' ', '').trim();
+        final cleanB64 = b64Str
+            .replaceAll('\n', '')
+            .replaceAll('\r', '')
+            .replaceAll(' ', '')
+            .trim();
         final decoded = base64Decode(cleanB64);
         if (decoded.isNotEmpty) return decoded;
       } catch (_) {
@@ -285,7 +341,10 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
     }
 
     // Method 2: Chunked dd + base64
-    final sizeStr = await appState.executeRouterCommandOutput('sh', ['-c', 'wc -c "$filePath"']);
+    final sizeStr = await appState.executeRouterCommandOutput('sh', [
+      '-c',
+      'wc -c "$filePath"',
+    ]);
     int? totalSize;
     if (sizeStr != null && sizeStr.trim().isNotEmpty) {
       final parts = sizeStr.trim().split(RegExp(r'\s+'));
@@ -301,13 +360,17 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
       int offset = 0;
       int chunkIndex = 0;
       while (offset < totalSize) {
-        final chunkB64 = await appState.executeRouterCommandOutput(
-          'sh',
-          ['-c', 'dd if="$filePath" bs=$chunkSize skip=$chunkIndex count=1 2>/dev/null | base64'],
-        );
+        final chunkB64 = await appState.executeRouterCommandOutput('sh', [
+          '-c',
+          'dd if="$filePath" bs=$chunkSize skip=$chunkIndex count=1 2>/dev/null | base64',
+        ]);
 
         if (chunkB64 != null && chunkB64.trim().isNotEmpty) {
-          final cleanB64 = chunkB64.replaceAll('\n', '').replaceAll('\r', '').replaceAll(' ', '').trim();
+          final cleanB64 = chunkB64
+              .replaceAll('\n', '')
+              .replaceAll('\r', '')
+              .replaceAll(' ', '')
+              .trim();
           try {
             final decoded = base64Decode(cleanB64);
             if (decoded.isNotEmpty) {
@@ -340,9 +403,16 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
     }
 
     // Method 3: Hexdump
-    final hexStr = await appState.executeRouterCommandOutput('sh', ['-c', 'hexdump -v -e \'1/1 "%02x"\' "$filePath" 2>/dev/null || od -tx1 -An "$filePath" | tr -d " \n\r"']);
+    final hexStr = await appState.executeRouterCommandOutput('sh', [
+      '-c',
+      'hexdump -v -e \'1/1 "%02x"\' "$filePath" 2>/dev/null || od -tx1 -An "$filePath" | tr -d " \n\r"',
+    ]);
     if (hexStr != null && hexStr.trim().isNotEmpty) {
-      final cleanHex = hexStr.replaceAll('\n', '').replaceAll('\r', '').replaceAll(' ', '').trim();
+      final cleanHex = hexStr
+          .replaceAll('\n', '')
+          .replaceAll('\r', '')
+          .replaceAll(' ', '')
+          .trim();
       final List<int> byteList = [];
       for (var i = 0; i < cleanHex.length; i += 2) {
         if (i + 2 <= cleanHex.length) {
@@ -385,7 +455,10 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         request.headers.add('User-Agent', 'Mozilla/5.0');
         final response = await request.close();
         if (response.statusCode == 200) {
-          final bytes = await response.fold<List<int>>([], (previous, element) => previous..addAll(element));
+          final bytes = await response.fold<List<int>>(
+            [],
+            (previous, element) => previous..addAll(element),
+          );
           if (bytes.isNotEmpty) {
             return Uint8List.fromList(bytes);
           }
@@ -400,11 +473,17 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         final request = await client.postUrl(Uri.parse(urlStr));
         request.headers.add('Cookie', 'sysauth=$sysauth');
         request.headers.add('User-Agent', 'Mozilla/5.0');
-        request.headers.contentType = ContentType('application', 'x-www-form-urlencoded');
+        request.headers.contentType = ContentType(
+          'application',
+          'x-www-form-urlencoded',
+        );
         request.write('backup=1');
         final response = await request.close();
         if (response.statusCode == 200) {
-          final bytes = await response.fold<List<int>>([], (previous, element) => previous..addAll(element));
+          final bytes = await response.fold<List<int>>(
+            [],
+            (previous, element) => previous..addAll(element),
+          );
           if (bytes.isNotEmpty) {
             return Uint8List.fromList(bytes);
           }
@@ -426,19 +505,27 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
       Uint8List? bytes;
 
       // Strategy 1: Create backup archive on router & read via chunked RPC file.read
-      Logger.info('Backup Strategy 1: Creating /tmp/app_backup.tar.gz and reading via chunked RPC...');
+      Logger.info(
+        'Backup Strategy 1: Creating /tmp/app_backup.tar.gz and reading via chunked RPC...',
+      );
       await appState.executeRouterCommand('sh', [
         '-c',
-        'sysupgrade -b /tmp/app_backup.tar.gz 2>/dev/null || tar -czf /tmp/app_backup.tar.gz -C / etc/config etc/passwd etc/shadow etc/dropbear etc/uhttpd etc/dnsmasq.conf etc/sysupgrade.conf etc/uci-defaults 2>/dev/null'
+        'sysupgrade -b /tmp/app_backup.tar.gz 2>/dev/null || tar -czf /tmp/app_backup.tar.gz -C / etc/config etc/passwd etc/shadow etc/dropbear etc/uhttpd etc/dnsmasq.conf etc/sysupgrade.conf etc/uci-defaults 2>/dev/null',
       ]);
       bytes = await _readRouterFileAsBytes(appState, '/tmp/app_backup.tar.gz');
-      unawaited(appState.executeRouterCommand('rm', ['-f', '/tmp/app_backup.tar.gz']));
+      unawaited(
+        appState.executeRouterCommand('rm', ['-f', '/tmp/app_backup.tar.gz']),
+      );
 
       if (bytes != null && bytes.isNotEmpty) {
         if (_validateBackupArchiveBytes(bytes)) {
-          Logger.info('Backup Strategy 1 succeeded: ${bytes.length} bytes downloaded');
+          Logger.info(
+            'Backup Strategy 1 succeeded: ${bytes.length} bytes downloaded',
+          );
         } else {
-          Logger.warning('Backup Strategy 1 generated invalid/corrupt payload. Retrying with next strategy...');
+          Logger.warning(
+            'Backup Strategy 1 generated invalid/corrupt payload. Retrying with next strategy...',
+          );
           bytes = null;
         }
       }
@@ -448,16 +535,22 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         Logger.info('Backup Strategy 2: Single-command stream to base64...');
         final directB64 = await appState.executeRouterCommandOutput('sh', [
           '-c',
-          'sysupgrade -b - 2>/dev/null | base64 || (sysupgrade -b /tmp/b.tgz 2>/dev/null && base64 /tmp/b.tgz && rm -f /tmp/b.tgz) || tar -czf - -C / etc/config etc/passwd etc/shadow etc/dropbear etc/uhttpd etc/dnsmasq.conf etc/sysupgrade.conf etc/uci-defaults 2>/dev/null | base64'
+          'sysupgrade -b - 2>/dev/null | base64 || (sysupgrade -b /tmp/b.tgz 2>/dev/null && base64 /tmp/b.tgz && rm -f /tmp/b.tgz) || tar -czf - -C / etc/config etc/passwd etc/shadow etc/dropbear etc/uhttpd etc/dnsmasq.conf etc/sysupgrade.conf etc/uci-defaults 2>/dev/null | base64',
         ]);
 
         if (directB64 != null && directB64.trim().isNotEmpty) {
           try {
-            final cleanB64 = directB64.replaceAll('\n', '').replaceAll('\r', '').replaceAll(' ', '').trim();
+            final cleanB64 = directB64
+                .replaceAll('\n', '')
+                .replaceAll('\r', '')
+                .replaceAll(' ', '')
+                .trim();
             final decoded = base64Decode(cleanB64);
             if (decoded.isNotEmpty && _validateBackupArchiveBytes(decoded)) {
               bytes = decoded;
-              Logger.info('Backup Strategy 2 succeeded: ${bytes.length} bytes downloaded');
+              Logger.info(
+                'Backup Strategy 2 succeeded: ${bytes.length} bytes downloaded',
+              );
             }
           } catch (e) {
             Logger.warning('Backup Strategy 2 decode error: $e');
@@ -467,29 +560,53 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
 
       // Strategy 3: Direct HTTP/HTTPS download from LuCI backup endpoints
       if (bytes == null || bytes.isEmpty) {
-        Logger.info('Backup Strategy 3: Downloading via LuCI HTTP endpoints...');
+        Logger.info(
+          'Backup Strategy 3: Downloading via LuCI HTTP endpoints...',
+        );
         final httpBytes = await _downloadBackupViaHttp(appState);
-        if (httpBytes != null && httpBytes.isNotEmpty && _validateBackupArchiveBytes(httpBytes)) {
+        if (httpBytes != null &&
+            httpBytes.isNotEmpty &&
+            _validateBackupArchiveBytes(httpBytes)) {
           bytes = httpBytes;
-          Logger.info('Backup Strategy 3 succeeded: ${bytes.length} bytes downloaded');
+          Logger.info(
+            'Backup Strategy 3 succeeded: ${bytes.length} bytes downloaded',
+          );
         }
       }
 
       // Strategy 4: UCI configuration export as a text configuration backup
       if (bytes == null || bytes.isEmpty) {
-        Logger.info('Backup Strategy 4: Fallback to UCI export configuration backup...');
-        final uciExport = await appState.executeRouterCommandOutput('uci', ['export']);
+        Logger.info(
+          'Backup Strategy 4: Fallback to UCI export configuration backup...',
+        );
+        final uciExport = await appState.executeRouterCommandOutput('uci', [
+          'export',
+        ]);
         if (uciExport != null && uciExport.trim().isNotEmpty) {
           bytes = Uint8List.fromList(utf8.encode(uciExport));
-          Logger.info('Backup Strategy 4 succeeded via uci export: ${bytes.length} bytes downloaded');
+          Logger.info(
+            'Backup Strategy 4 succeeded via uci export: ${bytes.length} bytes downloaded',
+          );
         } else {
           // Sub-strategy 4b: Individual UCI config collection via RPC uci.get
-          final configs = ['dhcp', 'dropbear', 'firewall', 'luci', 'network', 'system', 'uhttpd', 'wireless'];
+          final configs = [
+            'dhcp',
+            'dropbear',
+            'firewall',
+            'luci',
+            'network',
+            'system',
+            'uhttpd',
+            'wireless',
+          ];
           final Map<String, dynamic> combinedConfig = {};
           for (final cfg in configs) {
             try {
               final res = await appState.callRpc('uci', 'get', {'config': cfg});
-              if (res is List && res.length > 1 && res[0] == 0 && res[1] != null) {
+              if (res is List &&
+                  res.length > 1 &&
+                  res[0] == 0 &&
+                  res[1] != null) {
                 combinedConfig[cfg] = res[1];
               }
             } catch (_) {}
@@ -502,7 +619,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
               'configs': combinedConfig,
             });
             bytes = Uint8List.fromList(utf8.encode(jsonBackup));
-            Logger.info('Backup Strategy 4 succeeded via aggregated RPC uci.get: ${bytes.length} bytes downloaded');
+            Logger.info(
+              'Backup Strategy 4 succeeded via aggregated RPC uci.get: ${bytes.length} bytes downloaded',
+            );
           }
         }
       }
@@ -510,19 +629,25 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
       // Strategy 5: Reviewer mode mock fallback
       if (bytes == null || bytes.isEmpty) {
         if (appState.reviewerModeEnabled) {
-          bytes = Uint8List.fromList(List<int>.generate(512, (i) => (i * 7) % 256));
+          bytes = Uint8List.fromList(
+            List<int>.generate(512, (i) => (i * 7) % 256),
+          );
         } else {
-          throw Exception('Failed to read generated backup file from router using all available strategies.');
+          throw Exception(
+            'Failed to read generated backup file from router using all available strategies.',
+          );
         }
       }
 
-      final fileName = 'backup-${DateTime.now().millisecondsSinceEpoch ~/ 1000}.tar.gz';
-      
+      final fileName =
+          'backup-${DateTime.now().millisecondsSinceEpoch ~/ 1000}.tar.gz';
+
       // Save directly to /storage/emulated/0/Download/ (Public Downloads)
-      final saveResult = await OsPlatformIntegration.saveDownloadedFileWithResult(
-        bytes: bytes,
-        fileName: fileName,
-      );
+      final saveResult =
+          await OsPlatformIntegration.saveDownloadedFileWithResult(
+            bytes: bytes,
+            fileName: fileName,
+          );
 
       // GUARANTEE overlay reset BEFORE displaying prompt
       if (mounted) {
@@ -533,7 +658,10 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
 
       if (saveResult != null) {
         context.showToastSuccess('Backup archive downloaded successfully.');
-        await OsPlatformIntegration.showBackupDownloadedPrompt(context, saveResult);
+        await OsPlatformIntegration.showBackupDownloadedPrompt(
+          context,
+          saveResult,
+        );
       } else {
         context.showToastError('Failed to write backup file to storage.');
       }
@@ -541,7 +669,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
       Logger.error('Backup Generation Error: $e', stack);
       if (mounted) {
         setState(() => _isProcessing = false);
-        context.showToastError('Backup Generation Failed: ${e.toString().replaceAll('Exception: ', '')}');
+        context.showToastError(
+          'Backup Generation Failed: ${e.toString().replaceAll('Exception: ', '')}',
+        );
       }
     } finally {
       if (mounted) {
@@ -574,11 +704,16 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         final decompressed = GZipCodec().decode(bytes);
         if (decompressed.isEmpty) return false;
         if (decompressed.length >= 262) {
-          final decompMagic = String.fromCharCodes(decompressed.sublist(257, 262));
+          final decompMagic = String.fromCharCodes(
+            decompressed.sublist(257, 262),
+          );
           if (decompMagic.startsWith('ustar')) return true;
         }
         final text = latin1.decode(
-          decompressed.sublist(0, decompressed.length > 2048 ? 2048 : decompressed.length),
+          decompressed.sublist(
+            0,
+            decompressed.length > 2048 ? 2048 : decompressed.length,
+          ),
           allowInvalid: true,
         );
         if (text.contains('etc/') ||
@@ -599,17 +734,24 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
 
   Future<void> _handleUploadArchive() async {
     try {
-      final pickedFiles = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['gz', 'tgz', 'tar'],
-      );
-      if (pickedFiles.isEmpty) return;
+      dynamic pickedResult;
+      try {
+        pickedResult = await FilePicker.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['gz', 'tgz', 'tar'],
+        );
+      } catch (_) {}
 
-      final pickedFile = pickedFiles.first;
+      pickedResult ??= await FilePicker.pickFiles(type: FileType.any);
+
+      if (pickedResult == null || pickedResult.files.isEmpty) return;
+
+      final pickedFile = pickedResult.files.first;
       final fileNameLower = pickedFile.name.toLowerCase();
 
       // Extension Validation Guardrail: Ensure file is a valid OpenWrt backup archive
-      final isValidExtension = fileNameLower.endsWith('.tar.gz') ||
+      final isValidExtension =
+          fileNameLower.endsWith('.tar.gz') ||
           fileNameLower.endsWith('.tgz') ||
           fileNameLower.endsWith('.tar') ||
           fileNameLower.endsWith('.gz');
@@ -618,18 +760,27 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         if (mounted) {
           context.showToastError(
             'Invalid Archive Extension',
-            subtitle: 'Please select a valid OpenWrt backup archive (.tar.gz, .tgz, .tar, or .gz).',
+            subtitle:
+                'Please select a valid OpenWrt backup archive (.tar.gz, .tgz, .tar, or .gz).',
           );
         }
         return;
       }
       Uint8List? fileBytes;
-      if (pickedFile.path != null) {
+      try {
+        fileBytes = await pickedFile.readAsBytes();
+      } catch (_) {
+        fileBytes = pickedFile.bytes;
+      }
+      if (fileBytes == null && pickedFile.path != null) {
         try {
           fileBytes = await File(pickedFile.path!).readAsBytes();
         } catch (e) {
           if (mounted) {
-            context.showToastError('File Read Error', subtitle: 'Could not read selected file from storage.');
+            context.showToastError(
+              'File Read Error',
+              subtitle: 'Could not read selected file from storage.',
+            );
           }
           return;
         }
@@ -645,7 +796,8 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         if (mounted) {
           context.showToastError(
             'Corrupt or Invalid Archive Payload',
-            subtitle: 'The selected file is corrupt or not a valid gzipped tarball. Pre-restore validation aborted to prevent router configuration corruption.',
+            subtitle:
+                'The selected file is corrupt or not a valid gzipped tarball. Pre-restore validation aborted to prevent router configuration corruption.',
           );
         }
         return;
@@ -661,11 +813,19 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
       final b64Str = base64Encode(fileBytes);
 
       const chunkSize = 8000;
-      await appState.executeRouterCommand('sh', ['-c', 'rm -f /tmp/uploaded_backup.tar.gz.b64 /tmp/uploaded_backup.tar.gz']);
+      await appState.executeRouterCommand('sh', [
+        '-c',
+        'rm -f /tmp/uploaded_backup.tar.gz.b64 /tmp/uploaded_backup.tar.gz',
+      ]);
       for (var i = 0; i < b64Str.length; i += chunkSize) {
-        final end = (i + chunkSize < b64Str.length) ? i + chunkSize : b64Str.length;
+        final end = (i + chunkSize < b64Str.length)
+            ? i + chunkSize
+            : b64Str.length;
         final chunk = b64Str.substring(i, end);
-        await appState.executeRouterCommand('sh', ['-c', 'echo -n "$chunk" >> /tmp/uploaded_backup.tar.gz.b64']);
+        await appState.executeRouterCommand('sh', [
+          '-c',
+          'echo -n "$chunk" >> /tmp/uploaded_backup.tar.gz.b64',
+        ]);
         if (mounted) {
           setState(() {
             _uploadProgress = end / b64Str.length;
@@ -675,7 +835,7 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
 
       await appState.executeRouterCommand('sh', [
         '-c',
-        'base64 -d /tmp/uploaded_backup.tar.gz.b64 > /tmp/uploaded_backup.tar.gz 2>/dev/null || openssl base64 -d -in /tmp/uploaded_backup.tar.gz.b64 -out /tmp/uploaded_backup.tar.gz 2>/dev/null || uudecode -o /tmp/uploaded_backup.tar.gz /tmp/uploaded_backup.tar.gz.b64 2>/dev/null && rm -f /tmp/uploaded_backup.tar.gz.b64'
+        'base64 -d /tmp/uploaded_backup.tar.gz.b64 > /tmp/uploaded_backup.tar.gz 2>/dev/null || openssl base64 -d -in /tmp/uploaded_backup.tar.gz.b64 -out /tmp/uploaded_backup.tar.gz 2>/dev/null || uudecode -o /tmp/uploaded_backup.tar.gz /tmp/uploaded_backup.tar.gz.b64 2>/dev/null && rm -f /tmp/uploaded_backup.tar.gz.b64',
       ]);
 
       setState(() {
@@ -683,23 +843,40 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         _uploadProgress = null;
       });
 
-      final restoreSuccess = await appState.executeRouterCommand('sysupgrade', ['-r', '/tmp/uploaded_backup.tar.gz']);
-      final fallbackSuccess = !restoreSuccess ? await appState.executeRouterCommand('tar', ['-xzf', '/tmp/uploaded_backup.tar.gz', '-C', '/']) : true;
+      final restoreSuccess = await appState.executeRouterCommand('sysupgrade', [
+        '-r',
+        '/tmp/uploaded_backup.tar.gz',
+      ]);
+      final fallbackSuccess = !restoreSuccess
+          ? await appState.executeRouterCommand('tar', [
+              '-xzf',
+              '/tmp/uploaded_backup.tar.gz',
+              '-C',
+              '/',
+            ])
+          : true;
 
       // Reload config daemons so restored /etc/config settings take effect on running services
-      await appState.executeRouterCommand('sh', ['-c', '/sbin/reload_config 2>/dev/null || /etc/init.d/luci reload 2>/dev/null || true']);
+      await appState.executeRouterCommand('sh', [
+        '-c',
+        '/sbin/reload_config 2>/dev/null || /etc/init.d/luci reload 2>/dev/null || true',
+      ]);
 
       if (!mounted) return;
       if (restoreSuccess || fallbackSuccess) {
         unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
-        context.showToastSuccess('Configuration restored successfully from archive.');
+        context.showToastSuccess(
+          'Configuration restored successfully from archive.',
+        );
         _showPostRestoreRebootDialog();
       } else {
         context.showToastError('Failed to restore backup configuration.');
       }
     } catch (e) {
       if (!mounted) return;
-      context.showToastError('Archive Upload Failed: ${e.toString().replaceAll('Exception: ', '')}');
+      context.showToastError(
+        'Archive Upload Failed: ${e.toString().replaceAll('Exception: ', '')}',
+      );
     } finally {
       if (mounted) {
         setState(() => _isProcessing = false);
@@ -753,7 +930,11 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                 color: Colors.red.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+              child: const Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.red,
+                size: 28,
+              ),
             ),
             const SizedBox(width: 12),
             const Text('Perform Factory Reset?'),
@@ -772,7 +953,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Perform Factory Reset'),
@@ -799,7 +982,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
 
     if (!mounted) return;
     if (success) {
-      context.showToastWarning('Factory reset initiated. Router is now rebooting...');
+      context.showToastWarning(
+        'Factory reset initiated. Router is now rebooting...',
+      );
       _showRebootCountdownDialog();
     } else {
       context.showToastError('Failed to execute factory reset on router.');
@@ -808,7 +993,11 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
 
   Uint8List? _parseRawOutputToBytes(String? rawOutput) {
     if (rawOutput == null || rawOutput.trim().isEmpty) return null;
-    final clean = rawOutput.replaceAll('\n', '').replaceAll('\r', '').replaceAll(' ', '').trim();
+    final clean = rawOutput
+        .replaceAll('\n', '')
+        .replaceAll('\r', '')
+        .replaceAll(' ', '')
+        .trim();
     if (clean.isEmpty) return null;
 
     // 1. Base64 attempt
@@ -845,7 +1034,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
     appState.setHeavyTaskRunning(true);
     try {
       final devName = dev.split('/').last; // e.g. mtd0
-      final blockDev = dev.contains('mtdblock') ? dev : dev.replaceAll('/dev/mtd', '/dev/mtdblock');
+      final blockDev = dev.contains('mtdblock')
+          ? dev
+          : dev.replaceAll('/dev/mtd', '/dev/mtdblock');
 
       // Find size if known from _mtdList
       int? expectedSize;
@@ -862,14 +1053,17 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
       // Strategy 0: Native LuCI file.read RPC with base64 encoding (100% ubus ACL compliant, 0 shell commands)
       for (final targetDev in candidates) {
         try {
-          Logger.info('MTD Dump Strategy 0 (Native file.read RPC with base64): $targetDev...');
+          Logger.info(
+            'MTD Dump Strategy 0 (Native file.read RPC with base64): $targetDev...',
+          );
           final accumulated = <int>[];
           const chunkSize = 65536; // 64 KB per chunk
           int offset = 0;
           int emptyCount = 0;
 
           while (offset < (expectedSize ?? 128 * 1024 * 1024)) {
-            final fetchSize = (expectedSize != null && (expectedSize - offset) < chunkSize)
+            final fetchSize =
+                (expectedSize != null && (expectedSize - offset) < chunkSize)
                 ? (expectedSize - offset)
                 : chunkSize;
 
@@ -905,7 +1099,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
           }
 
           if (accumulated.isNotEmpty) {
-            Logger.info('MTD Dump Strategy 0 succeeded: ${accumulated.length} bytes read from $targetDev');
+            Logger.info(
+              'MTD Dump Strategy 0 succeeded: ${accumulated.length} bytes read from $targetDev',
+            );
             return Uint8List.fromList(accumulated);
           }
         } catch (e) {
@@ -922,16 +1118,14 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         int chunkIndex = 0;
         int emptyChunkCount = 0;
 
-        while (chunkIndex < 4096) { // Cap at 128 MB max
+        while (chunkIndex < 4096) {
+          // Cap at 128 MB max
           final skip2k = chunkIndex * chunkBlocks;
-          final chunkRaw = await appState.executeRouterCommandOutput(
-            'sh',
-            [
-              '-c',
-              'dd if="$targetDev" bs=2048 skip=$skip2k count=$chunkBlocks 2>/dev/null | base64 2>/dev/null || '
-              'dd if="$targetDev" bs=2048 skip=$skip2k count=$chunkBlocks 2>/dev/null | hexdump -v -e \'1/1 "%02x"\' 2>/dev/null'
-            ],
-          );
+          final chunkRaw = await appState.executeRouterCommandOutput('sh', [
+            '-c',
+            'dd if="$targetDev" bs=2048 skip=$skip2k count=$chunkBlocks 2>/dev/null | base64 2>/dev/null || '
+                'dd if="$targetDev" bs=2048 skip=$skip2k count=$chunkBlocks 2>/dev/null | hexdump -v -e \'1/1 "%02x"\' 2>/dev/null',
+          ]);
 
           final chunkBytes = _parseRawOutputToBytes(chunkRaw);
           if (chunkBytes != null && chunkBytes.isNotEmpty) {
@@ -941,7 +1135,8 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
             if (onProgress != null) {
               onProgress(accumulatedBytes.length, expectedSize);
             }
-            if (expectedSize != null && accumulatedBytes.length >= expectedSize) {
+            if (expectedSize != null &&
+                accumulatedBytes.length >= expectedSize) {
               break; // Fully read expected partition size
             }
             if (chunkBytes.length < chunkSize) {
@@ -956,7 +1151,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         }
 
         if (accumulatedBytes.isNotEmpty) {
-          Logger.info('MTD Dump Strategy 1 succeeded: ${accumulatedBytes.length} bytes read from $targetDev');
+          Logger.info(
+            'MTD Dump Strategy 1 succeeded: ${accumulatedBytes.length} bytes read from $targetDev',
+          );
           return Uint8List.fromList(accumulatedBytes);
         }
       }
@@ -966,7 +1163,7 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
       final tmpFile = '/tmp/$devName.bin';
       await appState.executeRouterCommand('sh', [
         '-c',
-        'dd if="$dev" of="$tmpFile" bs=2048 2>/dev/null || dd if="$blockDev" of="$tmpFile" bs=2048 2>/dev/null || cat "$dev" > "$tmpFile" 2>/dev/null'
+        'dd if="$dev" of="$tmpFile" bs=2048 2>/dev/null || dd if="$blockDev" of="$tmpFile" bs=2048 2>/dev/null || cat "$dev" > "$tmpFile" 2>/dev/null',
       ]);
 
       final bytes = await _readRouterFileAsBytes(appState, tmpFile);
@@ -1000,23 +1197,27 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
             setState(() {
               if (totalBytes != null && totalBytes > 0) {
                 _uploadProgress = (readBytes / totalBytes).clamp(0.0, 1.0);
-                _statusMessage = 'Dumping $dev (${_formatByteSize(readBytes)} / ${_formatByteSize(totalBytes)})...';
+                _statusMessage =
+                    'Dumping $dev (${_formatByteSize(readBytes)} / ${_formatByteSize(totalBytes)})...';
               } else {
-                _statusMessage = 'Dumping $dev (${_formatByteSize(readBytes)})...';
+                _statusMessage =
+                    'Dumping $dev (${_formatByteSize(readBytes)})...';
               }
             });
           }
         },
       );
-      if (bytes == null || bytes.isEmpty) throw Exception('Failed to dump and read $dev partition from router.');
+      if (bytes == null || bytes.isEmpty)
+        throw Exception('Failed to dump and read $dev partition from router.');
 
       final fileName = '$filename.bin';
 
       // Save directly to /storage/emulated/0/Download/ (Public Downloads)
-      final saveResult = await OsPlatformIntegration.saveDownloadedFileWithResult(
-        bytes: bytes,
-        fileName: fileName,
-      );
+      final saveResult =
+          await OsPlatformIntegration.saveDownloadedFileWithResult(
+            bytes: bytes,
+            fileName: fileName,
+          );
 
       // GUARANTEE overlay reset BEFORE displaying prompt
       if (mounted) {
@@ -1028,15 +1229,22 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
       if (saveResult != null) {
         unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
         context.showToastSuccess('Partition image saved successfully.');
-        await OsPlatformIntegration.showBackupDownloadedPrompt(context, saveResult);
+        await OsPlatformIntegration.showBackupDownloadedPrompt(
+          context,
+          saveResult,
+        );
       } else {
-        context.showToastError('Failed to write partition image file to storage.');
+        context.showToastError(
+          'Failed to write partition image file to storage.',
+        );
       }
     } catch (e, stack) {
       Logger.error('Partition Image Download Error: $e', stack);
       if (mounted) {
         setState(() => _isProcessing = false);
-        context.showToastError('Failed to save mtdblock: ${e.toString().replaceAll('Exception: ', '')}');
+        context.showToastError(
+          'Failed to save mtdblock: ${e.toString().replaceAll('Exception: ', '')}',
+        );
       }
     } finally {
       if (mounted) {
@@ -1047,18 +1255,24 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
 
   Future<void> _handlePerformSysupgrade() async {
     try {
-      final pickedFiles = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['bin', 'gz', 'tgz', 'tar'],
-      );
+      dynamic pickedResult;
+      try {
+        pickedResult = await FilePicker.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['bin', 'gz', 'tgz', 'tar', 'img', 'trx'],
+        );
+      } catch (_) {}
 
-      if (pickedFiles.isEmpty) return;
+      pickedResult ??= await FilePicker.pickFiles(type: FileType.any);
 
-      final pickedFile = pickedFiles.first;
+      if (pickedResult == null || pickedResult.files.isEmpty) return;
+
+      final pickedFile = pickedResult.files.first;
       final fileNameLower = pickedFile.name.toLowerCase();
 
       // Extension Validation Guardrail: Ensure file is a valid OpenWrt firmware image
-      final isValidFirmware = fileNameLower.endsWith('.bin') ||
+      final isValidFirmware =
+          fileNameLower.endsWith('.bin') ||
           fileNameLower.endsWith('.img') ||
           fileNameLower.endsWith('.img.gz') ||
           fileNameLower.endsWith('.gz') ||
@@ -1068,17 +1282,25 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         if (mounted) {
           context.showToastError(
             'Invalid Firmware Format',
-            subtitle: 'Please select a valid OpenWrt firmware image (.bin, .img, .img.gz, .gz, or .trx).',
+            subtitle:
+                'Please select a valid OpenWrt firmware image (.bin, .img, .img.gz, .gz, or .trx).',
           );
         }
         return;
       }
-      if (pickedFile.path == null) {
-        throw Exception('Could not determine file path.');
+      Uint8List? fileBytes;
+      try {
+        fileBytes = await pickedFile.readAsBytes();
+      } catch (_) {
+        fileBytes = pickedFile.bytes;
       }
-      final fileBytes = await File(pickedFile.path!).readAsBytes();
+      if (fileBytes == null && pickedFile.path != null) {
+        try {
+          fileBytes = await File(pickedFile.path!).readAsBytes();
+        } catch (_) {}
+      }
 
-      if (fileBytes.isEmpty) {
+      if (fileBytes == null || fileBytes.isEmpty) {
         throw Exception('Could not read chosen firmware image file.');
       }
 
@@ -1091,7 +1313,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
       if (_tmpAvailableMb > 0 && fileSizeMb > (_tmpAvailableMb - 2.0)) {
         if (!mounted) return;
         unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
-        context.showToastError('Insufficient /tmp space for upload ($fileSizeMbStr MB required, ${_tmpAvailableMb.toStringAsFixed(1)} MB available).');
+        context.showToastError(
+          'Insufficient /tmp space for upload ($fileSizeMbStr MB required, ${_tmpAvailableMb.toStringAsFixed(1)} MB available).',
+        );
         return;
       }
 
@@ -1105,12 +1329,20 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
       final appState = ref.read(appStateProvider);
       final b64Str = base64Encode(fileBytes);
       const chunkSize = 30000;
-      await appState.executeRouterCommand('sh', ['-c', 'rm -f /tmp/sysupgrade_firmware.bin.b64 /tmp/sysupgrade_firmware.bin']);
+      await appState.executeRouterCommand('sh', [
+        '-c',
+        'rm -f /tmp/sysupgrade_firmware.bin.b64 /tmp/sysupgrade_firmware.bin',
+      ]);
 
       for (var i = 0; i < b64Str.length; i += chunkSize) {
-        final end = (i + chunkSize < b64Str.length) ? i + chunkSize : b64Str.length;
+        final end = (i + chunkSize < b64Str.length)
+            ? i + chunkSize
+            : b64Str.length;
         final chunk = b64Str.substring(i, end);
-        await appState.executeRouterCommand('sh', ['-c', 'echo -n "$chunk" >> /tmp/sysupgrade_firmware.bin.b64']);
+        await appState.executeRouterCommand('sh', [
+          '-c',
+          'echo -n "$chunk" >> /tmp/sysupgrade_firmware.bin.b64',
+        ]);
         if (mounted) {
           setState(() {
             _uploadProgress = end / b64Str.length;
@@ -1118,7 +1350,10 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         }
       }
 
-      await appState.executeRouterCommand('sh', ['-c', 'base64 -d /tmp/sysupgrade_firmware.bin.b64 > /tmp/sysupgrade_firmware.bin && rm -f /tmp/sysupgrade_firmware.bin.b64']);
+      await appState.executeRouterCommand('sh', [
+        '-c',
+        'base64 -d /tmp/sysupgrade_firmware.bin.b64 > /tmp/sysupgrade_firmware.bin && rm -f /tmp/sysupgrade_firmware.bin.b64',
+      ]);
 
       // Pre-Flash Image Validation Check (`sysupgrade -t`)
       setState(() {
@@ -1126,8 +1361,14 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         _uploadProgress = null;
       });
 
-      final testResult = await appState.executeRouterCommandOutput('sysupgrade', ['-t', '/tmp/sysupgrade_firmware.bin']);
-      final isVerified = testResult != null && !testResult.toLowerCase().contains('invalid') && !testResult.toLowerCase().contains('error');
+      final testResult = await appState.executeRouterCommandOutput(
+        'sysupgrade',
+        ['-t', '/tmp/sysupgrade_firmware.bin'],
+      );
+      final isVerified =
+          testResult != null &&
+          !testResult.toLowerCase().contains('invalid') &&
+          !testResult.toLowerCase().contains('error');
 
       setState(() => _isProcessing = false);
 
@@ -1140,7 +1381,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         barrierDismissible: false,
         builder: (ctx) => StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
             title: Row(
               children: [
                 Container(
@@ -1149,10 +1392,17 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                     color: Colors.blue.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.system_update_alt, color: Colors.blue, size: 26),
+                  child: const Icon(
+                    Icons.system_update_alt,
+                    color: Colors.blue,
+                    size: 26,
+                  ),
                 ),
                 const SizedBox(width: 12),
-                const Text('Firmware Pre-Flash Check', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const Text(
+                  'Firmware Pre-Flash Check',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
               ],
             ),
             content: SingleChildScrollView(
@@ -1163,21 +1413,37 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isVerified ? Colors.teal.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
+                      color: isVerified
+                          ? Colors.teal.withValues(alpha: 0.1)
+                          : Colors.orange.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: isVerified ? Colors.teal : Colors.orange),
+                      border: Border.all(
+                        color: isVerified ? Colors.teal : Colors.orange,
+                      ),
                     ),
                     child: Row(
                       children: [
-                        Icon(isVerified ? Icons.check_circle_outline : Icons.warning_amber_rounded, color: isVerified ? Colors.teal : Colors.orange),
+                        Icon(
+                          isVerified
+                              ? Icons.check_circle_outline
+                              : Icons.warning_amber_rounded,
+                          color: isVerified ? Colors.teal : Colors.orange,
+                        ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                isVerified ? 'Image Verification Passed' : 'Pre-Flash Test Unverified',
-                                style: TextStyle(fontWeight: FontWeight.bold, color: isVerified ? Colors.teal : Colors.orange.shade900),
+                                isVerified
+                                    ? 'Image Verification Passed'
+                                    : 'Pre-Flash Test Unverified',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isVerified
+                                      ? Colors.teal
+                                      : Colors.orange.shade900,
+                                ),
                               ),
                               Text(
                                 isVerified
@@ -1192,13 +1458,34 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Text('File: $fileName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  Text('Size: $fileSizeMbStr MB', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                  Text('Target ROM: $_romFlavor', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text(
+                    'File: $fileName',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  Text(
+                    'Size: $fileSizeMbStr MB',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  Text(
+                    'Target ROM: $_romFlavor',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
                   const Divider(height: 24),
                   CheckboxListTile(
-                    title: const Text('Keep settings and current configuration (-k)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                    subtitle: const Text('Retain active network, Wi-Fi, and user credentials.', style: TextStyle(fontSize: 11)),
+                    title: const Text(
+                      'Keep settings and current configuration (-k)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Retain active network, Wi-Fi, and user credentials.',
+                      style: TextStyle(fontSize: 11),
+                    ),
                     value: _keepSettings,
                     contentPadding: EdgeInsets.zero,
                     controlAffinity: ListTileControlAffinity.leading,
@@ -1209,8 +1496,18 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                     },
                   ),
                   CheckboxListTile(
-                    title: const Text('Force upgrade (-F)', style: TextStyle(fontSize: 13, color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                    subtitle: const Text('Bypass board architecture validation (CAUTION!)', style: TextStyle(fontSize: 11)),
+                    title: const Text(
+                      'Force upgrade (-F)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Bypass board architecture validation (CAUTION!)',
+                      style: TextStyle(fontSize: 11),
+                    ),
                     value: _forceSysupgrade,
                     contentPadding: EdgeInsets.zero,
                     controlAffinity: ListTileControlAffinity.leading,
@@ -1234,7 +1531,11 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                         Expanded(
                           child: Text(
                             'WARNING: Do NOT disconnect power or ethernet during the flashing process!',
-                            style: TextStyle(fontSize: 11, color: Colors.red, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -1252,7 +1553,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 onPressed: () => Navigator.of(ctx).pop(true),
                 icon: const Icon(Icons.flash_on),
@@ -1265,7 +1568,12 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
 
       // Clean up uploaded firmware file from router /tmp on cancel
       if (proceed != true) {
-        unawaited(appState.executeRouterCommand('rm', ['-f', '/tmp/sysupgrade_firmware.bin']));
+        unawaited(
+          appState.executeRouterCommand('rm', [
+            '-f',
+            '/tmp/sysupgrade_firmware.bin',
+          ]),
+        );
         return;
       }
 
@@ -1278,34 +1586,47 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
       // Execute background sysupgrade so connection drop on router reboot doesn't throw false negative
       final flagStr = _keepSettings ? '-k' : '-n';
       final forceStr = _forceSysupgrade ? '-F' : '';
-      final bgCmd = "(sleep 1 && sysupgrade $flagStr $forceStr /tmp/sysupgrade_firmware.bin) >/dev/null 2>&1 &";
+      final bgCmd =
+          "(sleep 1 && sysupgrade $flagStr $forceStr /tmp/sysupgrade_firmware.bin) >/dev/null 2>&1 &";
 
-      final flashInitiated = await appState.executeRouterCommand('sh', ['-c', bgCmd]);
+      final flashInitiated = await appState.executeRouterCommand('sh', [
+        '-c',
+        bgCmd,
+      ]);
 
       if (!mounted) return;
       if (flashInitiated) {
-        context.showToastSuccess('Firmware flash initiated successfully. Router is rebooting.');
+        context.showToastSuccess(
+          'Firmware flash initiated successfully. Router is rebooting.',
+        );
         _showRebootCountdownDialog();
       } else {
         // Fallback direct execution
         await appState.executeRouterCommand('sysupgrade', [
           if (_keepSettings) '-k' else '-n',
           if (_forceSysupgrade) '-F',
-          '/tmp/sysupgrade_firmware.bin'
+          '/tmp/sysupgrade_firmware.bin',
         ]);
         if (mounted) {
-          context.showToastSuccess('Firmware flash initiated successfully. Router is rebooting.');
+          context.showToastSuccess(
+            'Firmware flash initiated successfully. Router is rebooting.',
+          );
           _showRebootCountdownDialog();
         }
       }
     } catch (e) {
       if (!mounted) return;
       // Socket exception or network disconnection is expected when router shuts down interface during sysupgrade
-      if (e.toString().toLowerCase().contains('socket') || e.toString().toLowerCase().contains('connection')) {
-        context.showToastSuccess('Firmware flash initiated successfully. Router is rebooting.');
+      if (e.toString().toLowerCase().contains('socket') ||
+          e.toString().toLowerCase().contains('connection')) {
+        context.showToastSuccess(
+          'Firmware flash initiated successfully. Router is rebooting.',
+        );
         _showRebootCountdownDialog();
       } else {
-        context.showToastError('Firmware Flash Failed: ${e.toString().replaceAll('Exception: ', '')}');
+        context.showToastError(
+          'Firmware Flash Failed: ${e.toString().replaceAll('Exception: ', '')}',
+        );
       }
     } finally {
       if (mounted) {
@@ -1322,7 +1643,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
       context: context,
       isDismissible: false,
       enableDrag: false,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) {
           countdownTimer ??= Timer.periodic(const Duration(seconds: 1), (t) {
@@ -1374,23 +1697,28 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const LuciAppBar(
-        title: 'Backup / Flash Firmware',
-      ),
+      appBar: const LuciAppBar(title: 'Backup / Flash Firmware'),
       body: Stack(
         children: [
           _buildActionsView(context),
           if (_isProcessing)
             SizedBox.expand(
               child: Container(
-                color: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.65),
+                color: Theme.of(
+                  context,
+                ).colorScheme.scrim.withValues(alpha: 0.65),
                 child: Center(
                   child: Card(
                     elevation: 8,
                     color: Theme.of(context).colorScheme.surface,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 24,
+                      ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -1399,7 +1727,8 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                             const SizedBox(height: 12),
                             Text(
                               '${(_uploadProgress! * 100).toInt()}% uploaded',
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                           ] else ...[
                             const CircularProgressIndicator(),
@@ -1407,7 +1736,8 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                           const SizedBox(height: 16),
                           Text(
                             _statusMessage ?? 'Processing...',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 18),
@@ -1416,7 +1746,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                               setState(() {
                                 _isProcessing = false;
                               });
-                              context.showToastInfo('Operation overlay dismissed.');
+                              context.showToastInfo(
+                                'Operation overlay dismissed.',
+                              );
                             },
                             icon: const Icon(Icons.close_rounded, size: 18),
                             label: const Text('Cancel / Dismiss'),
@@ -1440,14 +1772,17 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
         const LuciContextualHintBanner(
           hintId: 'backup_safety_advisory_hint',
           title: 'Backup & Sysupgrade Guidance',
-          message: 'Downloading a backup archive preserves your custom settings across firmware updates. Always double-check target architecture before flashing new images.',
+          message:
+              'Downloading a backup archive preserves your custom settings across firmware updates. Always double-check target architecture before flashing new images.',
           icon: Icons.shield_outlined,
           accentColor: Colors.teal,
         ),
         // System Hardware & Multi-ROM Context Banner
         Card(
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
@@ -1466,24 +1801,38 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.router, color: LuciColors.primary, size: 24),
+                    const Icon(
+                      Icons.router,
+                      color: LuciColors.primary,
+                      size: 24,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         _routerModel,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.teal.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         '/tmp Space: $_tmpAvailableSpace',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.teal),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.teal,
+                        ),
                       ),
                     ),
                   ],
@@ -1492,29 +1841,44 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.blue.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: Colors.blue.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Text(
                         _romFlavor,
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blue),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Target Arch: $_targetArch',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
-                Text('Firmware Version: $_firmwareVersion', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                Text(
+                  'Firmware Version: $_firmwareVersion',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
               ],
             ),
           ),
@@ -1527,7 +1891,8 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
           title: 'Backup Configuration Archive',
           icon: Icons.archive_outlined,
           iconColor: Colors.teal,
-          description: 'Generate and download a tar.gz archive of your router\'s system configurations, passwords, and custom scripts.',
+          description:
+              'Generate and download a tar.gz archive of your router\'s system configurations, passwords, and custom scripts.',
           actionWidget: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1536,7 +1901,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                   backgroundColor: Colors.teal,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 onPressed: _isProcessing ? null : _handleGenerateBackup,
                 icon: const Icon(Icons.download),
@@ -1547,7 +1914,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.teal,
                   side: const BorderSide(color: Colors.teal),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 onPressed: _isProcessing ? null : _showCurrentBackupFileList,
                 icon: const Icon(Icons.list_alt),
@@ -1564,7 +1933,8 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
           title: 'Restore & Reset Settings',
           icon: Icons.restore_outlined,
           iconColor: Colors.redAccent,
-          description: 'Upload a backup archive to restore settings, or perform a complete factory reset to return firmware to default state.',
+          description:
+              'Upload a backup archive to restore settings, or perform a complete factory reset to return firmware to default state.',
           actionWidget: Row(
             children: [
               Expanded(
@@ -1572,7 +1942,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.redAccent,
                     side: const BorderSide(color: Colors.redAccent),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   onPressed: _isProcessing ? null : _handleFactoryReset,
                   child: const Text('Perform Reset'),
@@ -1584,7 +1956,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.teal,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   onPressed: _isProcessing ? null : _handleUploadArchive,
                   icon: const Icon(Icons.upload_file),
@@ -1619,8 +1993,13 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                     child: DropdownButtonFormField<String>(
                       initialValue: _selectedMtdDevice,
                       decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                       items: _mtdList.map((m) {
                         return DropdownMenuItem<String>(
@@ -1632,7 +2011,8 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                           ),
                         );
                       }).toList(),
-                      onChanged: (val) => setState(() => _selectedMtdDevice = val),
+                      onChanged: (val) =>
+                          setState(() => _selectedMtdDevice = val),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1640,7 +2020,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.amber.shade800,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                     onPressed: _isProcessing ? null : _handleSaveMtdblock,
                     child: const Text('Save mtdblock'),
@@ -1668,9 +2050,14 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
               ),
               const SizedBox(height: 14),
               CheckboxListTile(
-                title: const Text('Keep settings and current configuration (-k)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                title: const Text(
+                  'Keep settings and current configuration (-k)',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                ),
                 value: _keepSettings,
-                onChanged: _isProcessing ? null : (val) => setState(() => _keepSettings = val ?? true),
+                onChanged: _isProcessing
+                    ? null
+                    : (val) => setState(() => _keepSettings = val ?? true),
                 contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
               ),
@@ -1682,7 +2069,9 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   onPressed: _isProcessing ? null : _handlePerformSysupgrade,
                   icon: const Icon(Icons.flash_on),
@@ -1718,7 +2107,10 @@ class _SystemBackupUpgradeScreenState extends ConsumerState<SystemBackupUpgradeS
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),

@@ -47,23 +47,26 @@ void main() {
   });
 
   group('EntitlementState Transitions', () {
-    test('State copyWith correctly updates entitlement tier and retains state flags', () {
-      const initial = EntitlementState(tier: EntitlementTier.free);
-      expect(initial.tier, equals(EntitlementTier.free));
+    test(
+      'State copyWith correctly updates entitlement tier and retains state flags',
+      () {
+        const initial = EntitlementState(tier: EntitlementTier.free);
+        expect(initial.tier, equals(EntitlementTier.free));
 
-      final plusState = initial.copyWith(tier: EntitlementTier.plus);
-      expect(plusState.tier, equals(EntitlementTier.plus));
-      expect(plusState.isAdFree, isTrue);
-      expect(plusState.canAddRouter(5), isTrue);
+        final plusState = initial.copyWith(tier: EntitlementTier.plus);
+        expect(plusState.tier, equals(EntitlementTier.plus));
+        expect(plusState.isAdFree, isTrue);
+        expect(plusState.canAddRouter(5), isTrue);
 
-      final proState = plusState.copyWith(tier: EntitlementTier.pro);
-      expect(proState.tier, equals(EntitlementTier.pro));
-      expect(proState.isAdFree, isTrue);
-      expect(proState.canAddRouter(5), isTrue);
+        final proState = plusState.copyWith(tier: EntitlementTier.pro);
+        expect(proState.tier, equals(EntitlementTier.pro));
+        expect(proState.isAdFree, isTrue);
+        expect(proState.canAddRouter(5), isTrue);
 
-      final lifetimeState = proState.copyWith(tier: EntitlementTier.lifetime);
-      expect(lifetimeState.tier, equals(EntitlementTier.lifetime));
-      expect(lifetimeState.isAdFree, isTrue);
-    });
+        final lifetimeState = proState.copyWith(tier: EntitlementTier.lifetime);
+        expect(lifetimeState.tier, equals(EntitlementTier.lifetime));
+        expect(lifetimeState.isAdFree, isTrue);
+      },
+    );
   });
 }

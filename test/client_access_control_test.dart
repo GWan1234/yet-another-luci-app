@@ -55,19 +55,22 @@ void main() {
       expect(success, isTrue);
     });
 
-    test('fetchRestrictedAndBannedClientsLive returns direct router status', () async {
-      final data = await mockApiService.fetchRestrictedAndBannedClientsLive(
-        '192.168.1.1',
-        'mock-sysauth',
-        false,
-      );
+    test(
+      'fetchRestrictedAndBannedClientsLive returns direct router status',
+      () async {
+        final data = await mockApiService.fetchRestrictedAndBannedClientsLive(
+          '192.168.1.1',
+          'mock-sysauth',
+          false,
+        );
 
-      expect(data, contains('restricted'));
-      expect(data, contains('banned'));
-      expect(data['restricted'], isNotEmpty);
-      expect(data['banned'], isNotEmpty);
-      expect(data['restricted']!.first['mac'], equals('11:22:33:44:55:66'));
-      expect(data['banned']!.first['mac'], equals('99:88:77:66:55:44'));
-    });
+        expect(data, contains('restricted'));
+        expect(data, contains('banned'));
+        expect(data['restricted'], isNotEmpty);
+        expect(data['banned'], isNotEmpty);
+        expect(data['restricted']!.first['mac'], equals('11:22:33:44:55:66'));
+        expect(data['banned']!.first['mac'], equals('99:88:77:66:55:44'));
+      },
+    );
   });
 }

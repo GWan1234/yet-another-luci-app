@@ -35,10 +35,19 @@ class OpenWrtPackage {
     PackageManagerType managerType = PackageManagerType.opkg,
   }) {
     return OpenWrtPackage(
-      name: json['name']?.toString() ?? json['package']?.toString() ?? json['pkg']?.toString() ?? 'unknown-package',
-      version: json['version']?.toString() ?? json['ver']?.toString() ?? '1.0.0',
-      architecture: json['architecture']?.toString() ?? json['arch']?.toString(),
-      description: json['description']?.toString() ?? json['desc']?.toString() ?? 'OpenWrt package',
+      name:
+          json['name']?.toString() ??
+          json['package']?.toString() ??
+          json['pkg']?.toString() ??
+          'unknown-package',
+      version:
+          json['version']?.toString() ?? json['ver']?.toString() ?? '1.0.0',
+      architecture:
+          json['architecture']?.toString() ?? json['arch']?.toString(),
+      description:
+          json['description']?.toString() ??
+          json['desc']?.toString() ??
+          'OpenWrt package',
       size: json['size']?.toString() ?? json['installed_size']?.toString(),
       isInstalled: isInstalled,
       hasUpdate: json['has_update'] == true || json['upgradable'] == true,
@@ -46,7 +55,8 @@ class OpenWrtPackage {
     );
   }
 
-  String get fileExtension => managerType == PackageManagerType.apk ? '.apk' : '.ipk';
+  String get fileExtension =>
+      managerType == PackageManagerType.apk ? '.apk' : '.ipk';
 }
 
 /// Represents a LuCI application plugin (luci-app-*).
@@ -84,19 +94,26 @@ class PackageManagerOverview {
     required this.discoveredLuciApps,
   });
 
-  factory PackageManagerOverview.fromDashboardData(Map<String, dynamic>? data, {bool isReviewerMode = false}) {
+  factory PackageManagerOverview.fromDashboardData(
+    Map<String, dynamic>? data, {
+    bool isReviewerMode = false,
+  }) {
     final installed = <OpenWrtPackage>[];
     final available = <OpenWrtPackage>[];
     PackageManagerType type = PackageManagerType.opkg;
 
     if (data != null) {
       // Check if OpenWrt 24.10+ APK manager is active
-      final mgrStr = data['packageManager']?.toString() ?? data['pkg_mgr']?.toString();
+      final mgrStr =
+          data['packageManager']?.toString() ?? data['pkg_mgr']?.toString();
       if (mgrStr == 'apk' || data.containsKey('apkPackages')) {
         type = PackageManagerType.apk;
       }
 
-      dynamic installedRaw = data['installedPackages'] ?? data['apkPackages'] ?? data['opkgPackages'];
+      dynamic installedRaw =
+          data['installedPackages'] ??
+          data['apkPackages'] ??
+          data['opkgPackages'];
       if (installedRaw is Map) {
         if (installedRaw.containsKey('packages')) {
           installedRaw = installedRaw['packages'];
@@ -111,7 +128,9 @@ class PackageManagerOverview {
       }
 
       if (installedRaw is String) {
-        if (installedRaw.contains('Package: ') && (installedRaw.contains('Status: ') || installedRaw.contains('Version: '))) {
+        if (installedRaw.contains('Package: ') &&
+            (installedRaw.contains('Status: ') ||
+                installedRaw.contains('Version: '))) {
           // OPKG status file format (/usr/lib/opkg/status or /var/lib/opkg/status)
           final blocks = installedRaw.split(RegExp(r'\n\s*\n'));
           for (final block in blocks) {
@@ -133,13 +152,17 @@ class PackageManagerOverview {
               }
             }
             if (pkgName != null && pkgName.isNotEmpty) {
-              installed.add(OpenWrtPackage(
-                name: pkgName,
-                version: pkgVer ?? 'installed',
-                description: pkgDesc.isEmpty ? 'OpenWrt package ($pkgName)' : pkgDesc,
-                isInstalled: true,
-                managerType: type,
-              ));
+              installed.add(
+                OpenWrtPackage(
+                  name: pkgName,
+                  version: pkgVer ?? 'installed',
+                  description: pkgDesc.isEmpty
+                      ? 'OpenWrt package ($pkgName)'
+                      : pkgDesc,
+                  isInstalled: true,
+                  managerType: type,
+                ),
+              );
             }
           }
         } else if (installedRaw.contains('P:') && installedRaw.contains('V:')) {
@@ -159,13 +182,17 @@ class PackageManagerOverview {
               }
             }
             if (pkgName != null && pkgName.isNotEmpty) {
-              installed.add(OpenWrtPackage(
-                name: pkgName,
-                version: pkgVer ?? 'installed',
-                description: pkgDesc.isEmpty ? 'APK package ($pkgName)' : pkgDesc,
-                isInstalled: true,
-                managerType: PackageManagerType.apk,
-              ));
+              installed.add(
+                OpenWrtPackage(
+                  name: pkgName,
+                  version: pkgVer ?? 'installed',
+                  description: pkgDesc.isEmpty
+                      ? 'APK package ($pkgName)'
+                      : pkgDesc,
+                  isInstalled: true,
+                  managerType: PackageManagerType.apk,
+                ),
+              );
             }
           }
         } else {
@@ -173,8 +200,11 @@ class PackageManagerOverview {
           final lines = installedRaw.split('\n');
           for (final line in lines) {
             final trimmed = line.trim();
-            if (trimmed.isEmpty || trimmed.startsWith('#') || trimmed.startsWith('WARNING')) continue;
-            
+            if (trimmed.isEmpty ||
+                trimmed.startsWith('#') ||
+                trimmed.startsWith('WARNING'))
+              continue;
+
             String pkgName;
             String pkgVer = 'installed';
             String pkgDesc = '';
@@ -190,7 +220,9 @@ class PackageManagerOverview {
               if (parts.length > 1) pkgVer = parts[1].trim();
               if (parts.length > 2) pkgDesc = parts.sublist(2).join(' ');
             } else {
-              final match = RegExp(r'^([a-zA-Z0-9_\-]+?)-([0-9].*)$').firstMatch(trimmed);
+              final match = RegExp(
+                r'^([a-zA-Z0-9_\-]+?)-([0-9].*)$',
+              ).firstMatch(trimmed);
               if (match != null) {
                 pkgName = match.group(1)!;
                 pkgVer = match.group(2)!;
@@ -199,29 +231,43 @@ class PackageManagerOverview {
               }
             }
 
-            if (pkgName.isNotEmpty && pkgName != 'Package:' && pkgName != 'Status:') {
-              installed.add(OpenWrtPackage(
-                name: pkgName,
-                version: pkgVer,
-                description: pkgDesc.isEmpty ? 'OpenWrt package ($pkgName)' : pkgDesc,
-                isInstalled: true,
-                managerType: type,
-              ));
+            if (pkgName.isNotEmpty &&
+                pkgName != 'Package:' &&
+                pkgName != 'Status:') {
+              installed.add(
+                OpenWrtPackage(
+                  name: pkgName,
+                  version: pkgVer,
+                  description: pkgDesc.isEmpty
+                      ? 'OpenWrt package ($pkgName)'
+                      : pkgDesc,
+                  isInstalled: true,
+                  managerType: type,
+                ),
+              );
             }
           }
         }
       } else if (installedRaw is List) {
         for (final item in installedRaw) {
           if (item is Map<String, dynamic>) {
-            installed.add(OpenWrtPackage.fromJson(item, isInstalled: true, managerType: type));
+            installed.add(
+              OpenWrtPackage.fromJson(
+                item,
+                isInstalled: true,
+                managerType: type,
+              ),
+            );
           } else if (item is String && item.isNotEmpty) {
-            installed.add(OpenWrtPackage(
-              name: item,
-              version: 'installed',
-              description: 'OpenWrt package ($item)',
-              isInstalled: true,
-              managerType: type,
-            ));
+            installed.add(
+              OpenWrtPackage(
+                name: item,
+                version: 'installed',
+                description: 'OpenWrt package ($item)',
+                isInstalled: true,
+                managerType: type,
+              ),
+            );
           }
         }
       } else if (installedRaw is Map) {
@@ -235,15 +281,23 @@ class PackageManagerOverview {
           final nameStr = pkgName.toString();
           if (nameStr == 'packages' || nameStr == 'result') return;
           if (val is Map) {
-            installed.add(OpenWrtPackage.fromJson(Map<String, dynamic>.from(val), isInstalled: true, managerType: type));
+            installed.add(
+              OpenWrtPackage.fromJson(
+                Map<String, dynamic>.from(val),
+                isInstalled: true,
+                managerType: type,
+              ),
+            );
           } else {
-            installed.add(OpenWrtPackage(
-              name: nameStr,
-              version: val?.toString() ?? 'installed',
-              description: 'OpenWrt package ($nameStr)',
-              isInstalled: true,
-              managerType: type,
-            ));
+            installed.add(
+              OpenWrtPackage(
+                name: nameStr,
+                version: val?.toString() ?? 'installed',
+                description: 'OpenWrt package ($nameStr)',
+                isInstalled: true,
+                managerType: type,
+              ),
+            );
           }
         });
       }
@@ -260,42 +314,62 @@ class PackageManagerOverview {
             final parts = trimmed.split(' - ');
             final pkgName = parts[0].trim();
             final pkgVer = parts.length > 1 ? parts[1].trim() : 'available';
-            final pkgDesc = parts.length > 2 ? parts[2].trim() : 'OpenWrt repository package';
+            final pkgDesc = parts.length > 2
+                ? parts[2].trim()
+                : 'OpenWrt repository package';
             if (!installed.any((p) => p.name == pkgName)) {
-              available.add(OpenWrtPackage(
-                name: pkgName,
-                version: pkgVer,
-                description: pkgDesc,
-                isInstalled: false,
-                managerType: type,
-              ));
+              available.add(
+                OpenWrtPackage(
+                  name: pkgName,
+                  version: pkgVer,
+                  description: pkgDesc,
+                  isInstalled: false,
+                  managerType: type,
+                ),
+              );
             }
           } else {
             final parts = trimmed.split(RegExp(r'\s+'));
             final pkgName = parts[0];
             final pkgVer = parts.length > 1 ? parts[1] : 'available';
-            final pkgDesc = parts.length > 2 ? parts.sublist(2).join(' ') : 'OpenWrt repository package';
+            final pkgDesc = parts.length > 2
+                ? parts.sublist(2).join(' ')
+                : 'OpenWrt repository package';
             if (!installed.any((p) => p.name == pkgName)) {
-              available.add(OpenWrtPackage(
-                name: pkgName,
-                version: pkgVer,
-                description: pkgDesc,
-                isInstalled: false,
-                managerType: type,
-              ));
+              available.add(
+                OpenWrtPackage(
+                  name: pkgName,
+                  version: pkgVer,
+                  description: pkgDesc,
+                  isInstalled: false,
+                  managerType: type,
+                ),
+              );
             }
           }
         }
       } else if (availableRaw is List) {
         for (final item in availableRaw) {
           if (item is Map<String, dynamic>) {
-            available.add(OpenWrtPackage.fromJson(item, isInstalled: false, managerType: type));
+            available.add(
+              OpenWrtPackage.fromJson(
+                item,
+                isInstalled: false,
+                managerType: type,
+              ),
+            );
           }
         }
       } else if (availableRaw is Map) {
         availableRaw.forEach((_, item) {
           if (item is Map<String, dynamic>) {
-            available.add(OpenWrtPackage.fromJson(item, isInstalled: false, managerType: type));
+            available.add(
+              OpenWrtPackage.fromJson(
+                item,
+                isInstalled: false,
+                managerType: type,
+              ),
+            );
           }
         });
       }
@@ -305,22 +379,90 @@ class PackageManagerOverview {
     if (isReviewerMode) {
       if (installed.isEmpty) {
         installed.addAll([
-          OpenWrtPackage(name: 'luci-base', version: 'git-23.330.60124', description: 'LuCI core JavaScript and MVC framework', isInstalled: true, managerType: type),
-          OpenWrtPackage(name: 'luci-mod-admin-full', version: 'git-23.330.60124', description: 'LuCI Administration User Interface', isInstalled: true, managerType: type),
-          OpenWrtPackage(name: 'dnsmasq-full', version: '2.89-1', description: 'DNS forwarder and DHCP server with DNSSEC support', isInstalled: true, managerType: type),
-          OpenWrtPackage(name: 'wireguard-tools', version: '1.0.20210914-1', description: 'WireGuard control utilities', isInstalled: true, managerType: type),
-          OpenWrtPackage(name: 'firewall4', version: '2023-09-12', description: 'OpenWrt nftables-based firewall manager', isInstalled: true, managerType: type),
-          OpenWrtPackage(name: 'dropbear', version: '2022.82-2', description: 'Small SSH daemon', isInstalled: true, managerType: type),
+          OpenWrtPackage(
+            name: 'luci-base',
+            version: 'git-23.330.60124',
+            description: 'LuCI core JavaScript and MVC framework',
+            isInstalled: true,
+            managerType: type,
+          ),
+          OpenWrtPackage(
+            name: 'luci-mod-admin-full',
+            version: 'git-23.330.60124',
+            description: 'LuCI Administration User Interface',
+            isInstalled: true,
+            managerType: type,
+          ),
+          OpenWrtPackage(
+            name: 'dnsmasq-full',
+            version: '2.89-1',
+            description: 'DNS forwarder and DHCP server with DNSSEC support',
+            isInstalled: true,
+            managerType: type,
+          ),
+          OpenWrtPackage(
+            name: 'wireguard-tools',
+            version: '1.0.20210914-1',
+            description: 'WireGuard control utilities',
+            isInstalled: true,
+            managerType: type,
+          ),
+          OpenWrtPackage(
+            name: 'firewall4',
+            version: '2023-09-12',
+            description: 'OpenWrt nftables-based firewall manager',
+            isInstalled: true,
+            managerType: type,
+          ),
+          OpenWrtPackage(
+            name: 'dropbear',
+            version: '2022.82-2',
+            description: 'Small SSH daemon',
+            isInstalled: true,
+            managerType: type,
+          ),
         ]);
       }
 
       if (available.isEmpty) {
         available.addAll([
-          OpenWrtPackage(name: 'luci-app-adguardhome', version: '1.8.2-1', description: 'AdGuard Home network-wide ad blocker LuCI integration', isInstalled: false, managerType: type),
-          OpenWrtPackage(name: 'luci-app-sqm', version: '1.5.0-1', description: 'Smart Queue Management (Bufferbloat control) interface', isInstalled: false, managerType: type),
-          OpenWrtPackage(name: 'luci-app-ttyd', version: '1.7.3-1', description: 'Web-based terminal command line interface', isInstalled: false, managerType: type),
-          OpenWrtPackage(name: 'luci-app-aria2', version: '1.0.3-2', description: 'Lightweight multi-protocol download manager LuCI app', isInstalled: false, managerType: type),
-          OpenWrtPackage(name: 'luci-app-samba4', version: '4.18.5-1', description: 'Samba4 Windows network file sharing server interface', isInstalled: false, managerType: type),
+          OpenWrtPackage(
+            name: 'luci-app-adguardhome',
+            version: '1.8.2-1',
+            description:
+                'AdGuard Home network-wide ad blocker LuCI integration',
+            isInstalled: false,
+            managerType: type,
+          ),
+          OpenWrtPackage(
+            name: 'luci-app-sqm',
+            version: '1.5.0-1',
+            description:
+                'Smart Queue Management (Bufferbloat control) interface',
+            isInstalled: false,
+            managerType: type,
+          ),
+          OpenWrtPackage(
+            name: 'luci-app-ttyd',
+            version: '1.7.3-1',
+            description: 'Web-based terminal command line interface',
+            isInstalled: false,
+            managerType: type,
+          ),
+          OpenWrtPackage(
+            name: 'luci-app-aria2',
+            version: '1.0.3-2',
+            description: 'Lightweight multi-protocol download manager LuCI app',
+            isInstalled: false,
+            managerType: type,
+          ),
+          OpenWrtPackage(
+            name: 'luci-app-samba4',
+            version: '4.18.5-1',
+            description: 'Samba4 Windows network file sharing server interface',
+            isInstalled: false,
+            managerType: type,
+          ),
         ]);
       }
     }
@@ -375,7 +517,8 @@ class PackageManagerOverview {
         id: 'sqm',
         name: 'SQM QoS',
         packageName: 'luci-app-sqm',
-        description: 'Smart Queue Management to eliminate latency & bufferbloat',
+        description:
+            'Smart Queue Management to eliminate latency & bufferbloat',
         icon: Icons.speed,
         isInstalled: isPkgInstalled('luci-app-sqm'),
         installedVersion: getPkgVersion('luci-app-sqm'),
@@ -412,12 +555,18 @@ class PackageManagerOverview {
     // Automatically discover any other installed luci-app-* packages from router
     for (final pkg in installed) {
       if (pkg.name.startsWith('luci-app-')) {
-        final alreadyInCatalog = knownApps.any((app) => app.packageName == pkg.name);
+        final alreadyInCatalog = knownApps.any(
+          (app) => app.packageName == pkg.name,
+        );
         if (!alreadyInCatalog) {
           final rawName = pkg.name.replaceFirst('luci-app-', '');
           final formattedTitle = rawName
               .split('-')
-              .map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '')
+              .map(
+                (w) => w.isNotEmpty
+                    ? '${w[0].toUpperCase()}${w.substring(1)}'
+                    : '',
+              )
               .join(' ');
 
           knownApps.add(
@@ -467,7 +616,8 @@ class OpenWrtPackageRepository {
     final trimmed = line.trim();
     if (trimmed.isEmpty || trimmed.startsWith('#')) return null;
     final parts = trimmed.split(RegExp(r'\s+'));
-    if (parts.length >= 3 && (parts[0].startsWith('src') || parts[0] == 'dest')) {
+    if (parts.length >= 3 &&
+        (parts[0].startsWith('src') || parts[0] == 'dest')) {
       return OpenWrtPackageRepository(
         name: parts[1],
         url: parts[2],
@@ -492,7 +642,10 @@ class OpenWrtPackageRepository {
     } else {
       final uri = Uri.tryParse(trimmed);
       if (uri != null && uri.pathSegments.isNotEmpty) {
-        name = uri.pathSegments.lastWhere((s) => s.isNotEmpty, orElse: () => 'repo');
+        name = uri.pathSegments.lastWhere(
+          (s) => s.isNotEmpty,
+          orElse: () => 'repo',
+        );
       }
     }
     return OpenWrtPackageRepository(

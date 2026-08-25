@@ -13,7 +13,8 @@ class SystemMonitoringScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final appState = ref.watch(appStateProvider);
     final sysInfo = appState.dashboardData?['sysInfo'] as Map<String, dynamic>?;
-    final boardInfo = appState.dashboardData?['boardInfo'] as Map<String, dynamic>?;
+    final boardInfo =
+        appState.dashboardData?['boardInfo'] as Map<String, dynamic>?;
     final metrics = SystemMetrics.fromSysInfo(sysInfo, boardInfo: boardInfo);
 
     final hostname = boardInfo?['hostname']?.toString() ?? 'Router';
@@ -28,7 +29,9 @@ class SystemMonitoringScreen extends ConsumerWidget {
             Text(
               '$hostname ($model)',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.7),
               ),
             ),
           ],
@@ -47,7 +50,10 @@ class SystemMonitoringScreen extends ConsumerWidget {
               icon: Icons.memory_outlined,
               color: Colors.orange,
               children: [
-                _buildInfoRow('Estimated Usage', '${metrics.cpuUsagePercent.toStringAsFixed(1)}%'),
+                _buildInfoRow(
+                  'Estimated Usage',
+                  '${metrics.cpuUsagePercent.toStringAsFixed(1)}%',
+                ),
                 _buildInfoRow('1 Min Load', metrics.load1m.toStringAsFixed(2)),
               ],
             ),
@@ -58,12 +64,30 @@ class SystemMonitoringScreen extends ConsumerWidget {
               icon: Icons.pie_chart_outline,
               color: Colors.blue,
               children: [
-                _buildInfoRow('Usage Percent', '${metrics.memoryUsagePercent.toStringAsFixed(1)}%'),
-                _buildInfoRow('Used Memory', _formatBytes(metrics.usedMemoryBytes)),
-                _buildInfoRow('Free Memory', _formatBytes(metrics.freeMemoryBytes)),
-                _buildInfoRow('Buffered', _formatBytes(metrics.bufferedMemoryBytes)),
-                _buildInfoRow('Cached', _formatBytes(metrics.cachedMemoryBytes)),
-                _buildInfoRow('Total Memory', _formatBytes(metrics.totalMemoryBytes)),
+                _buildInfoRow(
+                  'Usage Percent',
+                  '${metrics.memoryUsagePercent.toStringAsFixed(1)}%',
+                ),
+                _buildInfoRow(
+                  'Used Memory',
+                  _formatBytes(metrics.usedMemoryBytes),
+                ),
+                _buildInfoRow(
+                  'Free Memory',
+                  _formatBytes(metrics.freeMemoryBytes),
+                ),
+                _buildInfoRow(
+                  'Buffered',
+                  _formatBytes(metrics.bufferedMemoryBytes),
+                ),
+                _buildInfoRow(
+                  'Cached',
+                  _formatBytes(metrics.cachedMemoryBytes),
+                ),
+                _buildInfoRow(
+                  'Total Memory',
+                  _formatBytes(metrics.totalMemoryBytes),
+                ),
               ],
             ),
             const SizedBox(height: 12),

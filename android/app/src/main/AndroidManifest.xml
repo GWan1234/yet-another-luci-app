@@ -4,6 +4,10 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
+    <!-- File Storage Permissions for Legacy Android & Android 10 (API <= 29) -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" android:maxSdkVersion="29"/>
+
     <!-- Support the Dev / In-App Purchases & Licensing Permission -->
     <uses-permission android:name="com.android.vending.BILLING"/>
     <uses-permission android:name="com.android.vending.CHECK_LICENSE"/>
@@ -33,6 +37,7 @@
         android:largeHeap="false"
         android:hardwareAccelerated="true"
         android:enableOnBackInvokedCallback="true"
+        android:requestLegacyExternalStorage="true"
         android:label="Yet Another LuCI App"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"

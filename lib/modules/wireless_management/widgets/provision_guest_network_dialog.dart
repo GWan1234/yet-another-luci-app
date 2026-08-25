@@ -14,16 +14,15 @@ import '../models/wireless_info.dart';
 class ProvisionGuestNetworkDialog extends ConsumerStatefulWidget {
   final List<WirelessRadio> radios;
 
-  const ProvisionGuestNetworkDialog({
-    super.key,
-    required this.radios,
-  });
+  const ProvisionGuestNetworkDialog({super.key, required this.radios});
 
   @override
-  ConsumerState<ProvisionGuestNetworkDialog> createState() => _ProvisionGuestNetworkDialogState();
+  ConsumerState<ProvisionGuestNetworkDialog> createState() =>
+      _ProvisionGuestNetworkDialogState();
 }
 
-class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetworkDialog> {
+class _ProvisionGuestNetworkDialogState
+    extends ConsumerState<ProvisionGuestNetworkDialog> {
   final _formKey = GlobalKey<FormState>();
   final _ssidController = TextEditingController(text: 'MyHome_Guest');
   final _passphraseController = TextEditingController();
@@ -37,8 +36,8 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
 
   late WirelessRadio _selectedRadio;
   String _selectedEncryption = 'sae-mixed'; // best-recommended default
-  String _selectedPmf = '1';                // optional PMF by default
-  bool _isolateClients = true;              // always on for guest networks
+  String _selectedPmf = '1'; // optional PMF by default
+  bool _isolateClients = true; // always on for guest networks
   bool _isSubmitting = false;
   bool _showPassphrase = false;
 
@@ -71,7 +70,13 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
     super.initState();
     _selectedRadio = widget.radios.isNotEmpty
         ? widget.radios.first
-        : const WirelessRadio(name: 'radio0', isUp: true, channel: 'auto', country: 'US', interfaces: []);
+        : const WirelessRadio(
+            name: 'radio0',
+            isUp: true,
+            channel: 'auto',
+            country: 'US',
+            interfaces: [],
+          );
     _fetchAvailableNetworks();
     _fetchHardwareCapabilities();
   }
@@ -114,8 +119,7 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
           _applySmartDefaults();
         });
       }
-    } catch (_) {
-    }
+    } catch (_) {}
   }
 
   /// Guest-optimised smart defaults: prefer sae-mixed for compatibility, always isolate.
@@ -166,10 +170,14 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
     if (!_formKey.currentState!.validate()) return;
 
     final appState = ref.read(appStateProvider);
-    final hasUciWrite = (appState.capabilities?.hasUciWriteAccess ?? true) && appState.isAdministrativeUser;
+    final hasUciWrite =
+        (appState.capabilities?.hasUciWriteAccess ?? true) &&
+        appState.isAdministrativeUser;
 
     if (!hasUciWrite) {
-      context.showToastError('Read-only session: UCI write permission required to create Guest Wi-Fi.');
+      context.showToastError(
+        'Read-only session: UCI write permission required to create Guest Wi-Fi.',
+      );
       return;
     }
 
@@ -200,7 +208,9 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
       ieee80211r: _ieee80211r,
       ftOverDs: _ftOverDs,
       ftPskGenerateLocal: _ftPskGenerateLocal,
-      mobilityDomain: _mobilityDomainController.text.trim().isNotEmpty ? _mobilityDomainController.text.trim().toLowerCase() : null,
+      mobilityDomain: _mobilityDomainController.text.trim().isNotEmpty
+          ? _mobilityDomainController.text.trim().toLowerCase()
+          : null,
       wmm: _wmm,
       hidden: _hidden,
       dtimPeriod: int.tryParse(_dtimPeriodController.text.trim()),
@@ -219,13 +229,19 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
       setState(() => _isSubmitting = false);
       if (success) {
         Navigator.pop(context, true);
-        context.showToastSuccess('New Guest Wi-Fi "${_ssidController.text.trim()}" created successfully!');
+        context.showToastSuccess(
+          'New Guest Wi-Fi "${_ssidController.text.trim()}" created successfully!',
+        );
       } else {
         final username = appState.sessionUsername;
         if (!hasUciWrite) {
-          context.showToastError('Access Denied: Account \'$username\' lacks ubus UCI write authorization.');
+          context.showToastError(
+            'Access Denied: Account \'$username\' lacks ubus UCI write authorization.',
+          );
         } else {
-          context.showToastError('Failed to provision guest network on router.');
+          context.showToastError(
+            'Failed to provision guest network on router.',
+          );
         }
       }
     }
@@ -236,7 +252,9 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
     final theme = Theme.of(context);
     final needsPass = _requiresPassphrase();
     final appState = ref.watch(appStateProvider);
-    final hasUciWrite = (appState.capabilities?.hasUciWriteAccess ?? true) && appState.isAdministrativeUser;
+    final hasUciWrite =
+        (appState.capabilities?.hasUciWriteAccess ?? true) &&
+        appState.isAdministrativeUser;
 
     return PopScope(
       canPop: !_isSubmitting,
@@ -249,7 +267,9 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
             Expanded(
               child: Text(
                 'Create New Guest Wi-Fi',
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -268,16 +288,26 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
                     decoration: BoxDecoration(
                       color: Colors.red.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.red.withValues(alpha: 0.4)),
+                      border: Border.all(
+                        color: Colors.red.withValues(alpha: 0.4),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.lock_clock_outlined, color: Colors.red, size: 20),
+                        const Icon(
+                          Icons.lock_clock_outlined,
+                          color: Colors.red,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Logged in as non-root / read-only session (\'${appState.sessionUsername}\'). UCI write privileges required.',
-                            style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: theme.colorScheme.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -314,18 +344,27 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    color: theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.5,
+                    ),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: theme.colorScheme.outlineVariant),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline_rounded, size: 18, color: theme.colorScheme.primary),
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 18,
+                        color: theme.colorScheme.primary,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Radio settings (Channel ${_selectedRadio.channel}, Band ${_selectedRadio.bandLabel}) are inherited from physical radio ${_selectedRadio.name.toUpperCase()}.',
-                          style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
                     ],
@@ -345,9 +384,11 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
                   ),
                   onChanged: (_) => setState(() {}),
                   validator: (val) {
-                    if (val == null || val.trim().isEmpty) return 'Guest SSID name cannot be empty';
+                    if (val == null || val.trim().isEmpty)
+                      return 'Guest SSID name cannot be empty';
                     final bytes = utf8.encode(val.trim()).length;
-                    if (bytes > 32) return 'SSID length exceeds 32 UTF-8 bytes ($bytes bytes)';
+                    if (bytes > 32)
+                      return 'SSID length exceeds 32 UTF-8 bytes ($bytes bytes)';
                     return null;
                   },
                 ),
@@ -366,7 +407,11 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
                   items: _availableNetworks.map((network) {
                     return DropdownMenuItem(
                       value: network,
-                      child: Text(network, overflow: TextOverflow.ellipsis, maxLines: 1),
+                      child: Text(
+                        network,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
                     );
                   }).toList(),
                   onChanged: (val) {
@@ -386,12 +431,15 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
                     ),
                     validator: (val) {
                       if (_selectedNetwork != 'guest') return null;
-                      if (val == null || val.trim().isEmpty) return 'Guest IP address is required';
+                      if (val == null || val.trim().isEmpty)
+                        return 'Guest IP address is required';
                       final parts = val.trim().split('.');
-                      if (parts.length != 4) return 'Enter a valid IPv4 address (e.g. 192.168.2.1)';
+                      if (parts.length != 4)
+                        return 'Enter a valid IPv4 address (e.g. 192.168.2.1)';
                       for (final part in parts) {
                         final n = int.tryParse(part);
-                        if (n == null || n < 0 || n > 255) return 'Invalid octet: $part';
+                        if (n == null || n < 0 || n > 255)
+                          return 'Invalid octet: $part';
                       }
                       return null;
                     },
@@ -409,11 +457,30 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
                     border: OutlineInputBorder(),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'sae-mixed', child: Text('WPA2/WPA3 Personal (sae-mixed) — Recommended')),
-                    DropdownMenuItem(value: 'sae', child: Text('WPA3 Personal Only (sae)')),
-                    DropdownMenuItem(value: 'psk2', child: Text('WPA2 Personal (psk2)')),
-                    DropdownMenuItem(value: 'owe', child: Text('Enhanced Open (OWE — No Password, Encrypted)')),
-                    DropdownMenuItem(value: 'none', child: Text('Open (No Encryption / No Password)')),
+                    DropdownMenuItem(
+                      value: 'sae-mixed',
+                      child: Text(
+                        'WPA2/WPA3 Personal (sae-mixed) — Recommended',
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'sae',
+                      child: Text('WPA3 Personal Only (sae)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'psk2',
+                      child: Text('WPA2 Personal (psk2)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'owe',
+                      child: Text(
+                        'Enhanced Open (OWE — No Password, Encrypted)',
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'none',
+                      child: Text('Open (No Encryption / No Password)'),
+                    ),
                   ],
                   onChanged: (val) {
                     if (val != null) {
@@ -437,16 +504,25 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
                       prefixIcon: const Icon(Icons.key_rounded, size: 20),
                       border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
-                        icon: Icon(_showPassphrase ? Icons.visibility_off : Icons.visibility, size: 18),
-                        onPressed: () => setState(() => _showPassphrase = !_showPassphrase),
+                        icon: Icon(
+                          _showPassphrase
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                          size: 18,
+                        ),
+                        onPressed: () =>
+                            setState(() => _showPassphrase = !_showPassphrase),
                       ),
                     ),
                     onChanged: (_) => setState(() {}),
                     validator: (val) {
                       if (!needsPass) return null;
-                      if (val == null || val.trim().isEmpty) return 'Passphrase is required for encrypted networks';
-                      if (val.trim().length < 8) return 'Passphrase must be at least 8 characters';
-                      if (val.trim().length > 63) return 'Passphrase cannot exceed 63 characters';
+                      if (val == null || val.trim().isEmpty)
+                        return 'Passphrase is required for encrypted networks';
+                      if (val.trim().length < 8)
+                        return 'Passphrase must be at least 8 characters';
+                      if (val.trim().length > 63)
+                        return 'Passphrase cannot exceed 63 characters';
                       return null;
                     },
                   ),
@@ -457,8 +533,14 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
                 // Client Isolation Switch
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Client Isolation', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                  subtitle: const Text('Prevents connected guest devices from talking to each other', style: TextStyle(fontSize: 11)),
+                  title: const Text(
+                    'Client Isolation',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                  subtitle: const Text(
+                    'Prevents connected guest devices from talking to each other',
+                    style: TextStyle(fontSize: 11),
+                  ),
                   value: _isolateClients,
                   onChanged: (val) => setState(() => _isolateClients = val),
                 ),
@@ -471,7 +553,11 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
                     tilePadding: EdgeInsets.zero,
                     title: Row(
                       children: [
-                        Icon(Icons.tune_rounded, size: 18, color: theme.colorScheme.primary),
+                        Icon(
+                          Icons.tune_rounded,
+                          size: 18,
+                          color: theme.colorScheme.primary,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'Advanced Options',
@@ -482,7 +568,8 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
                         ),
                       ],
                     ),
-                    onExpansionChanged: (expanded) => setState(() => _showAdvanced = expanded),
+                    onExpansionChanged: (expanded) =>
+                        setState(() => _showAdvanced = expanded),
                     initiallyExpanded: _showAdvanced,
                     childrenPadding: const EdgeInsets.only(top: 8),
                     children: [
@@ -492,19 +579,35 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
                           initialValue: _selectedPmf,
                           isExpanded: true,
                           decoration: const InputDecoration(
-                            labelText: 'Protected Management Frames (PMF / 802.11w)',
-                            prefixIcon: Icon(Icons.verified_user_rounded, size: 20),
+                            labelText:
+                                'Protected Management Frames (PMF / 802.11w)',
+                            prefixIcon: Icon(
+                              Icons.verified_user_rounded,
+                              size: 20,
+                            ),
                             border: OutlineInputBorder(),
                           ),
                           items: const [
-                            DropdownMenuItem(value: '0', child: Text('Disabled (Not recommended)')),
-                            DropdownMenuItem(value: '1', child: Text('Optional — recommended default')),
-                            DropdownMenuItem(value: '2', child: Text('Required (WPA3 / strict mode)')),
+                            DropdownMenuItem(
+                              value: '0',
+                              child: Text('Disabled (Not recommended)'),
+                            ),
+                            DropdownMenuItem(
+                              value: '1',
+                              child: Text('Optional — recommended default'),
+                            ),
+                            DropdownMenuItem(
+                              value: '2',
+                              child: Text('Required (WPA3 / strict mode)'),
+                            ),
                           ],
-                          onChanged: (_selectedEncryption == 'sae' || _selectedEncryption == 'owe')
+                          onChanged:
+                              (_selectedEncryption == 'sae' ||
+                                  _selectedEncryption == 'owe')
                               ? null
                               : (val) {
-                                  if (val != null) setState(() => _selectedPmf = val);
+                                  if (val != null)
+                                    setState(() => _selectedPmf = val);
                                 },
                         ),
                         const SizedBox(height: 12),
@@ -513,8 +616,17 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
                       // Hidden SSID
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('Hidden SSID', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                        subtitle: const Text('Do not broadcast SSID in beacon frames', style: TextStyle(fontSize: 11)),
+                        title: const Text(
+                          'Hidden SSID',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Do not broadcast SSID in beacon frames',
+                          style: TextStyle(fontSize: 11),
+                        ),
                         value: _hidden,
                         onChanged: (val) => setState(() => _hidden = val),
                       ),
@@ -523,35 +635,76 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Icon(Icons.directions_run_rounded, size: 16, color: theme.colorScheme.primary),
+                          Icon(
+                            Icons.directions_run_rounded,
+                            size: 16,
+                            color: theme.colorScheme.primary,
+                          ),
                           const SizedBox(width: 6),
-                          const Text('Fast Roaming (802.11r/k/v)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          const Text(
+                            'Fast Roaming (802.11r/k/v)',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       CheckboxListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('Enable 802.11r Fast BSS Transition', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                        subtitle: const Text('Seamless roaming between access points', style: TextStyle(fontSize: 11)),
+                        title: const Text(
+                          'Enable 802.11r Fast BSS Transition',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Seamless roaming between access points',
+                          style: TextStyle(fontSize: 11),
+                        ),
                         value: _ieee80211r,
-                        onChanged: (val) => setState(() => _ieee80211r = val ?? false),
+                        onChanged: (val) =>
+                            setState(() => _ieee80211r = val ?? false),
                         dense: true,
                       ),
                       if (_ieee80211r) ...[
                         CheckboxListTile(
                           contentPadding: EdgeInsets.zero,
-                          title: const Text('FT over DS', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                          subtitle: const Text('Fast transition over Distribution System', style: TextStyle(fontSize: 11)),
+                          title: const Text(
+                            'FT over DS',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          subtitle: const Text(
+                            'Fast transition over Distribution System',
+                            style: TextStyle(fontSize: 11),
+                          ),
                           value: _ftOverDs,
-                          onChanged: (val) => setState(() => _ftOverDs = val ?? false),
+                          onChanged: (val) =>
+                              setState(() => _ftOverDs = val ?? false),
                           dense: true,
                         ),
                         CheckboxListTile(
                           contentPadding: EdgeInsets.zero,
-                          title: const Text('FT PSK Generate Local', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                          subtitle: const Text('Generate PSK locally per AP', style: TextStyle(fontSize: 11)),
+                          title: const Text(
+                            'FT PSK Generate Local',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          subtitle: const Text(
+                            'Generate PSK locally per AP',
+                            style: TextStyle(fontSize: 11),
+                          ),
                           value: _ftPskGenerateLocal,
-                          onChanged: (val) => setState(() => _ftPskGenerateLocal = val ?? false),
+                          onChanged: (val) => setState(
+                            () => _ftPskGenerateLocal = val ?? false,
+                          ),
                           dense: true,
                         ),
                         TextFormField(
@@ -559,7 +712,10 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
                           decoration: const InputDecoration(
                             labelText: 'Mobility Domain',
                             hintText: '4 hex chars (e.g., a1b2)',
-                            prefixIcon: Icon(Icons.confirmation_number_rounded, size: 20),
+                            prefixIcon: Icon(
+                              Icons.confirmation_number_rounded,
+                              size: 20,
+                            ),
                             border: OutlineInputBorder(),
                           ),
                           maxLength: 4,
@@ -571,39 +727,87 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Icon(Icons.tune_rounded, size: 16, color: theme.colorScheme.primary),
+                          Icon(
+                            Icons.tune_rounded,
+                            size: 16,
+                            color: theme.colorScheme.primary,
+                          ),
                           const SizedBox(width: 6),
-                          const Text('QoS & Wireless Controls', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          const Text(
+                            'QoS & Wireless Controls',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
                         ],
                       ),
                       CheckboxListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('WMM / QoS', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                        subtitle: const Text('Enable Wi-Fi Multimedia quality-of-service', style: TextStyle(fontSize: 11)),
+                        title: const Text(
+                          'WMM / QoS',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Enable Wi-Fi Multimedia quality-of-service',
+                          style: TextStyle(fontSize: 11),
+                        ),
                         value: _wmm,
                         onChanged: (val) => setState(() => _wmm = val ?? true),
                         dense: true,
                       ),
                       CheckboxListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('Disassociate Low-ACK Clients', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                        subtitle: const Text('Kick weak clients with excessive packet loss', style: TextStyle(fontSize: 11)),
+                        title: const Text(
+                          'Disassociate Low-ACK Clients',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Kick weak clients with excessive packet loss',
+                          style: TextStyle(fontSize: 11),
+                        ),
                         value: _disassocLowAck,
-                        onChanged: (val) => setState(() => _disassocLowAck = val ?? true),
+                        onChanged: (val) =>
+                            setState(() => _disassocLowAck = val ?? true),
                         dense: true,
                       ),
                       CheckboxListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('Multicast to Unicast Conversion', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                        subtitle: const Text('Improves multicast video/audio streaming reliability', style: TextStyle(fontSize: 11)),
+                        title: const Text(
+                          'Multicast to Unicast Conversion',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Improves multicast video/audio streaming reliability',
+                          style: TextStyle(fontSize: 11),
+                        ),
                         value: _multicastToUnicast,
-                        onChanged: (val) => setState(() => _multicastToUnicast = val ?? false),
+                        onChanged: (val) =>
+                            setState(() => _multicastToUnicast = val ?? false),
                         dense: true,
                       ),
                       CheckboxListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('WDS (Wireless Distribution System)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                        subtitle: const Text('Transparent bridge mode for multi-AP meshing', style: TextStyle(fontSize: 11)),
+                        title: const Text(
+                          'WDS (Wireless Distribution System)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Transparent bridge mode for multi-AP meshing',
+                          style: TextStyle(fontSize: 11),
+                        ),
                         value: _wds,
                         onChanged: (val) => setState(() => _wds = val ?? false),
                         dense: true,
@@ -613,9 +817,19 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
                       // MAC Filtering
                       Row(
                         children: [
-                          Icon(Icons.filter_alt_rounded, size: 16, color: theme.colorScheme.primary),
+                          Icon(
+                            Icons.filter_alt_rounded,
+                            size: 16,
+                            color: theme.colorScheme.primary,
+                          ),
                           const SizedBox(width: 6),
-                          const Text('MAC Address Access Control', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          const Text(
+                            'MAC Address Access Control',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 6),
@@ -628,9 +842,20 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
                           border: OutlineInputBorder(),
                         ),
                         items: const [
-                          DropdownMenuItem(value: 'disable', child: Text('Disabled — Allow All MACs')),
-                          DropdownMenuItem(value: 'allow', child: Text('Allow List — Only listed MACs can connect')),
-                          DropdownMenuItem(value: 'deny', child: Text('Deny List — Block listed MACs')),
+                          DropdownMenuItem(
+                            value: 'disable',
+                            child: Text('Disabled — Allow All MACs'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'allow',
+                            child: Text(
+                              'Allow List — Only listed MACs can connect',
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'deny',
+                            child: Text('Deny List — Block listed MACs'),
+                          ),
                         ],
                         onChanged: (val) {
                           if (val != null) setState(() => _macfilter = val);
@@ -645,7 +870,8 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
                             labelText: 'MAC Addresses List',
                             hintText: '00:11:22:33:44:55\nAA:BB:CC:DD:EE:FF',
                             border: OutlineInputBorder(),
-                            helperText: 'One MAC address per line or separated by spaces/commas',
+                            helperText:
+                                'One MAC address per line or separated by spaces/commas',
                           ),
                         ),
                       ],
@@ -659,13 +885,24 @@ class _ProvisionGuestNetworkDialogState extends ConsumerState<ProvisionGuestNetw
         ),
         actions: [
           TextButton(
-            onPressed: _isSubmitting ? null : () => Navigator.pop(context, false),
+            onPressed: _isSubmitting
+                ? null
+                : () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
           FilledButton.icon(
-            onPressed: (_isSubmitting || !hasUciWrite) ? null : _submitProvisionGuest,
+            onPressed: (_isSubmitting || !hasUciWrite)
+                ? null
+                : _submitProvisionGuest,
             icon: _isSubmitting
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
                 : const Icon(Icons.add_moderator_rounded, size: 18),
             label: Text(_isSubmitting ? 'Creating…' : 'Create New Guest Wi-Fi'),
           ),

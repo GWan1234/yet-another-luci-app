@@ -47,7 +47,10 @@ class SelfDeviceGuard {
   }
 
   /// Checks if target MAC or target IP belongs to the current device running this app.
-  static Future<bool> isSelfDevice(String? targetMac, [String? targetIp]) async {
+  static Future<bool> isSelfDevice(
+    String? targetMac, [
+    String? targetIp,
+  ]) async {
     final addresses = await getLocalDeviceAddresses();
 
     if (targetIp != null && targetIp.isNotEmpty && targetIp != 'N/A') {
@@ -77,12 +80,14 @@ class SelfDeviceGuard {
     final isSelf = await isSelfDevice(targetMac, targetIp);
     if (!isSelf || !context.mounted) return true;
 
-    final displayName = targetHostname ?? targetIp ?? targetMac ?? 'Current Device';
+    final displayName =
+        targetHostname ?? targetIp ?? targetMac ?? 'Current Device';
 
     final confirmed = await LuciGuardrail.showConfirmation(
       context,
       title: 'Managing Device Warning',
-      subtitle: 'Target ($displayName) is the phone/device currently running this app.\n\nPerforming "$actionName" on your own managing device will sever your router connection and disconnect this app session.',
+      subtitle:
+          'Target ($displayName) is the phone/device currently running this app.\n\nPerforming "$actionName" on your own managing device will sever your router connection and disconnect this app session.',
       confirmLabel: 'Proceed Anyway',
       cancelLabel: 'Cancel (Recommended)',
       icon: Icons.phonelink_setup_rounded,
@@ -96,7 +101,8 @@ class SelfDeviceGuard {
         LuciToastManager.showGuardrail(
           context,
           'Action Aborted by Guardrail',
-          subtitle: 'Modification on active managing device cancelled for safety.',
+          subtitle:
+              'Modification on active managing device cancelled for safety.',
         );
       } else {
         LuciToastManager.showWarning(

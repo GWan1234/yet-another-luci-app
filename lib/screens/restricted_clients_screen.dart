@@ -12,10 +12,12 @@ class RestrictedClientsScreen extends ConsumerStatefulWidget {
   const RestrictedClientsScreen({super.key});
 
   @override
-  ConsumerState<RestrictedClientsScreen> createState() => _RestrictedClientsScreenState();
+  ConsumerState<RestrictedClientsScreen> createState() =>
+      _RestrictedClientsScreenState();
 }
 
-class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScreen> {
+class _RestrictedClientsScreenState
+    extends ConsumerState<RestrictedClientsScreen> {
   bool _isLoading = true;
   Map<String, List<Map<String, dynamic>>> _liveData = {
     'restricted': [],
@@ -35,7 +37,9 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
     });
 
     final appState = ref.read(appStateProvider);
-    final data = await appState.fetchRestrictedAndBannedClientsLive(context: context);
+    final data = await appState.fetchRestrictedAndBannedClientsLive(
+      context: context,
+    );
 
     if (mounted) {
       final seenRestricted = <String>{};
@@ -57,10 +61,7 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
       }
 
       setState(() {
-        _liveData = {
-          'restricted': cleanRestricted,
-          'banned': cleanBanned,
-        };
+        _liveData = {'restricted': cleanRestricted, 'banned': cleanBanned};
         _isLoading = false;
       });
     }
@@ -76,16 +77,26 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
       );
     }
 
-    final success = await appState.pauseClientInternet(mac, pause: false, context: context);
+    final success = await appState.pauseClientInternet(
+      mac,
+      pause: false,
+      context: context,
+    );
     if (!mounted) return;
 
     if (success) {
       unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
-      context.showToastSuccess('Internet restored for $name.', actionKey: actionKey);
+      context.showToastSuccess(
+        'Internet restored for $name.',
+        actionKey: actionKey,
+      );
       await _fetchLiveData();
     } else {
       unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
-      context.showToastError('Failed to restore internet for $name.', actionKey: actionKey);
+      context.showToastError(
+        'Failed to restore internet for $name.',
+        actionKey: actionKey,
+      );
     }
   }
 
@@ -104,13 +115,21 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
     if (success) {
       unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
       if (mounted) {
-        LuciToastManager.safeShowSuccess(context, 'Client $name unbanned successfully.', actionKey: actionKey);
+        LuciToastManager.safeShowSuccess(
+          context,
+          'Client $name unbanned successfully.',
+          actionKey: actionKey,
+        );
         await _fetchLiveData();
       }
     } else {
       unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
       if (mounted) {
-        LuciToastManager.safeShowError(context, 'Failed to unban client $name.', actionKey: actionKey);
+        LuciToastManager.safeShowError(
+          context,
+          'Failed to unban client $name.',
+          actionKey: actionKey,
+        );
       }
     }
   }
@@ -154,7 +173,9 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
                         Icon(
                           Icons.verified_user_outlined,
                           size: 72,
-                          color: theme.colorScheme.primary.withValues(alpha: 0.6),
+                          color: theme.colorScheme.primary.withValues(
+                            alpha: 0.6,
+                          ),
                         ),
                         const SizedBox(height: 16),
                         Text(
@@ -181,7 +202,8 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
                           _buildSectionHeader(
                             context,
                             title: 'Internet Paused Clients',
-                            subtitle: 'Access restricted via router firewall rules',
+                            subtitle:
+                                'Access restricted via router firewall rules',
                             icon: Icons.pause_circle_outline,
                             color: Colors.orange,
                             count: restrictedList.length,
@@ -203,7 +225,8 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
                           _buildSectionHeader(
                             context,
                             title: 'Wi-Fi Banned Devices',
-                            subtitle: 'Kicked & blacklisted from Wi-Fi association',
+                            subtitle:
+                                'Kicked & blacklisted from Wi-Fi association',
                             icon: Icons.block_outlined,
                             color: Colors.red,
                             count: bannedList.length,
@@ -261,7 +284,10 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: color.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
@@ -315,10 +341,7 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
           backgroundColor: Colors.orange.withValues(alpha: 0.15),
           child: const Icon(Icons.pause, color: Colors.orange),
         ),
-        title: Text(
-          name,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -372,10 +395,7 @@ class _RestrictedClientsScreenState extends ConsumerState<RestrictedClientsScree
           backgroundColor: Colors.red.withValues(alpha: 0.15),
           child: const Icon(Icons.block, color: Colors.red),
         ),
-        title: Text(
-          name,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
+        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,

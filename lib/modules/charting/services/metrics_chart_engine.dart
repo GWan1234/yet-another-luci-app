@@ -51,14 +51,16 @@ class MetricsChartEngine extends StateNotifier<RealtimeMetricsData> {
   Timer? _timer;
 
   MetricsChartEngine({int timeWindowSeconds = 60, int intervalSeconds = 2})
-      : super(RealtimeMetricsData(
+    : super(
+        RealtimeMetricsData(
           cpuHistory: [],
           ramHistory: [],
           rxHistory: [],
           txHistory: [],
           pollingIntervalSeconds: intervalSeconds.clamp(1, 10),
           timeWindowSeconds: timeWindowSeconds.clamp(15, 600),
-        ));
+        ),
+      );
 
   int get maxPoints => state.maxPoints;
 
@@ -131,5 +133,5 @@ class MetricsChartEngine extends StateNotifier<RealtimeMetricsData> {
 
 final metricsChartEngineProvider =
     StateNotifierProvider<MetricsChartEngine, RealtimeMetricsData>((ref) {
-  return MetricsChartEngine();
-});
+      return MetricsChartEngine();
+    });

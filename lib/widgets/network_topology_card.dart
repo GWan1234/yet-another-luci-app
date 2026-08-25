@@ -10,11 +10,7 @@ class NetworkTopologyCard extends StatelessWidget {
   final NetworkTopology? topology;
   final VoidCallback? onRetry;
 
-  const NetworkTopologyCard({
-    super.key,
-    required this.topology,
-    this.onRetry,
-  });
+  const NetworkTopologyCard({super.key, required this.topology, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +22,9 @@ class NetworkTopologyCard extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
         shape: RoundedRectangleBorder(
           borderRadius: LuciCardStyles.standardRadius,
-          side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.2)),
+          side: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.2),
+          ),
         ),
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
         child: Padding(
@@ -39,7 +37,11 @@ class NetworkTopologyCard extends StatelessWidget {
                   color: colorScheme.onSurfaceVariant.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.hub_outlined, color: colorScheme.onSurfaceVariant, size: 18),
+                child: Icon(
+                  Icons.hub_outlined,
+                  color: colorScheme.onSurfaceVariant,
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -56,7 +58,8 @@ class NetworkTopologyCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      topology?.errorMessage ?? 'Configuration payload empty or probing unsupported.',
+                      topology?.errorMessage ??
+                          'Configuration payload empty or probing unsupported.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                         fontSize: 11,
@@ -90,7 +93,9 @@ class NetworkTopologyCard extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
         shape: RoundedRectangleBorder(
           borderRadius: LuciCardStyles.standardRadius,
-          side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.2)),
+          side: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.2),
+          ),
         ),
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
         child: Padding(
@@ -103,7 +108,11 @@ class NetworkTopologyCard extends StatelessWidget {
                   color: colorScheme.primary.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.lan_outlined, color: colorScheme.primary, size: 18),
+                child: Icon(
+                  Icons.lan_outlined,
+                  color: colorScheme.primary,
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -156,15 +165,21 @@ class NetworkTopologyCard extends StatelessWidget {
                   child: Row(
                     children: [
                       Icon(
-                        isDsa ? Icons.hub_outlined : Icons.settings_input_component,
+                        isDsa
+                            ? Icons.hub_outlined
+                            : Icons.settings_input_component,
                         color: colorScheme.primary,
                         size: 22,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          isDsa ? 'DSA Switch Topology' : 'Legacy swconfig Topology',
-                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                          isDsa
+                              ? 'DSA Switch Topology'
+                              : 'Legacy swconfig Topology',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -173,7 +188,10 @@ class NetworkTopologyCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: colorScheme.primaryContainer.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(12),
@@ -240,7 +258,9 @@ class NetworkTopologyCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   vlan.name,
-                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -250,7 +270,9 @@ class NetworkTopologyCard extends StatelessWidget {
           Wrap(
             spacing: 6,
             runSpacing: 6,
-            children: vlan.ports.map((port) => _buildPortBadge(context, port)).toList(),
+            children: vlan.ports
+                .map((port) => _buildPortBadge(context, port))
+                .toList(),
           ),
         ],
       ),

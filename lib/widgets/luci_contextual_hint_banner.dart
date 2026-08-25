@@ -28,10 +28,12 @@ class LuciContextualHintBanner extends StatefulWidget {
   });
 
   @override
-  State<LuciContextualHintBanner> createState() => _LuciContextualHintBannerState();
+  State<LuciContextualHintBanner> createState() =>
+      _LuciContextualHintBannerState();
 }
 
-class _LuciContextualHintBannerState extends State<LuciContextualHintBanner> with SingleTickerProviderStateMixin {
+class _LuciContextualHintBannerState extends State<LuciContextualHintBanner>
+    with SingleTickerProviderStateMixin {
   bool _isDismissed = true; // Default to hidden until verified
   bool _isLoaded = false;
 
@@ -44,7 +46,8 @@ class _LuciContextualHintBannerState extends State<LuciContextualHintBanner> wit
   Future<void> _checkDismissStatus() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final dismissed = prefs.getBool('hint_dismissed_${widget.hintId}') ?? false;
+      final dismissed =
+          prefs.getBool('hint_dismissed_${widget.hintId}') ?? false;
       if (mounted) {
         setState(() {
           _isDismissed = dismissed;
@@ -137,7 +140,10 @@ class _LuciContextualHintBannerState extends State<LuciContextualHintBanner> wit
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         foregroundColor: color,
@@ -145,7 +151,10 @@ class _LuciContextualHintBannerState extends State<LuciContextualHintBanner> wit
                       onPressed: _dismiss,
                       child: const Text(
                         'Got it',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -190,7 +199,10 @@ class _LuciContextualHintBannerState extends State<LuciContextualHintBanner> wit
                 const SizedBox(width: 8),
                 TextButton(
                   style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     foregroundColor: color,

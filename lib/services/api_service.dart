@@ -2,12 +2,11 @@
 // Copyright 2026 Tuhin Garai. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
+import 'package:yet_another_luci_app/modules/parental_controls/models/parental_profile.dart';
 import 'package:yet_another_luci_app/modules/services_system/models/ddns_info.dart';
 import 'package:yet_another_luci_app/services/interfaces/api_service_interface.dart';
 import '../utils/http_client_manager.dart';
@@ -38,15 +37,15 @@ class RealApiService implements IApiService {
   ///
   /// Some router images only support one form, so callers should try both when
   /// running package manager helper commands to remain compatible.
-  static Map<String, dynamic> fileExecParams(String command, List<String> arguments) => {
-        'command': command,
-        'params': arguments,
-      };
+  static Map<String, dynamic> fileExecParams(
+    String command,
+    List<String> arguments,
+  ) => {'command': command, 'params': arguments};
 
-  static Map<String, dynamic> fileExecArgs(String command, List<String> arguments) => {
-        'command': command,
-        'args': arguments,
-      };
+  static Map<String, dynamic> fileExecArgs(
+    String command,
+    List<String> arguments,
+  ) => {'command': command, 'args': arguments};
 
   Dio _createHttpClient(
     bool useHttps,
@@ -61,146 +60,41 @@ class RealApiService implements IApiService {
   }
 
   @override
-  Future<String> login(
+  Future<AuthResult> authenticate(
     String ipAddress,
     String username,
     String password,
     bool useHttps, {
     BuildContext? context,
-  }) async {
-    final result = await loginWithProtocolDetection(
-      ipAddress,
-      username,
-      password,
-      useHttps,
-      context: context,
-    );
-    if (result.token == null) {
-      throw Exception('Login failed');
-    }
-    return result.token!;
-  }
-
-  /// Login with automatic HTTPS redirect detection
-  /// Returns both the auth token and the actual protocol used
-  Future<LoginResult> loginWithProtocolDetection(
-    String ipAddress,
-    String username,
-    String password,
-    bool initialUseHttps, {
-    BuildContext? context,
-  }) async {
-    // First try with the initial protocol
-    var result = await _login(
-      ipAddress,
-      username,
-      password,
-      initialUseHttps,
-      context: context,
-      checkRedirect: true,
-    );
-
-    // Check if we got a redirect marker
-    if (result != null && result.startsWith('HTTPS_REDIRECT:')) {
-      final token = result.substring('HTTPS_REDIRECT:'.length);
-      Logger.info('Login successful via HTTP to HTTPS redirect');
-      return LoginResult(token: token, actualUseHttps: true);
-    }
-
-    if (result != null) {
-      return LoginResult(token: result, actualUseHttps: initialUseHttps);
-    }
-
-    // If login failed and we were using HTTP, try HTTPS in case of redirect
-    if (!initialUseHttps) {
-      Logger.info('HTTP login failed or redirected, attempting HTTPS');
-      final safeContext = context?.mounted == true ? context : null;
-      result = await _login(
-        ipAddress,
-        username,
-        password,
-        true, // Try with HTTPS
-        context: safeContext,
-        checkRedirect: false,
-      );
-
-      if (result != null) {
-        Logger.info('Login successful with HTTPS after redirect detection');
-        return LoginResult(token: result, actualUseHttps: true);
-      }
-    }
-
-    return LoginResult(token: null, actualUseHttps: initialUseHttps);
-  }
-
-  Future<String?> _login(
-    String ipAddress,
-    String username,
-    String password,
-    bool useHttps, {
-    BuildContext? context,
-    bool checkRedirect = false,
   }) async {
     final client = _createHttpClient(useHttps, ipAddress, context: context);
-    final uri = _buildUrl(ipAddress, useHttps, '/cgi-bin/luci/');
-    final params =
-        'luci_username=${Uri.encodeComponent(username)}&luci_password=${Uri.encodeComponent(password)}';
+    bool redirectDetected = false;
+    bool targetIsHttps = false;
+    bool invalidCredentialsDetected = false;
 
-    try {
-      // Normal POST request - Dio will follow redirects by default
-      final response = await client.post(
-        uri.toString(),
-        data: params,
-        options: Options(
-          contentType: Headers.formUrlEncodedContentType,
-          followRedirects: true,
-          validateStatus: (code) => code != null && code >= 200 && code < 400 || code == 302,
-        ),
-      );
-
-      // Check if we were redirected to HTTPS (only relevant for initial HTTP attempts)
-      if (checkRedirect && !useHttps) {
-        final finalUrl = response.realUri;
-        if (finalUrl.scheme == 'https') {
-          Logger.info('Detected HTTP to HTTPS redirect: $uri -> $finalUrl');
-          // If we got a successful login after redirect, extract the token
-          if (response.statusCode == 302 || response.statusCode == 200) {
-            final setCookies = response.headers.map['set-cookie'];
-            if (setCookies != null && setCookies.isNotEmpty) {
-              final cookies = setCookies.join(',').split(',');
-              for (final cookie in cookies) {
-                if (cookie.contains('sysauth')) {
-                  final cookieValue = cookie.split(';')[0].split('=')[1];
-                  // Signal that HTTPS should be used by returning a special marker
-                  // We'll handle this in loginWithProtocolDetection
-                  return 'HTTPS_REDIRECT:$cookieValue';
-                }
-              }
-            }
-          }
-          // No token found, trigger HTTPS retry
-          return null;
-        }
-      }
-
-      if (response.statusCode == 302 || response.statusCode == 200) {
-        // Parse Set-Cookie headers to find sysauth cookie
-        final setCookies = response.headers.map['set-cookie'];
-        if (setCookies != null && setCookies.isNotEmpty) {
-          final cookies = setCookies.join(',').split(',');
-          for (final cookie in cookies) {
-            if (cookie.contains('sysauth')) {
-              final cookieValue = cookie.split(';')[0].split('=')[1];
-              return cookieValue;
-            }
-          }
-        }
-      }
-
-      // Fallback: Try ubus JSON-RPC session.login (for modern OpenWrt 24.10/25.12+)
+    // Helper to verify candidate token against router system.board
+    Future<bool> verifyToken(String candidateToken, bool protocolHttps) async {
       try {
-        final ubusUrl = _buildUrl(ipAddress, useHttps, '/ubus');
-        final rpcPayload = {
+        final res = await callWithContext(
+          ipAddress,
+          candidateToken,
+          protocolHttps,
+          object: 'system',
+          method: 'board',
+          context: context,
+        );
+        return res != null;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    // Step 1: ubus JSON-RPC session.login (/ubus & /cgi-bin/luci/admin/ubus)
+    final ubusEndpoints = ['/ubus', '/cgi-bin/luci/admin/ubus'];
+    for (final endpoint in ubusEndpoints) {
+      try {
+        final ubusUrl = _buildUrl(ipAddress, useHttps, endpoint);
+        final ubusPayload = {
           'jsonrpc': '2.0',
           'id': 1,
           'method': 'call',
@@ -208,106 +102,301 @@ class RealApiService implements IApiService {
             '00000000000000000000000000000000',
             'session',
             'login',
-            {'username': username, 'password': password}
+            {'username': username, 'password': password},
           ],
         };
-        final ubusResponse = await client.post(
+        final response = await client.post(
           ubusUrl.toString(),
-          data: jsonEncode(rpcPayload),
+          data: jsonEncode(ubusPayload),
           options: Options(
             headers: {'Content-Type': 'application/json'},
+            followRedirects: false,
             validateStatus: (code) => code != null && code < 500,
           ),
         );
-        if (ubusResponse.statusCode == 200) {
-          final decoded = ubusResponse.data is String
-              ? jsonDecode(ubusResponse.data as String)
-              : ubusResponse.data;
-          if (decoded is Map &&
-              decoded['result'] is List &&
-              (decoded['result'] as List).length > 1) {
-            final resData = decoded['result'][1];
-            if (resData is Map && resData['ubus_rpc_session'] != null) {
-              final sessionToken = resData['ubus_rpc_session'].toString();
-              Logger.info('Successfully authenticated via ubus JSON-RPC session.login');
-              return sessionToken;
-            }
+
+        final location = response.headers.value('location') ?? '';
+        if (response.statusCode == 302 ||
+            response.statusCode == 301 ||
+            location.isNotEmpty) {
+          redirectDetected = true;
+          if (location.startsWith('https://') ||
+              response.realUri.scheme == 'https') {
+            targetIsHttps = true;
           }
         }
-      } catch (ubusErr) {
-        Logger.info('ubus JSON-RPC login attempt fallback error: $ubusErr');
-      }
 
-      return null;
-    } on DioException catch (e, stack) {
-      Logger.exception('Login failed', e, stack);
-
-      final isCertError =
-          e.error is HandshakeException || e.message?.contains('CERTIFICATE_VERIFY_FAILED') == true;
-
-      if (!useHttps && checkRedirect && isCertError) {
-        Logger.info('Detected HTTPS certificate issue during redirect; retrying with HTTPS');
-        final retryContext = context != null && context.mounted ? context : null;
-        try {
-          return await _login(
-            ipAddress,
-            username,
-            password,
-            true,
-            context: retryContext,
-            checkRedirect: false,
-          );
-        } on DioException catch (httpsError, httpsStack) {
-          Logger.exception('HTTPS retry after redirect failed', httpsError, httpsStack);
+        final token = _extractAuthToken(response);
+        if (token != null) {
+          final isVerified = await verifyToken(token, useHttps);
+          if (isVerified) {
+            Logger.info(
+              'Step 1 (ubus JSON-RPC $endpoint) succeeded and verified',
+            );
+            return AuthResult.success(token, actualUseHttps: useHttps);
+          }
         }
-      }
 
-      if (useHttps && context != null && context.mounted && isCertError) {
-        // Try to prompt for certificate acceptance
-        final accepted = await _httpClientManager.promptForCertificateAcceptance(
-          context: context,
-          hostWithPort: ipAddress,
-          useHttps: useHttps,
+        if (response.data is Map && response.data['error'] != null) {
+          final err = response.data['error'];
+          if (err is Map &&
+              (err['code'] == 6 || err['message'] == 'Access denied')) {
+            invalidCredentialsDetected = true;
+          }
+        }
+      } on DioException catch (e) {
+        Logger.info(
+          'Step 1 (ubus JSON-RPC $endpoint) failed [${e.type}]: ${e.message}',
+        );
+      } catch (e) {
+        Logger.info('Step 1 (ubus JSON-RPC $endpoint) unexpected error: $e');
+      }
+    }
+
+    // Step 2: CGI Form Login (/cgi-bin/luci/ & candidate paths)
+    final cgiPaths = [
+      '/cgi-bin/luci/',
+      '/cgi-bin/luci',
+      '/cgi-bin/luci/admin/',
+    ];
+    for (final path in cgiPaths) {
+      try {
+        final cgiUrl = _buildUrl(ipAddress, useHttps, path);
+        final formParams =
+            'luci_username=${Uri.encodeComponent(username)}&luci_password=${Uri.encodeComponent(password)}&username=${Uri.encodeComponent(username)}&password=${Uri.encodeComponent(password)}';
+        final response = await client.post(
+          cgiUrl.toString(),
+          data: formParams,
+          options: Options(
+            contentType: Headers.formUrlEncodedContentType,
+            followRedirects: true,
+            validateStatus: (code) => code != null && code < 500,
+          ),
         );
 
-        if (accepted && context.mounted) {
-          // Create a new client and retry the login
-          final retryClient = _createHttpClient(useHttps, ipAddress, context: context);
-          try {
-            final retryResponse = await retryClient.post(
-              uri.toString(),
-              data: params,
-              options: Options(
-                contentType: Headers.formUrlEncodedContentType,
-                followRedirects: true,
-                validateStatus: (code) => code != null && code >= 200 && code < 400 || code == 302,
-              ),
-            );
-
-            if (retryResponse.statusCode == 302 || retryResponse.statusCode == 200) {
-              final setCookies = retryResponse.headers.map['set-cookie'];
-              if (setCookies != null && setCookies.isNotEmpty) {
-                final cookies = setCookies.join(',').split(',');
-                for (final cookie in cookies) {
-                  if (cookie.contains('sysauth')) {
-                    final cookieValue = cookie.split(';')[0].split('=')[1];
-                    return cookieValue;
-                  }
-                }
-              }
-            }
-          } on DioException catch (retryError, retryStack) {
-            Logger.exception('Login retry failed', retryError, retryStack);
+        final location = response.headers.value('location') ?? '';
+        if (response.statusCode == 302 ||
+            response.statusCode == 301 ||
+            location.isNotEmpty) {
+          redirectDetected = true;
+          if (location.startsWith('https://') ||
+              response.realUri.scheme == 'https') {
+            targetIsHttps = true;
           }
+        }
+
+        final token = _extractAuthToken(response);
+        if (token != null) {
+          final isVerified = await verifyToken(token, useHttps);
+          if (isVerified) {
+            Logger.info('Step 2 (CGI form login $path) succeeded and verified');
+            return AuthResult.success(token, actualUseHttps: useHttps);
+          }
+        }
+
+        if (response.statusCode == 401 || response.statusCode == 403) {
+          invalidCredentialsDetected = true;
+        }
+      } on DioException catch (e) {
+        Logger.info(
+          'Step 2 (CGI form login $path) failed [${e.type}]: ${e.message}',
+        );
+      } catch (e) {
+        Logger.info('Step 2 (CGI form login $path) unexpected error: $e');
+      }
+    }
+
+    // Step 3: LuCI RPC auth (/cgi-bin/luci/rpc/auth)
+    try {
+      final rpcUrl = _buildUrl(ipAddress, useHttps, '/cgi-bin/luci/rpc/auth');
+      final rpcPayload = {
+        'method': 'login',
+        'params': [username, password],
+        'id': 1,
+      };
+      final response = await client.post(
+        rpcUrl.toString(),
+        data: jsonEncode(rpcPayload),
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+          followRedirects: false,
+          validateStatus: (code) => code != null && code < 500,
+        ),
+      );
+
+      final token = _extractAuthToken(response);
+      if (token != null) {
+        final isVerified = await verifyToken(token, useHttps);
+        if (isVerified) {
+          Logger.info('Step 3 (LuCI RPC auth) succeeded and verified');
+          return AuthResult.success(token, actualUseHttps: useHttps);
         }
       }
 
-      if (isCertError) {
-        return null;
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        invalidCredentialsDetected = true;
       }
-
-      rethrow;
+    } on DioException catch (e) {
+      Logger.info('Step 3 (LuCI RPC auth) failed [${e.type}]: ${e.message}');
+    } catch (e) {
+      Logger.info('Step 3 (LuCI RPC auth) unexpected error: $e');
     }
+
+    // Step 4: Protocol Fallback Replay (HTTP <-> HTTPS switch)
+    if (redirectDetected || !useHttps) {
+      try {
+        final replayUseHttps = targetIsHttps || !useHttps;
+        final replayClient = _createHttpClient(
+          replayUseHttps,
+          ipAddress,
+          context: context,
+        );
+
+        final replayUrl = _buildUrl(ipAddress, replayUseHttps, '/ubus');
+        final ubusPayload = {
+          'jsonrpc': '2.0',
+          'id': 1,
+          'method': 'call',
+          'params': [
+            '00000000000000000000000000000000',
+            'session',
+            'login',
+            {'username': username, 'password': password},
+          ],
+        };
+        final response = await replayClient.post(
+          replayUrl.toString(),
+          data: jsonEncode(ubusPayload),
+          options: Options(
+            headers: {'Content-Type': 'application/json'},
+            followRedirects: false,
+            validateStatus: (code) => code != null && code < 500,
+          ),
+        );
+
+        final token = _extractAuthToken(response);
+        if (token != null) {
+          final isVerified = await verifyToken(token, replayUseHttps);
+          if (isVerified) {
+            Logger.info(
+              'Step 4 (Protocol fallback replay) succeeded and verified',
+            );
+            return AuthResult.success(token, actualUseHttps: replayUseHttps);
+          }
+        }
+      } on DioException catch (e) {
+        Logger.info(
+          'Step 4 (Protocol fallback replay) failed [${e.type}]: ${e.message}',
+        );
+      } catch (e) {
+        Logger.info('Step 4 (Protocol fallback replay) unexpected error: $e');
+      }
+    }
+
+    if (invalidCredentialsDetected) {
+      return AuthResult.invalidCredentials();
+    }
+
+    return AuthResult.unreachable();
+  }
+
+  @override
+  Future<String> login(
+    String ipAddress,
+    String username,
+    String password,
+    bool useHttps, {
+    BuildContext? context,
+  }) async {
+    final result = await authenticate(
+      ipAddress,
+      username,
+      password,
+      useHttps,
+      context: context,
+    );
+    if (!result.isSuccess || result.token == null) {
+      throw Exception(result.errorMessage ?? 'Login failed');
+    }
+    return result.token!;
+  }
+
+  static String? _extractAuthToken(Response response) {
+    // 1. Set-Cookie header with exact match 'sysauth', 'sysauth_http', or 'sysauth_https'
+    final setCookies = response.headers.map['set-cookie'];
+    if (setCookies != null && setCookies.isNotEmpty) {
+      for (final rawHeader in setCookies) {
+        final parts = rawHeader.split(';');
+        for (final part in parts) {
+          final trimmed = part.trim();
+          final eqIdx = trimmed.indexOf('=');
+          if (eqIdx != -1) {
+            final key = trimmed.substring(0, eqIdx).trim().toLowerCase();
+            var val = trimmed.substring(eqIdx + 1).trim();
+
+            if (val.startsWith('"') && val.endsWith('"') && val.length >= 2) {
+              val = val.substring(1, val.length - 1).trim();
+            }
+
+            if ((key == 'sysauth' ||
+                    key == 'sysauth_http' ||
+                    key == 'sysauth_https') &&
+                val.isNotEmpty &&
+                val != 'deleted' &&
+                val != 'expired' &&
+                val != 'null') {
+              return val;
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Location header (or realUri) containing stok=<value> via strict regex
+    final location = response.headers.value('location');
+    if (location != null) {
+      final match = RegExp(r'stok=([a-zA-Z0-9_-]+)').firstMatch(location);
+      if (match != null && match.group(1) != null) {
+        final stokVal = match.group(1)!;
+        if (stokVal.isNotEmpty && stokVal.length >= 16) {
+          return stokVal;
+        }
+      }
+    }
+
+    final realUriStr = response.realUri.toString();
+    final uriMatch = RegExp(r'stok=([a-zA-Z0-9_-]+)').firstMatch(realUriStr);
+    if (uriMatch != null && uriMatch.group(1) != null) {
+      final stokVal = uriMatch.group(1)!;
+      if (stokVal.isNotEmpty && stokVal.length >= 16) {
+        return stokVal;
+      }
+    }
+
+    // 3. Response body field stok / result / ubus_rpc_session
+    if (response.data != null) {
+      final dynamic data = response.data is String
+          ? (response.data as String).startsWith('{')
+                ? jsonDecode(response.data as String)
+                : null
+          : response.data;
+      if (data is Map) {
+        if (data['stok'] != null && data['stok'].toString().isNotEmpty) {
+          return data['stok'].toString();
+        }
+        if (data['result'] is String && (data['result'] as String).isNotEmpty) {
+          return data['result'] as String;
+        }
+        if (data['result'] is List && (data['result'] as List).length > 1) {
+          final resData = data['result'][1];
+          if (resData is Map && resData['ubus_rpc_session'] != null) {
+            return resData['ubus_rpc_session'].toString();
+          }
+        }
+      }
+    }
+
+    return null;
   }
 
   @override
@@ -378,7 +467,12 @@ class RealApiService implements IApiService {
           url.toString(),
           data: jsonEncode(rpcPayload),
           options: Options(
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+              'Content-Type': 'application/json',
+              if (sysauth.isNotEmpty)
+                'Cookie':
+                    'sysauth=$sysauth; sysauth_http=$sysauth; sysauth_https=$sysauth',
+            },
             responseDecoder: (responseBytes, options, responseBody) {
               return utf8.decode(responseBytes, allowMalformed: true);
             },
@@ -493,7 +587,9 @@ class RealApiService implements IApiService {
         context: context,
       );
 
-      if (wirelessResult is List && wirelessResult.length > 1 && wirelessResult[0] == 0) {
+      if (wirelessResult is List &&
+          wirelessResult.length > 1 &&
+          wirelessResult[0] == 0) {
         final wirelessData = wirelessResult[1] as Map<String, dynamic>?;
         if (wirelessData != null) {
           for (final entry in wirelessData.entries) {
@@ -501,13 +597,16 @@ class RealApiService implements IApiService {
             if (radioData == null || radioData['interfaces'] == null) continue;
 
             final rawIfaces = radioData['interfaces'];
-            final interfaces = rawIfaces is List ? rawIfaces : (rawIfaces is Map ? rawIfaces.values.toList() : null);
+            final interfaces = rawIfaces is List
+                ? rawIfaces
+                : (rawIfaces is Map ? rawIfaces.values.toList() : null);
             if (interfaces == null) continue;
 
             for (final iface in interfaces) {
               if (iface is Map<String, dynamic>) {
                 final ifname = iface['ifname']?.toString();
-                final ssid = iface['config']?['ssid']?.toString() ??
+                final ssid =
+                    iface['config']?['ssid']?.toString() ??
                     iface['iwinfo']?['ssid']?.toString() ??
                     iface['ssid']?.toString() ??
                     ifname;
@@ -533,10 +632,13 @@ class RealApiService implements IApiService {
         context: context?.mounted == true ? context : null,
       );
       if (uciRes is List && uciRes.length > 1 && uciRes[0] == 0) {
-        final values = (uciRes[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>?;
+        final values =
+            (uciRes[1] as Map<String, dynamic>?)?['values']
+                as Map<String, dynamic>?;
         if (values != null) {
           for (final section in values.values) {
-            if (section is Map<String, dynamic> && section['.type'] == 'wifi-iface') {
+            if (section is Map<String, dynamic> &&
+                section['.type'] == 'wifi-iface') {
               final ifname = section['ifname']?.toString();
               final ssid = section['ssid']?.toString() ?? ifname;
               if (ifname != null && ifname.isNotEmpty && ssid != null) {
@@ -647,7 +749,9 @@ class RealApiService implements IApiService {
         params: {},
         context: context?.mounted == true ? context : null,
       );
-      if (resultHostapd is List && resultHostapd.length > 1 && resultHostapd[0] == 0) {
+      if (resultHostapd is List &&
+          resultHostapd.length > 1 &&
+          resultHostapd[0] == 0) {
         final data = resultHostapd[1];
         if (data is Map && data['clients'] is Map) {
           final clientsMap = data['clients'] as Map<String, dynamic>;
@@ -676,7 +780,8 @@ class RealApiService implements IApiService {
           final macRegex = RegExp(r'([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})');
           for (final m in macRegex.allMatches(stdout)) {
             final macStr = m.group(0);
-            if (macStr != null) stations.add(macStr.toUpperCase().replaceAll('-', ':'));
+            if (macStr != null)
+              stations.add(macStr.toUpperCase().replaceAll('-', ':'));
           }
         }
 
@@ -696,7 +801,8 @@ class RealApiService implements IApiService {
             final macRegex = RegExp(r'([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})');
             for (final m in macRegex.allMatches(stdout)) {
               final macStr = m.group(0);
-              if (macStr != null) stations.add(macStr.toUpperCase().replaceAll('-', ':'));
+              if (macStr != null)
+                stations.add(macStr.toUpperCase().replaceAll('-', ':'));
             }
           }
         }
@@ -740,7 +846,8 @@ class RealApiService implements IApiService {
         if (values != null) {
           values.forEach((_, sec) {
             if (sec is Map<String, dynamic>) {
-              final rawName = sec['name']?.toString() ??
+              final rawName =
+                  sec['name']?.toString() ??
                   sec['hostname']?.toString() ??
                   sec['comment']?.toString() ??
                   sec['description']?.toString();
@@ -763,7 +870,9 @@ class RealApiService implements IApiService {
                     hints[normMac] = {
                       'name': rawName,
                       'staticLeaseName': rawName,
-                      'ipaddrs': sec['ip'] != null ? [sec['ip'].toString()] : [],
+                      'ipaddrs': sec['ip'] != null
+                          ? [sec['ip'].toString()]
+                          : [],
                       'staticLeaseIp': sec['ip']?.toString(),
                       'isStaticLease': true,
                     };
@@ -819,7 +928,8 @@ class RealApiService implements IApiService {
                 };
               } else {
                 // Keep static lease info if set from UCI in step 1, otherwise update missing dynamic fields
-                if (existing['name'] == null || existing['name'].toString().isEmpty) {
+                if (existing['name'] == null ||
+                    existing['name'].toString().isEmpty) {
                   existing['name'] = name ?? '';
                 }
                 if (newIps != null && newIps.isNotEmpty) {
@@ -931,9 +1041,7 @@ class RealApiService implements IApiService {
                 'public_key': publicKey,
                 'endpoint': peer['endpoint'] ?? 'N/A',
                 'last_handshake':
-                    int.tryParse(
-                      peer['latest_handshake']?.toString() ?? '0',
-                    ) ??
+                    int.tryParse(peer['latest_handshake']?.toString() ?? '0') ??
                     0,
               };
             }
@@ -1022,8 +1130,11 @@ class RealApiService implements IApiService {
     try {
       final mCtx = mountedContext(context);
       final res = await callWithContext(
-        ipAddress, sysauth, useHttps,
-        object: 'uci', method: 'get',
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'get',
         params: {'config': 'network'},
         context: mCtx,
       );
@@ -1064,7 +1175,8 @@ class RealApiService implements IApiService {
   }
 
   /// Helper to safely obtain mounted BuildContext across async gaps.
-  BuildContext? mountedContext(BuildContext? ctx) => (ctx != null && ctx.mounted) ? ctx : null;
+  BuildContext? mountedContext(BuildContext? ctx) =>
+      (ctx != null && ctx.mounted) ? ctx : null;
 
   @override
   bool execSucceeded(dynamic res) {
@@ -1087,8 +1199,6 @@ class RealApiService implements IApiService {
 
   bool _execSucceeded(dynamic res) => execSucceeded(res);
 
-
-
   @override
   Future<bool> setSsidEnabled(
     String ipAddress,
@@ -1110,7 +1220,13 @@ class RealApiService implements IApiService {
         context: mCtx,
       );
       if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) {
-        await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
+        await uciRevert(
+          ipAddress,
+          sysauth,
+          useHttps,
+          config: 'wireless',
+          context: mCtx,
+        );
         return false;
       }
 
@@ -1122,7 +1238,13 @@ class RealApiService implements IApiService {
         context: mCtx,
       );
       if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0) {
-        await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
+        await uciRevert(
+          ipAddress,
+          sysauth,
+          useHttps,
+          config: 'wireless',
+          context: mCtx,
+        );
         return false;
       }
 
@@ -1142,7 +1264,13 @@ class RealApiService implements IApiService {
       return _execSucceeded(reloadRes);
     } catch (e, stack) {
       Logger.exception('setSsidEnabled failed for $ifaceSection', e, stack);
-      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
+      await uciRevert(
+        ipAddress,
+        sysauth,
+        useHttps,
+        config: 'wireless',
+        context: mountedContext(context),
+      );
       return false;
     }
   }
@@ -1164,11 +1292,21 @@ class RealApiService implements IApiService {
         useHttps,
         object: 'uci',
         method: 'set',
-        params: {'config': 'wireless', 'section': sectionName, 'values': values},
+        params: {
+          'config': 'wireless',
+          'section': sectionName,
+          'values': values,
+        },
         context: mCtx,
       );
       if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) {
-        await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
+        await uciRevert(
+          ipAddress,
+          sysauth,
+          useHttps,
+          config: 'wireless',
+          context: mCtx,
+        );
         return false;
       }
 
@@ -1194,11 +1332,27 @@ class RealApiService implements IApiService {
       }
 
       // Atomic Rollback on Apply Failure
-      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
+      await uciRevert(
+        ipAddress,
+        sysauth,
+        useHttps,
+        config: 'wireless',
+        context: mCtx,
+      );
       return false;
     } catch (e, stack) {
-      Logger.exception('updateWirelessInterfaceConfig failed for $sectionName', e, stack);
-      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
+      Logger.exception(
+        'updateWirelessInterfaceConfig failed for $sectionName',
+        e,
+        stack,
+      );
+      await uciRevert(
+        ipAddress,
+        sysauth,
+        useHttps,
+        config: 'wireless',
+        context: mCtx,
+      );
       return false;
     }
   }
@@ -1230,10 +1384,20 @@ class RealApiService implements IApiService {
           useHttps,
           object: 'uci',
           method: 'set',
-          params: {'config': 'wireless', 'section': sectionName, 'values': priorValues},
+          params: {
+            'config': 'wireless',
+            'section': sectionName,
+            'values': priorValues,
+          },
           context: mountedContext(context),
         );
-        await uciCommit(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
+        await uciCommit(
+          ipAddress,
+          sysauth,
+          useHttps,
+          config: 'wireless',
+          context: mountedContext(context),
+        );
       }
 
       final reloadRes = await callWithContext(
@@ -1249,9 +1413,16 @@ class RealApiService implements IApiService {
         context: mountedContext(context),
       );
 
-      return res is List && res.isNotEmpty && res[0] == 0 && _execSucceeded(reloadRes);
+      return res is List &&
+          res.isNotEmpty &&
+          res[0] == 0 &&
+          _execSucceeded(reloadRes);
     } catch (e, stack) {
-      Logger.exception('revertWirelessInterfaceConfig failed for $sectionName', e, stack);
+      Logger.exception(
+        'revertWirelessInterfaceConfig failed for $sectionName',
+        e,
+        stack,
+      );
       return false;
     }
   }
@@ -1273,11 +1444,21 @@ class RealApiService implements IApiService {
         useHttps,
         object: 'uci',
         method: 'set',
-        params: {'config': 'wireless', 'section': sectionName, 'values': values},
+        params: {
+          'config': 'wireless',
+          'section': sectionName,
+          'values': values,
+        },
         context: mCtx,
       );
       if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) {
-        await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
+        await uciRevert(
+          ipAddress,
+          sysauth,
+          useHttps,
+          config: 'wireless',
+          context: mCtx,
+        );
         return false;
       }
 
@@ -1303,11 +1484,27 @@ class RealApiService implements IApiService {
       }
 
       // Atomic Rollback on Apply Failure
-      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
+      await uciRevert(
+        ipAddress,
+        sysauth,
+        useHttps,
+        config: 'wireless',
+        context: mCtx,
+      );
       return false;
     } catch (e, stack) {
-      Logger.exception('updateWirelessRadioConfig failed for $sectionName', e, stack);
-      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
+      Logger.exception(
+        'updateWirelessRadioConfig failed for $sectionName',
+        e,
+        stack,
+      );
+      await uciRevert(
+        ipAddress,
+        sysauth,
+        useHttps,
+        config: 'wireless',
+        context: mCtx,
+      );
       return false;
     }
   }
@@ -1339,10 +1536,20 @@ class RealApiService implements IApiService {
           useHttps,
           object: 'uci',
           method: 'set',
-          params: {'config': 'wireless', 'section': sectionName, 'values': priorValues},
+          params: {
+            'config': 'wireless',
+            'section': sectionName,
+            'values': priorValues,
+          },
           context: mountedContext(context),
         );
-        await uciCommit(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
+        await uciCommit(
+          ipAddress,
+          sysauth,
+          useHttps,
+          config: 'wireless',
+          context: mountedContext(context),
+        );
       }
 
       final reloadRes = await callWithContext(
@@ -1358,9 +1565,16 @@ class RealApiService implements IApiService {
         context: mountedContext(context),
       );
 
-      return res is List && res.isNotEmpty && res[0] == 0 && _execSucceeded(reloadRes);
+      return res is List &&
+          res.isNotEmpty &&
+          res[0] == 0 &&
+          _execSucceeded(reloadRes);
     } catch (e, stack) {
-      Logger.exception('revertWirelessRadioConfig failed for $sectionName', e, stack);
+      Logger.exception(
+        'revertWirelessRadioConfig failed for $sectionName',
+        e,
+        stack,
+      );
       return false;
     }
   }
@@ -1377,14 +1591,19 @@ class RealApiService implements IApiService {
   ) async {
     try {
       final res = await callWithContext(
-        ipAddress, sysauth, useHttps,
-        object: 'uci', method: 'get',
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'get',
         params: {'config': 'wireless'},
         context: context,
       );
       final usedIndices = <int>{};
       if (res is List && res.length > 1 && res[0] == 0) {
-        final values = (res[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>?;
+        final values =
+            (res[1] as Map<String, dynamic>?)?['values']
+                as Map<String, dynamic>?;
         if (values != null) {
           for (final key in values.keys) {
             final match = RegExp(r'^wifinet(\d+)$').firstMatch(key.toString());
@@ -1419,8 +1638,11 @@ class RealApiService implements IApiService {
   ) async {
     try {
       final res = await callWithContext(
-        ipAddress, sysauth, useHttps,
-        object: 'uci', method: 'rename',
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'rename',
         params: {
           'config': config,
           'section': anonymousSection,
@@ -1443,14 +1665,18 @@ class RealApiService implements IApiService {
   }) async {
     try {
       final res = await callWithContext(
-        ipAddress, sysauth, useHttps,
-        object: 'uci', method: 'get',
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'get',
         params: {'config': 'wireless'},
         context: context,
       );
 
       if (res is! List || res.length < 2 || res[0] != 0) return 0;
-      final values = (res[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>?;
+      final values =
+          (res[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>?;
       if (values == null) return 0;
 
       // Collect existing wifinet indices to avoid collisions when renaming
@@ -1461,7 +1687,8 @@ class RealApiService implements IApiService {
         final sectionMap = entry.value;
         if (sectionMap is Map) {
           final type = sectionMap['.type']?.toString();
-          final isAnon = sectionMap['.anonymous'] == true ||
+          final isAnon =
+              sectionMap['.anonymous'] == true ||
               sectionMap['.anonymous'].toString() == 'true';
           if (type == 'wifi-iface' && isAnon) {
             anonymousSections.add(key);
@@ -1488,8 +1715,13 @@ class RealApiService implements IApiService {
         usedIndices.add(idx);
 
         final renamed = await _renameUciSection(
-          ipAddress, sysauth, useHttps,
-          'wireless', anonSection, namedSection, context,
+          ipAddress,
+          sysauth,
+          useHttps,
+          'wireless',
+          anonSection,
+          namedSection,
+          context,
         );
         if (renamed) migratedCount++;
       }
@@ -1497,8 +1729,11 @@ class RealApiService implements IApiService {
       // Commit all renames atomically if any succeeded
       if (migratedCount > 0) {
         await callWithContext(
-          ipAddress, sysauth, useHttps,
-          object: 'uci', method: 'commit',
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'commit',
           params: {'config': 'wireless'},
           context: context,
         );
@@ -1512,7 +1747,189 @@ class RealApiService implements IApiService {
   }
 
   @override
-  Future<Map<String, List<Map<String, String>>>> fetchWirelessHardwareCapabilities({
+  Future<bool> applyParentalProfileDns(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String profileId,
+    required List<String> macAddresses,
+    required List<String>? dnsServers,
+    BuildContext? context,
+  }) async {
+    try {
+      final safeId = profileId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+      final tag = 'p_tag_$safeId';
+      final dnsStr = dnsServers?.join(',') ?? '';
+
+      final script =
+          '''
+T="$tag"
+DNS="$dnsStr"
+if [ "\$DNS" = "" ]; then
+  uci delete dhcp.\$T 2>/dev/null
+  for sec in \$(uci show dhcp 2>/dev/null | grep -i '@host' | grep "\\.mac=" | cut -d. -f2 | sort -u); do
+    cur_tag=\$(uci get dhcp.\$sec.tag 2>/dev/null)
+    if [ "\$cur_tag" = "\$T" ]; then
+      uci delete dhcp.\$sec.tag
+    fi
+  done
+else
+  uci set dhcp.\$T=tag
+  uci set dhcp.\$T.dhcp_option="6,\$DNS"
+  MACS="${macAddresses.map((m) => m.toLowerCase()).join(' ')}"
+  for m in \$MACS; do
+    sec=\$(uci show dhcp 2>/dev/null | grep -i "@host.*\\.mac=.*\$m" | cut -d. -f2 | head -n1)
+    if [ -z "\$sec" ]; then
+      sec=\$(uci add dhcp host)
+      uci set dhcp.\$sec.mac="\$m"
+      name=\$(echo "\$m" | tr ':' '-')
+      uci set dhcp.\$sec.name="p_\$name"
+    fi
+    uci set dhcp.\$sec.tag="\$T"
+  done
+fi
+uci commit dhcp
+/etc/init.d/dnsmasq restart 2>/dev/null || true
+''';
+
+      return await systemExec(
+            ipAddress,
+            sysauth,
+            useHttps,
+            command: script,
+            context: context,
+          ) !=
+          null;
+    } catch (e, stack) {
+      Logger.exception('applyParentalProfileDns failed', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<List<ParentalProfile>?> fetchParentalProfiles(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  }) async {
+    try {
+      final mCtx = mountedContext(context);
+      final res = await callWithContext(
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'get',
+        params: {'config': 'parental'},
+        context: mCtx,
+      );
+      if (res is List && res.length > 1) {
+        if (res[0] != 0) {
+          // If ubus returned error (e.g. config file does not exist yet), return empty list
+          return [];
+        }
+        final uciData = res[1];
+        final valuesMap = (uciData is Map && uciData['values'] is Map)
+            ? uciData['values'] as Map
+            : (uciData is Map ? uciData : {});
+        final profiles = <ParentalProfile>[];
+        valuesMap.forEach((key, val) {
+          if (val is Map && val['.type'] == 'profile') {
+            profiles.add(
+              ParentalProfile.fromJson(
+                Map<String, dynamic>.from(val),
+                key.toString(),
+              ),
+            );
+          }
+        });
+        return profiles;
+      }
+    } catch (e, stack) {
+      Logger.exception('fetchParentalProfiles failed', e, stack);
+    }
+    return null;
+  }
+
+  @override
+  Future<bool> saveParentalProfile(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required ParentalProfile profile,
+    BuildContext? context,
+  }) async {
+    try {
+      final sec = profile.id.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+      final safeName = profile.name.replaceAll("'", "'\\''");
+      final safeIcon = profile.icon.replaceAll("'", "'\\''");
+      final safeColor = profile.color.replaceAll("'", "'\\''");
+      final macsStr = profile.macAddresses.map((m) => m.toLowerCase()).join(' ');
+      final dnsStr = profile.customDnsServers.join(' ');
+
+      final script = '''
+touch /etc/config/parental 2>/dev/null || true
+SEC="$sec"
+uci set parental.\$SEC=profile
+uci set parental.\$SEC.name='$safeName'
+uci set parental.\$SEC.icon='$safeIcon'
+uci set parental.\$SEC.color='$safeColor'
+uci set parental.\$SEC.is_paused="${profile.isPaused ? '1' : '0'}"
+uci set parental.\$SEC.is_enabled="${profile.isEnabled ? '1' : '0'}"
+uci set parental.\$SEC.content_filter="${profile.contentFilter.toStorageString()}"
+uci delete parental.\$SEC.mac 2>/dev/null || true
+for m in $macsStr; do uci add_list parental.\$SEC.mac="\$m"; done
+uci delete parental.\$SEC.custom_dns 2>/dev/null || true
+for d in $dnsStr; do uci add_list parental.\$SEC.custom_dns="\$d"; done
+uci commit parental
+''';
+
+      return await systemExec(
+        ipAddress,
+        sysauth,
+        useHttps,
+        command: script,
+        context: context,
+      ) != null;
+    } catch (e, stack) {
+      Logger.exception('saveParentalProfile failed', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> deleteParentalProfile(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String profileId,
+    BuildContext? context,
+  }) async {
+    try {
+      final sec = profileId.replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_');
+      final script = '''
+SEC="$sec"
+uci delete parental.\$SEC 2>/dev/null || true
+uci commit parental
+''';
+
+      return await systemExec(
+        ipAddress,
+        sysauth,
+        useHttps,
+        command: script,
+        context: context,
+      ) != null;
+    } catch (e, stack) {
+      Logger.exception('deleteParentalProfile failed', e, stack);
+      return false;
+    }
+  }
+
+  @override
+  Future<Map<String, List<Map<String, String>>>>
+  fetchWirelessHardwareCapabilities({
     required String sectionName,
     String? radioName,
     required String ipAddress,
@@ -1521,19 +1938,27 @@ class RealApiService implements IApiService {
     BuildContext? context,
   }) async {
     try {
-      final targetDevice = sectionName.isNotEmpty ? sectionName : (radioName ?? 'wlan0');
+      final targetDevice = sectionName.isNotEmpty
+          ? sectionName
+          : (radioName ?? 'wlan0');
       final mCtx = mountedContext(context);
 
       final encResult = await callWithContext(
-        ipAddress, sysauth, useHttps,
-        object: 'iwinfo', method: 'encryption',
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'iwinfo',
+        method: 'encryption',
         params: {'device': targetDevice},
         context: mCtx,
       );
 
       final cipherResult = await callWithContext(
-        ipAddress, sysauth, useHttps,
-        object: 'iwinfo', method: 'ciphers',
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'iwinfo',
+        method: 'ciphers',
         params: {'device': targetDevice},
         context: mCtx,
       );
@@ -1576,9 +2001,14 @@ class RealApiService implements IApiService {
         };
       }
     } catch (e) {
-      Logger.debug('fetchWirelessHardwareCapabilities failed for $sectionName: $e');
+      Logger.debug(
+        'fetchWirelessHardwareCapabilities failed for $sectionName: $e',
+      );
     }
-    return {'encryptions': _fallbackEncryptions(), 'ciphers': _fallbackCiphers()};
+    return {
+      'encryptions': _fallbackEncryptions(),
+      'ciphers': _fallbackCiphers(),
+    };
   }
 
   @override
@@ -1601,26 +2031,38 @@ class RealApiService implements IApiService {
 
       final responses = await Future.wait([
         callWithContext(
-          ipAddress, sysauth, useHttps,
-          object: 'iwinfo', method: 'countrylist',
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'iwinfo',
+          method: 'countrylist',
           params: {'device': targetDevice},
           context: mCtx,
         ),
         callWithContext(
-          ipAddress, sysauth, useHttps,
-          object: 'iwinfo', method: 'freqlist',
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'iwinfo',
+          method: 'freqlist',
           params: {'device': targetDevice},
           context: mCtx,
         ),
         callWithContext(
-          ipAddress, sysauth, useHttps,
-          object: 'iwinfo', method: 'htmodelist',
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'iwinfo',
+          method: 'htmodelist',
           params: {'device': targetDevice},
           context: mCtx,
         ),
         callWithContext(
-          ipAddress, sysauth, useHttps,
-          object: 'iwinfo', method: 'txpowerlist',
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'iwinfo',
+          method: 'txpowerlist',
           params: {'device': targetDevice},
           context: mCtx,
         ),
@@ -1643,12 +2085,16 @@ class RealApiService implements IApiService {
       if (countryData is List) {
         for (final item in countryData) {
           if (item is Map) {
-            final code = (item['code'] ?? item['iso'] ?? item['country'])?.toString().toUpperCase();
+            final code = (item['code'] ?? item['iso'] ?? item['country'])
+                ?.toString()
+                .toUpperCase();
             final name = (item['name'] ?? item['country'] ?? code)?.toString();
             if (code != null && code.isNotEmpty) {
               countries.add({
                 'code': code,
-                'label': name != null && name != code ? '$code — $name' : '$code — Country Code',
+                'label': name != null && name != code
+                    ? '$code — $name'
+                    : '$code — Country Code',
               });
             }
           } else if (item is String && item.isNotEmpty) {
@@ -1668,7 +2114,10 @@ class RealApiService implements IApiService {
         freqData = freqRes[1];
       }
       if (freqData is Map) {
-        freqData = freqData['results'] ?? freqData['freqlist'] ?? freqData['channellist'];
+        freqData =
+            freqData['results'] ??
+            freqData['freqlist'] ??
+            freqData['channellist'];
       }
       if (freqData is List) {
         for (final item in freqData) {
@@ -1711,12 +2160,18 @@ class RealApiService implements IApiService {
       if (htModes.isEmpty) {
         try {
           final infoRes = await callWithContext(
-            ipAddress, sysauth, useHttps,
-            object: 'iwinfo', method: 'info',
+            ipAddress,
+            sysauth,
+            useHttps,
+            object: 'iwinfo',
+            method: 'info',
             params: {'device': targetDevice},
             context: mCtx,
           );
-          if (infoRes is List && infoRes.length > 1 && infoRes[0] == 0 && infoRes[1] is Map) {
+          if (infoRes is List &&
+              infoRes.length > 1 &&
+              infoRes[0] == 0 &&
+              infoRes[1] is Map) {
             final infoMap = infoRes[1] as Map;
             final modesList = infoMap['htmodes'];
             if (modesList is List) {
@@ -1845,7 +2300,10 @@ class RealApiService implements IApiService {
       );
 
       String? sectionName;
-      if (addRes is List && addRes.isNotEmpty && addRes[0] == 0 && addRes.length > 1) {
+      if (addRes is List &&
+          addRes.isNotEmpty &&
+          addRes[0] == 0 &&
+          addRes.length > 1) {
         final data = addRes[1];
         if (data is Map && data['section'] != null) {
           sectionName = data['section'].toString();
@@ -1861,11 +2319,19 @@ class RealApiService implements IApiService {
       // Immediately rename anonymous cfg###### section to wifinet# to prevent
       // LuCI "Wireless configuration migration" dialog on next UI visit.
       final namedSection = await _nextWifinetName(
-        ipAddress, sysauth, useHttps, mountedContext(context),
+        ipAddress,
+        sysauth,
+        useHttps,
+        mountedContext(context),
       );
       final renamed = await _renameUciSection(
-        ipAddress, sysauth, useHttps,
-        'wireless', sectionName, namedSection, mountedContext(context),
+        ipAddress,
+        sysauth,
+        useHttps,
+        'wireless',
+        sectionName,
+        namedSection,
+        mountedContext(context),
       );
       if (renamed) sectionName = namedSection;
 
@@ -1890,12 +2356,22 @@ class RealApiService implements IApiService {
         useHttps,
         object: 'uci',
         method: 'set',
-        params: {'config': 'wireless', 'section': sectionName, 'values': values},
+        params: {
+          'config': 'wireless',
+          'section': sectionName,
+          'values': values,
+        },
         context: mountedContext(context),
       );
 
       if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) {
-        await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
+        await uciRevert(
+          ipAddress,
+          sysauth,
+          useHttps,
+          config: 'wireless',
+          context: mountedContext(context),
+        );
         return false;
       }
 
@@ -1919,11 +2395,27 @@ class RealApiService implements IApiService {
         );
         return true;
       }
-      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
+      await uciRevert(
+        ipAddress,
+        sysauth,
+        useHttps,
+        config: 'wireless',
+        context: mountedContext(context),
+      );
       return false;
     } catch (e, stack) {
-      Logger.exception('addWirelessInterface failed for radio $radioName', e, stack);
-      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
+      Logger.exception(
+        'addWirelessInterface failed for radio $radioName',
+        e,
+        stack,
+      );
+      await uciRevert(
+        ipAddress,
+        sysauth,
+        useHttps,
+        config: 'wireless',
+        context: mountedContext(context),
+      );
       return false;
     }
   }
@@ -1948,7 +2440,13 @@ class RealApiService implements IApiService {
       );
 
       if (delRes is List && delRes.isNotEmpty && delRes[0] != 0) {
-        await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
+        await uciRevert(
+          ipAddress,
+          sysauth,
+          useHttps,
+          config: 'wireless',
+          context: mountedContext(context),
+        );
         return false;
       }
 
@@ -1972,11 +2470,27 @@ class RealApiService implements IApiService {
         );
         return true;
       }
-      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
+      await uciRevert(
+        ipAddress,
+        sysauth,
+        useHttps,
+        config: 'wireless',
+        context: mountedContext(context),
+      );
       return false;
     } catch (e, stack) {
-      Logger.exception('deleteWirelessInterface failed for $sectionName', e, stack);
-      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
+      Logger.exception(
+        'deleteWirelessInterface failed for $sectionName',
+        e,
+        stack,
+      );
+      await uciRevert(
+        ipAddress,
+        sysauth,
+        useHttps,
+        config: 'wireless',
+        context: mountedContext(context),
+      );
       return false;
     }
   }
@@ -1993,8 +2507,11 @@ class RealApiService implements IApiService {
   }) async {
     try {
       final setRes = await callWithContext(
-        ipAddress, sysauth, useHttps,
-        object: 'uci', method: 'set',
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'set',
         params: {'config': config, 'section': section, 'values': values},
         context: context,
       );
@@ -2002,9 +2519,17 @@ class RealApiService implements IApiService {
         return true;
       }
       final addRes = await callWithContext(
-        ipAddress, sysauth, useHttps,
-        object: 'uci', method: 'add',
-        params: {'config': config, 'type': type, 'name': section, 'values': values},
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'add',
+        params: {
+          'config': config,
+          'type': type,
+          'name': section,
+          'values': values,
+        },
         context: context,
       );
       return addRes is List && addRes.isNotEmpty && addRes[0] == 0;
@@ -2058,20 +2583,24 @@ class RealApiService implements IApiService {
       if (network == 'guest') {
         // Configure /etc/config/network interface 'guest'
         await _ensureUciSection(
-          ipAddress, sysauth, useHttps,
-          'network', 'guest', 'interface',
-          {
-            'proto': 'static',
-            'ipaddr': guestIp,
-            'netmask': '255.255.255.0',
-          },
+          ipAddress,
+          sysauth,
+          useHttps,
+          'network',
+          'guest',
+          'interface',
+          {'proto': 'static', 'ipaddr': guestIp, 'netmask': '255.255.255.0'},
           context: mCtx,
         );
 
         // Configure /etc/config/dhcp section 'guest'
         await _ensureUciSection(
-          ipAddress, sysauth, useHttps,
-          'dhcp', 'guest', 'dhcp',
+          ipAddress,
+          sysauth,
+          useHttps,
+          'dhcp',
+          'guest',
+          'dhcp',
           {
             'interface': 'guest',
             'start': '100',
@@ -2084,8 +2613,12 @@ class RealApiService implements IApiService {
         // Step 3: Configure /etc/config/firewall zone and forwarding for guest
         // Use REJECT for input to prevent guests from accessing router gateway / LuCI / SSH
         await _ensureUciSection(
-          ipAddress, sysauth, useHttps,
-          'firewall', 'zone_guest', 'zone',
+          ipAddress,
+          sysauth,
+          useHttps,
+          'firewall',
+          'zone_guest',
+          'zone',
           {
             'name': 'guest',
             'network': ['guest'],
@@ -2098,8 +2631,12 @@ class RealApiService implements IApiService {
 
         // Allow essential DHCP (UDP 67) for guest devices
         await _ensureUciSection(
-          ipAddress, sysauth, useHttps,
-          'firewall', 'rule_guest_dhcp', 'rule',
+          ipAddress,
+          sysauth,
+          useHttps,
+          'firewall',
+          'rule_guest_dhcp',
+          'rule',
           {
             'name': 'Allow-Guest-DHCP',
             'src': 'guest',
@@ -2112,8 +2649,12 @@ class RealApiService implements IApiService {
 
         // Allow essential DNS (UDP/TCP 53) for guest devices
         await _ensureUciSection(
-          ipAddress, sysauth, useHttps,
-          'firewall', 'rule_guest_dns', 'rule',
+          ipAddress,
+          sysauth,
+          useHttps,
+          'firewall',
+          'rule_guest_dns',
+          'rule',
           {
             'name': 'Allow-Guest-DNS',
             'src': 'guest',
@@ -2126,26 +2667,33 @@ class RealApiService implements IApiService {
 
         // Forward guest traffic to WAN for internet access
         await _ensureUciSection(
-          ipAddress, sysauth, useHttps,
-          'firewall', 'fwd_guest_wan', 'forwarding',
-          {
-            'src': 'guest',
-            'dest': 'wan',
-          },
+          ipAddress,
+          sysauth,
+          useHttps,
+          'firewall',
+          'fwd_guest_wan',
+          'forwarding',
+          {'src': 'guest', 'dest': 'wan'},
           context: mCtx,
         );
       }
 
       // Step 4: Add wireless interface for guest SSID
       final addWifiRes = await callWithContext(
-        ipAddress, sysauth, useHttps,
-        object: 'uci', method: 'add',
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'add',
         params: {'config': 'wireless', 'type': 'wifi-iface'},
         context: mCtx,
       );
 
       String? sectionName;
-      if (addWifiRes is List && addWifiRes.isNotEmpty && addWifiRes[0] == 0 && addWifiRes.length > 1) {
+      if (addWifiRes is List &&
+          addWifiRes.isNotEmpty &&
+          addWifiRes[0] == 0 &&
+          addWifiRes.length > 1) {
         final data = addWifiRes[1];
         if (data is Map && data['section'] != null) {
           sectionName = data['section'].toString();
@@ -2160,10 +2708,20 @@ class RealApiService implements IApiService {
 
       // Immediately rename anonymous cfg###### section to wifinet# to prevent
       // LuCI "Wireless configuration migration" dialog on next UI visit.
-      final namedGuestSection = await _nextWifinetName(ipAddress, sysauth, useHttps, mCtx);
+      final namedGuestSection = await _nextWifinetName(
+        ipAddress,
+        sysauth,
+        useHttps,
+        mCtx,
+      );
       final guestRenamed = await _renameUciSection(
-        ipAddress, sysauth, useHttps,
-        'wireless', sectionName, namedGuestSection, mCtx,
+        ipAddress,
+        sysauth,
+        useHttps,
+        'wireless',
+        sectionName,
+        namedGuestSection,
+        mCtx,
       );
       if (guestRenamed) sectionName = namedGuestSection;
 
@@ -2201,7 +2759,8 @@ class RealApiService implements IApiService {
         if (encryption == 'sae') {
           wifiValues['ieee80211w'] = '2'; // Required for WPA3-SAE
         } else if (encryption == 'sae-mixed' || ieee80211r) {
-          wifiValues['ieee80211w'] = '1'; // Optional for transitional or 802.11r
+          wifiValues['ieee80211w'] =
+              '1'; // Optional for transitional or 802.11r
         }
       }
 
@@ -2244,23 +2803,36 @@ class RealApiService implements IApiService {
       }
 
       await callWithContext(
-        ipAddress, sysauth, useHttps,
-        object: 'uci', method: 'set',
-        params: {'config': 'wireless', 'section': sectionName, 'values': wifiValues},
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'set',
+        params: {
+          'config': 'wireless',
+          'section': sectionName,
+          'values': wifiValues,
+        },
         context: mCtx,
       );
 
       // Step 5: Execute cross-config atomic apply and immediately confirm to persist changes
       final applyRes = await callWithContext(
-        ipAddress, sysauth, useHttps,
-        object: 'uci', method: 'apply',
+        ipAddress,
+        sysauth,
+        useHttps,
+        object: 'uci',
+        method: 'apply',
         params: {'rollback': false},
         context: mCtx,
       );
       if (applyRes is List && applyRes.isNotEmpty && applyRes[0] == 0) {
         await callWithContext(
-          ipAddress, sysauth, useHttps,
-          object: 'uci', method: 'confirm',
+          ipAddress,
+          sysauth,
+          useHttps,
+          object: 'uci',
+          method: 'confirm',
           context: mCtx,
         );
         return true;
@@ -2268,13 +2840,29 @@ class RealApiService implements IApiService {
 
       // Revert staged changes across modified configs on failure
       for (final cfg in ['wireless', 'firewall', 'dhcp', 'network']) {
-        await uciRevert(ipAddress, sysauth, useHttps, config: cfg, context: mCtx);
+        await uciRevert(
+          ipAddress,
+          sysauth,
+          useHttps,
+          config: cfg,
+          context: mCtx,
+        );
       }
       return false;
     } catch (e, stack) {
-      Logger.exception('provisionGuestNetwork failed for radio $radioName', e, stack);
+      Logger.exception(
+        'provisionGuestNetwork failed for radio $radioName',
+        e,
+        stack,
+      );
       for (final cfg in ['wireless', 'firewall', 'dhcp', 'network']) {
-        await uciRevert(ipAddress, sysauth, useHttps, config: cfg, context: mountedContext(context));
+        await uciRevert(
+          ipAddress,
+          sysauth,
+          useHttps,
+          config: cfg,
+          context: mountedContext(context),
+        );
       }
       return false;
     }
@@ -2311,7 +2899,13 @@ class RealApiService implements IApiService {
           context: mCtx,
         );
         if (res is List && res.isNotEmpty && res[0] != 0) {
-          await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
+          await uciRevert(
+            ipAddress,
+            sysauth,
+            useHttps,
+            config: 'wireless',
+            context: mCtx,
+          );
           return false;
         }
       }
@@ -2328,11 +2922,23 @@ class RealApiService implements IApiService {
       if (applyRes is List && applyRes.isNotEmpty && applyRes[0] == 0) {
         return true;
       }
-      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
+      await uciRevert(
+        ipAddress,
+        sysauth,
+        useHttps,
+        config: 'wireless',
+        context: mCtx,
+      );
       return false;
     } catch (e, stack) {
       Logger.exception('setWifiAccessControl failed', e, stack);
-      await uciRevert(ipAddress, sysauth, useHttps, config: 'wireless', context: mCtx);
+      await uciRevert(
+        ipAddress,
+        sysauth,
+        useHttps,
+        config: 'wireless',
+        context: mCtx,
+      );
       return false;
     }
   }
@@ -2401,7 +3007,13 @@ class RealApiService implements IApiService {
           context: mountedContext(context),
         );
       }
-      await uciCommit(ipAddress, sysauth, useHttps, config: 'wireless', context: mountedContext(context));
+      await uciCommit(
+        ipAddress,
+        sysauth,
+        useHttps,
+        config: 'wireless',
+        context: mountedContext(context),
+      );
       final reloadRes = await callWithContext(
         ipAddress,
         sysauth,
@@ -2415,7 +3027,10 @@ class RealApiService implements IApiService {
         context: mountedContext(context),
       );
 
-      return res is List && res.isNotEmpty && res[0] == 0 && _execSucceeded(reloadRes);
+      return res is List &&
+          res.isNotEmpty &&
+          res[0] == 0 &&
+          _execSucceeded(reloadRes);
     } catch (e, stack) {
       Logger.exception('revertWifiAccessControl failed', e, stack);
       return false;
@@ -2441,12 +3056,12 @@ class RealApiService implements IApiService {
           'params': [
             '-c',
             'mkdir -p /usr/share/rpcd/acl.d/ && '
-            'printf \'{\\n  "luci-app-tailscale": {\\n    "description": "Tailscale VPN ACL Permissions",\\n    "read": {\\n      "file": {\\n        "/usr/sbin/tailscale": [ "exec" ],\\n        "/usr/bin/tailscale": [ "exec" ],\\n        "/usr/bin/nextdns": [ "exec" ],\\n        "/usr/bin/cloudflared": [ "exec" ]\\n      }\\n    },\\n    "write": {\\n      "file": {\\n        "/usr/sbin/tailscale": [ "exec" ],\\n        "/usr/bin/tailscale": [ "exec" ],\\n        "/usr/bin/nextdns": [ "exec" ],\\n        "/usr/bin/cloudflared": [ "exec" ]\\n      }\\n    }\\n  }\\n}\\n\' > /usr/share/rpcd/acl.d/luci-app-tailscale.json && '
-            'if command -v apk >/dev/null 2>&1; then '
-            'apk update && apk add luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status; '
-            'else '
-            'opkg update && opkg install luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status; '
-            'fi && /etc/init.d/rpcd restart'
+                'printf \'{\\n  "luci-app-tailscale": {\\n    "description": "Tailscale VPN ACL Permissions",\\n    "read": {\\n      "file": {\\n        "/usr/sbin/tailscale": [ "exec" ],\\n        "/usr/bin/tailscale": [ "exec" ],\\n        "/usr/bin/nextdns": [ "exec" ],\\n        "/usr/bin/cloudflared": [ "exec" ]\\n      }\\n    },\\n    "write": {\\n      "file": {\\n        "/usr/sbin/tailscale": [ "exec" ],\\n        "/usr/bin/tailscale": [ "exec" ],\\n        "/usr/bin/nextdns": [ "exec" ],\\n        "/usr/bin/cloudflared": [ "exec" ]\\n      }\\n    }\\n  }\\n}\\n\' > /usr/share/rpcd/acl.d/luci-app-tailscale.json && '
+                'if command -v apk >/dev/null 2>&1; then '
+                'apk update && apk add luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status; '
+                'else '
+                'opkg update && opkg install luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status; '
+                'fi && /etc/init.d/rpcd restart',
           ],
         },
         context: context,
@@ -2466,12 +3081,12 @@ class RealApiService implements IApiService {
           'args': [
             '-c',
             'mkdir -p /usr/share/rpcd/acl.d/ && '
-            'printf \'{\\n  "luci-app-tailscale": {\\n    "description": "Tailscale VPN ACL Permissions",\\n    "read": {\\n      "file": {\\n        "/usr/sbin/tailscale": [ "exec" ],\\n        "/usr/bin/tailscale": [ "exec" ],\\n        "/usr/bin/nextdns": [ "exec" ],\\n        "/usr/bin/cloudflared": [ "exec" ]\\n      }\\n    },\\n    "write": {\\n      "file": {\\n        "/usr/sbin/tailscale": [ "exec" ],\\n        "/usr/bin/tailscale": [ "exec" ],\\n        "/usr/bin/nextdns": [ "exec" ],\\n        "/usr/bin/cloudflared": [ "exec" ]\\n      }\\n    }\\n  }\\n}\\n\' > /usr/share/rpcd/acl.d/luci-app-tailscale.json && '
-            'if command -v apk >/dev/null 2>&1; then '
-            'apk update && apk add luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status; '
-            'else '
-            'opkg update && opkg install luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status; '
-            'fi && /etc/init.d/rpcd restart'
+                'printf \'{\\n  "luci-app-tailscale": {\\n    "description": "Tailscale VPN ACL Permissions",\\n    "read": {\\n      "file": {\\n        "/usr/sbin/tailscale": [ "exec" ],\\n        "/usr/bin/tailscale": [ "exec" ],\\n        "/usr/bin/nextdns": [ "exec" ],\\n        "/usr/bin/cloudflared": [ "exec" ]\\n      }\\n    },\\n    "write": {\\n      "file": {\\n        "/usr/sbin/tailscale": [ "exec" ],\\n        "/usr/bin/tailscale": [ "exec" ],\\n        "/usr/bin/nextdns": [ "exec" ],\\n        "/usr/bin/cloudflared": [ "exec" ]\\n      }\\n    }\\n  }\\n}\\n\' > /usr/share/rpcd/acl.d/luci-app-tailscale.json && '
+                'if command -v apk >/dev/null 2>&1; then '
+                'apk update && apk add luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status; '
+                'else '
+                'opkg update && opkg install luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status; '
+                'fi && /etc/init.d/rpcd restart',
           ],
         },
         context: context,
@@ -2532,10 +3147,7 @@ class RealApiService implements IApiService {
           useHttps,
           object: 'rc',
           method: 'init',
-          params: {
-            'name': serviceName,
-            'action': action,
-          },
+          params: {'name': serviceName, 'action': action},
           context: context,
         );
         if (_execSucceeded(rcRes)) return true;
@@ -2591,7 +3203,10 @@ class RealApiService implements IApiService {
       );
 
       if (getRes is List && getRes.length > 1 && getRes[0] == 0) {
-        final values = (getRes[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>? ?? {};
+        final values =
+            (getRes[1] as Map<String, dynamic>?)?['values']
+                as Map<String, dynamic>? ??
+            {};
         String? targetSecKey;
         List<String> currentMacs = [];
 
@@ -2604,7 +3219,9 @@ class RealApiService implements IApiService {
               targetSecKey = entry.key;
               final srcMac = sec['src_mac'];
               if (srcMac is List) {
-                currentMacs = srcMac.map((e) => e.toString().toUpperCase()).toList();
+                currentMacs = srcMac
+                    .map((e) => e.toString().toUpperCase())
+                    .toList();
               } else if (srcMac != null) {
                 currentMacs = [srcMac.toString().toUpperCase()];
               }
@@ -2645,10 +3262,7 @@ class RealApiService implements IApiService {
             params: {
               'config': 'firewall',
               'section': targetSecKey,
-              'values': {
-                'src': '*',
-                'src_mac': currentMacs,
-              },
+              'values': {'src': '*', 'src_mac': currentMacs},
             },
             context: mountedContext(context),
           );
@@ -2674,11 +3288,14 @@ class RealApiService implements IApiService {
         );
       }
     } catch (e) {
-      Logger.warning('Native ubus firewall rule check/add encountered issue: $e');
+      Logger.warning(
+        'Native ubus firewall rule check/add encountered issue: $e',
+      );
     }
 
     // 2. Shell fallback check and execute for single universal rule (uci, nft, and iptables)
-    final shellScript = '''
+    final shellScript =
+        '''
 MAC_U="$macUpper"
 MAC_L="$macLower"
 RULE_NAME="$ruleName"
@@ -2723,7 +3340,9 @@ exit 0
     );
 
     if (!ruleExisted) {
-      Logger.info('Created firewall rule "$ruleName" to restrict client $macUpper');
+      Logger.info(
+        'Created firewall rule "$ruleName" to restrict client $macUpper',
+      );
     }
 
     return true;
@@ -2755,7 +3374,10 @@ exit 0
       );
 
       if (getRes is List && getRes.length > 1 && getRes[0] == 0) {
-        final values = (getRes[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>? ?? {};
+        final values =
+            (getRes[1] as Map<String, dynamic>?)?['values']
+                as Map<String, dynamic>? ??
+            {};
         for (final entry in values.entries) {
           final secKey = entry.key;
           final sec = entry.value;
@@ -2767,18 +3389,31 @@ exit 0
 
             List<String> macs = [];
             if (srcMac is List) {
-              macs.addAll(srcMac.map((e) => e.toString().toUpperCase().replaceAll('-', ':')));
+              macs.addAll(
+                srcMac.map(
+                  (e) => e.toString().toUpperCase().replaceAll('-', ':'),
+                ),
+              );
             } else if (srcMac != null) {
               macs.add(srcMac.toString().toUpperCase().replaceAll('-', ':'));
             }
             if (destMac is List) {
-              macs.addAll(destMac.map((e) => e.toString().toUpperCase().replaceAll('-', ':')));
+              macs.addAll(
+                destMac.map(
+                  (e) => e.toString().toUpperCase().replaceAll('-', ':'),
+                ),
+              );
             } else if (destMac != null) {
               macs.add(destMac.toString().toUpperCase().replaceAll('-', ':'));
             }
 
-            final matchesTargetMac = macs.any((m) => m == macUpper || m.toLowerCase() == macLower);
-            final isBlockTarget = target == 'DROP' || target == 'REJECT' || target == 'STOP' ||
+            final matchesTargetMac = macs.any(
+              (m) => m == macUpper || m.toLowerCase() == macLower,
+            );
+            final isBlockTarget =
+                target == 'DROP' ||
+                target == 'REJECT' ||
+                target == 'STOP' ||
                 name.startsWith('Pause_Internet_') ||
                 name.startsWith('Ban_Client_') ||
                 name.startsWith('Kick_Client_') ||
@@ -2786,7 +3421,9 @@ exit 0
 
             if (matchesTargetMac && isBlockTarget) {
               if (name == ruleName || macs.length > 1) {
-                macs.removeWhere((m) => m == macUpper || m.toLowerCase() == macLower);
+                macs.removeWhere(
+                  (m) => m == macUpper || m.toLowerCase() == macLower,
+                );
                 if (macs.isEmpty) {
                   await callWithContext(
                     ipAddress,
@@ -2852,7 +3489,8 @@ exit 0
       Logger.warning('Native ubus firewall remove encountered issue: $e');
     }
 
-    final script = '''
+    final script =
+        '''
 MAC_U="$macUpper"
 MAC_L="$macLower"
 CLEAN="$macClean"
@@ -2924,7 +3562,10 @@ exit 0
       );
 
       if (getRes is List && getRes.length > 1 && getRes[0] == 0) {
-        final values = (getRes[1] as Map<String, dynamic>?)?['values'] as Map<String, dynamic>? ?? {};
+        final values =
+            (getRes[1] as Map<String, dynamic>?)?['values']
+                as Map<String, dynamic>? ??
+            {};
         for (final entry in values.entries) {
           final secKey = entry.key;
           final sec = entry.value;
@@ -2933,11 +3574,27 @@ exit 0
             if (macfilter == 'deny' || macfilter == '2') {
               final rawMaclist = sec['maclist'];
               List<String> macs = rawMaclist is List
-                  ? rawMaclist.map((e) => e.toString().toUpperCase().replaceAll('-', ':')).toList()
-                  : (rawMaclist != null ? [rawMaclist.toString().toUpperCase().replaceAll('-', ':')] : []);
+                  ? rawMaclist
+                        .map(
+                          (e) =>
+                              e.toString().toUpperCase().replaceAll('-', ':'),
+                        )
+                        .toList()
+                  : (rawMaclist != null
+                        ? [
+                            rawMaclist.toString().toUpperCase().replaceAll(
+                              '-',
+                              ':',
+                            ),
+                          ]
+                        : []);
 
-              if (macs.any((m) => m == macUpper || m.toLowerCase() == macLower)) {
-                macs.removeWhere((m) => m == macUpper || m.toLowerCase() == macLower);
+              if (macs.any(
+                (m) => m == macUpper || m.toLowerCase() == macLower,
+              )) {
+                macs.removeWhere(
+                  (m) => m == macUpper || m.toLowerCase() == macLower,
+                );
                 await callWithContext(
                   ipAddress,
                   sysauth,
@@ -2981,7 +3638,8 @@ exit 0
       Logger.warning('_removeWirelessMacFilter ubus error: $e');
     }
 
-    final script = '''
+    final script =
+        '''
 MAC_U="$macUpper"
 MAC_L="$macLower"
 
@@ -3028,7 +3686,8 @@ exit 0
       final int banTimeMs = (banTimeSeconds <= 0 ? 0 : banTimeSeconds) * 1000;
       final targetIface = (iface != null && iface.isNotEmpty) ? iface : '';
 
-      final cmdScript = '''
+      final cmdScript =
+          '''
 MAC_U="$macUpper"
 MAC_L="$macLower"
 IFACE="$targetIface"
@@ -3152,7 +3811,8 @@ exit 0
     final macUpper = macAddress.toUpperCase().replaceAll('-', ':');
     final macLower = macAddress.toLowerCase();
 
-    final unbanScript = '''
+    final unbanScript =
+        '''
 MAC_U="$macUpper"
 MAC_L="$macLower"
 
@@ -3213,7 +3873,8 @@ exit 0
   }
 
   @override
-  Future<Map<String, List<Map<String, dynamic>>>> fetchRestrictedAndBannedClientsLive(
+  Future<Map<String, List<Map<String, dynamic>>>>
+  fetchRestrictedAndBannedClientsLive(
     String ipAddress,
     String sysauth,
     bool useHttps, {
@@ -3278,7 +3939,8 @@ echo "\$DENY_MACS \$WIFI_UCI" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^F
 
           if (trimmed.isNotEmpty && trimmed.contains(':')) {
             final macUpper = trimmed.toUpperCase().replaceAll('-', ':');
-            if (macUpper == '00:00:00:00:00:00' || macUpper == 'FF:FF:FF:FF:FF:FF') {
+            if (macUpper == '00:00:00:00:00:00' ||
+                macUpper == 'FF:FF:FF:FF:FF:FF') {
               continue;
             }
 
@@ -3287,12 +3949,16 @@ echo "\$DENY_MACS \$WIFI_UCI" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^F
               'name': macUpper,
               'ip': 'N/A',
               'type': currentSection,
-              'source': currentSection == 'restricted' ? 'Internet Access Paused' : 'Wi-Fi Access Control (Banned)',
+              'source': currentSection == 'restricted'
+                  ? 'Internet Access Paused'
+                  : 'Wi-Fi Access Control (Banned)',
             };
 
-            if (currentSection == 'restricted' && !result['restricted']!.any((e) => e['mac'] == macUpper)) {
+            if (currentSection == 'restricted' &&
+                !result['restricted']!.any((e) => e['mac'] == macUpper)) {
               result['restricted']!.add(entry);
-            } else if (currentSection == 'banned' && !result['banned']!.any((e) => e['mac'] == macUpper)) {
+            } else if (currentSection == 'banned' &&
+                !result['banned']!.any((e) => e['mac'] == macUpper)) {
               result['banned']!.add(entry);
             }
           }
@@ -3352,17 +4018,19 @@ echo "\$DENY_MACS \$WIFI_UCI" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^F
       final cleanTargetIp = targetIp.trim();
       final sanitizedLt = _sanitizeOpenWrtLeaseTime(leaseTime);
 
-      final values = <String, String>{
-        'name': hostname.trim(),
-      };
+      final values = <String, String>{'name': hostname.trim()};
 
-      if (macUpper.isNotEmpty && macUpper != 'N/A' && !macUpper.startsWith('DUID:')) {
+      if (macUpper.isNotEmpty &&
+          macUpper != 'N/A' &&
+          !macUpper.startsWith('DUID:')) {
         values['mac'] = macUpper;
       }
       if (cleanTargetIp.isNotEmpty && cleanTargetIp != 'N/A') {
         values['ip'] = cleanTargetIp;
       }
-      if (targetIp6 != null && targetIp6.trim().isNotEmpty && targetIp6.trim() != 'N/A') {
+      if (targetIp6 != null &&
+          targetIp6.trim().isNotEmpty &&
+          targetIp6.trim() != 'N/A') {
         values['ip6addr'] = targetIp6.trim();
       }
       if (duid != null && duid.trim().isNotEmpty && duid.trim() != 'N/A') {
@@ -3397,11 +4065,13 @@ echo "\$DENY_MACS \$WIFI_UCI" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^F
 
               if (ipVal == cleanTargetIp) {
                 isMatch = true;
-              } else if (macVal is String && macVal.toUpperCase().replaceAll('-', ':') == macUpper) {
+              } else if (macVal is String &&
+                  macVal.toUpperCase().replaceAll('-', ':') == macUpper) {
                 isMatch = true;
               } else if (macVal is List) {
                 for (final item in macVal) {
-                  if (item.toString().toUpperCase().replaceAll('-', ':') == macUpper) {
+                  if (item.toString().toUpperCase().replaceAll('-', ':') ==
+                      macUpper) {
                     isMatch = true;
                     break;
                   }
@@ -3415,7 +4085,9 @@ echo "\$DENY_MACS \$WIFI_UCI" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^F
           });
         }
       } catch (e) {
-        Logger.warning('uci dhcp lookup encountered issue during addStaticLease: $e');
+        Logger.warning(
+          'uci dhcp lookup encountered issue during addStaticLease: $e',
+        );
       }
 
       bool addSuccess = false;
@@ -3454,7 +4126,13 @@ echo "\$DENY_MACS \$WIFI_UCI" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^F
         );
         addSuccess = setRes is List && setRes.isNotEmpty && setRes[0] == 0;
         if (addSuccess) {
-          await uciCommit(ipAddress, sysauth, useHttps, config: 'dhcp', context: mountedContext(context));
+          await uciCommit(
+            ipAddress,
+            sysauth,
+            useHttps,
+            config: 'dhcp',
+            context: mountedContext(context),
+          );
         }
       } else {
         // Create new host section via uci.add
@@ -3464,16 +4142,18 @@ echo "\$DENY_MACS \$WIFI_UCI" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^F
           useHttps,
           object: 'uci',
           method: 'add',
-          params: {
-            'config': 'dhcp',
-            'type': 'host',
-            'values': values,
-          },
+          params: {'config': 'dhcp', 'type': 'host', 'values': values},
           context: mountedContext(context),
         );
         addSuccess = addRes is List && addRes.isNotEmpty && addRes[0] == 0;
         if (addSuccess) {
-          await uciCommit(ipAddress, sysauth, useHttps, config: 'dhcp', context: mountedContext(context));
+          await uciCommit(
+            ipAddress,
+            sysauth,
+            useHttps,
+            config: 'dhcp',
+            context: mountedContext(context),
+          );
         }
       }
 
@@ -3571,7 +4251,9 @@ echo "\$DENY_MACS \$WIFI_UCI" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^F
           });
         }
       } catch (e) {
-        Logger.warning('ubus dhcp config lookup failed during deleteStaticLease: $e');
+        Logger.warning(
+          'ubus dhcp config lookup failed during deleteStaticLease: $e',
+        );
       }
 
       bool deleteSuccess = false;
@@ -3584,10 +4266,7 @@ echo "\$DENY_MACS \$WIFI_UCI" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^F
             useHttps,
             object: 'uci',
             method: 'delete',
-            params: {
-              'config': 'dhcp',
-              'section': sec,
-            },
+            params: {'config': 'dhcp', 'section': sec},
             context: mountedContext(context),
           );
           if (delRes is List && delRes.isNotEmpty && delRes[0] == 0) {
@@ -3595,7 +4274,13 @@ echo "\$DENY_MACS \$WIFI_UCI" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^F
           }
         }
         if (deleteSuccess) {
-          await uciCommit(ipAddress, sysauth, useHttps, config: 'dhcp', context: mountedContext(context));
+          await uciCommit(
+            ipAddress,
+            sysauth,
+            useHttps,
+            config: 'dhcp',
+            context: mountedContext(context),
+          );
         }
       }
 
@@ -3609,7 +4294,10 @@ echo "\$DENY_MACS \$WIFI_UCI" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^F
           method: 'exec',
           params: {
             'command': '/bin/sh',
-            'params': ['-c', "for sec in \$(uci show dhcp 2>/dev/null | grep -i '$cleanMac' | cut -d. -f2 | sort -u); do uci delete dhcp.\$sec 2>/dev/null || true; done; uci commit dhcp && /etc/init.d/dnsmasq restart"],
+            'params': [
+              '-c',
+              "for sec in \$(uci show dhcp 2>/dev/null | grep -i '$cleanMac' | cut -d. -f2 | sort -u); do uci delete dhcp.\$sec 2>/dev/null || true; done; uci commit dhcp && /etc/init.d/dnsmasq restart",
+            ],
           },
           context: mountedContext(context),
         );
@@ -3645,7 +4333,8 @@ echo "\$DENY_MACS \$WIFI_UCI" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^F
       final macUpper = macAddress.toUpperCase().replaceAll('-', ':');
       final macLower = macAddress.toLowerCase().replaceAll('-', ':');
 
-      final script = '''
+      final script =
+          '''
 MAC_U="$macUpper"
 MAC_L="$macLower"
 
@@ -3678,7 +4367,11 @@ exit 0
 
       return true;
     } catch (e, stack) {
-      Logger.exception('refreshClientConnection failed for $macAddress', e, stack);
+      Logger.exception(
+        'refreshClientConnection failed for $macAddress',
+        e,
+        stack,
+      );
       return false;
     }
   }
@@ -3710,7 +4403,8 @@ exit 0
             if (proc is Map) {
               final cmd = (proc['COMMAND'] ?? '').toString();
               final pid = (proc['PID'] ?? '').toString();
-              if (pid.isNotEmpty && (cmd.contains('dnsmasq') || cmd.contains('odhcpd'))) {
+              if (pid.isNotEmpty &&
+                  (cmd.contains('dnsmasq') || cmd.contains('odhcpd'))) {
                 try {
                   // Send SIGHUP (-1) via /bin/kill which is allowed by ubus ACLs
                   await callWithContext(
@@ -3744,10 +4438,15 @@ exit 0
 
       // 3. Fallback: attempt /bin/sh shell script if router allows full shell exec
       try {
-        final macUpper = macsToFlush.map((m) => m.toUpperCase().replaceAll('-', ':')).join('|');
-        final macLower = macsToFlush.map((m) => m.toLowerCase().replaceAll('-', ':')).join('|');
+        final macUpper = macsToFlush
+            .map((m) => m.toUpperCase().replaceAll('-', ':'))
+            .join('|');
+        final macLower = macsToFlush
+            .map((m) => m.toLowerCase().replaceAll('-', ':'))
+            .join('|');
         final macPattern = '$macUpper|$macLower';
-        final script = '''
+        final script =
+            '''
 for f in /tmp/dhcp.leases /var/dhcp.leases /tmp/dnsmasq.leases /var/run/odhcpd.leases /tmp/odhcpd.leases /tmp/hosts/odhcpd; do
   if [ -f "\$f" ]; then
     grep -vE "$macPattern" "\$f" > "\$f.tmp" 2>/dev/null && mv "\$f.tmp" "\$f" 2>/dev/null || true
@@ -3785,9 +4484,10 @@ exit 0
 
     // 1. Attempt router-side URL fetch via /bin/sh exec (handles CGNAT from router WAN context)
     try {
-      final cmd = 'V4=\$(wget -q -O - http://api.ipify.org 2>/dev/null || wget -q -O - http://checkip.amazonaws.com 2>/dev/null || curl -s -m 3 http://api.ipify.org 2>/dev/null || uclient-fetch -q -O - http://api.ipify.org 2>/dev/null); '
-                  'V6=\$(wget -q -O - http://api6.ipify.org 2>/dev/null || wget -q -O - http://v6.ipv6-test.com/api/myip.php 2>/dev/null || curl -s -6 -m 3 http://api6.ipify.org 2>/dev/null || uclient-fetch -q -O - http://api6.ipify.org 2>/dev/null); '
-                  'echo "V4:\$V4"; echo "V6:\$V6"';
+      final cmd =
+          'V4=\$(wget -q -O - http://api.ipify.org 2>/dev/null || wget -q -O - http://checkip.amazonaws.com 2>/dev/null || curl -s -m 3 http://api.ipify.org 2>/dev/null || uclient-fetch -q -O - http://api.ipify.org 2>/dev/null); '
+          'V6=\$(wget -q -O - http://api6.ipify.org 2>/dev/null || wget -q -O - http://v6.ipv6-test.com/api/myip.php 2>/dev/null || curl -s -6 -m 3 http://api6.ipify.org 2>/dev/null || uclient-fetch -q -O - http://api6.ipify.org 2>/dev/null); '
+          'echo "V4:\$V4"; echo "V6:\$V6"';
 
       final shellRes = await callWithContext(
         ipAddress,
@@ -3826,7 +4526,9 @@ exit 0
     // 2. Client-side HTTP fallback if router execution returned null
     if (publicV4 == null) {
       try {
-        final res = await http.get(Uri.parse('http://api.ipify.org')).timeout(const Duration(seconds: 3));
+        final res = await http
+            .get(Uri.parse('http://api.ipify.org'))
+            .timeout(const Duration(seconds: 3));
         if (res.statusCode == 200) {
           final body = res.body.trim();
           if (_isValidIpv4Candidate(body)) {
@@ -3840,7 +4542,9 @@ exit 0
 
     if (publicV6 == null) {
       try {
-        final res = await http.get(Uri.parse('http://api6.ipify.org')).timeout(const Duration(seconds: 3));
+        final res = await http
+            .get(Uri.parse('http://api6.ipify.org'))
+            .timeout(const Duration(seconds: 3));
         if (res.statusCode == 200) {
           final body = res.body.trim();
           if (body.contains(':')) {
@@ -3856,7 +4560,9 @@ exit 0
   }
 
   static bool _isValidIpv4Candidate(String ip) {
-    final reg = RegExp(r'^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.){3}(25[0-5]|(2[0-4]|1\d|[1-9]|)\d)$');
+    final reg = RegExp(
+      r'^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.){3}(25[0-5]|(2[0-4]|1\d|[1-9]|)\d)$',
+    );
     return reg.hasMatch(ip);
   }
 
@@ -3880,12 +4586,18 @@ exit 0
           params: {'config': 'dhcp'},
           context: mountedContext(context),
         );
-        if (execSucceeded(uciRes) && uciRes is List && uciRes.length > 1 && uciRes[1] is Map) {
+        if (execSucceeded(uciRes) &&
+            uciRes is List &&
+            uciRes.length > 1 &&
+            uciRes[1] is Map) {
           final values = uciRes[1]['values'] ?? uciRes[1];
           if (values is Map) {
             values.forEach((k, v) {
-              if (v is Map && (v['.type'] == 'dnsmasq' || k.toString().contains('dnsmasq'))) {
-                if (v['leasefile'] != null && v['leasefile'].toString().isNotEmpty) {
+              if (v is Map &&
+                  (v['.type'] == 'dnsmasq' ||
+                      k.toString().contains('dnsmasq'))) {
+                if (v['leasefile'] != null &&
+                    v['leasefile'].toString().isNotEmpty) {
                   leasePath = v['leasefile'].toString();
                 }
               }
@@ -3939,7 +4651,8 @@ exit 0
             if (proc is Map) {
               final cmd = (proc['COMMAND'] ?? '').toString();
               final pid = (proc['PID'] ?? '').toString();
-              if (pid.isNotEmpty && (cmd.contains('dnsmasq') || cmd.contains('odhcpd'))) {
+              if (pid.isNotEmpty &&
+                  (cmd.contains('dnsmasq') || cmd.contains('odhcpd'))) {
                 try {
                   await callWithContext(
                     ipAddress,
@@ -3959,7 +4672,8 @@ exit 0
       } catch (_) {}
 
       // 4. Shell purge fallback script if shell exec is permitted
-      final purgeScript = '''
+      final purgeScript =
+          '''
 rm -f "$leasePath" /tmp/dhcp.leases /var/dhcp.leases /tmp/dnsmasq.leases /var/lib/misc/dnsmasq.leases /var/run/odhcpd.leases 2>/dev/null || > "$leasePath" 2>/dev/null || true
 ''';
       try {
@@ -4047,7 +4761,9 @@ rm -f "$leasePath" /tmp/dhcp.leases /var/dhcp.leases /tmp/dnsmasq.leases /var/li
           .map((l) => l.trim())
           .where((l) => l.isNotEmpty)
           .toList();
-      final content = sanitizedLines.isEmpty ? '' : '${sanitizedLines.join('\n')}\n';
+      final content = sanitizedLines.isEmpty
+          ? ''
+          : '${sanitizedLines.join('\n')}\n';
 
       // 1. Write the crontab file to /etc/crontabs/root
       final writeRes = await callWithContext(
@@ -4056,10 +4772,7 @@ rm -f "$leasePath" /tmp/dhcp.leases /var/dhcp.leases /tmp/dnsmasq.leases /var/li
         useHttps,
         object: 'file',
         method: 'write',
-        params: {
-          'path': '/etc/crontabs/root',
-          'data': content,
-        },
+        params: {'path': '/etc/crontabs/root', 'data': content},
         context: mountedContext(context),
       );
 
@@ -4155,10 +4868,7 @@ rm -f "$leasePath" /tmp/dhcp.leases /var/dhcp.leases /tmp/dnsmasq.leases /var/li
         useHttps,
         object: 'uci',
         method: 'delete',
-        params: {
-          'config': 'ddns',
-          'section': instanceName,
-        },
+        params: {'config': 'ddns', 'section': instanceName},
         context: mountedContext(context),
       );
 
@@ -4202,10 +4912,14 @@ rm -f "$leasePath" /tmp/dhcp.leases /var/dhcp.leases /tmp/dnsmasq.leases /var/li
   }) async {
     try {
       if (instance.lookupHost.isEmpty && instance.domain.isEmpty) {
-        return DdnsValidationResult.failure('Lookup Hostname / Domain cannot be empty.');
+        return DdnsValidationResult.failure(
+          'Lookup Hostname / Domain cannot be empty.',
+        );
       }
 
-      final hostToTest = instance.lookupHost.isNotEmpty ? instance.lookupHost : instance.domain;
+      final hostToTest = instance.lookupHost.isNotEmpty
+          ? instance.lookupHost
+          : instance.domain;
 
       final rpcRes = await callWithContext(
         ipAddress,
@@ -4228,7 +4942,9 @@ rm -f "$leasePath" /tmp/dhcp.leases /var/dhcp.leases /tmp/dnsmasq.leases /var/li
         return DdnsValidationResult.success(
           testOutput: 'DNS Lookup Successful:\n$combined',
         );
-      } else if (combined.contains("can't find") || combined.contains('NXDOMAIN') || combined.contains('ServFail')) {
+      } else if (combined.contains("can't find") ||
+          combined.contains('NXDOMAIN') ||
+          combined.contains('ServFail')) {
         return DdnsValidationResult.failure(
           'Hostname DNS lookup failed ($hostToTest). Ensure domain exists or is registered.',
           testOutput: combined,
@@ -4239,7 +4955,9 @@ rm -f "$leasePath" /tmp/dhcp.leases /var/dhcp.leases /tmp/dnsmasq.leases /var/li
         testOutput: 'Configuration passed basic validation checks.\n$combined',
       );
     } catch (e) {
-      return DdnsValidationResult.failure('Validation test execution error: $e');
+      return DdnsValidationResult.failure(
+        'Validation test execution error: $e',
+      );
     }
   }
 

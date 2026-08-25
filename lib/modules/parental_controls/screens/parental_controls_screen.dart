@@ -18,7 +18,8 @@ class ParentalControlsScreen extends ConsumerStatefulWidget {
   const ParentalControlsScreen({super.key});
 
   @override
-  ConsumerState<ParentalControlsScreen> createState() => _ParentalControlsScreenState();
+  ConsumerState<ParentalControlsScreen> createState() =>
+      _ParentalControlsScreenState();
 }
 
 class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
@@ -46,7 +47,14 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      if (_expiryTimer == null || !_expiryTimer!.isActive) {
+        _startExpiryTimer();
+      }
       _checkPausesAndSchedules();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      _expiryTimer?.cancel();
     }
   }
 
@@ -61,10 +69,14 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
     final appState = ref.read(appStateProvider);
     final raw = await appState.secureRead('parental_controls_store_v1');
     if (!mounted) return;
-    // Register listener AFTER load to avoid persisting the initial empty→loaded
-    // transition back to storage (which would overwrite an existing good value).
     _store.loadFromString(raw);
     _storeLoaded = true;
+
+    final routerProfiles = await appState.fetchParentalProfiles();
+    if (routerProfiles != null) {
+      _store.setProfiles(routerProfiles);
+    }
+
     _store.addListener(_onStoreChange);
     if (mounted) setState(() {});
   }
@@ -72,7 +84,10 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
   Future<void> _persistStore() async {
     if (!_storeLoaded) return;
     final appState = ref.read(appStateProvider);
-    await appState.secureWrite('parental_controls_store_v1', _store.toJsonString());
+    await appState.secureWrite(
+      'parental_controls_store_v1',
+      _store.toJsonString(),
+    );
   }
 
   void _startExpiryTimer() {
@@ -101,7 +116,9 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
           if (inScheduleWindow && !currentlyPaused) {
             // Schedule block window active: enforce firewall block
             appState.pauseClientInternet(mac, pause: true, context: null);
-          } else if (!inScheduleWindow && !profile.isPaused && currentlyPaused) {
+          } else if (!inScheduleWindow &&
+              !profile.isPaused &&
+              currentlyPaused) {
             // Schedule block window ended: restore internet access
             appState.pauseClientInternet(mac, pause: false, context: null);
           }
@@ -110,7 +127,10 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
     }
   }
 
-  Future<void> _pauseProfile(ParentalProfile profile, PauseDuration duration) async {
+  Future<void> _pauseProfile(
+    ParentalProfile profile,
+    PauseDuration duration,
+  ) async {
     if (!mounted) return;
     final appState = ref.read(appStateProvider);
     final caps = appState.capabilities;
@@ -118,7 +138,9 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
 
     if (!hasFirewall) {
       if (mounted) {
-        context.showToastError('Firewall write access unavailable. Cannot pause internet.');
+        context.showToastError(
+          'Firewall write access unavailable. Cannot pause internet.',
+        );
       }
       return;
     }
@@ -143,13 +165,20 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
 
     final actionKey = 'pause_profile_${profile.id}';
     if (mounted) {
-      context.showToastLoading('Pausing internet for ${profile.name}…', actionKey: actionKey);
+      context.showToastLoading(
+        'Pausing internet for ${profile.name}…',
+        actionKey: actionKey,
+      );
     }
 
     bool allOk = true;
     for (final mac in profile.macAddresses) {
       // ignore: use_build_context_synchronously — context checked via mounted guard above
-      final ok = await appState.pauseClientInternet(mac, pause: true, context: null);
+      final ok = await appState.pauseClientInternet(
+        mac,
+        pause: true,
+        context: null,
+      );
       if (!ok) allOk = false;
     }
 
@@ -181,25 +210,39 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
     final actionKey = 'resume_profile_${profile.id}';
 
     if (!auto && mounted) {
-      context.showToastLoading('Resuming internet for ${profile.name}…', actionKey: actionKey);
+      context.showToastLoading(
+        'Resuming internet for ${profile.name}…',
+        actionKey: actionKey,
+      );
     }
 
     bool allOk = true;
     for (final mac in profile.macAddresses) {
-      final ok = await appState.pauseClientInternet(mac, pause: false, context: null);
+      final ok = await appState.pauseClientInternet(
+        mac,
+        pause: false,
+        context: null,
+      );
       if (!ok) allOk = false;
     }
 
     if (allOk || profile.macAddresses.isEmpty) {
       _store.markProfileResumed(profile.id);
-      if (!auto) unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
+      if (!auto)
+        unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
       if (!auto && mounted) {
-        context.showToastSuccess('Internet resumed for ${profile.name}.', actionKey: actionKey);
+        context.showToastSuccess(
+          'Internet resumed for ${profile.name}.',
+          actionKey: actionKey,
+        );
       }
     } else {
       if (!auto && mounted) {
         unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
-        context.showToastError('Failed to resume for some devices.', actionKey: actionKey);
+        context.showToastError(
+          'Failed to resume for some devices.',
+          actionKey: actionKey,
+        );
       }
     }
   }
@@ -211,11 +254,26 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
         allProfiles: _store.profiles,
         onSave: (profile) async {
           _store.addProfile(profile);
+          final appState = ref.read(appStateProvider);
+          await appState.saveParentalProfile(profile: profile);
           if (profile.isCurrentlyBlocked) {
-            final appState = ref.read(appStateProvider);
             for (final mac in profile.macAddresses) {
-              await appState.pauseClientInternet(mac, pause: true, context: null);
+              await appState.pauseClientInternet(
+                mac,
+                pause: true,
+                context: null,
+              );
             }
+          }
+          if (profile.hasContentFilter) {
+            await appState.applyParentalProfileDns(
+              profileId: profile.id,
+              macAddresses: profile.macAddresses,
+              dnsServers: profile.contentFilter == ContentFilterDns.custom
+                  ? profile.customDnsServers
+                  : profile.contentFilter.primaryServers,
+              context: null,
+            );
           }
         },
       ),
@@ -234,20 +292,40 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
           _store.updateProfile(updated);
 
           final appState = ref.read(appStateProvider);
+          await appState.saveParentalProfile(profile: updated);
+
           // 1. MACs removed from profile: unblock if no other profile blocks them
           final removedMacs = oldMacs.difference(newMacs);
           for (final mac in removedMacs) {
             if (!_store.isMacPaused(mac)) {
-              await appState.pauseClientInternet(mac, pause: false, context: null);
+              await appState.pauseClientInternet(
+                mac,
+                pause: false,
+                context: null,
+              );
             }
           }
           // 2. MACs newly added to profile: block if profile is currently blocked
           final addedMacs = newMacs.difference(oldMacs);
           if (updated.isCurrentlyBlocked) {
             for (final mac in addedMacs) {
-              await appState.pauseClientInternet(mac, pause: true, context: null);
+              await appState.pauseClientInternet(
+                mac,
+                pause: true,
+                context: null,
+              );
             }
           }
+          
+          // 3. Apply DNS changes
+          await appState.applyParentalProfileDns(
+            profileId: updated.id,
+            macAddresses: updated.macAddresses,
+            dnsServers: updated.contentFilter == ContentFilterDns.custom
+                ? updated.customDnsServers
+                : updated.contentFilter.primaryServers,
+            context: null,
+          );
         },
       ),
     );
@@ -267,9 +345,18 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
               _store.deleteProfile(profile.id);
+
+              final appState = ref.read(appStateProvider);
+              await appState.deleteParentalProfile(profileId: profile.id);
+              await appState.applyParentalProfileDns(
+                profileId: profile.id,
+                macAddresses: [],
+                dnsServers: null,
+                context: null,
+              );
             },
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Delete'),
@@ -324,7 +411,8 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
             _CapabilityBanner(
               icon: Icons.rate_review_outlined,
               color: theme.colorScheme.primary,
-              message: 'Reviewer Mode — changes are simulated and not sent to a real router.',
+              message:
+                  'Reviewer Mode — changes are simulated and not sent to a real router.',
             ),
 
           // ── Body ────────────────────────────────────────────────────
@@ -332,54 +420,75 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
             child: !_storeLoaded
                 ? const Center(child: CircularProgressIndicator())
                 : profiles.isEmpty
-                    ? _EmptyState(onAdd: _openAddProfile)
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                        itemCount: profiles.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 12),
-                        itemBuilder: (ctx, i) {
-                          final profile = profiles[i];
-                          return ParentalProfileCard(
-                            profile: profile,
-                            hasFirewall: hasFirewall,
-                            hasFileExec: hasFileExec,
-                            onPause: (duration) => _pauseProfile(profile, duration),
-                            onResume: () => _resumeProfile(
-                              profile,
-                              appState: ref.read(appStateProvider),
-                            ),
-                            onEdit: () => _openEditProfile(profile),
-                            onDelete: () => _confirmDeleteProfile(profile),
-                            onToggleEnabled: () async {
-                              _store.toggleProfileEnabled(profile.id);
-                              final updated = _store.getProfile(profile.id);
-                              if (updated != null && mounted) {
-                                final isNowEnabled = updated.isEnabled;
-                                final appState = ref.read(appStateProvider);
-                                if (!isNowEnabled) {
-                                  // Profile is now bypassed: remove active firewall block for assigned devices
-                                  for (final mac in updated.macAddresses) {
-                                    await appState.pauseClientInternet(mac, pause: false, context: null);
-                                  }
-                                } else if (updated.isCurrentlyBlocked) {
-                                  // Profile re-enabled and currently blocked: re-apply firewall block for assigned devices
-                                  for (final mac in updated.macAddresses) {
-                                    await appState.pauseClientInternet(mac, pause: true, context: null);
-                                  }
-                                }
-                                if (mounted) {
-                                  // ignore: use_build_context_synchronously — mounted guard checked above
-                                  context.showToastInfo(
-                                    isNowEnabled
-                                        ? 'Rules re-enabled for ${profile.name}'
-                                        : 'Restrictions bypassed for ${profile.name}',
-                                  );
-                                }
+                ? _EmptyState(onAdd: _openAddProfile)
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                    itemCount: profiles.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (ctx, i) {
+                      final profile = profiles[i];
+                      return ParentalProfileCard(
+                        profile: profile,
+                        hasFirewall: hasFirewall,
+                        hasFileExec: hasFileExec,
+                        onPause: (duration) => _pauseProfile(profile, duration),
+                        onResume: () => _resumeProfile(
+                          profile,
+                          appState: ref.read(appStateProvider),
+                        ),
+                        onEdit: () => _openEditProfile(profile),
+                        onDelete: () => _confirmDeleteProfile(profile),
+                        onToggleEnabled: () async {
+                          _store.toggleProfileEnabled(profile.id);
+                          final updated = _store.getProfile(profile.id);
+                          if (updated != null && mounted) {
+                            final isNowEnabled = updated.isEnabled;
+                            final appState = ref.read(appStateProvider);
+                            await appState.saveParentalProfile(profile: updated);
+                            if (!isNowEnabled) {
+                              // Profile is now bypassed: remove active firewall block for assigned devices
+                              for (final mac in updated.macAddresses) {
+                                await appState.pauseClientInternet(
+                                  mac,
+                                  pause: false,
+                                  context: null,
+                                );
                               }
-                            },
-                          );
+                            } else if (updated.isCurrentlyBlocked) {
+                              // Profile re-enabled and currently blocked: re-apply firewall block for assigned devices
+                              for (final mac in updated.macAddresses) {
+                                await appState.pauseClientInternet(
+                                  mac,
+                                  pause: true,
+                                  context: null,
+                                );
+                              }
+                            }
+                            
+                            // Apply or remove DNS rules
+                            await appState.applyParentalProfileDns(
+                              profileId: updated.id,
+                              macAddresses: isNowEnabled ? updated.macAddresses : [],
+                              dnsServers: isNowEnabled
+                                  ? (updated.contentFilter == ContentFilterDns.custom
+                                      ? updated.customDnsServers
+                                      : updated.contentFilter.primaryServers)
+                                  : null,
+                              context: null,
+                            );
+                            if (mounted) {
+                              // ignore: use_build_context_synchronously — mounted guard checked above
+                              context.showToastInfo(
+                                isNowEnabled
+                                    ? 'Rules re-enabled for ${profile.name}'
+                                    : 'Restrictions bypassed for ${profile.name}',
+                              );
+                            }
+                          }
                         },
-                      ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -413,7 +522,9 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
                     width: 36,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.3,
+                      ),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -426,8 +537,9 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
                       const SizedBox(width: 10),
                       Text(
                         'Activity Log',
-                        style: theme.textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const Spacer(),
                       if (log.isNotEmpty)
@@ -468,7 +580,9 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
                                 size: 20,
                                 color: _colorForEvent(e.eventType, theme),
                               ),
-                              title: Text('${e.profileName}: ${e.eventType.label}'),
+                              title: Text(
+                                '${e.profileName}: ${e.eventType.label}',
+                              ),
                               subtitle: Text(
                                 _formatTs(e.timestamp) +
                                     (e.detail != null ? ' · ${e.detail}' : ''),
@@ -598,7 +712,9 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 20),
             Text(
               'No Profiles Yet',
-              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 12),
             Text(

@@ -13,7 +13,10 @@ class StorageMonitoringCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final appState = ref.watch(appStateProvider);
     final mountData = appState.dashboardData?['mountPoints'];
-    final storage = StorageOverview.fromRpcData(mountData, isReviewerMode: appState.reviewerModeEnabled);
+    final storage = StorageOverview.fromRpcData(
+      mountData,
+      isReviewerMode: appState.reviewerModeEnabled,
+    );
 
     final displayItems = storage.priorityDisplayMounts;
 
@@ -41,9 +44,8 @@ class StorageMonitoringCard extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           'Storage & Overlay',
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -54,7 +56,9 @@ class StorageMonitoringCard extends ConsumerWidget {
                 Text(
                   '${storage.mountedDevices.length} Mounts',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
               ],
@@ -63,14 +67,20 @@ class StorageMonitoringCard extends ConsumerWidget {
             if (displayItems.isEmpty)
               Text(
                 'No storage devices detected.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: Colors.grey),
               )
             else
               Column(
                 children: [
                   for (int i = 0; i < displayItems.length; i++) ...[
                     if (i > 0) const SizedBox(height: 10),
-                    _buildStorageBarForItem(context, item: displayItems[i], index: i),
+                    _buildStorageBarForItem(
+                      context,
+                      item: displayItems[i],
+                      index: i,
+                    ),
                   ],
                 ],
               ),
@@ -97,7 +107,12 @@ class StorageMonitoringCard extends ConsumerWidget {
       label = mountTarget;
     }
 
-    final colors = [Colors.teal, Colors.indigo, Colors.amber.shade700, Colors.purple];
+    final colors = [
+      Colors.teal,
+      Colors.indigo,
+      Colors.amber.shade700,
+      Colors.purple,
+    ];
     final color = colors[index % colors.length];
 
     return _buildStorageBar(
@@ -133,7 +148,9 @@ class StorageMonitoringCard extends ConsumerWidget {
             Expanded(
               child: Text(
                 label,
-                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
               ),
@@ -141,7 +158,9 @@ class StorageMonitoringCard extends ConsumerWidget {
             const SizedBox(width: 8),
             Text(
               '$formattedUsed / $formattedTotal (${percent.toStringAsFixed(0)}%)',
-              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),

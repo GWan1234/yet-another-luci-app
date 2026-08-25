@@ -39,9 +39,8 @@ class WirelessManagementCard extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           'Wireless Radios & SSIDs',
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -52,10 +51,16 @@ class WirelessManagementCard extends ConsumerWidget {
                 InkWell(
                   borderRadius: BorderRadius.circular(8),
                   onTap: () {
-                    appState.requestTab(2, clientCategoryFilter: ClientCategoryFilter.wireless);
+                    appState.requestTab(
+                      2,
+                      clientCategoryFilter: ClientCategoryFilter.wireless,
+                    );
                   },
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6.0,
+                      vertical: 2.0,
+                    ),
                     child: Text(
                       '${overview.totalConnectedStations} Wi-Fi Clients',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -69,57 +74,76 @@ class WirelessManagementCard extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             Row(
-              children: overview.radios.map((radio) => Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                radio.name.toUpperCase(),
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                                overflow: TextOverflow.ellipsis,
+              children: overview.radios
+                  .map(
+                    (radio) => Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest
+                                .withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      radio.name.toUpperCase(),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    radio.bandLabel,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              radio.bandLabel,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.primary,
+                              const SizedBox(height: 4),
+                              Text(
+                                'Channel ${radio.channel} • ${radio.txPowerDbm ?? 20} dBm',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Channel ${radio.channel} • ${radio.txPowerDbm ?? 20} dBm',
-                          style: const TextStyle(fontSize: 11, color: Colors.grey),
-                        ),
-                        const SizedBox(height: 4),
-                        ...radio.interfaces.map(
-                          (iface) => Text(
-                            'SSID: ${iface.ssid}',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                            overflow: TextOverflow.ellipsis,
+                              const SizedBox(height: 4),
+                              ...radio.interfaces.map(
+                                (iface) => Text(
+                                  'SSID: ${iface.ssid}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              )).toList(),
+                  )
+                  .toList(),
             ),
           ],
         ),

@@ -5,11 +5,12 @@
   <h2>Modern OpenWrt & LuCI Router Manager for Mobile</h2>
   <p>Maintained by <b>Tuhin Garai (@nightcodex7)</b></p>
 
+  [![Version](https://img.shields.io/badge/Version-v0.1.6-blue.svg?style=for-the-badge&logo=github)](https://github.com/nightcodex7/yet-another-luci-app/releases)
   [![Flutter](https://img.shields.io/badge/Flutter-3.32.5+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
   [![Dart](https://img.shields.io/badge/Dart-3.8+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
   [![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg?style=for-the-badge)](LICENSE)
   [![Build Status](https://img.shields.io/badge/Build-Passing-teal.svg?style=for-the-badge)]()
-  [![OpenWrt](https://img.shields.io/badge/OpenWrt-21.02--24.10+-1589F0?style=for-the-badge&logo=openwrt&logoColor=white)](https://openwrt.org)
+  [![OpenWrt](https://img.shields.io/badge/OpenWrt-19.07--24.10+-1589F0?style=for-the-badge&logo=openwrt&logoColor=white)](https://openwrt.org)
 
   <br><br>
 
@@ -23,55 +24,73 @@
 
 <br>
 
-**Yet Another LuCI App** is a modern, high-performance Flutter mobile application for managing, monitoring, and diagnosing OpenWrt routers. Built with Material 3 design principles, custom micro-animations, and full LuCI RPC integration, it brings desktop-class router control directly to your mobile phone.
+**Yet Another LuCI App** is a modern Flutter mobile application for managing, monitoring, and diagnosing OpenWrt routers. Built with Material 3 design principles, custom micro-animations, self-device guardrails, atomic UCI transaction engines, and full LuCI RPC integration, it brings desktop-class router control directly to mobile devices.
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
-### 📡 Multi-Router Management & Secure Vault
+### Multi-Router Management & Secure Vault
 
-- **Multi-Device Support:** Switch between unlimited OpenWrt routers with isolated secure credentials.
-- **HTTPS & Custom Ports:** Connect via HTTP/HTTPS with support for self-signed SSL certificates.
+- **Multi-Device Support:** Manage and switch between multiple OpenWrt routers with isolated credentials stored in native secure storage.
+- **Resilient Authentication Stack:** Automatic fallback chain supporting LuCI RPC (`/cgi-bin/luci/rpc/auth`), ubus JSON-RPC (`session.login`), and redirect-aware CGI form authentication (`sysauth` cookies and `stok` tokens).
+- **HTTPS & Custom Ports:** Connect via HTTP or HTTPS with custom port configurations and local SSL certificate validation overrides.
 
-### 📊 Real-Time Dashboard & Network Vitals
+### Parental Controls & Scheduled Access
 
-- **Dual Themes:** Clean, seamless switching between Light and Dark themes.
-- **Animated Vitals Gauges:** Live CPU load, RAM memory usage, Swap, and root `/` filesystem capacity.
-- **Real-Time Throughput Graph:** Smooth live chart displaying network transfer rates (Rx/Tx Kbps/Mbps) with configurable polling intervals.
-- **Interface Overview Cards:** Live UP/DOWN statuses, assigned IPv4/IPv6 addresses, MACs, protocols, and public IP badges on WAN interfaces with direct tab navigation.
+- **Profile-Based Management:** Group connected devices under profiles with customizable access schedules.
+- **Automated Access Windows:** Enforces firewall blocking rules during scheduled restriction windows and restores access automatically when windows expire.
+- **Domain Filtering & Overrides:** Filter specific domains per profile or toggle instant unrestricted bypass overrides.
 
-### 📱 Connected Client Management
+### Guest Wi-Fi & Wireless Diagnostics
 
-- **Unified Connected List:** Synchronous aggregation of active DHCP leases, ARP neighbor entries, and wireless stations.
-- **Device Identification:** Displays hostname (prioritizing static leases and DHCP), IP, MAC address, vendor OUI, connected SSID, and radio band badges.
-- **Expandable IPv6 Management:** Clean IPv6 address deduplication with toggleable expand/collapse lists for clients with multiple private (ULA) or link-local IPv6 addresses.
-- **Wi-Fi Access Control:** Quick MAC entry tool for access management.
+- **One-Click Guest Networks:** Provision guest Wi-Fi SSIDs with automatic AP client isolation (`ap_isolate=1`) and dedicated firewall zone isolation.
+- **Wi-Fi Access Control:** Enforce MAC address allowlists or denylists with direct router UCI synchronization.
+- **QR Code Sharing:** Generate on-screen Wi-Fi QR codes for quick client connection.
+- **Multi-Band Diagnostics:** Monitor 2.4GHz, 5GHz, and 6GHz radios with frequency details, channel width, transmit power, and connected station bandwidth metrics.
 
-### 📶 Wireless Radios & Station Diagnostics
+### Self-Device Protection & Atomic UCI Engine
 
-- **Radio Band Management:** Multi-radio card diagnostic for 2.4GHz, 5GHz, and 6GHz bands.
-- **Precise Frequency Info:** Displays operational frequency up to 3 decimal places (e.g. 2.423 GHz), channel, transmit power, and active stations.
-- **Station Throughput & Diagnostics:** View exact connected client hostnames, signal quality, and live Rx/Tx bandwidth rates adaptively formatted in `Gbps`, `Mbps`, `Kbps`, or `B/s`.
+- **Self-Device Guard:** Automatically detects local client IP and MAC addresses to prevent accidental self-lockouts during access rule changes.
+- **Atomic UCI Rollback:** Automatically executes `uci revert` across target configuration files if an intermediate multi-step RPC request fails.
 
-### 📦 OPKG & APK Dual Package Manager
+### Dashboard & Network Vitals
 
-- **Smart Engine Detection:** Automatic engine switching between standard `opkg` and OpenWrt 24.10+ `apk` package managers.
-- **Package Search & Feed Updates:** Search available repositories, update package lists, install, and remove modules.
-- **LuCI App Finder:** Dedicated view for discovering and managing installed vs. available LuCI extensions (`luci-app-*`).
+- **Dual Themes:** Switch seamlessly between Light and Dark Material 3 themes.
+- **Animated Gauges:** Live visual gauges for CPU load, RAM usage, Swap space, and root `/` filesystem capacity.
+- **Real-Time Throughput Graph:** Smooth live chart displaying network transfer rates (Rx/Tx) with customizable polling intervals.
+- **Interface Cards:** Status cards for WAN, LAN, and WWAN showing IP addresses, MACs, protocols, and WAN public IP verification.
 
-### ⚙️ System Diagnostics & Control
+### Connected Client Management
 
-- **Services Management:** View active `procd` daemons and init scripts with live status tracking (Running, Stopped, Enabled, Disabled). Start, stop, restart, enable, or disable services remotely.
-- **Cron Job Scheduler:** View custom or system scheduled tasks (`/etc/crontabs/root`).
-- **Disk & Filesystems Monitor:** Storage usage breakdown for root `/`, overlay `/overlay`, temporary `/tmp`, and attached USB storage.
-- **Preserved Backup File Viewer:** Inspect files preserved during sysupgrade operations (`sysupgrade -l`).
+- **Unified Client List:** Aggregates active DHCP leases, ARP neighbor entries, and wireless stations into a single view.
+- **Device Details:** Displays hostname, IP, MAC address, vendor OUI, connected SSID, and radio band badges.
+- **IPv6 Management:** Displays deduplicated IPv6 address lists with toggleable expand/collapse views for multiple private or link-local addresses.
+- **Static Leases:** View, add, and modify static DHCP IP assignments.
+
+### OPKG & APK Dual Package Manager
+
+- **Smart Engine Detection:** Automatically switches between standard `opkg` (OpenWrt 21.02–23.05) and modern `apk` (OpenWrt 24.10+) package engines.
+- **Package Management:** Search repository feeds, update package lists, install, and remove packages.
+- **LuCI App Finder:** Discover and manage installed vs. available LuCI extension modules (`luci-app-*`).
+
+### System Services, VPN & Storage
+
+- **Services Control:** View active `procd` daemons and init scripts; start, stop, restart, enable, or disable services remotely.
+- **VPN Monitoring:** Monitor status and interfaces for WireGuard, OpenVPN, Tailscale, and ZeroTier connections.
+- **Cron Scheduler:** View and edit system scheduled tasks (`/etc/crontabs/root`).
+- **Disk & Storage Monitor:** Monitor disk space breakdown for root `/`, `/overlay`, `/tmp`, and attached USB drives.
+
+### Backup, Restore & Partition Tools
+
+- **Pre-Restore Validation:** Validates gzip headers (`0x1F 0x8B`) and `ustar` archive structures prior to upload to prevent corrupt backup restores.
+- **Preserved File Viewer:** Inspect files marked for retention during sysupgrade operations (`sysupgrade -l`).
 - **MTD Partition Dumper:** Save binary `mtdblock` partition images directly from `/proc/mtd`.
-- **Factory Reset Trigger:** Remotely initiate system reset (`firstboot -y`) and router reboot.
+- **Factory Reset:** Trigger remote system reset (`firstboot -y`) and router reboot.
 
 ---
 
-## 📸 Screenshots Showcase
+## Screenshots Showcase
 
 <div align="center">
   <p><b>Explore full resolution screenshots of Yet Another LuCI App features:</b></p>
@@ -104,16 +123,12 @@
 <br>
 
 <div align="center">
-  <a href="https://github.com/nightcodex7/yet-another-luci-app/tree/main/assets/screenshots">
-    <img src="https://img.shields.io/badge/📂%20View%20All%20Screenshots%20in%20Repository-0A84FF?style=for-the-badge&logo=github&logoColor=white" alt="View All Screenshots on GitHub"/>
-  </a>
-  <br>
-  <p><i>Click the badge above or navigate to <a href="assets/screenshots/">assets/screenshots/</a> to view the complete collection of screenshots on GitHub.</i></p>
+  <p><i>Navigate to <a href="assets/screenshots/">assets/screenshots/</a> to view the complete collection of screenshots in the repository.</i></p>
 </div>
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 yet-another-luci-app/
@@ -126,24 +141,29 @@ yet-another-luci-app/
 ├── fastlane/                  # Google Play Store release metadata & screenshots
 ├── lib/                       # Main Flutter codebase
 │   ├── config/                # Design tokens, themes, app routes, and constants
-│   ├── models/                # Strongly-typed data models (Client, Interface, Router, etc.)
-│   ├── modules/               # Feature modules (Package Manager, System Backup, Services, Cron, Storage)
-│   ├── screens/               # Core screens (Dashboard, Clients, Interfaces, Login, Settings)
+│   ├── models/                # Data models (Client, Interface, Router, etc.)
+│   ├── modules/               # Feature modules (Package Manager, Parental Controls, VPN, Services, Backup, Storage, etc.)
+│   ├── providers/             # State & entitlement providers
+│   ├── screens/               # Core screens (Dashboard, Clients, Interfaces, Login, Settings, More)
 │   ├── services/              # API communication layer, JSON-RPC client, secure storage
-│   ├── state/                 # State management engine (Riverpod AppState)
-│   ├── widgets/               # Reusable UI widgets, animated gauges, throughput charts
+│   ├── state/                 # State management engine (Riverpod controllers)
+│   ├── utils/                 # Security guardrails, HTTP client managers, platform utilities
+│   ├── widgets/               # Reusable UI widgets, animated gauges, throughput charts, topology map
 │   └── main.dart              # Application entry point
 ├── scripts/                   # Auxiliary maintenance scripts
 ├── store-badges/              # Google Play Store promotional badges
+├── test/                      # Unit, widget, and integration test suite
 ├── pubspec.yaml               # Flutter package specification & dependencies
-├── PRIVACY_POLICY.md          # Full privacy policy disclosure
+├── AUDIT_TRACKER.md           # Production hardening & security audit tracker
+├── PRIVACY_POLICY.md          # Privacy policy disclosure
 ├── CONTRIBUTING.md            # Guidelines for open-source contributors
+├── CONTRIBUTORS.md            # Creator attribution & maintainer guidelines
 └── README.md                  # Project documentation
 ```
 
 ---
 
-## 🛠️ Building & Running
+## Building & Running
 
 ### Prerequisites
 
@@ -165,13 +185,16 @@ flutter pub get
 # 3. Analyze code quality
 flutter analyze
 
-# 4. Run application in dev mode
+# 4. Run test suite
+flutter test
+
+# 5. Run application in dev mode
 flutter run
 ```
 
 ---
 
-## 🔐 Router Requirements & Security
+## Router Requirements & Security
 
 To enable full communication between **Yet Another LuCI App** and your OpenWrt router, ensure the following RPC modules are installed on your router:
 
@@ -184,12 +207,14 @@ opkg install luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status
 ### Security Highlights
 
 - **Zero Analytics:** No tracking telemetry, no cloud relays, zero data collection.
-- **Local Vault:** Router IP addresses, credentials, and tokens remain isolated on your local device.
-- **SSL Support:** Supports HTTPS RPC endpoints and self-signed SSL certificate bypass options.
+- **Local Vault:** Router IP addresses, credentials, and tokens remain isolated on your local device inside native secure storage.
+- **Self-Device Guard:** Active IP/MAC auto-detection prevents self-lockout during network access modifications.
+- **Atomic Rollbacks:** Staged UCI changes revert automatically if RPC failures occur, preventing broken router state.
+- **SSL Support:** Supports HTTPS RPC endpoints and self-signed SSL certificate bypass options for local subnets.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions, bug reports, and feature suggestions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting pull requests.
 
@@ -201,26 +226,12 @@ Contributions, bug reports, and feature suggestions are welcome! Please read [CO
 
 ---
 
-## 👥 Contributors & Original Creator Attribution
+## License & Credits
 
-This repository is created and maintained by **[Tuhin Garai (@nightcodex7)](https://github.com/nightcodex7)**.
-
-<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-1-orange.svg?style=flat-square)](#-contributors--original-creator-attribution)
-<!-- ALL-CONTRIBUTORS-BADGE:END -->
-
-| [<img src="https://github.com/nightcodex7.png?size=100" width="100px;" alt="Tuhin Garai"/><br /><sub><b>Tuhin Garai (@nightcodex7)</b></sub>](https://github.com/nightcodex7) |
-| :---: |
-| **Creator & Lead Maintainer** |
+Distributed under the **Apache License 2.0**. See [`LICENSE`](LICENSE), [`NOTICE`](NOTICE), and [`LICENSE_CHANGE.md`](LICENSE_CHANGE.md) for details.
 
 > [!IMPORTANT]
 > **Mandatory Fork Attribution Requirement:** Under Apache License 2.0 (Section 4), all forks and derivative versions of this repository on GitHub **MUST** retain original author credit for **Tuhin Garai (@nightcodex7)** in the `README.md`, `CONTRIBUTORS.md`, `NOTICE`, and repository commit history. Stripping or obscuring original creator attribution on GitHub repository forks is strictly prohibited. See [CONTRIBUTORS.md](CONTRIBUTORS.md) for details.
-
----
-
-## 📜 License & Credits
-
-Distributed under the **Apache License 2.0**. See [`LICENSE`](LICENSE), [`NOTICE`](NOTICE), and [`LICENSE_CHANGE.md`](LICENSE_CHANGE.md) for details.
 
 ### Acknowledgments
 
@@ -229,4 +240,4 @@ Distributed under the **Apache License 2.0**. See [`LICENSE`](LICENSE), [`NOTICE
 - **Flutter Framework** — Built with Flutter and Riverpod for high-performance reactive UI rendering.
 
 ---
-*Maintained with ❤️ by [Tuhin Garai (@nightcodex7)](https://github.com/nightcodex7)*
+*Maintained by [Tuhin Garai (@nightcodex7)](https://github.com/nightcodex7)*

@@ -34,11 +34,7 @@ void main() {
           'masq': '1',
           'network': ['wan', 'wan6'],
         },
-        'fwd_lan_wan': {
-          '.type': 'forwarding',
-          'src': 'lan',
-          'dest': 'wan',
-        },
+        'fwd_lan_wan': {'.type': 'forwarding', 'src': 'lan', 'dest': 'wan'},
         'redirect_ssh': {
           '.type': 'redirect',
           'name': 'SSH External',
@@ -57,7 +53,7 @@ void main() {
           'target': 'ACCEPT',
           'enabled': '1',
         },
-      }
+      },
     };
 
     final validFw4Uci = {
@@ -103,7 +99,7 @@ void main() {
           'target': 'NFT_EXPRESSION_SET',
           'enabled': '1',
         },
-      }
+      },
     };
 
     test('Fw3FirewallParser correctly parses fw3 UCI rules', () {
@@ -119,78 +115,94 @@ void main() {
       expect(overview.customRules.first.isUnrecognizedTarget, isFalse);
     });
 
-    test('Fw4FirewallParser correctly parses fw4 rules including NOTRACK & unrecognized targets', () {
-      final overview = Fw4FirewallParser.parse(validFw4Uci);
+    test(
+      'Fw4FirewallParser correctly parses fw4 rules including NOTRACK & unrecognized targets',
+      () {
+        final overview = Fw4FirewallParser.parse(validFw4Uci);
 
-      expect(overview.isAvailable, isTrue);
-      expect(overview.backend, equals(FirewallBackend.fw4));
-      expect(overview.customRules.length, equals(2));
+        expect(overview.isAvailable, isTrue);
+        expect(overview.backend, equals(FirewallBackend.fw4));
+        expect(overview.customRules.length, equals(2));
 
-      final notrackRule = overview.customRules.firstWhere((r) => r.name == 'Bypass-CT-Local');
-      expect(notrackRule.target, equals('NOTRACK'));
-      expect(notrackRule.isUnrecognizedTarget, isFalse);
+        final notrackRule = overview.customRules.firstWhere(
+          (r) => r.name == 'Bypass-CT-Local',
+        );
+        expect(notrackRule.target, equals('NOTRACK'));
+        expect(notrackRule.isUnrecognizedTarget, isFalse);
 
-      final customRule = overview.customRules.firstWhere((r) => r.name == 'Custom-NFT-Set');
-      expect(customRule.target, equals('NFT_EXPRESSION_SET'));
-      expect(customRule.isUnrecognizedTarget, isTrue);
-    });
+        final customRule = overview.customRules.firstWhere(
+          (r) => r.name == 'Custom-NFT-Set',
+        );
+        expect(customRule.target, equals('NFT_EXPRESSION_SET'));
+        expect(customRule.isUnrecognizedTarget, isTrue);
+      },
+    );
 
-    test('Parser produces distinct empty states: noCustomRules vs unavailable', () {
-      final validZeroRulesUci = {
-        'values': {
-          'defaults': {
-            '.type': 'defaults',
-            'input': 'ACCEPT',
-            'output': 'ACCEPT',
-            'forward': 'REJECT',
+    test(
+      'Parser produces distinct empty states: noCustomRules vs unavailable',
+      () {
+        final validZeroRulesUci = {
+          'values': {
+            'defaults': {
+              '.type': 'defaults',
+              'input': 'ACCEPT',
+              'output': 'ACCEPT',
+              'forward': 'REJECT',
+            },
+            'lan': {
+              '.type': 'zone',
+              'name': 'lan',
+              'input': 'ACCEPT',
+              'output': 'ACCEPT',
+              'forward': 'ACCEPT',
+              'network': ['lan'],
+            },
           },
-          'lan': {
-            '.type': 'zone',
-            'name': 'lan',
-            'input': 'ACCEPT',
-            'output': 'ACCEPT',
-            'forward': 'ACCEPT',
-            'network': ['lan'],
-          },
-        }
-      };
+        };
 
-      final emptyPayloadUci = {'values': {}};
+        final emptyPayloadUci = {'values': {}};
 
-      // 1. Genuine Zero Custom Rules state on valid config
-      final zeroRules = Fw4FirewallParser.parse(validZeroRulesUci);
-      expect(zeroRules.isAvailable, isTrue);
-      expect(zeroRules.isNoCustomRules, isTrue);
-      expect(zeroRules.customRules, isEmpty);
+        // 1. Genuine Zero Custom Rules state on valid config
+        final zeroRules = Fw4FirewallParser.parse(validZeroRulesUci);
+        expect(zeroRules.isAvailable, isTrue);
+        expect(zeroRules.isNoCustomRules, isTrue);
+        expect(zeroRules.customRules, isEmpty);
 
-      // 2. Empty payload is treated as unavailable, NOT zeroCustomRules
-      final emptyParse = Fw4FirewallParser.parse(emptyPayloadUci);
-      expect(emptyParse.isAvailable, isFalse);
-      expect(emptyParse.isNoCustomRules, isFalse);
-      expect(emptyParse.errorMessage, contains('empty or unpopulated'));
+        // 2. Empty payload is treated as unavailable, NOT zeroCustomRules
+        final emptyParse = Fw4FirewallParser.parse(emptyPayloadUci);
+        expect(emptyParse.isAvailable, isFalse);
+        expect(emptyParse.isNoCustomRules, isFalse);
+        expect(emptyParse.errorMessage, contains('empty or unpopulated'));
 
-      // 3. Capability unavailable state
-      final unavailable = FirewallOverview.unavailable(FirewallBackend.none, 'Capability probe failed');
-      expect(unavailable.isAvailable, isFalse);
-      expect(unavailable.isNoCustomRules, isFalse);
-      expect(unavailable.errorMessage, contains('Capability probe failed'));
-    });
+        // 3. Capability unavailable state
+        final unavailable = FirewallOverview.unavailable(
+          FirewallBackend.none,
+          'Capability probe failed',
+        );
+        expect(unavailable.isAvailable, isFalse);
+        expect(unavailable.isNoCustomRules, isFalse);
+        expect(unavailable.errorMessage, contains('Capability probe failed'));
+      },
+    );
 
-    test('RpcResult classification handles ubus status branches for firewall fetch', () {
-      final deniedRpc = [6, 'Access denied'];
-      final missingRpc = [3, 'Object not found'];
+    test(
+      'RpcResult classification handles ubus status branches for firewall fetch',
+      () {
+        final deniedRpc = [6, 'Access denied'];
+        final missingRpc = [3, 'Object not found'];
 
-      final deniedRes = RpcResult.fromUbusResponse<FirewallOverview>(
-        deniedRpc,
-        (data) => FirewallOverview.unavailable(FirewallBackend.fw4),
-      );
-      expect(deniedRes.status, equals(RpcCallStatus.permissionDenied));
+        final deniedRes = RpcResult.fromUbusResponse<FirewallOverview>(
+          deniedRpc,
+          (data) => FirewallOverview.unavailable(FirewallBackend.fw4),
+        );
+        expect(deniedRes.status, equals(RpcCallStatus.permissionDenied));
 
-      final missingRes = RpcResult.fromUbusResponse<FirewallOverview>(
-        missingRpc,
-        (data) => FirewallOverview.unavailable(FirewallBackend.fw4),
-      );
-      expect(missingRes.status, equals(RpcCallStatus.methodNotFound));
-    });
+        final missingRes = RpcResult.fromUbusResponse<FirewallOverview>(
+          missingRpc,
+          (data) => FirewallOverview.unavailable(FirewallBackend.fw4),
+        );
+        expect(missingRes.status, equals(RpcCallStatus.methodNotFound));
+      },
+    );
   });
 }

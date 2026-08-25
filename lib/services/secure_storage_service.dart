@@ -5,7 +5,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
 import 'package:yet_another_luci_app/models/router.dart';
 import '../utils/logger.dart';
-import 'package:yet_another_luci_app/config/app_config.dart';
 
 class SecureStorageService {
   final _storage = const FlutterSecureStorage();
@@ -33,18 +32,6 @@ class SecureStorageService {
   Future<Map<String, String?>> getCredentials() async {
     try {
       final all = await _storage.readAll();
-      final ipAddress = all['ipAddress'];
-      final username = all['username'];
-      final password = all['password'];
-      final useHttps = all['useHttps'];
-      if (ipAddress != null && ipAddress.isNotEmpty && username != null && password != null) {
-        return {
-          'ipAddress': ipAddress,
-          'username': username,
-          'password': password,
-          'useHttps': useHttps,
-        };
-      }
       final routers = await getRouters();
       if (routers.isNotEmpty) {
         // Prefer the explicitly selected router; fall back to first in list
@@ -60,6 +47,22 @@ class SecureStorageService {
           'username': router.username,
           'password': router.password,
           'useHttps': router.useHttps.toString(),
+        };
+      }
+
+      final ipAddress = all['ipAddress'];
+      final username = all['username'];
+      final password = all['password'];
+      final useHttps = all['useHttps'];
+      if (ipAddress != null &&
+          ipAddress.isNotEmpty &&
+          username != null &&
+          password != null) {
+        return {
+          'ipAddress': ipAddress,
+          'username': username,
+          'password': password,
+          'useHttps': useHttps,
         };
       }
       return {
@@ -81,16 +84,10 @@ class SecureStorageService {
 
   Future<void> clearCredentials() async {
     try {
-      // Clear all credentials but preserve reviewer mode flag
-      final reviewerMode = await _storage.read(key: AppConfig.reviewerModeKey);
-      await _storage.deleteAll();
-      // Restore reviewer mode flag if it was set
-      if (reviewerMode != null) {
-        await _storage.write(
-          key: AppConfig.reviewerModeKey,
-          value: reviewerMode,
-        );
-      }
+      await _storage.delete(key: 'ipAddress');
+      await _storage.delete(key: 'username');
+      await _storage.delete(key: 'password');
+      await _storage.delete(key: 'useHttps');
     } catch (e, stack) {
       Logger.exception('Failed to clear credentials', e, stack);
       // Don't rethrow as this is often called during cleanup

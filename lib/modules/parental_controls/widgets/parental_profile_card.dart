@@ -62,7 +62,9 @@ class ParentalProfileCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
             decoration: BoxDecoration(
               color: accentColor.withValues(alpha: 0.06),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
             ),
             child: Row(
               children: [
@@ -75,7 +77,10 @@ class ParentalProfileCard extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: Center(
-                    child: Text(profile.icon, style: const TextStyle(fontSize: 22)),
+                    child: Text(
+                      profile.icon,
+                      style: const TextStyle(fontSize: 22),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -87,8 +92,9 @@ class ParentalProfileCard extends StatelessWidget {
                         profile.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -119,15 +125,25 @@ class ParentalProfileCard extends StatelessWidget {
                     if (v == 'delete') onDelete();
                   },
                   itemBuilder: (_) => [
-                    const PopupMenuItem(value: 'edit', child: Text('Edit Profile')),
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Text('Edit Profile'),
+                    ),
                     if (onToggleEnabled != null)
                       PopupMenuItem(
                         value: 'toggle_enabled',
-                        child: Text(profile.isEnabled ? 'Bypass Restrictions' : 'Enable Guardrails'),
+                        child: Text(
+                          profile.isEnabled
+                              ? 'Bypass Restrictions'
+                              : 'Enable Guardrails',
+                        ),
                       ),
                     const PopupMenuItem(
                       value: 'delete',
-                      child: Text('Delete', style: TextStyle(color: Colors.red)),
+                      child: Text(
+                        'Delete',
+                        style: TextStyle(color: Colors.red),
+                      ),
                     ),
                   ],
                 ),
@@ -136,7 +152,9 @@ class ParentalProfileCard extends StatelessWidget {
           ),
 
           // ── Feature chips ─────────────────────────────────────────────
-          if (profile.hasSchedule || profile.hasTimeLimit || profile.hasContentFilter)
+          if (profile.hasSchedule ||
+              profile.hasTimeLimit ||
+              profile.hasContentFilter)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
               child: Wrap(
@@ -157,7 +175,8 @@ class ParentalProfileCard extends StatelessWidget {
                       icon: Icons.timer_outlined,
                       label: '${profile.dailyTimeLimitMinutes}m/day',
                       color: Colors.purple,
-                      tooltip: 'Daily time limit: ${profile.dailyTimeLimitMinutes} minutes',
+                      tooltip:
+                          'Daily time limit: ${profile.dailyTimeLimitMinutes} minutes',
                     ),
                   if (profile.hasContentFilter)
                     _FeatureChip(
@@ -190,14 +209,15 @@ class ParentalProfileCard extends StatelessWidget {
                 else
                   Expanded(
                     child: _PauseButton(
-                      enabled: hasFirewall && profile.hasMacs && profile.isEnabled,
+                      enabled:
+                          hasFirewall && profile.hasMacs && profile.isEnabled,
                       tooltip: !hasFirewall
                           ? 'Requires firewall write access'
                           : !profile.hasMacs
-                              ? 'Add devices to this profile first'
-                              : !profile.isEnabled
-                                  ? 'Profile is in Bypass mode (Unrestricted)'
-                                  : null,
+                          ? 'Add devices to this profile first'
+                          : !profile.isEnabled
+                          ? 'Profile is in Bypass mode (Unrestricted)'
+                          : null,
                       onPause: onPause,
                     ),
                   ),
@@ -368,7 +388,9 @@ class _PauseButton extends StatelessWidget {
         label: const Text('Pause Internet'),
         style: OutlinedButton.styleFrom(
           foregroundColor: Colors.orange,
-          side: BorderSide(color: Colors.orange.withValues(alpha: enabled ? 0.6 : 0.3)),
+          side: BorderSide(
+            color: Colors.orange.withValues(alpha: enabled ? 0.6 : 0.3),
+          ),
         ),
       ),
     );
@@ -393,7 +415,9 @@ class _PauseButton extends StatelessWidget {
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                    color: theme.colorScheme.onSurfaceVariant.withValues(
+                      alpha: 0.3,
+                    ),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -402,13 +426,18 @@ class _PauseButton extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                 child: Text(
                   'Pause internet for how long?',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               const Divider(height: 8),
               ...PauseDuration.values.map(
                 (d) => ListTile(
-                  leading: const Icon(Icons.pause_circle_outline, color: Colors.orange),
+                  leading: const Icon(
+                    Icons.pause_circle_outline,
+                    color: Colors.orange,
+                  ),
                   title: Text(d.label),
                   onTap: () {
                     Navigator.pop(ctx);

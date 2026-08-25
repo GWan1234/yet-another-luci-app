@@ -91,7 +91,9 @@ class _RouterDashboardSettingsScreenState
     if (wirelessRadios != null) {
       wirelessRadios.forEach((radioName, radioData) {
         final rawIfaces = radioData['interfaces'];
-        final interfaces = rawIfaces is List ? rawIfaces : (rawIfaces is Map ? rawIfaces.values.toList() : null);
+        final interfaces = rawIfaces is List
+            ? rawIfaces
+            : (rawIfaces is Map ? rawIfaces.values.toList() : null);
         if (interfaces != null) {
           for (var interface in interfaces) {
             final config = interface['config'] ?? {};
@@ -109,7 +111,9 @@ class _RouterDashboardSettingsScreenState
     }
 
     final rawDump = dashboardData['interfaceDump']?['interface'];
-    final interfaces = rawDump is List ? rawDump : (rawDump is Map ? rawDump.values.toList() : null);
+    final interfaces = rawDump is List
+        ? rawDump
+        : (rawDump is Map ? rawDump.values.toList() : null);
     if (interfaces != null) {
       for (var item in interfaces) {
         final interface = item as Map<String, dynamic>;
@@ -176,8 +180,9 @@ class _RouterDashboardSettingsScreenState
       children: [
         Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest
-                .withValues(alpha: 0.3),
+            color: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -185,8 +190,9 @@ class _RouterDashboardSettingsScreenState
               SwitchListTile.adaptive(
                 title: Text(
                   'Show All Interfaces',
-                  style: LuciTextStyles.detailValue(context)
-                      .copyWith(fontWeight: FontWeight.w600),
+                  style: LuciTextStyles.detailValue(
+                    context,
+                  ).copyWith(fontWeight: FontWeight.w600),
                 ),
                 value: _preferences.showAllThroughput,
                 onChanged: (value) {
@@ -199,8 +205,9 @@ class _RouterDashboardSettingsScreenState
                     } else {
                       _preferences = _preferences.copyWith(
                         showAllThroughput: false,
-                        primaryThroughputInterface:
-                            interfaces.isNotEmpty ? interfaces.first : null,
+                        primaryThroughputInterface: interfaces.isNotEmpty
+                            ? interfaces.first
+                            : null,
                       );
                     }
                   });
@@ -225,8 +232,10 @@ class _RouterDashboardSettingsScreenState
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
                 value: iface,
-                groupValue: _preferences.primaryThroughputInterface, // ignore: deprecated_member_use
-                onChanged: (value) { // ignore: deprecated_member_use
+                groupValue: _preferences
+                    .primaryThroughputInterface, // ignore: deprecated_member_use
+                onChanged: (value) {
+                  // ignore: deprecated_member_use
                   setState(() {
                     _preferences = _preferences.copyWith(
                       showAllThroughput: false,
@@ -241,7 +250,7 @@ class _RouterDashboardSettingsScreenState
               ),
             );
           }),
-        ]
+        ],
       ],
     );
   }
@@ -256,8 +265,9 @@ class _RouterDashboardSettingsScreenState
       children: [
         Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest
-                .withValues(alpha: 0.3),
+            color: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -265,8 +275,9 @@ class _RouterDashboardSettingsScreenState
               SwitchListTile.adaptive(
                 title: Text(
                   'Show All Networks',
-                  style: LuciTextStyles.detailValue(context)
-                      .copyWith(fontWeight: FontWeight.w600),
+                  style: LuciTextStyles.detailValue(
+                    context,
+                  ).copyWith(fontWeight: FontWeight.w600),
                 ),
                 value: _preferences.enabledWirelessInterfaces.isEmpty,
                 onChanged: (value) {
@@ -277,8 +288,9 @@ class _RouterDashboardSettingsScreenState
                       );
                     } else {
                       _preferences = _preferences.copyWith(
-                        enabledWirelessInterfaces:
-                            Set.from(_availableWirelessInterfaces),
+                        enabledWirelessInterfaces: Set.from(
+                          _availableWirelessInterfaces,
+                        ),
                       );
                     }
                   });
@@ -293,27 +305,31 @@ class _RouterDashboardSettingsScreenState
         if (_preferences.enabledWirelessInterfaces.isNotEmpty) ...[
           SizedBox(height: LuciSpacing.sm),
           ...sortedInterfaces.map((interface) {
-            final isEnabled =
-                _preferences.enabledWirelessInterfaces.contains(interface);
+            final isEnabled = _preferences.enabledWirelessInterfaces.contains(
+              interface,
+            );
             return Padding(
               padding: EdgeInsets.symmetric(vertical: LuciSpacing.xs),
               child: CheckboxListTile(
-                title: Text(interface, style: LuciTextStyles.detailValue(context)),
+                title: Text(
+                  interface,
+                  style: LuciTextStyles.detailValue(context),
+                ),
                 secondary: Icon(
                   Icons.wifi,
                   size: 20,
                   color: isEnabled
                       ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant
-                          .withValues(alpha: 0.5),
+                      : Theme.of(
+                          context,
+                        ).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                 ),
                 value: isEnabled,
                 onChanged: (value) {
                   setState(() {
-                    final newSet =
-                        Set<String>.from(_preferences.enabledWirelessInterfaces);
+                    final newSet = Set<String>.from(
+                      _preferences.enabledWirelessInterfaces,
+                    );
                     if (value ?? false) {
                       newSet.add(interface);
                     } else {
@@ -346,8 +362,9 @@ class _RouterDashboardSettingsScreenState
       children: [
         Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest
-                .withValues(alpha: 0.3),
+            color: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -355,8 +372,9 @@ class _RouterDashboardSettingsScreenState
               SwitchListTile.adaptive(
                 title: Text(
                   'Show All Interfaces',
-                  style: LuciTextStyles.detailValue(context)
-                      .copyWith(fontWeight: FontWeight.w600),
+                  style: LuciTextStyles.detailValue(
+                    context,
+                  ).copyWith(fontWeight: FontWeight.w600),
                 ),
                 value: _preferences.enabledWiredInterfaces.isEmpty,
                 onChanged: (value) {
@@ -367,8 +385,9 @@ class _RouterDashboardSettingsScreenState
                       );
                     } else {
                       _preferences = _preferences.copyWith(
-                        enabledWiredInterfaces:
-                            Set.from(_availableWiredInterfaces),
+                        enabledWiredInterfaces: Set.from(
+                          _availableWiredInterfaces,
+                        ),
                       );
                     }
                   });
@@ -383,30 +402,33 @@ class _RouterDashboardSettingsScreenState
         if (_preferences.enabledWiredInterfaces.isNotEmpty) ...[
           SizedBox(height: LuciSpacing.sm),
           ...sortedInterfaces.map((interface) {
-            final isEnabled =
-                _preferences.enabledWiredInterfaces.contains(interface);
+            final isEnabled = _preferences.enabledWiredInterfaces.contains(
+              interface,
+            );
             final description = _getInterfaceDescription(interface);
             return Padding(
               padding: EdgeInsets.symmetric(vertical: LuciSpacing.xs),
               child: CheckboxListTile(
-                title: Text(interface.toUpperCase(),
-                    style: LuciTextStyles.detailValue(context)),
+                title: Text(
+                  interface.toUpperCase(),
+                  style: LuciTextStyles.detailValue(context),
+                ),
                 subtitle: description,
                 secondary: Icon(
                   Icons.cable,
                   size: 20,
                   color: isEnabled
                       ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant
-                          .withValues(alpha: 0.5),
+                      : Theme.of(
+                          context,
+                        ).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                 ),
                 value: isEnabled,
                 onChanged: (value) {
                   setState(() {
-                    final newSet =
-                        Set<String>.from(_preferences.enabledWiredInterfaces);
+                    final newSet = Set<String>.from(
+                      _preferences.enabledWiredInterfaces,
+                    );
                     if (value ?? false) {
                       newSet.add(interface);
                     } else {
@@ -432,19 +454,24 @@ class _RouterDashboardSettingsScreenState
   Widget? _getInterfaceDescription(String interface) {
     final lower = interface.toLowerCase();
     if (lower.startsWith('wan')) {
-      return Text('Wide Area Network',
-          style: LuciTextStyles.cardSubtitle(context));
+      return Text(
+        'Wide Area Network',
+        style: LuciTextStyles.cardSubtitle(context),
+      );
     } else if (lower.startsWith('lan')) {
-      return Text('Local Area Network',
-          style: LuciTextStyles.cardSubtitle(context));
+      return Text(
+        'Local Area Network',
+        style: LuciTextStyles.cardSubtitle(context),
+      );
     } else if (lower.contains('wireguard') || lower.startsWith('wg')) {
-      return Text('WireGuard VPN',
-          style: LuciTextStyles.cardSubtitle(context));
+      return Text('WireGuard VPN', style: LuciTextStyles.cardSubtitle(context));
     } else if (lower.contains('openvpn')) {
       return Text('OpenVPN', style: LuciTextStyles.cardSubtitle(context));
     } else if (lower.contains('pppoe')) {
-      return Text('PPPoE Connection',
-          style: LuciTextStyles.cardSubtitle(context));
+      return Text(
+        'PPPoE Connection',
+        style: LuciTextStyles.cardSubtitle(context),
+      );
     }
     return null;
   }

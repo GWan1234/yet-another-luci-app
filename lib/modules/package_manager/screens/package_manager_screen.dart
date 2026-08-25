@@ -15,7 +15,8 @@ class PackageManagerScreen extends ConsumerStatefulWidget {
   const PackageManagerScreen({super.key});
 
   @override
-  ConsumerState<PackageManagerScreen> createState() => _PackageManagerScreenState();
+  ConsumerState<PackageManagerScreen> createState() =>
+      _PackageManagerScreenState();
 }
 
 class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
@@ -61,11 +62,16 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
           if (res.isSuccess && res.data != null) {
             _installedPackages = res.data;
           } else {
-            _errorMessage = res.errorMessage ?? 'Could not read installed packages from router.';
-            _isPermissionDenied = res.isPermissionDenied ||
+            _errorMessage =
+                res.errorMessage ??
+                'Could not read installed packages from router.';
+            _isPermissionDenied =
+                res.isPermissionDenied ||
                 (res.errorMessage != null &&
                     (res.errorMessage!.contains('code 6') ||
-                        res.errorMessage!.toLowerCase().contains('permission denied')));
+                        res.errorMessage!.toLowerCase().contains(
+                          'permission denied',
+                        )));
             _installedPackages = null;
           }
         });
@@ -75,7 +81,9 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
         setState(() {
           _isLoading = false;
           _errorMessage = e.toString();
-          _isPermissionDenied = e.toString().toLowerCase().contains('permission denied') || e.toString().contains('code 6');
+          _isPermissionDenied =
+              e.toString().toLowerCase().contains('permission denied') ||
+              e.toString().contains('code 6');
           _installedPackages = null;
         });
       }
@@ -102,11 +110,17 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.extension_off_rounded, size: 64, color: Colors.grey.shade400),
+                Icon(
+                  Icons.extension_off_rounded,
+                  size: 64,
+                  color: Colors.grey.shade400,
+                ),
                 const SizedBox(height: 16),
                 Text(
                   'Package Manager Not Detected',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -117,7 +131,10 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
                   onPressed: () async {
-                    context.showToastInfo('Capabilities Probe', subtitle: 'Re-probing router capabilities...');
+                    context.showToastInfo(
+                      'Capabilities Probe',
+                      subtitle: 'Re-probing router capabilities...',
+                    );
                     await ref.read(appStateProvider).redetectCapabilities();
                     await _loadPackages();
                   },
@@ -175,7 +192,8 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
                   TextField(
                     controller: _searchController,
                     decoration: InputDecoration(
-                      hintText: 'Search installed packages (e.g. luci-app, wireguard)...',
+                      hintText:
+                          'Search installed packages (e.g. luci-app, wireguard)...',
                       prefixIcon: const Icon(Icons.search),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
@@ -183,26 +201,41 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
                               onPressed: () => _searchController.clear(),
                             )
                           : null,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
 
-                  if (_errorMessage != null && (_installedPackages == null || _installedPackages!.isEmpty)) ...[
+                  if (_errorMessage != null &&
+                      (_installedPackages == null ||
+                          _installedPackages!.isEmpty)) ...[
                     const SizedBox(height: 24),
                     Card(
                       elevation: 2,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      color: _isPermissionDenied ? Colors.orange.shade50 : Theme.of(context).cardColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      color: _isPermissionDenied
+                          ? Colors.orange.shade50
+                          : Theme.of(context).cardColor,
                       child: Padding(
                         padding: const EdgeInsets.all(20.0),
                         child: Column(
                           children: [
                             Icon(
-                              _isPermissionDenied ? Icons.lock_outline_rounded : Icons.cloud_off_rounded,
+                              _isPermissionDenied
+                                  ? Icons.lock_outline_rounded
+                                  : Icons.cloud_off_rounded,
                               size: 56,
-                              color: _isPermissionDenied ? Colors.orange.shade800 : Colors.grey.shade400,
+                              color: _isPermissionDenied
+                                  ? Colors.orange.shade800
+                                  : Colors.grey.shade400,
                             ),
                             const SizedBox(height: 16),
                             Text(
@@ -210,25 +243,30 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
                                   ? 'Router Permission Denied (ubus code 6)'
                                   : 'Package List Unavailable',
                               textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(
                                     fontWeight: FontWeight.bold,
-                                    color: _isPermissionDenied ? Colors.orange.shade900 : null,
+                                    color: _isPermissionDenied
+                                        ? Colors.orange.shade900
+                                        : null,
                                   ),
                             ),
                             const SizedBox(height: 12),
                             Text(
                               _isPermissionDenied
                                   ? 'OpenWrt\'s RPC daemon (rpcd) blocked package queries with ubus code 6 (Permission Denied).\n\n'
-                                      'Stock LuCI images only allow package listing via the whitelisted helper:\n'
-                                      '/usr/libexec/package-manager-call list-installed\n\n'
-                                      'To fix on the router:\n'
-                                      '1. Install luci-app-package-manager (grants the whitelisted exec ACL).\n'
-                                      '2. Or install luci-mod-rpc for broader RPC file access.\n'
-                                      '3. Ensure you log in as root.'
+                                        'Stock LuCI images only allow package listing via the whitelisted helper:\n'
+                                        '/usr/libexec/package-manager-call list-installed\n\n'
+                                        'To fix on the router:\n'
+                                        '1. Install luci-app-package-manager (grants the whitelisted exec ACL).\n'
+                                        '2. Or install luci-mod-rpc for broader RPC file access.\n'
+                                        '3. Ensure you log in as root.'
                                   : _errorMessage!,
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: _isPermissionDenied ? Colors.orange.shade900 : Colors.grey.shade600,
+                                color: _isPermissionDenied
+                                    ? Colors.orange.shade900
+                                    : Colors.grey.shade600,
                                 fontSize: 13,
                                 height: 1.4,
                               ),
@@ -246,8 +284,14 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
                                 ),
                                 OutlinedButton.icon(
                                   onPressed: () async {
-                                    context.showToastInfo('Capabilities Probe', subtitle: 'Re-probing router capabilities...');
-                                    await ref.read(appStateProvider).redetectCapabilities();
+                                    context.showToastInfo(
+                                      'Capabilities Probe',
+                                      subtitle:
+                                          'Re-probing router capabilities...',
+                                    );
+                                    await ref
+                                        .read(appStateProvider)
+                                        .redetectCapabilities();
                                     await _loadPackages();
                                   },
                                   icon: const Icon(Icons.search),
@@ -263,13 +307,16 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
                     // Installed Packages Header
                     Row(
                       children: [
-                        Icon(Icons.inventory_2_outlined, size: 20, color: Theme.of(context).colorScheme.primary),
+                        Icon(
+                          Icons.inventory_2_outlined,
+                          size: 20,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'Installed Packages (${filteredPackages.length})',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
@@ -288,7 +335,9 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
                         ),
                       )
                     else
-                      ...filteredPackages.map((p) => _buildPackageCard(context, p)),
+                      ...filteredPackages.map(
+                        (p) => _buildPackageCard(context, p),
+                      ),
                     const SizedBox(height: 32),
                   ],
                 ],
@@ -318,7 +367,10 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
             Expanded(
               child: Text(
                 pkg.name,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
               ),
             ),
             Container(
@@ -329,7 +381,11 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
               ),
               child: Text(
                 pkg.fileExtension,
-                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.primary,
+                ),
               ),
             ),
           ],
@@ -345,14 +401,18 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
               context: context,
               builder: (context) => AlertDialog(
                 title: Text('Remove ${pkg.name}?'),
-                content: Text('Are you sure you want to uninstall ${pkg.name} from the router?'),
+                content: Text(
+                  'Are you sure you want to uninstall ${pkg.name} from the router?',
+                ),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(context, false),
                     child: const Text('Cancel'),
                   ),
                   ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                    ),
                     onPressed: () => Navigator.pop(context, true),
                     child: const Text('Remove'),
                   ),
@@ -371,10 +431,9 @@ class _PackageManagerScreenState extends ConsumerState<PackageManagerScreen> {
               );
             }
 
-            final result = await ref.read(appStateProvider).managePackageResult(
-                  packageName: pkg.name,
-                  action: 'remove',
-                );
+            final result = await ref
+                .read(appStateProvider)
+                .managePackageResult(packageName: pkg.name, action: 'remove');
 
             if (context.mounted) {
               if (result.isSuccess) {

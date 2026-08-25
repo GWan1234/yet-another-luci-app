@@ -3,11 +3,15 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:yet_another_luci_app/state/app_state.dart';
 import 'package:yet_another_luci_app/services/secure_storage_service.dart';
 import 'package:yet_another_luci_app/config/app_config.dart';
 import 'package:yet_another_luci_app/widgets/theme_router_logo.dart';
 import 'package:yet_another_luci_app/screens/main_screen.dart';
 import 'package:yet_another_luci_app/screens/login_screen.dart';
+
+import 'package:yet_another_luci_app/utils/http_client_manager.dart';
+import 'package:yet_another_luci_app/utils/gateway_utils.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -38,80 +42,115 @@ class _SplashScreenState extends State<SplashScreen>
       curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
     );
     _controller.forward();
-    _checkReviewerMode();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _initializeAppSession();
+    });
   }
 
-  Future<void> _checkReviewerMode() async {
-    // Run storage check concurrently with logo animation for instant cold boot speed
-    final storageFuture = SecureStorageService().readValue(
+  Future<void> _initializeAppSession() async {
+    // Concurrently initialize SSL certs, read secure storage & detect gateway IP during splash logo animation
+    final reviewerStorageFuture = SecureStorageService().readValue(
       AppConfig.reviewerModeKey,
     );
-    final minDelayFuture = Future.delayed(const Duration(milliseconds: 500));
+    final credsFuture = SecureStorageService().getCredentials();
+    final certsFuture = HttpClientManager().ensureInitialized();
+    final gatewayFuture = GatewayUtils.detectGatewayIp();
+    final minDelayFuture = Future.delayed(const Duration(milliseconds: 400));
 
-    final results = await Future.wait([storageFuture, minDelayFuture]);
-    final reviewerModeEnabled = results[0];
+    final results = await Future.wait([
+      reviewerStorageFuture,
+      credsFuture,
+      certsFuture,
+      gatewayFuture,
+      minDelayFuture,
+    ]);
+
+    final reviewerModeEnabled = results[0] as String?;
+    final creds = results[1] as Map<String, String?>;
+    final detectedGateway = results[3] as String?;
 
     if (!mounted) return;
 
+    final appState = AppState.instance;
+
     if (reviewerModeEnabled == 'true') {
+      await appState.setReviewerMode(true);
+      if (!mounted) return;
       _navigateToMainScreen();
-    } else {
-      _navigateToLoginScreen();
+      return;
     }
+
+    final hasSavedCreds =
+        creds['ipAddress'] != null &&
+        creds['ipAddress']!.isNotEmpty &&
+        creds['password'] != null;
+
+    if (hasSavedCreds) {
+      final success = await appState.tryAutoLogin(
+        context: mounted ? context : null,
+      );
+      if (!mounted) return;
+      if (success) {
+        _navigateToMainScreen();
+        return;
+      }
+    }
+
+    final effectiveIp =
+        (creds['ipAddress'] != null && creds['ipAddress']!.isNotEmpty)
+        ? creds['ipAddress']
+        : detectedGateway;
+
+    _navigateToLoginScreen(
+      initialIp: effectiveIp,
+      initialUsername: creds['username'],
+      initialPassword: creds['password'],
+    );
   }
 
   void _navigateToMainScreen() {
     if (!mounted) return;
-    final disableAnimations = MediaQuery.of(context).disableAnimations;
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => const MainScreen(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          if (disableAnimations) return child;
-          final curved = CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-          );
-          final scaleAnimation = Tween<double>(begin: 0.96, end: 1.0).animate(curved);
-          return RepaintBoundary(
-            child: FadeTransition(
-              opacity: curved,
-              child: ScaleTransition(
-                scale: scaleAnimation,
-                child: child,
-              ),
-            ),
-          );
-        },
-        transitionDuration: disableAnimations ? Duration.zero : const Duration(milliseconds: 400),
-      ),
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const MainScreen()),
+      (route) => false,
     );
   }
 
-  void _navigateToLoginScreen() {
+  void _navigateToLoginScreen({
+    String? initialIp,
+    String? initialUsername,
+    String? initialPassword,
+  }) {
     if (!mounted) return;
     final disableAnimations = MediaQuery.of(context).disableAnimations;
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => const LoginScreen(),
+        pageBuilder: (context, animation, secondaryAnimation) => LoginScreen(
+          initialIp: initialIp,
+          initialUsername: initialUsername,
+          initialPassword: initialPassword,
+        ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           if (disableAnimations) return child;
           final curved = CurvedAnimation(
             parent: animation,
             curve: Curves.easeInOutCubic,
           );
-          final scaleAnimation = Tween<double>(begin: 0.97, end: 1.0).animate(curved);
+          final scaleAnimation = Tween<double>(
+            begin: 0.97,
+            end: 1.0,
+          ).animate(curved);
           return RepaintBoundary(
             child: FadeTransition(
               opacity: curved,
-              child: ScaleTransition(
-                scale: scaleAnimation,
-                child: child,
-              ),
+              child: ScaleTransition(scale: scaleAnimation, child: child),
             ),
           );
         },
-        transitionDuration: disableAnimations ? Duration.zero : const Duration(milliseconds: 450),
+        transitionDuration: disableAnimations
+            ? Duration.zero
+            : const Duration(milliseconds: 450),
       ),
     );
   }
@@ -172,7 +211,9 @@ class _SplashScreenState extends State<SplashScreen>
                                     borderRadius: BorderRadius.circular(24),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.04),
+                                        color: Colors.black.withValues(
+                                          alpha: 0.04,
+                                        ),
                                         blurRadius: 16,
                                         offset: const Offset(0, 4),
                                       ),
@@ -195,23 +236,29 @@ class _SplashScreenState extends State<SplashScreen>
                                 children: [
                                   Text(
                                     'Yet Another LuCI App',
-                                    style: theme.textTheme.headlineMedium?.copyWith(
-                                      color: colorScheme.onSurface,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.3,
-                                    ),
+                                    style: theme.textTheme.headlineMedium
+                                        ?.copyWith(
+                                          color: colorScheme.onSurface,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.3,
+                                        ),
                                     textAlign: TextAlign.center,
                                   ),
                                   const SizedBox(height: 10),
 
                                   // Matte Technical Subtitle Badge
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 6,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                      color: colorScheme.surfaceContainerHighest
+                                          .withValues(alpha: 0.5),
                                       borderRadius: BorderRadius.circular(14),
                                       border: Border.all(
-                                        color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+                                        color: colorScheme.outlineVariant
+                                            .withValues(alpha: 0.6),
                                         width: 1,
                                       ),
                                     ),
@@ -227,11 +274,13 @@ class _SplashScreenState extends State<SplashScreen>
                                         Flexible(
                                           child: Text(
                                             'OpenWrt Router Management System',
-                                            style: theme.textTheme.labelMedium?.copyWith(
-                                              color: colorScheme.onSurfaceVariant,
-                                              fontWeight: FontWeight.w600,
-                                              letterSpacing: 0.2,
-                                            ),
+                                            style: theme.textTheme.labelMedium
+                                                ?.copyWith(
+                                                  color: colorScheme
+                                                      .onSurfaceVariant,
+                                                  fontWeight: FontWeight.w600,
+                                                  letterSpacing: 0.2,
+                                                ),
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
@@ -247,12 +296,17 @@ class _SplashScreenState extends State<SplashScreen>
                             FadeTransition(
                               opacity: _logoFade,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: colorScheme.surfaceContainer.withValues(alpha: 0.8),
+                                  color: colorScheme.surfaceContainer
+                                      .withValues(alpha: 0.8),
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
-                                    color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                                    color: colorScheme.outlineVariant
+                                        .withValues(alpha: 0.5),
                                   ),
                                 ),
                                 child: Row(
@@ -263,7 +317,10 @@ class _SplashScreenState extends State<SplashScreen>
                                       height: 14,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              primaryColor,
+                                            ),
                                       ),
                                     ),
                                     const SizedBox(width: 10),
@@ -290,12 +347,19 @@ class _SplashScreenState extends State<SplashScreen>
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainer.withValues(alpha: 0.7),
+                        color: colorScheme.surfaceContainer.withValues(
+                          alpha: 0.7,
+                        ),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+                          color: colorScheme.outlineVariant.withValues(
+                            alpha: 0.4,
+                          ),
                         ),
                       ),
                       child: Row(
@@ -304,7 +368,9 @@ class _SplashScreenState extends State<SplashScreen>
                           Text(
                             'by Tuhin Garai',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                              color: colorScheme.onSurfaceVariant.withValues(
+                                alpha: 0.8,
+                              ),
                               fontStyle: FontStyle.italic,
                               fontWeight: FontWeight.w500,
                             ),
@@ -315,13 +381,12 @@ class _SplashScreenState extends State<SplashScreen>
                             height: 3,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                              color: colorScheme.onSurfaceVariant.withValues(
+                                alpha: 0.5,
+                              ),
                             ),
                           ),
-                          const Text(
-                            '🐙',
-                            style: TextStyle(fontSize: 12),
-                          ),
+                          const Text('🐙', style: TextStyle(fontSize: 12)),
                           const SizedBox(width: 4),
                           Text(
                             '@nightcodex7',
@@ -393,7 +458,8 @@ class _NetworkTopologyMeshPainter extends CustomPainter {
             if (c - 1 >= 0) canvas.drawLine(pt, grid[r + 1][c - 1], linePaint);
           } else {
             if (c < cols) canvas.drawLine(pt, grid[r + 1][c], linePaint);
-            if (c + 1 < cols) canvas.drawLine(pt, grid[r + 1][c + 1], linePaint);
+            if (c + 1 < cols)
+              canvas.drawLine(pt, grid[r + 1][c + 1], linePaint);
           }
         }
 
@@ -412,7 +478,11 @@ class _NetworkTopologyMeshPainter extends CustomPainter {
     const double tickLen = 6.0;
     for (double y = 40; y < size.height - 40; y += 40) {
       canvas.drawLine(Offset(0, y), Offset(tickLen, y), tickPaint);
-      canvas.drawLine(Offset(size.width - tickLen, y), Offset(size.width, y), tickPaint);
+      canvas.drawLine(
+        Offset(size.width - tickLen, y),
+        Offset(size.width, y),
+        tickPaint,
+      );
     }
   }
 

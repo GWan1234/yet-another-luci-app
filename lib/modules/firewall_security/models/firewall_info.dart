@@ -79,10 +79,7 @@ class FirewallForwarding {
   final String srcZone;
   final String destZone;
 
-  const FirewallForwarding({
-    required this.srcZone,
-    required this.destZone,
-  });
+  const FirewallForwarding({required this.srcZone, required this.destZone});
 
   factory FirewallForwarding.fromJson(Map<String, dynamic> json) {
     return FirewallForwarding(
@@ -116,10 +113,16 @@ class FirewallPortForwarding {
     return FirewallPortForwarding(
       name: json['name']?.toString() ?? json['.name']?.toString() ?? 'Redirect',
       srcZone: json['src']?.toString() ?? 'wan',
-      srcPort: json['src_dport']?.toString() ?? json['src_port']?.toString() ?? 'Any',
+      srcPort:
+          json['src_dport']?.toString() ??
+          json['src_port']?.toString() ??
+          'Any',
       destZone: json['dest']?.toString() ?? 'lan',
       destIp: json['dest_ip']?.toString() ?? 'Any',
-      destPort: json['dest_port']?.toString() ?? json['src_dport']?.toString() ?? 'Any',
+      destPort:
+          json['dest_port']?.toString() ??
+          json['src_dport']?.toString() ??
+          'Any',
       proto: json['proto']?.toString() ?? 'tcp',
     );
   }
@@ -219,7 +222,10 @@ class FirewallOverview {
     this.errorMessage,
   });
 
-  factory FirewallOverview.unavailable(FirewallBackend backend, [String? reason]) {
+  factory FirewallOverview.unavailable(
+    FirewallBackend backend, [
+    String? reason,
+  ]) {
     return FirewallOverview(
       backend: backend,
       defaultPolicy: const FirewallDefaultPolicy(
@@ -247,16 +253,55 @@ class FirewallOverview {
       if (isReviewerMode) {
         return Fw4FirewallParser.parse({
           'values': {
-            'defaults': {'.type': 'defaults', 'input': 'ACCEPT', 'output': 'ACCEPT', 'forward': 'REJECT'},
-            'lan': {'.type': 'zone', 'name': 'lan', 'input': 'ACCEPT', 'output': 'ACCEPT', 'forward': 'ACCEPT', 'network': ['lan']},
-            'wan': {'.type': 'zone', 'name': 'wan', 'input': 'REJECT', 'output': 'ACCEPT', 'forward': 'REJECT', 'masq': '1', 'network': ['wan', 'wan6']},
+            'defaults': {
+              '.type': 'defaults',
+              'input': 'ACCEPT',
+              'output': 'ACCEPT',
+              'forward': 'REJECT',
+            },
+            'lan': {
+              '.type': 'zone',
+              'name': 'lan',
+              'input': 'ACCEPT',
+              'output': 'ACCEPT',
+              'forward': 'ACCEPT',
+              'network': ['lan'],
+            },
+            'wan': {
+              '.type': 'zone',
+              'name': 'wan',
+              'input': 'REJECT',
+              'output': 'ACCEPT',
+              'forward': 'REJECT',
+              'masq': '1',
+              'network': ['wan', 'wan6'],
+            },
             'fwd': {'.type': 'forwarding', 'src': 'lan', 'dest': 'wan'},
-            'ssh': {'.type': 'redirect', 'name': 'SSH Forward', 'src': 'wan', 'src_dport': '2222', 'dest': 'lan', 'dest_ip': '192.168.1.1', 'dest_port': '22', 'proto': 'tcp'},
-            'r1': {'.type': 'rule', 'name': 'Allow-DHCP-Renew', 'src': 'wan', 'dest': 'lan', 'target': 'ACCEPT', 'enabled': '1'},
-          }
+            'ssh': {
+              '.type': 'redirect',
+              'name': 'SSH Forward',
+              'src': 'wan',
+              'src_dport': '2222',
+              'dest': 'lan',
+              'dest_ip': '192.168.1.1',
+              'dest_port': '22',
+              'proto': 'tcp',
+            },
+            'r1': {
+              '.type': 'rule',
+              'name': 'Allow-DHCP-Renew',
+              'src': 'wan',
+              'dest': 'lan',
+              'target': 'ACCEPT',
+              'enabled': '1',
+            },
+          },
         });
       }
-      return FirewallOverview.unavailable(backend, 'No firewall configuration data received');
+      return FirewallOverview.unavailable(
+        backend,
+        'No firewall configuration data received',
+      );
     }
 
     if (backend == FirewallBackend.fw3) {
@@ -297,14 +342,22 @@ class Fw3FirewallParser {
             defaultsMap = Map<String, dynamic>.from(val);
             hasDefaultsOrZone = true;
           } else if (type == 'zone') {
-            zoneList.add(FirewallZone.fromJson(key, Map<String, dynamic>.from(val)));
+            zoneList.add(
+              FirewallZone.fromJson(key, Map<String, dynamic>.from(val)),
+            );
             hasDefaultsOrZone = true;
           } else if (type == 'forwarding') {
-            fwdList.add(FirewallForwarding.fromJson(Map<String, dynamic>.from(val)));
+            fwdList.add(
+              FirewallForwarding.fromJson(Map<String, dynamic>.from(val)),
+            );
           } else if (type == 'redirect') {
-            pfList.add(FirewallPortForwarding.fromJson(Map<String, dynamic>.from(val)));
+            pfList.add(
+              FirewallPortForwarding.fromJson(Map<String, dynamic>.from(val)),
+            );
           } else if (type == 'rule') {
-            ruleList.add(FirewallCustomRule.fromJson(key, Map<String, dynamic>.from(val)));
+            ruleList.add(
+              FirewallCustomRule.fromJson(key, Map<String, dynamic>.from(val)),
+            );
           }
         }
       });
@@ -367,14 +420,22 @@ class Fw4FirewallParser {
             defaultsMap = Map<String, dynamic>.from(val);
             hasDefaultsOrZone = true;
           } else if (type == 'zone') {
-            zoneList.add(FirewallZone.fromJson(key, Map<String, dynamic>.from(val)));
+            zoneList.add(
+              FirewallZone.fromJson(key, Map<String, dynamic>.from(val)),
+            );
             hasDefaultsOrZone = true;
           } else if (type == 'forwarding') {
-            fwdList.add(FirewallForwarding.fromJson(Map<String, dynamic>.from(val)));
+            fwdList.add(
+              FirewallForwarding.fromJson(Map<String, dynamic>.from(val)),
+            );
           } else if (type == 'redirect') {
-            pfList.add(FirewallPortForwarding.fromJson(Map<String, dynamic>.from(val)));
+            pfList.add(
+              FirewallPortForwarding.fromJson(Map<String, dynamic>.from(val)),
+            );
           } else if (type == 'rule') {
-            ruleList.add(FirewallCustomRule.fromJson(key, Map<String, dynamic>.from(val)));
+            ruleList.add(
+              FirewallCustomRule.fromJson(key, Map<String, dynamic>.from(val)),
+            );
           }
         }
       });

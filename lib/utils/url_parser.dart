@@ -1,6 +1,8 @@
 // Copyright 2026 Tuhin Garai. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import 'dart:io';
+
 class UrlParser {
   static const int defaultHttpPort = 80;
   static const int defaultHttpsPort = 443;
@@ -97,6 +99,16 @@ class UrlParser {
         return _parseIPv6(input);
       }
 
+      final parsedIp = InternetAddress.tryParse(input);
+      if (parsedIp != null && parsedIp.type == InternetAddressType.IPv6) {
+        return ParsedUrl(
+          host: '[$input]',
+          port: defaultHttpPort,
+          useHttps: false,
+          isValid: true,
+        );
+      }
+
       return ParsedUrl(
         host: '',
         port: defaultHttpPort,
@@ -144,27 +156,8 @@ class UrlParser {
 
   static bool _isValidHost(String host) {
     if (host.isEmpty) return false;
-
-    // Check for IPv4
-    final ipv4Regex = RegExp(r'^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$');
-    final ipv4Match = ipv4Regex.firstMatch(host);
-    if (ipv4Match != null) {
-      // Validate each octet
-      for (int i = 1; i <= 4; i++) {
-        final octet = int.tryParse(ipv4Match.group(i)!);
-        if (octet == null || octet < 0 || octet > 255) {
-          return false;
-        }
-      }
-      return true;
-    }
-
-    // Check for hostname (basic validation)
-    final hostnameRegex = RegExp(
-      r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$',
-    );
-
-    return hostnameRegex.hasMatch(host);
+    return InternetAddress.tryParse(host) != null ||
+        Uri.tryParse('http://$host')?.hasAuthority == true;
   }
 
   static String buildUrl(String host, int port, bool useHttps) {

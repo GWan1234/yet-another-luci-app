@@ -32,7 +32,8 @@ class _LuciSmoothSpinnerState extends State<LuciSmoothSpinner>
   void initState() {
     super.initState();
     // Compute current rotation phase (0.0 to 1.0) based on wall clock (1000ms loop)
-    final initialPhase = (DateTime.now().millisecondsSinceEpoch % 1000) / 1000.0;
+    final initialPhase =
+        (DateTime.now().millisecondsSinceEpoch % 1000) / 1000.0;
     _controller = AnimationController(
       value: initialPhase,
       duration: const Duration(milliseconds: 1000),

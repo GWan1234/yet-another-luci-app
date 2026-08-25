@@ -11,6 +11,11 @@ import 'package:yet_another_luci_app/main.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yet_another_luci_app/widgets/scroll_jitter_guard.dart';
 
+import 'package:flutter/services.dart';
+import 'package:yet_another_luci_app/utils/gateway_utils.dart';
+import 'package:yet_another_luci_app/services/secure_storage_service.dart';
+import 'package:yet_another_luci_app/screens/login_screen.dart';
+
 class MainScreen extends ConsumerStatefulWidget {
   final int? initialTab;
   final String? interfaceToScroll;
@@ -21,7 +26,8 @@ class MainScreen extends ConsumerStatefulWidget {
   ConsumerState<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObserver {
+class _MainScreenState extends ConsumerState<MainScreen>
+    with WidgetsBindingObserver {
   int _selectedIndex = 0;
   String? _currentInterfaceToScroll;
   final Set<int> _activatedTabs = {0};
@@ -96,6 +102,38 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
   @override
   Widget build(BuildContext context) {
     final appState = ref.watch(appStateProvider);
+
+    // Guardrail: If session is completely unauthenticated and not in reviewer mode,
+    // redirect smoothly to LoginScreen instead of leaving the app on a blank main screen.
+    if (appState.sysauth == null &&
+        !appState.reviewerModeEnabled &&
+        !appState.isLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (mounted &&
+            appState.sysauth == null &&
+            !appState.reviewerModeEnabled &&
+            !appState.isLoading) {
+          final creds = await SecureStorageService().getCredentials();
+          final detectedGateway = await GatewayUtils.detectGatewayIp();
+          final effectiveIp =
+              (creds['ipAddress'] != null && creds['ipAddress']!.isNotEmpty)
+                  ? creds['ipAddress']
+                  : detectedGateway;
+
+          if (!mounted) return;
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => LoginScreen(
+                initialIp: effectiveIp,
+                initialUsername: creds['username'],
+                initialPassword: creds['password'],
+              ),
+            ),
+          );
+        }
+      });
+    }
+
     if (appState.requestedTab != null &&
         appState.requestedTab != _selectedIndex) {
       final safeRequestedTab = appState.requestedTab!.clamp(0, 4);
@@ -127,152 +165,171 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     final isRebooting = appState.isRebooting;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      body: ScrollJitterGuard(
-        child: IndexedStack(
-          index: _selectedIndex,
-          children: [
-            _activatedTabs.contains(0) ? const DashboardScreen() : const SizedBox.shrink(),
-            _activatedTabs.contains(1)
-                ? InterfacesScreen(
-                    scrollToInterface: _currentInterfaceToScroll,
-                    onScrollComplete: _clearInterfaceToScroll,
-                  )
-                : const SizedBox.shrink(),
-            _activatedTabs.contains(2) ? const ClientsScreen() : const SizedBox.shrink(),
-            _activatedTabs.contains(3) ? const WirelessManagementScreen() : const SizedBox.shrink(),
-            _activatedTabs.contains(4) ? const MoreScreen() : const SizedBox.shrink(),
-          ],
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        child: SizedBox(
-          height: 72,
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.bottomCenter,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        SystemNavigator.pop();
+      },
+      child: Scaffold(
+        body: ScrollJitterGuard(
+          child: IndexedStack(
+            index: _selectedIndex,
             children: [
-              // Flat Matt Bottom Bar Container
-              Container(
-                height: 60,
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainer,
-                  border: Border(
-                    top: BorderSide(
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.2),
-                      width: 1,
+              _activatedTabs.contains(0)
+                  ? const DashboardScreen()
+                  : const SizedBox.shrink(),
+              _activatedTabs.contains(1)
+                  ? InterfacesScreen(
+                      scrollToInterface: _currentInterfaceToScroll,
+                      onScrollComplete: _clearInterfaceToScroll,
+                    )
+                  : const SizedBox.shrink(),
+              _activatedTabs.contains(2)
+                  ? const ClientsScreen()
+                  : const SizedBox.shrink(),
+              _activatedTabs.contains(3)
+                  ? const WirelessManagementScreen()
+                  : const SizedBox.shrink(),
+              _activatedTabs.contains(4)
+                  ? const MoreScreen()
+                  : const SizedBox.shrink(),
+            ],
+          ),
+        ),
+        bottomNavigationBar: SafeArea(
+          child: SizedBox(
+            height: 72,
+            child: Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.bottomCenter,
+              children: [
+                // Flat Matt Bottom Bar Container
+                Container(
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainer,
+                    border: Border(
+                      top: BorderSide(
+                        color: colorScheme.outlineVariant.withValues(
+                          alpha: 0.2,
+                        ),
+                        width: 1,
+                      ),
                     ),
                   ),
-                ),
-                child: Row(
-                  children: [
-                    // Left Wing (Interfaces & Clients)
-                    Expanded(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildNavItem(
-                            index: 1,
-                            label: 'Interfaces',
-                            icon: Icons.lan_outlined,
-                            selectedIcon: Icons.lan,
-                            isRebooting: isRebooting,
-                          ),
-                          _buildNavItem(
-                            index: 2,
-                            label: 'Clients',
-                            icon: Icons.people_outline,
-                            selectedIcon: Icons.people,
-                            isRebooting: isRebooting,
-                            badgeCount: appState.clients.where((c) => c.isConnected).length,
-                          ),
-                        ],
+                  child: Row(
+                    children: [
+                      // Left Wing (Interfaces & Clients)
+                      Expanded(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _buildNavItem(
+                              index: 1,
+                              label: 'Interfaces',
+                              icon: Icons.lan_outlined,
+                              selectedIcon: Icons.lan,
+                              isRebooting: isRebooting,
+                            ),
+                            _buildNavItem(
+                              index: 2,
+                              label: 'Clients',
+                              icon: Icons.people_outline,
+                              selectedIcon: Icons.people,
+                              isRebooting: isRebooting,
+                              badgeCount: appState.clients
+                                  .where((c) => c.isConnected)
+                                  .length,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    // Center Clearance Spacer for Elevated Dashboard Badge
-                    const SizedBox(width: 64),
-                    // Right Wing (Wireless & More)
-                    Expanded(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildNavItem(
-                            index: 3,
-                            label: 'Wireless',
-                            icon: Icons.wifi_outlined,
-                            selectedIcon: Icons.wifi,
-                            isRebooting: isRebooting,
-                          ),
-                          _buildNavItem(
-                            index: 4,
-                            label: 'More',
-                            icon: Icons.more_horiz_outlined,
-                            selectedIcon: Icons.more_horiz,
-                            isRebooting: false,
-                          ),
-                        ],
+                      // Center Clearance Spacer for Elevated Dashboard Badge
+                      const SizedBox(width: 64),
+                      // Right Wing (Wireless & More)
+                      Expanded(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _buildNavItem(
+                              index: 3,
+                              label: 'Wireless',
+                              icon: Icons.wifi_outlined,
+                              selectedIcon: Icons.wifi,
+                              isRebooting: isRebooting,
+                            ),
+                            _buildNavItem(
+                              index: 4,
+                              label: 'More',
+                              icon: Icons.more_horiz_outlined,
+                              selectedIcon: Icons.more_horiz,
+                              isRebooting: false,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
-              // Solid Flat Matt Circular Center Dashboard Badge Button (Index 0)
-              Align(
-                alignment: Alignment.topCenter,
-                child: Transform.translate(
-                  offset: const Offset(0, -12),
-                  child: GestureDetector(
-                    onTap: () {
-                      if (isRebooting) return;
-                      _onItemTapped(0);
-                    },
-                    behavior: HitTestBehavior.opaque,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _selectedIndex == 0
-                                ? colorScheme.primary
-                                : colorScheme.surfaceContainerHigh,
-                            border: Border.all(
-                              color: colorScheme.surface,
-                              width: 3,
+                // Solid Flat Matt Circular Center Dashboard Badge Button (Index 0)
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: Transform.translate(
+                    offset: const Offset(0, -12),
+                    child: GestureDetector(
+                      onTap: () {
+                        if (isRebooting) return;
+                        _onItemTapped(0);
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _selectedIndex == 0
+                                  ? colorScheme.primary
+                                  : colorScheme.surfaceContainerHigh,
+                              border: Border.all(
+                                color: colorScheme.surface,
+                                width: 3,
+                              ),
+                            ),
+                            child: Icon(
+                              _selectedIndex == 0
+                                  ? Icons.dashboard_rounded
+                                  : Icons.dashboard_outlined,
+                              color: _selectedIndex == 0
+                                  ? colorScheme.onPrimary
+                                  : colorScheme.onSurfaceVariant,
+                              size: 24,
                             ),
                           ),
-                          child: Icon(
-                            _selectedIndex == 0
-                                ? Icons.dashboard_rounded
-                                : Icons.dashboard_outlined,
-                            color: _selectedIndex == 0
-                                ? colorScheme.onPrimary
-                                : colorScheme.onSurfaceVariant,
-                            size: 24,
+                          const SizedBox(height: 2),
+                          Text(
+                            'Dashboard',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: _selectedIndex == 0
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: _selectedIndex == 0
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurfaceVariant,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Dashboard',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: _selectedIndex == 0
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                            color: _selectedIndex == 0
-                                ? colorScheme.primary
-                                : colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -293,7 +350,8 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
         ? colorScheme.onSurface.withValues(alpha: 0.38)
         : (isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant);
 
-    final semanticText = '$label, tab ${index + 1} of 5. ${isSelected ? "Currently active tab." : "Double tap to switch to $label."}';
+    final semanticText =
+        '$label, tab ${index + 1} of 5. ${isSelected ? "Currently active tab." : "Double tap to switch to $label."}';
 
     return Semantics(
       selected: isSelected,
@@ -322,12 +380,20 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                       child: Transform.translate(
                         offset: const Offset(8, -4),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1,
+                          ),
                           decoration: BoxDecoration(
-                            color: isSelected ? colorScheme.primary : colorScheme.secondary,
+                            color: isSelected
+                                ? colorScheme.primary
+                                : colorScheme.secondary,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                          constraints: const BoxConstraints(
+                            minWidth: 14,
+                            minHeight: 14,
+                          ),
                           child: Text(
                             badgeCount > 99 ? '99+' : '$badgeCount',
                             style: TextStyle(
@@ -378,9 +444,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         backgroundColor: colorScheme.surface,
         surfaceTintColor: Colors.transparent,
         title: Row(
@@ -444,7 +508,9 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                color: colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.5,
+                ),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: colorScheme.outlineVariant.withValues(alpha: 0.5),

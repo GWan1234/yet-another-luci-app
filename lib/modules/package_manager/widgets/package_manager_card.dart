@@ -12,7 +12,9 @@ class PackageManagerCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appState = ref.watch(appStateProvider);
-    final overview = PackageManagerOverview.fromDashboardData(appState.dashboardData);
+    final overview = PackageManagerOverview.fromDashboardData(
+      appState.dashboardData,
+    );
 
     return Card(
       elevation: 2,
@@ -43,13 +45,20 @@ class PackageManagerCard extends ConsumerWidget {
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    overview.activeManager == PackageManagerType.apk ? 'APK Mode' : 'OPKG Mode',
+                    overview.activeManager == PackageManagerType.apk
+                        ? 'APK Mode'
+                        : 'OPKG Mode',
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.primary,
                       fontSize: 10,
@@ -75,7 +84,9 @@ class PackageManagerCard extends ConsumerWidget {
                   child: _buildMetricTile(
                     context,
                     label: 'Package Manager',
-                    value: overview.activeManager == PackageManagerType.apk ? 'Alpine APK' : 'OpenWrt OPKG',
+                    value: overview.activeManager == PackageManagerType.apk
+                        ? 'Alpine APK'
+                        : 'OpenWrt OPKG',
                     icon: Icons.inventory_2_outlined,
                     color: Colors.blue,
                   ),

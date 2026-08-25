@@ -3,6 +3,7 @@
 
 import 'package:flutter/foundation.dart';
 import 'luci_module.dart';
+import '../built_in_modules.dart';
 
 /// Central registry for managing dynamic LuCI app modules.
 class LuciModuleRegistry extends ChangeNotifier {
@@ -13,17 +14,39 @@ class LuciModuleRegistry extends ChangeNotifier {
   static LuciModuleRegistry get instance => _instance;
 
   final Map<String, LuciModule> _modules = {};
+  bool _isAutoInitializing = false;
+
+  void _ensureInitialized() {
+    if (_modules.isEmpty && !_isAutoInitializing) {
+      _isAutoInitializing = true;
+      registerBuiltInModules();
+      _isAutoInitializing = false;
+    }
+  }
+
+  /// Registers multiple modules in a single batch, notifying listeners only once.
+  void registerModules(List<LuciModule> modules) {
+    bool addedAny = false;
+    for (final module in modules) {
+      if (!_modules.containsKey(module.id)) {
+        _modules[module.id] = module;
+        module.initialize();
+        addedAny = true;
+      }
+    }
+    if (addedAny) {
+      notifyListeners();
+    }
+  }
 
   /// Registers a module with the framework.
   void registerModule(LuciModule module) {
     if (_modules.containsKey(module.id)) {
-      debugPrint('[LuciModuleRegistry] Module already registered: ${module.id}');
       return;
     }
     _modules[module.id] = module;
     module.initialize();
     notifyListeners();
-    debugPrint('[LuciModuleRegistry] Registered module: ${module.id} (${module.name})');
   }
 
   /// Unregisters a module by its ID.
@@ -32,15 +55,18 @@ class LuciModuleRegistry extends ChangeNotifier {
     if (module != null) {
       module.dispose();
       notifyListeners();
-      debugPrint('[LuciModuleRegistry] Unregistered module: $id');
     }
   }
 
   /// Retrieves a registered module by ID.
-  LuciModule? getModule(String id) => _modules[id];
+  LuciModule? getModule(String id) {
+    _ensureInitialized();
+    return _modules[id];
+  }
 
   /// Returns all registered modules sorted by priority.
   List<LuciModule> get allModules {
+    _ensureInitialized();
     final list = _modules.values.toList();
     list.sort((a, b) => a.priority.compareTo(b.priority));
     return list;

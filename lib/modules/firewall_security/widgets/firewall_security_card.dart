@@ -13,7 +13,8 @@ class FirewallSecurityCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appState = ref.watch(appStateProvider);
-    final backend = appState.capabilities?.firewallBackend ?? FirewallBackend.fw4;
+    final backend =
+        appState.capabilities?.firewallBackend ?? FirewallBackend.fw4;
     final uciFirewall = appState.dashboardData?['uciFirewallConfig'];
     final overview = FirewallOverview.fromUciData(
       uciFirewall,
@@ -54,7 +55,9 @@ class FirewallSecurityCard extends ConsumerWidget {
                 Text(
                   '${overview.zones.length} Zones',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
               ],

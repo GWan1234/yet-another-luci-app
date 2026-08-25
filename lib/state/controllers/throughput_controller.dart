@@ -15,9 +15,8 @@ import 'package:yet_another_luci_app/services/throughput_service.dart';
 /// (`appState.rxHistory`, `appState.currentTxRate`, etc.) continues
 /// to work without modification.
 class ThroughputController {
-  ThroughputController({
-    required ThroughputService throughputService,
-  }) : _throughputService = throughputService;
+  ThroughputController({required ThroughputService throughputService})
+    : _throughputService = throughputService;
 
   final ThroughputService _throughputService;
 
@@ -49,7 +48,11 @@ class ThroughputController {
 
   /// Updates the polling interval (clamped 1–10s) and restarts the timer.
   /// Returns true if the interval actually changed.
-  bool setInterval(int seconds, {required bool isRebooting, required VoidCallback onTick}) {
+  bool setInterval(
+    int seconds, {
+    required bool isRebooting,
+    required VoidCallback onTick,
+  }) {
     final clamped = seconds.clamp(1, 10);
     if (_throughputIntervalSeconds == clamped) return false;
     _throughputIntervalSeconds = clamped;

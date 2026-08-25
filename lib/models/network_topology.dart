@@ -98,13 +98,13 @@ class TopologyPort {
   });
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'isTagged': isTagged,
-        'isWan': isWan,
-        'portIndex': portIndex,
-        'isUp': isUp,
-        'linkSpeed': linkSpeed,
-      };
+    'name': name,
+    'isTagged': isTagged,
+    'isWan': isWan,
+    'portIndex': portIndex,
+    'isUp': isUp,
+    'linkSpeed': linkSpeed,
+  };
 }
 
 /// Configured VLAN entry
@@ -122,11 +122,11 @@ class VlanConfig {
   });
 
   Map<String, dynamic> toJson() => {
-        'vid': vid,
-        'name': name,
-        'ports': ports.map((p) => p.toJson()).toList(),
-        'device': device,
-      };
+    'vid': vid,
+    'name': name,
+    'ports': ports.map((p) => p.toJson()).toList(),
+    'device': device,
+  };
 }
 
 /// Unified output schema for Network Topology (DSA or swconfig)
@@ -157,11 +157,16 @@ class NetworkTopology {
       bridges: const [],
       isAvailable: false,
       isZeroVlans: false,
-      errorMessage: reason ?? 'Topology unavailable for current capabilities profile',
+      errorMessage:
+          reason ?? 'Topology unavailable for current capabilities profile',
     );
   }
 
-  factory NetworkTopology.zeroVlans(NetworkModel model, {List<TopologyPort>? ports, List<String>? bridges}) {
+  factory NetworkTopology.zeroVlans(
+    NetworkModel model, {
+    List<TopologyPort>? ports,
+    List<String>? bridges,
+  }) {
     return NetworkTopology(
       modelType: model,
       ports: ports ?? const [],
@@ -175,7 +180,10 @@ class NetworkTopology {
 
 /// Dedicated DSA (Distributed Switch Architecture) topology parser
 class DsaTopologyParser {
-  static NetworkTopology parse(Map<String, dynamic> uciNetworkConfig, Map<String, dynamic>? networkDevices) {
+  static NetworkTopology parse(
+    Map<String, dynamic> uciNetworkConfig,
+    Map<String, dynamic>? networkDevices,
+  ) {
     try {
       final rawValues = uciNetworkConfig['values'];
       final Map<String, dynamic> uciValues = (rawValues is Map)
@@ -183,7 +191,10 @@ class DsaTopologyParser {
           : Map<String, dynamic>.from(uciNetworkConfig);
 
       if (uciValues.isEmpty) {
-        return NetworkTopology.unavailable(NetworkModel.dsa, 'UCI network configuration payload is empty or unpopulated');
+        return NetworkTopology.unavailable(
+          NetworkModel.dsa,
+          'UCI network configuration payload is empty or unpopulated',
+        );
       }
 
       final vlans = <VlanConfig>[];
@@ -194,7 +205,9 @@ class DsaTopologyParser {
       uciValues.forEach((key, val) {
         if (val is Map) {
           final type = val['.type']?.toString();
-          if (type == 'interface' || type == 'device' || type == 'bridge-vlan') {
+          if (type == 'interface' ||
+              type == 'device' ||
+              type == 'bridge-vlan') {
             hasValidNetworkSections = true;
           }
 
@@ -242,22 +255,31 @@ class DsaTopologyParser {
               }
             }
 
-            vlans.add(VlanConfig(
-              vid: vid,
-              name: 'VLAN $vid',
-              ports: portsList,
-              device: device,
-            ));
+            vlans.add(
+              VlanConfig(
+                vid: vid,
+                name: 'VLAN $vid',
+                ports: portsList,
+                device: device,
+              ),
+            );
           }
         }
       });
 
       if (!hasValidNetworkSections) {
-        return NetworkTopology.unavailable(NetworkModel.dsa, 'No valid network sections found in UCI payload');
+        return NetworkTopology.unavailable(
+          NetworkModel.dsa,
+          'No valid network sections found in UCI payload',
+        );
       }
 
       if (vlans.isEmpty) {
-        return NetworkTopology.zeroVlans(NetworkModel.dsa, ports: allPorts, bridges: bridges);
+        return NetworkTopology.zeroVlans(
+          NetworkModel.dsa,
+          ports: allPorts,
+          bridges: bridges,
+        );
       }
 
       return NetworkTopology(
@@ -269,14 +291,20 @@ class DsaTopologyParser {
         isZeroVlans: false,
       );
     } catch (e) {
-      return NetworkTopology.unavailable(NetworkModel.dsa, 'Failed to parse DSA topology: $e');
+      return NetworkTopology.unavailable(
+        NetworkModel.dsa,
+        'Failed to parse DSA topology: $e',
+      );
     }
   }
 }
 
 /// Dedicated swconfig (legacy switch_vlan) topology parser
 class SwconfigTopologyParser {
-  static NetworkTopology parse(Map<String, dynamic> uciNetworkConfig, Map<String, dynamic>? networkDevices) {
+  static NetworkTopology parse(
+    Map<String, dynamic> uciNetworkConfig,
+    Map<String, dynamic>? networkDevices,
+  ) {
     try {
       final rawValues = uciNetworkConfig['values'];
       final Map<String, dynamic> uciValues = (rawValues is Map)
@@ -284,7 +312,10 @@ class SwconfigTopologyParser {
           : Map<String, dynamic>.from(uciNetworkConfig);
 
       if (uciValues.isEmpty) {
-        return NetworkTopology.unavailable(NetworkModel.swconfig, 'UCI network configuration payload is empty or unpopulated');
+        return NetworkTopology.unavailable(
+          NetworkModel.swconfig,
+          'UCI network configuration payload is empty or unpopulated',
+        );
       }
 
       final vlans = <VlanConfig>[];
@@ -295,16 +326,22 @@ class SwconfigTopologyParser {
       uciValues.forEach((key, val) {
         if (val is Map) {
           final type = val['.type']?.toString();
-          if (type == 'interface' || type == 'switch' || type == 'switch_vlan') {
+          if (type == 'interface' ||
+              type == 'switch' ||
+              type == 'switch_vlan') {
             hasValidNetworkSections = true;
           }
 
           if (type == 'switch') {
-            final name = val['name']?.toString() ?? val['.name']?.toString() ?? 'switch0';
+            final name =
+                val['name']?.toString() ??
+                val['.name']?.toString() ??
+                'switch0';
             switches.add(name);
           } else if (type == 'switch_vlan') {
             final switchDev = val['device']?.toString() ?? 'switch0';
-            final vlanIdStr = val['vlan']?.toString() ?? val['vlan_id']?.toString() ?? '1';
+            final vlanIdStr =
+                val['vlan']?.toString() ?? val['vlan_id']?.toString() ?? '1';
             final vid = int.tryParse(vlanIdStr) ?? 1;
             final rawPorts = val['ports']?.toString() ?? '';
 
@@ -314,8 +351,11 @@ class SwconfigTopologyParser {
               final isTagged = portToken.endsWith('t');
               final rawNum = portToken.replaceAll(RegExp(r'[^\d]'), '');
               final pIndex = int.tryParse(rawNum);
-              final portName = pIndex == 0 ? 'WAN (Port 0)' : 'LAN Port $rawNum';
-              final isWan = pIndex == 0 || portName.toLowerCase().contains('wan');
+              final portName = pIndex == 0
+                  ? 'WAN (Port 0)'
+                  : 'LAN Port $rawNum';
+              final isWan =
+                  pIndex == 0 || portName.toLowerCase().contains('wan');
 
               final port = TopologyPort(
                 name: portName,
@@ -329,22 +369,31 @@ class SwconfigTopologyParser {
               }
             }
 
-            vlans.add(VlanConfig(
-              vid: vid,
-              name: 'VLAN $vid ($switchDev)',
-              ports: portsList,
-              device: switchDev,
-            ));
+            vlans.add(
+              VlanConfig(
+                vid: vid,
+                name: 'VLAN $vid ($switchDev)',
+                ports: portsList,
+                device: switchDev,
+              ),
+            );
           }
         }
       });
 
       if (!hasValidNetworkSections) {
-        return NetworkTopology.unavailable(NetworkModel.swconfig, 'No valid network sections found in UCI payload');
+        return NetworkTopology.unavailable(
+          NetworkModel.swconfig,
+          'No valid network sections found in UCI payload',
+        );
       }
 
       if (vlans.isEmpty) {
-        return NetworkTopology.zeroVlans(NetworkModel.swconfig, ports: allPorts, bridges: switches);
+        return NetworkTopology.zeroVlans(
+          NetworkModel.swconfig,
+          ports: allPorts,
+          bridges: switches,
+        );
       }
 
       return NetworkTopology(
@@ -356,7 +405,10 @@ class SwconfigTopologyParser {
         isZeroVlans: false,
       );
     } catch (e) {
-      return NetworkTopology.unavailable(NetworkModel.swconfig, 'Failed to parse swconfig topology: $e');
+      return NetworkTopology.unavailable(
+        NetworkModel.swconfig,
+        'Failed to parse swconfig topology: $e',
+      );
     }
   }
 }

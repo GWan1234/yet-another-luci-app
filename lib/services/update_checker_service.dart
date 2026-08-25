@@ -42,13 +42,15 @@ class UpdateCheckerService {
       final info = await PackageInfo.fromPlatform();
       final currentVersionStr = info.version.trim();
 
-      final response = await http.get(
-        Uri.parse(_githubReleasesUrl),
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'YetAnotherLuCIApp/${info.version}',
-        },
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(
+            Uri.parse(_githubReleasesUrl),
+            headers: {
+              'Accept': 'application/vnd.github.v3+json',
+              'User-Agent': 'YetAnotherLuCIApp/${info.version}',
+            },
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (context.mounted) {
         Navigator.of(context, rootNavigator: true).pop(); // Dismiss loading
@@ -71,17 +73,21 @@ class UpdateCheckerService {
         }
 
         if (latestRelease != null) {
-          final rawTagName = (latestRelease['tag_name'] as String? ?? '').trim();
+          final rawTagName = (latestRelease['tag_name'] as String? ?? '')
+              .trim();
           final latestVersionStr = rawTagName.startsWith('v')
               ? rawTagName.substring(1)
               : rawTagName;
-          final htmlUrl = latestRelease['html_url'] as String? ??
+          final htmlUrl =
+              latestRelease['html_url'] as String? ??
               'https://github.com/nightcodex7/yet-another-luci-app/releases';
           final releaseNotes =
               latestRelease['body'] as String? ?? 'No release notes available.';
 
-          final int comparison =
-              _compareVersions(currentVersionStr, latestVersionStr);
+          final int comparison = _compareVersions(
+            currentVersionStr,
+            latestVersionStr,
+          );
 
           if (!context.mounted) return;
 
@@ -115,7 +121,10 @@ class UpdateCheckerService {
       }
     } catch (e) {
       if (context.mounted) {
-        Navigator.of(context, rootNavigator: true).pop(); // Dismiss loading if open
+        Navigator.of(
+          context,
+          rootNavigator: true,
+        ).pop(); // Dismiss loading if open
         _showErrorDialog(
           context,
           'Could not connect to GitHub to check for updates.',
@@ -191,27 +200,31 @@ class UpdateCheckerService {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  Text('v$currentVersion',
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    'v$currentVersion',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   const Icon(Icons.arrow_forward_rounded, size: 16),
-                  Text('v$latestVersion',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.primary)),
+                  Text(
+                    'v$latestVersion',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
-            const Text('Release Notes:',
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Release Notes:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 180),
               child: SingleChildScrollView(
-                child: Text(
-                  releaseNotes,
-                  style: theme.textTheme.bodyMedium,
-                ),
+                child: Text(releaseNotes, style: theme.textTheme.bodyMedium),
               ),
             ),
           ],
@@ -224,8 +237,10 @@ class UpdateCheckerService {
           FilledButton.icon(
             onPressed: () async {
               Navigator.of(context).pop();
-              await launchUrlString(downloadUrl,
-                  mode: LaunchMode.externalApplication);
+              await launchUrlString(
+                downloadUrl,
+                mode: LaunchMode.externalApplication,
+              );
             },
             icon: const Icon(Icons.download_rounded, size: 18),
             label: const Text('Download'),
@@ -235,8 +250,10 @@ class UpdateCheckerService {
     );
   }
 
-  static void _showUpToDateDialog(BuildContext context,
-      {required String currentVersion}) {
+  static void _showUpToDateDialog(
+    BuildContext context, {
+    required String currentVersion,
+  }) {
     final theme = Theme.of(context);
     showDialog(
       context: context,

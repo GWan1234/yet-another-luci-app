@@ -33,12 +33,17 @@ class RpcResultUiHelper {
     }
 
     if (result.isMethodNotFound) {
-      context.showToastWarning('Action "$actionLabel" is unavailable on this router capabilities profile.');
+      context.showToastWarning(
+        'Action "$actionLabel" is unavailable on this router capabilities profile.',
+      );
       return;
     }
 
     if (result.status == RpcCallStatus.networkError) {
-      context.showToastError('Network Error', subtitle: 'Network connection failed during $actionLabel.');
+      context.showToastError(
+        'Network Error',
+        subtitle: 'Network connection failed during $actionLabel.',
+      );
       return;
     }
 
@@ -50,7 +55,8 @@ class RpcResultUiHelper {
         title: Text('Failed: $actionLabel'),
         content: SingleChildScrollView(
           child: Text(
-            result.errorMessage ?? 'An unknown error occurred on the router during operation.',
+            result.errorMessage ??
+                'An unknown error occurred on the router during operation.',
             style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
           ),
         ),
@@ -65,7 +71,10 @@ class RpcResultUiHelper {
   }
 
   /// Displays standard RPCD ACL permission remediation guidance dialog with optional automatic fix button.
-  static void showPermissionDeniedDialog(BuildContext context, String actionLabel) {
+  static void showPermissionDeniedDialog(
+    BuildContext context,
+    String actionLabel,
+  ) {
     showDialog(
       context: context,
       builder: (ctx) => _PermissionDeniedDialog(actionLabel: actionLabel),
@@ -79,7 +88,8 @@ class _PermissionDeniedDialog extends StatefulWidget {
   const _PermissionDeniedDialog({required this.actionLabel});
 
   @override
-  State<_PermissionDeniedDialog> createState() => _PermissionDeniedDialogState();
+  State<_PermissionDeniedDialog> createState() =>
+      _PermissionDeniedDialogState();
 }
 
 class _PermissionDeniedDialogState extends State<_PermissionDeniedDialog> {
@@ -93,13 +103,18 @@ class _PermissionDeniedDialogState extends State<_PermissionDeniedDialog> {
     });
 
     try {
-      final success = await AppState.instance.autoFixPermissions(context: context);
+      final success = await AppState.instance.autoFixPermissions(
+        context: context,
+      );
       if (!mounted) return;
       if (success) {
         final parentContext = Navigator.of(context).context;
         Navigator.pop(context);
         if (parentContext.mounted) {
-          parentContext.showToastSuccess('Permissions fixed successfully!', subtitle: 'Capabilities re-probed.');
+          parentContext.showToastSuccess(
+            'Permissions fixed successfully!',
+            subtitle: 'Capabilities re-probed.',
+          );
         }
       } else {
         setState(() {
@@ -137,7 +152,9 @@ class _PermissionDeniedDialogState extends State<_PermissionDeniedDialog> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.errorContainer.withValues(alpha: 0.4),
+                  color: theme.colorScheme.errorContainer.withValues(
+                    alpha: 0.4,
+                  ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(

@@ -16,11 +16,18 @@ class ProbeResult {
   ProbeResult(this.name, this.ok, this.detail);
 }
 
-Future<String?> login(HttpClient client, Uri base, String user, String pass) async {
+Future<String?> login(
+  HttpClient client,
+  Uri base,
+  String user,
+  String pass,
+) async {
   final luciUri = base.replace(path: '/cgi-bin/luci/');
   final req = await client.postUrl(luciUri);
   req.headers.set('Content-Type', 'application/x-www-form-urlencoded');
-  req.write('luci_username=${Uri.encodeComponent(user)}&luci_password=${Uri.encodeComponent(pass)}');
+  req.write(
+    'luci_username=${Uri.encodeComponent(user)}&luci_password=${Uri.encodeComponent(pass)}',
+  );
   final resp = await req.close();
   await resp.drain<void>();
 
@@ -34,22 +41,26 @@ Future<String?> login(HttpClient client, Uri base, String user, String pass) asy
   final ubusUri = base.replace(path: '/ubus');
   final ubusReq = await client.postUrl(ubusUri);
   ubusReq.headers.set('Content-Type', 'application/json');
-  ubusReq.write(jsonEncode({
-    'jsonrpc': '2.0',
-    'id': 1,
-    'method': 'call',
-    'params': [
-      '00000000000000000000000000000000',
-      'session',
-      'login',
-      {'username': user, 'password': pass},
-    ],
-  }));
+  ubusReq.write(
+    jsonEncode({
+      'jsonrpc': '2.0',
+      'id': 1,
+      'method': 'call',
+      'params': [
+        '00000000000000000000000000000000',
+        'session',
+        'login',
+        {'username': user, 'password': pass},
+      ],
+    }),
+  );
   final ubusResp = await ubusReq.close();
   final ubusBody = await ubusResp.transform(utf8.decoder).join();
   try {
     final decoded = jsonDecode(ubusBody);
-    if (decoded is Map && decoded['result'] is List && decoded['result'].length >= 2) {
+    if (decoded is Map &&
+        decoded['result'] is List &&
+        decoded['result'].length >= 2) {
       final status = decoded['result'][0];
       final data = decoded['result'][1];
       if (status == 0 && data is Map && data['ubus_rpc_session'] != null) {
@@ -80,12 +91,14 @@ Future<dynamic> ubusCall(
       final req = await client.postUrl(uri);
       req.headers.set('Content-Type', 'application/json');
       req.cookies.add(Cookie('sysauth', token));
-      req.write(jsonEncode({
-        'jsonrpc': '2.0',
-        'id': 1,
-        'method': 'call',
-        'params': [token, object, method, params ?? {}],
-      }));
+      req.write(
+        jsonEncode({
+          'jsonrpc': '2.0',
+          'id': 1,
+          'method': 'call',
+          'params': [token, object, method, params ?? {}],
+        }),
+      );
       final resp = await req.close();
       final body = await resp.transform(utf8.decoder).join();
       final decoded = jsonDecode(body);
@@ -149,8 +162,7 @@ Future<void> main() async {
   final scheme = useHttps ? 'https' : 'http';
   final base = Uri.parse('$scheme://$ip');
 
-  final client = HttpClient()
-    ..badCertificateCallback = (_, _, _) => true;
+  final client = HttpClient()..badCertificateCallback = (_, _, _) => true;
 
   stdout.writeln('=== Router API Probe: $ip ($scheme) ===');
 
@@ -168,14 +180,25 @@ Future<void> main() async {
       final b = board[1] as Map;
       final rel = b['release'];
       final version = rel is Map ? rel['version'] : rel;
-      stdout.writeln('Router: ${b['model'] ?? b['hostname']} / OpenWrt $version');
+      stdout.writeln(
+        'Router: ${b['model'] ?? b['hostname']} / OpenWrt $version',
+      );
     }
   } catch (_) {}
 
   // Test wireless station detection paths
   try {
-    final wireless = await ubusCall(client, base, token, 'luci-rpc', 'getWirelessDevices');
-    if (wireless is List && wireless.length > 1 && wireless[0] == 0 && wireless[1] is Map) {
+    final wireless = await ubusCall(
+      client,
+      base,
+      token,
+      'luci-rpc',
+      'getWirelessDevices',
+    );
+    if (wireless is List &&
+        wireless.length > 1 &&
+        wireless[0] == 0 &&
+        wireless[1] is Map) {
       final radios = wireless[1] as Map;
       stdout.writeln('');
       stdout.writeln('=== Wireless Interfaces ===');
@@ -183,16 +206,28 @@ Future<void> main() async {
         final radio = radioEntry.value;
         if (radio is! Map) continue;
         final ifaces = radio['interfaces'];
-        final list = ifaces is List ? ifaces : (ifaces is Map ? ifaces.values.toList() : []);
+        final list = ifaces is List
+            ? ifaces
+            : (ifaces is Map ? ifaces.values.toList() : []);
         for (final iface in list) {
           if (iface is! Map) continue;
           final ifname = iface['ifname']?.toString() ?? '?';
-          final ssid = (iface['config'] is Map ? iface['config']['ssid'] : null)?.toString() ?? '?';
+          final ssid =
+              (iface['config'] is Map ? iface['config']['ssid'] : null)
+                  ?.toString() ??
+              '?';
           stdout.writeln('  $ifname ($ssid)');
 
           // iwinfo assoclist
           try {
-            final assoc = await ubusCall(client, base, token, 'iwinfo', 'assoclist', {'device': ifname});
+            final assoc = await ubusCall(
+              client,
+              base,
+              token,
+              'iwinfo',
+              'assoclist',
+              {'device': ifname},
+            );
             if (assoc is List && assoc.length > 1 && assoc[0] == 0) {
               final results = (assoc[1] is Map ? assoc[1]['results'] : null);
               final count = results is List ? results.length : 0;
@@ -206,7 +241,13 @@ Future<void> main() async {
 
           // hostapd get_clients
           try {
-            final hp = await ubusCall(client, base, token, 'hostapd.$ifname', 'get_clients');
+            final hp = await ubusCall(
+              client,
+              base,
+              token,
+              'hostapd.$ifname',
+              'get_clients',
+            );
             if (hp is List && hp.length > 1 && hp[0] == 0 && hp[1] is Map) {
               final clients = hp[1]['clients'];
               final count = clients is Map ? clients.length : 0;
@@ -222,8 +263,17 @@ Future<void> main() async {
 
   // DHCP lease count
   try {
-    final leases = await ubusCall(client, base, token, 'luci-rpc', 'getDHCPLeases');
-    if (leases is List && leases.length > 1 && leases[0] == 0 && leases[1] is Map) {
+    final leases = await ubusCall(
+      client,
+      base,
+      token,
+      'luci-rpc',
+      'getDHCPLeases',
+    );
+    if (leases is List &&
+        leases.length > 1 &&
+        leases[0] == 0 &&
+        leases[1] is Map) {
       final d4 = (leases[1]['dhcp_leases'] as List?)?.length ?? 0;
       final d6 = (leases[1]['dhcp6_leases'] as List?)?.length ?? 0;
       stdout.writeln('');
@@ -234,10 +284,15 @@ Future<void> main() async {
   // LuCI features relevant to app
   try {
     final features = await ubusCall(client, base, token, 'luci', 'getFeatures');
-    if (features is List && features.length > 1 && features[0] == 0 && features[1] is Map) {
+    if (features is List &&
+        features.length > 1 &&
+        features[0] == 0 &&
+        features[1] is Map) {
       final f = features[1] as Map;
       stdout.writeln('');
-      stdout.writeln('Features: opkg=${f['opkg']} apk=${f['apk']} firewall4=${f['firewall4']} wifi=${f['wifi']}');
+      stdout.writeln(
+        'Features: opkg=${f['opkg']} apk=${f['apk']} firewall4=${f['firewall4']} wifi=${f['wifi']}',
+      );
     }
   } catch (_) {}
 
@@ -245,30 +300,138 @@ Future<void> main() async {
     probe(client, base, token, 'system.board', 'system', 'board'),
     probe(client, base, token, 'system.info', 'system', 'info'),
     probe(client, base, token, 'system.mounts', 'system', 'mounts', null, true),
-    probe(client, base, token, 'network.device.status', 'network.device', 'status', {}, true),
-    probe(client, base, token, 'network.interface.dump', 'network.interface', 'dump'),
-    probe(client, base, token, 'luci-rpc.getWirelessDevices', 'luci-rpc', 'getWirelessDevices', null, true),
-    probe(client, base, token, 'luci-rpc.getNetworkDevices', 'luci-rpc', 'getNetworkDevices'),
-    probe(client, base, token, 'luci-rpc.getDHCPLeases', 'luci-rpc', 'getDHCPLeases', null, true),
-    probe(client, base, token, 'luci-rpc.getHostHints', 'luci-rpc', 'getHostHints', null, true),
-    probe(client, base, token, 'luci-rpc.getMountPoints', 'luci-rpc', 'getMountPoints', null, true),
-    probe(client, base, token, 'luci.getFeatures', 'luci', 'getFeatures', null, true),
-    probe(client, base, token, 'wireless.devices', 'wireless', 'devices', null, true),
+    probe(
+      client,
+      base,
+      token,
+      'network.device.status',
+      'network.device',
+      'status',
+      {},
+      true,
+    ),
+    probe(
+      client,
+      base,
+      token,
+      'network.interface.dump',
+      'network.interface',
+      'dump',
+    ),
+    probe(
+      client,
+      base,
+      token,
+      'luci-rpc.getWirelessDevices',
+      'luci-rpc',
+      'getWirelessDevices',
+      null,
+      true,
+    ),
+    probe(
+      client,
+      base,
+      token,
+      'luci-rpc.getNetworkDevices',
+      'luci-rpc',
+      'getNetworkDevices',
+    ),
+    probe(
+      client,
+      base,
+      token,
+      'luci-rpc.getDHCPLeases',
+      'luci-rpc',
+      'getDHCPLeases',
+      null,
+      true,
+    ),
+    probe(
+      client,
+      base,
+      token,
+      'luci-rpc.getHostHints',
+      'luci-rpc',
+      'getHostHints',
+      null,
+      true,
+    ),
+    probe(
+      client,
+      base,
+      token,
+      'luci-rpc.getMountPoints',
+      'luci-rpc',
+      'getMountPoints',
+      null,
+      true,
+    ),
+    probe(
+      client,
+      base,
+      token,
+      'luci.getFeatures',
+      'luci',
+      'getFeatures',
+      null,
+      true,
+    ),
+    probe(
+      client,
+      base,
+      token,
+      'wireless.devices',
+      'wireless',
+      'devices',
+      null,
+      true,
+    ),
     probe(client, base, token, 'service.list', 'service', 'list', null, true),
     probe(client, base, token, 'rc.list', 'rc', 'list', null, true),
     probe(client, base, token, 'rpc.list', 'rpc', 'list', null, true),
-    probe(client, base, token, 'uci.network', 'uci', 'get', {'config': 'network'}),
-    probe(client, base, token, 'uci.wireless', 'uci', 'get', {'config': 'wireless'}, true),
-    probe(client, base, token, 'uci.firewall', 'uci', 'get', {'config': 'firewall'}, true),
-    probe(client, base, token, 'uci.dhcp', 'uci', 'get', {'config': 'dhcp'}, true),
+    probe(client, base, token, 'uci.network', 'uci', 'get', {
+      'config': 'network',
+    }),
+    probe(client, base, token, 'uci.wireless', 'uci', 'get', {
+      'config': 'wireless',
+    }, true),
+    probe(client, base, token, 'uci.firewall', 'uci', 'get', {
+      'config': 'firewall',
+    }, true),
+    probe(client, base, token, 'uci.dhcp', 'uci', 'get', {
+      'config': 'dhcp',
+    }, true),
     // App uses {command, params} format for file.exec
-    probe(client, base, token, 'file.exec.df', 'file', 'exec', {'command': 'df', 'params': ['-k']}, true),
-    probe(client, base, token, 'file.exec.opkg', 'file', 'exec', {'command': 'opkg', 'params': ['list-installed']}, true),
-    probe(client, base, token, 'file.read.opkg-status', 'file', 'read', {'path': '/usr/lib/opkg/status'}, true),
-    probe(client, base, token, 'file.read.proc-mounts', 'file', 'read', {'path': '/proc/mounts'}, true),
-    probe(client, base, token, 'file.read.dhcp-leases', 'file', 'read', {'path': '/tmp/dhcp.leases'}, true),
-    probe(client, base, token, 'file.read.cron', 'file', 'read', {'path': '/etc/crontabs/root'}, true),
-    probe(client, base, token, 'luci.wireguard', 'luci.wireguard', 'getWgInstances', null, true),
+    probe(client, base, token, 'file.exec.df', 'file', 'exec', {
+      'command': 'df',
+      'params': ['-k'],
+    }, true),
+    probe(client, base, token, 'file.exec.opkg', 'file', 'exec', {
+      'command': 'opkg',
+      'params': ['list-installed'],
+    }, true),
+    probe(client, base, token, 'file.read.opkg-status', 'file', 'read', {
+      'path': '/usr/lib/opkg/status',
+    }, true),
+    probe(client, base, token, 'file.read.proc-mounts', 'file', 'read', {
+      'path': '/proc/mounts',
+    }, true),
+    probe(client, base, token, 'file.read.dhcp-leases', 'file', 'read', {
+      'path': '/tmp/dhcp.leases',
+    }, true),
+    probe(client, base, token, 'file.read.cron', 'file', 'read', {
+      'path': '/etc/crontabs/root',
+    }, true),
+    probe(
+      client,
+      base,
+      token,
+      'luci.wireguard',
+      'luci.wireguard',
+      'getWgInstances',
+      null,
+      true,
+    ),
   ];
 
   final results = await Future.wait(probes);
@@ -286,7 +449,9 @@ Future<void> main() async {
   }
 
   stdout.writeln('');
-  stdout.writeln('Summary: $passed passed, $failed failed (${results.length} total)');
+  stdout.writeln(
+    'Summary: $passed passed, $failed failed (${results.length} total)',
+  );
   client.close(force: true);
   exit(failed > 3 ? 1 : 0);
 }

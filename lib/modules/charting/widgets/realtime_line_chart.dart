@@ -91,7 +91,9 @@ class RealtimeLineChart extends StatelessWidget {
           child: Text(
             'Collecting metric samples...',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
         ),
@@ -108,7 +110,10 @@ class RealtimeLineChart extends StatelessWidget {
           if (spot > maxVal) maxVal = spot;
         }
       }
-      effectiveMaxY = _calculateNiceMax(maxVal, isThroughput: valueFormatter != null);
+      effectiveMaxY = _calculateNiceMax(
+        maxVal,
+        isThroughput: valueFormatter != null,
+      );
     }
     final double interval = effectiveMaxY / 4.0;
 
@@ -131,7 +136,10 @@ class RealtimeLineChart extends StatelessWidget {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 6.0),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: primaryColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
@@ -154,14 +162,16 @@ class RealtimeLineChart extends StatelessWidget {
                       const SizedBox(width: 6),
                       Text(
                         '${s.label}: ',
-                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                               fontWeight: FontWeight.w600,
                             ),
                       ),
                       Text(
                         formattedText,
-                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
                               color: primaryColor,
                               fontWeight: FontWeight.bold,
                             ),
@@ -195,9 +205,15 @@ class RealtimeLineChart extends StatelessWidget {
                 ),
                 titlesData: FlTitlesData(
                   show: true,
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
@@ -219,7 +235,9 @@ class RealtimeLineChart extends StatelessWidget {
                             text,
                             style: TextStyle(
                               fontSize: 9.5,
-                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+                              color: colorScheme.onSurfaceVariant.withValues(
+                                alpha: 0.75,
+                              ),
                               fontWeight: FontWeight.w600,
                             ),
                             textAlign: TextAlign.right,
@@ -233,26 +251,44 @@ class RealtimeLineChart extends StatelessWidget {
                 lineTouchData: LineTouchData(
                   touchTooltipData: LineTouchTooltipData(
                     fitInsideVertically: true,
-                    getTooltipColor: (spot) => Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
+                    getTooltipColor: (spot) => Theme.of(
+                      context,
+                    ).colorScheme.surface.withValues(alpha: 0.95),
                     tooltipBorderRadius: BorderRadius.circular(8),
-                    tooltipPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    tooltipPadding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     getTooltipItems: (touchedSpots) {
                       return touchedSpots.map((spot) {
-                        final seriesData = spot.barIndex < series.length ? series[spot.barIndex] : null;
+                        final seriesData = spot.barIndex < series.length
+                            ? series[spot.barIndex]
+                            : null;
                         final labelName = seriesData?.label ?? 'Metric';
-                        final color = spot.bar.gradient?.colors.first ?? spot.bar.color ?? Colors.white;
+                        final color =
+                            spot.bar.gradient?.colors.first ??
+                            spot.bar.color ??
+                            Colors.white;
                         final formatted = valueFormatter != null
                             ? valueFormatter!(spot.y)
                             : spot.y.toStringAsFixed(1);
                         return LineTooltipItem(
                           '$labelName: $formatted',
-                          TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12),
+                          TextStyle(
+                            color: color,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
                         );
                       }).toList();
                     },
                   ),
                 ),
-                lineBarsData: series.asMap().entries.map((e) => _buildBarData(e.value, barIndex: e.key)).toList(),
+                lineBarsData: series
+                    .asMap()
+                    .entries
+                    .map((e) => _buildBarData(e.value, barIndex: e.key))
+                    .toList(),
               ),
               duration: Duration.zero,
             ),
@@ -262,7 +298,10 @@ class RealtimeLineChart extends StatelessWidget {
     );
   }
 
-  LineChartBarData _buildBarData(ChartSeriesData seriesData, {int barIndex = 0}) {
+  LineChartBarData _buildBarData(
+    ChartSeriesData seriesData, {
+    int barIndex = 0,
+  }) {
     final data = seriesData.spots;
     final colors = seriesData.gradientColors;
 

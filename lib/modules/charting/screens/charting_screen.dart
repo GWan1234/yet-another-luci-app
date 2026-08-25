@@ -22,8 +22,12 @@ class ChartingScreen extends ConsumerWidget {
     // Listen for periodic app state telemetry ticks to push samples safely without build-loop recursion
     ref.listen(appStateProvider, (previous, next) {
       final sysInfo = next.dashboardData?['sysInfo'] as Map<String, dynamic>?;
-      final boardInfo = next.dashboardData?['boardInfo'] as Map<String, dynamic>?;
-      final systemMetrics = SystemMetrics.fromSysInfo(sysInfo, boardInfo: boardInfo);
+      final boardInfo =
+          next.dashboardData?['boardInfo'] as Map<String, dynamic>?;
+      final systemMetrics = SystemMetrics.fromSysInfo(
+        sysInfo,
+        boardInfo: boardInfo,
+      );
       engine.addSample(
         cpuUsage: systemMetrics.cpuUsagePercent,
         ramUsage: systemMetrics.memoryUsagePercent,
@@ -32,7 +36,8 @@ class ChartingScreen extends ConsumerWidget {
       );
     });
 
-    if (metricsData.pollingIntervalSeconds != appState.throughputIntervalSeconds) {
+    if (metricsData.pollingIntervalSeconds !=
+        appState.throughputIntervalSeconds) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         engine.updatePollingInterval(appState.throughputIntervalSeconds);
       });
@@ -40,9 +45,14 @@ class ChartingScreen extends ConsumerWidget {
 
     // Seed initial sample if buffer is empty
     if (metricsData.cpuHistory.isEmpty) {
-      final sysInfo = appState.dashboardData?['sysInfo'] as Map<String, dynamic>?;
-      final boardInfo = appState.dashboardData?['boardInfo'] as Map<String, dynamic>?;
-      final systemMetrics = SystemMetrics.fromSysInfo(sysInfo, boardInfo: boardInfo);
+      final sysInfo =
+          appState.dashboardData?['sysInfo'] as Map<String, dynamic>?;
+      final boardInfo =
+          appState.dashboardData?['boardInfo'] as Map<String, dynamic>?;
+      final systemMetrics = SystemMetrics.fromSysInfo(
+        sysInfo,
+        boardInfo: boardInfo,
+      );
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (metricsData.cpuHistory.isEmpty) {
           engine.addSample(
@@ -56,9 +66,7 @@ class ChartingScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Real-Time Metrics Charts'),
-      ),
+      appBar: AppBar(title: const Text('Real-Time Metrics Charts')),
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
@@ -77,7 +85,10 @@ class ChartingScreen extends ConsumerWidget {
               series: [
                 ChartSeriesData(
                   spots: metricsData.cpuHistory,
-                  gradientColors: [Colors.orange.shade700, Colors.orange.shade300],
+                  gradientColors: [
+                    Colors.orange.shade700,
+                    Colors.orange.shade300,
+                  ],
                   label: 'CPU Usage',
                 ),
               ],
@@ -155,8 +166,17 @@ class ChartingScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Polling Engine Interval', style: TextStyle(fontWeight: FontWeight.bold)),
-                Text('${currentInterval}s', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+                const Text(
+                  'Polling Engine Interval',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  '${currentInterval}s',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
               ],
             ),
             Slider(
@@ -175,8 +195,17 @@ class ChartingScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Rolling Chart Window', style: TextStyle(fontWeight: FontWeight.bold)),
-                Text('${currentWindow}s', style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary)),
+                const Text(
+                  'Rolling Chart Window',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  '${currentWindow}s',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),

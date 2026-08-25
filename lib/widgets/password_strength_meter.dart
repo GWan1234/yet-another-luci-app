@@ -3,30 +3,29 @@
 
 import 'package:flutter/material.dart';
 
-enum PasswordStrength {
-  weak,
-  fair,
-  strong,
-  veryStrong,
-}
+enum PasswordStrength { weak, fair, strong, veryStrong }
 
 /// A compact, animated password strength meter widget for Wi-Fi passphrases
 class PasswordStrengthMeter extends StatelessWidget {
   final String password;
 
-  const PasswordStrengthMeter({
-    super.key,
-    required this.password,
-  });
+  const PasswordStrengthMeter({super.key, required this.password});
 
   PasswordStrength? get _strength {
     if (password.length < 8) return null;
     int score = 0;
     if (password.length >= 8) score++;
     if (password.length >= 12) score++;
-    if (RegExp(r'[A-Z]').hasMatch(password) && RegExp(r'[a-z]').hasMatch(password)) score++;
-    if (RegExp(r'[0-9]').hasMatch(password)) score++;
-    if (RegExp(r'[@$!%*?&#^()_+\-=\[\]{};:"\\|,.<>/\~`]').hasMatch(password)) score++;
+    if (RegExp(r'[A-Z]').hasMatch(password) &&
+        RegExp(r'[a-z]').hasMatch(password)) {
+      score++;
+    }
+    if (RegExp(r'[0-9]').hasMatch(password)) {
+      score++;
+    }
+    if (RegExp(r'[@$!%*?&#^()_+\-=\[\]{};:"\\|,.<>/\~`]').hasMatch(password)) {
+      score++;
+    }
 
     if (score <= 1) return PasswordStrength.weak;
     if (score == 2) return PasswordStrength.fair;
@@ -95,7 +94,9 @@ class PasswordStrengthMeter extends StatelessWidget {
                   height: 4,
                   margin: EdgeInsets.only(right: index < 3 ? 4 : 0),
                   decoration: BoxDecoration(
-                    color: isActive ? color : theme.colorScheme.surfaceContainerHighest,
+                    color: isActive
+                        ? color
+                        : theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),

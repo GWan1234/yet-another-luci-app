@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:yet_another_luci_app/models/client.dart';
+import 'package:yet_another_luci_app/modules/parental_controls/models/parental_profile.dart';
 import 'package:yet_another_luci_app/services/interfaces/api_service_interface.dart';
 import 'package:yet_another_luci_app/services/interfaces/auth_service_interface.dart';
 import 'package:yet_another_luci_app/services/router_service.dart';
@@ -77,14 +78,14 @@ class NetworkActionsController {
     required Future<void> Function() refreshDashboard,
     required Future<void> Function() redetectCapabilities,
     required VoidCallback notifyListeners,
-  })  : _apiServiceRef = apiServiceRef,
-        _authServiceRef = authServiceRef,
-        _routerServiceRef = routerServiceRef,
-        _reviewerModeRef = reviewerModeRef,
-        _dashboardDataRef = dashboardDataRef,
-        _refreshDashboard = refreshDashboard,
-        _redetectCapabilities = redetectCapabilities,
-        _notifyListeners = notifyListeners;
+  }) : _apiServiceRef = apiServiceRef,
+       _authServiceRef = authServiceRef,
+       _routerServiceRef = routerServiceRef,
+       _reviewerModeRef = reviewerModeRef,
+       _dashboardDataRef = dashboardDataRef,
+       _refreshDashboard = refreshDashboard,
+       _redetectCapabilities = redetectCapabilities,
+       _notifyListeners = notifyListeners;
 
   final IApiService? Function() _apiServiceRef;
   final IAuthService? Function() _authServiceRef;
@@ -110,7 +111,8 @@ class NetworkActionsController {
   Timer? _accessControlCountdownTimer;
   Timer? _accessControlRevertRetryTimer;
 
-  bool get isAccessControlPendingConfirmation => _isAccessControlPendingConfirmation;
+  bool get isAccessControlPendingConfirmation =>
+      _isAccessControlPendingConfirmation;
   int get accessControlCountdownSeconds => _accessControlCountdownSeconds;
   Map<String, List<String>> get priorMaclistSnapshot => _priorMaclistSnapshot;
   Map<String, String> get priorMacfilterSnapshot => _priorMacfilterSnapshot;
@@ -172,18 +174,27 @@ class NetworkActionsController {
 
     try {
       final setRes = await _apiService!.uciSet(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         config: 'openvpn',
         section: name,
         values: {'enabled': enable ? '1' : '0'},
       );
       if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) return false;
-      final commitRes =
-          await _apiService!.uciCommit(ip, sysauth, _useHttps, config: 'openvpn');
-      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0) return false;
+      final commitRes = await _apiService!.uciCommit(
+        ip,
+        sysauth,
+        _useHttps,
+        config: 'openvpn',
+      );
+      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0)
+        return false;
 
       await _apiService!.manageServiceAction(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         serviceName: 'openvpn',
         action: enable ? 'start' : 'stop',
       );
@@ -212,8 +223,12 @@ class NetworkActionsController {
           section: 'settings',
           values: {'enabled': enable ? '1' : '0'},
         );
-        await _apiService!
-            .uciCommit(ip, sysauth, _useHttps, config: 'tailscale');
+        await _apiService!.uciCommit(
+          ip,
+          sysauth,
+          _useHttps,
+          config: 'tailscale',
+        );
       } catch (_) {}
 
       await _apiService!.manageServiceAction(
@@ -293,7 +308,9 @@ heal_dns() {
       if (enable) {
         // 1. Configure NextDNS listening port to 5342 to prevent port 53 collision
         await _apiService!.uciSet(
-          ip, sysauth, _useHttps,
+          ip,
+          sysauth,
+          _useHttps,
           config: 'nextdns',
           section: 'main',
           values: {
@@ -306,18 +323,23 @@ heal_dns() {
 
         // 2. Start nextdns service
         await _apiService!.manageServiceAction(
-          ip, sysauth, _useHttps,
+          ip,
+          sysauth,
+          _useHttps,
           serviceName: 'nextdns',
           action: 'start',
         );
 
         // 3. Activate NextDNS, ensure process is running on port 5342 & restart active DNS daemon
-        final activateCmd = '$restartDnsHelper\n'
+        final activateCmd =
+            '$restartDnsHelper\n'
             '(nextdns activate || /etc/init.d/nextdns activate 2>/dev/null || true) && '
             '(pgrep nextdns >/dev/null || nextdns run -config-file /etc/config/nextdns -listen 127.0.0.1:5342 &) && '
             'restart_dns';
         await _apiService!.call(
-          ip, sysauth, _useHttps,
+          ip,
+          sysauth,
+          _useHttps,
           object: 'file',
           method: 'exec',
           params: {
@@ -330,7 +352,9 @@ heal_dns() {
         const deactivateCmd =
             '(nextdns deactivate || /etc/init.d/nextdns deactivate 2>/dev/null || true)';
         await _apiService!.call(
-          ip, sysauth, _useHttps,
+          ip,
+          sysauth,
+          _useHttps,
           object: 'file',
           method: 'exec',
           params: {
@@ -341,13 +365,17 @@ heal_dns() {
 
         // 2. Stop nextdns service & kill process if needed
         await _apiService!.manageServiceAction(
-          ip, sysauth, _useHttps,
+          ip,
+          sysauth,
+          _useHttps,
           serviceName: 'nextdns',
           action: 'stop',
         );
         const killCmd = 'killall nextdns 2>/dev/null || true';
         await _apiService!.call(
-          ip, sysauth, _useHttps,
+          ip,
+          sysauth,
+          _useHttps,
           object: 'file',
           method: 'exec',
           params: {
@@ -358,7 +386,9 @@ heal_dns() {
 
         // 3. Disable nextdns in UCI
         await _apiService!.uciSet(
-          ip, sysauth, _useHttps,
+          ip,
+          sysauth,
+          _useHttps,
           config: 'nextdns',
           section: 'main',
           values: {'enabled': '0'},
@@ -366,12 +396,15 @@ heal_dns() {
         await _apiService!.uciCommit(ip, sysauth, _useHttps, config: 'nextdns');
 
         // 4. Purge orphaned drop-in configs and restore active DNS daemon
-        final purgeCmd = '$restartDnsHelper\n'
+        final purgeCmd =
+            '$restartDnsHelper\n'
             'rm -f /tmp/dnsmasq.d/nextdns.conf /var/etc/dnsmasq.d/nextdns.conf 2>/dev/null && '
             'uci del dhcp.@dnsmasq[0].noresolv 2>/dev/null || true && '
             'restart_dns';
         await _apiService!.call(
-          ip, sysauth, _useHttps,
+          ip,
+          sysauth,
+          _useHttps,
           object: 'file',
           method: 'exec',
           params: {
@@ -382,10 +415,13 @@ heal_dns() {
       }
 
       // 5. DHCP & DNS Self-Healing Guardrail: ensure active DNS daemon is running
-      final healCmd = '$healDnsHelper\n'
+      final healCmd =
+          '$healDnsHelper\n'
           'sleep 1 && heal_dns';
       await _apiService!.call(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         object: 'file',
         method: 'exec',
         params: {
@@ -399,12 +435,15 @@ heal_dns() {
     } catch (e, stack) {
       Logger.exception('Failed to toggle NextDNS', e, stack);
       try {
-        final emergencyCmd = '$restartDnsHelper\n'
+        final emergencyCmd =
+            '$restartDnsHelper\n'
             'rm -f /tmp/dnsmasq.d/nextdns.conf 2>/dev/null && '
             'uci del dhcp.@dnsmasq[0].noresolv 2>/dev/null || true && '
             'restart_dns';
         await _apiService!.call(
-          ip, sysauth, _useHttps,
+          ip,
+          sysauth,
+          _useHttps,
           object: 'file',
           method: 'exec',
           params: {
@@ -415,12 +454,16 @@ heal_dns() {
       } catch (_) {
         // Pure ubus RPC fallback if file.exec is unavailable
         await _apiService!.manageServiceAction(
-          ip, sysauth, _useHttps,
+          ip,
+          sysauth,
+          _useHttps,
           serviceName: 'nextdns',
           action: enable ? 'start' : 'stop',
         );
         await _apiService!.manageServiceAction(
-          ip, sysauth, _useHttps,
+          ip,
+          sysauth,
+          _useHttps,
           serviceName: 'dnsmasq',
           action: 'restart',
         );
@@ -438,18 +481,27 @@ heal_dns() {
 
     try {
       final setRes = await _apiService!.uciSet(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         config: 'cloudflared',
         section: 'main',
         values: {'enabled': enable ? '1' : '0'},
       );
       if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) return false;
-      final commitRes =
-          await _apiService!.uciCommit(ip, sysauth, _useHttps, config: 'cloudflared');
-      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0) return false;
+      final commitRes = await _apiService!.uciCommit(
+        ip,
+        sysauth,
+        _useHttps,
+        config: 'cloudflared',
+      );
+      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0)
+        return false;
 
       await _apiService!.manageServiceAction(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         serviceName: 'cloudflared',
         action: enable ? 'start' : 'stop',
       );
@@ -470,11 +522,20 @@ heal_dns() {
 
     try {
       final cmd = bringUp ? '/sbin/ifup' : '/sbin/ifdown';
-      await _apiService!.systemExec(ip, sysauth, _useHttps, command: '$cmd $ifaceName');
+      await _apiService!.systemExec(
+        ip,
+        sysauth,
+        _useHttps,
+        command: '$cmd $ifaceName',
+      );
       await _refreshDashboard();
       return true;
     } catch (e, stack) {
-      Logger.exception('Failed to toggle WireGuard interface $ifaceName', e, stack);
+      Logger.exception(
+        'Failed to toggle WireGuard interface $ifaceName',
+        e,
+        stack,
+      );
       return false;
     }
   }
@@ -488,7 +549,9 @@ heal_dns() {
 
     try {
       await _apiService!.manageServiceAction(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         serviceName: serviceName,
         action: 'restart',
       );
@@ -513,7 +576,9 @@ heal_dns() {
     if (ip == null || sysauth == null || _apiService == null) return false;
 
     final success = await _apiService!.manageServiceAction(
-      ip, sysauth, _useHttps,
+      ip,
+      sysauth,
+      _useHttps,
       serviceName: serviceName,
       action: action,
       context: context,
@@ -539,7 +604,9 @@ heal_dns() {
 
     try {
       final setRes = await _apiService!.uciSet(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         config: 'firewall',
         section: sectionKey,
         values: {'enabled': enabled ? '1' : '0'},
@@ -548,21 +615,30 @@ heal_dns() {
       if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) return false;
 
       final commitRes = await _apiService!.uciCommit(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         config: 'firewall',
         context: (context != null && context.mounted) ? context : null,
       );
-      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0) return false;
+      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0)
+        return false;
 
       await _apiService!.manageServiceAction(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         serviceName: 'firewall',
         action: 'reload',
         context: (context != null && context.mounted) ? context : null,
       );
       return true;
     } catch (e, stack) {
-      Logger.exception('updateFirewallCustomRuleStatus failed for $sectionKey', e, stack);
+      Logger.exception(
+        'updateFirewallCustomRuleStatus failed for $sectionKey',
+        e,
+        stack,
+      );
       return false;
     }
   }
@@ -582,7 +658,9 @@ heal_dns() {
 
     try {
       final setRes = await _apiService!.uciSet(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         config: 'network',
         section: interfaceName,
         values: {'disabled': enabled ? '0' : '1'},
@@ -591,21 +669,30 @@ heal_dns() {
       if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) return false;
 
       final commitRes = await _apiService!.uciCommit(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         config: 'network',
         context: (context != null && context.mounted) ? context : null,
       );
-      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0) return false;
+      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0)
+        return false;
 
       await _apiService!.manageServiceAction(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         serviceName: 'network',
         action: 'reload',
         context: (context != null && context.mounted) ? context : null,
       );
       return true;
     } catch (e, stack) {
-      Logger.exception('updateWiredInterfaceStatus failed for $interfaceName', e, stack);
+      Logger.exception(
+        'updateWiredInterfaceStatus failed for $interfaceName',
+        e,
+        stack,
+      );
       return false;
     }
   }
@@ -625,7 +712,9 @@ heal_dns() {
 
     try {
       final setRes = await _apiService!.uciSet(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         config: 'wireless',
         section: sectionKey,
         values: {'disabled': enabled ? '0' : '1'},
@@ -634,20 +723,29 @@ heal_dns() {
       if (setRes is List && setRes.isNotEmpty && setRes[0] != 0) return false;
 
       final commitRes = await _apiService!.uciCommit(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         config: 'wireless',
         context: (context != null && context.mounted) ? context : null,
       );
-      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0) return false;
+      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0)
+        return false;
 
       await _apiService!.systemExec(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         command: 'wifi reload',
         context: (context != null && context.mounted) ? context : null,
       );
       return true;
     } catch (e, stack) {
-      Logger.exception('updateWirelessInterfaceStatus failed for $sectionKey', e, stack);
+      Logger.exception(
+        'updateWirelessInterfaceStatus failed for $sectionKey',
+        e,
+        stack,
+      );
       return false;
     }
   }
@@ -677,7 +775,9 @@ heal_dns() {
       if (ip == null || sysauth == null || _apiService == null) return false;
 
       success = await _apiService!.updateWirelessInterfaceConfig(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         sectionName: sectionName,
         values: newValues,
         context: (context != null && context.mounted) ? context : null,
@@ -711,7 +811,9 @@ heal_dns() {
       if (ip == null || sysauth == null || _apiService == null) return false;
 
       success = await _apiService!.updateWirelessRadioConfig(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         sectionName: sectionName,
         values: newValues,
         context: (context != null && context.mounted) ? context : null,
@@ -740,7 +842,9 @@ heal_dns() {
       if (ip == null || sysauth == null || _apiService == null) return false;
 
       success = await _apiService!.addWirelessInterface(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         radioName: radioName,
         ssid: ssid,
         encryption: encryption,
@@ -768,7 +872,9 @@ heal_dns() {
       if (ip == null || sysauth == null || _apiService == null) return false;
 
       success = await _apiService!.deleteWirelessInterface(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         sectionName: sectionName,
         context: (context != null && context.mounted) ? context : null,
       );
@@ -821,7 +927,9 @@ heal_dns() {
       if (ip == null || sysauth == null || _apiService == null) return false;
 
       success = await _apiService!.provisionGuestNetwork(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         radioName: radioName,
         ssid: ssid,
         encryption: encryption,
@@ -859,13 +967,12 @@ heal_dns() {
     return success;
   }
 
-  Future<List<String>> fetchNetworkInterfaces({
-    BuildContext? context,
-  }) async {
+  Future<List<String>> fetchNetworkInterfaces({BuildContext? context}) async {
     if (!_isReviewerMode) {
       final ip = _ip;
       final sysauth = _sysauth;
-      if (ip == null || sysauth == null || _apiService == null) return ['lan', 'wan', 'guest'];
+      if (ip == null || sysauth == null || _apiService == null)
+        return ['lan', 'wan', 'guest'];
 
       return await _apiService!.fetchNetworkInterfaces(
         ipAddress: ip,
@@ -894,7 +1001,9 @@ heal_dns() {
       if (ip == null || sysauth == null || _apiService == null) return false;
 
       success = await _apiService!.setWifiAccessControl(
-        ip, sysauth, _useHttps,
+        ip,
+        sysauth,
+        _useHttps,
         maclistByIface: newMaclistByIface,
         macfilterByIface: newMacfilterByIface,
         context: (context != null && context.mounted) ? context : null,
@@ -932,7 +1041,9 @@ heal_dns() {
       final sysauth = _sysauth;
       if (ip != null && sysauth != null && _apiService != null) {
         success = await _apiService!.confirmWifiAccessControl(
-          ip, sysauth, _useHttps,
+          ip,
+          sysauth,
+          _useHttps,
         );
       }
     }
@@ -964,14 +1075,18 @@ heal_dns() {
       if (ip != null && sysauth != null && _apiService != null) {
         if (_pendingSectionName != null) {
           success = await _apiService!.revertWirelessInterfaceConfig(
-            ip, sysauth, _useHttps,
+            ip,
+            sysauth,
+            _useHttps,
             sectionName: _pendingSectionName!,
             priorValues: _priorValuesSnapshot,
             context: (context != null && context.mounted) ? context : null,
           );
         } else {
           success = await _apiService!.revertWifiAccessControl(
-            ip, sysauth, _useHttps,
+            ip,
+            sysauth,
+            _useHttps,
             maclistByIface: _priorMaclistSnapshot,
             macfilterByIface: _priorMacfilterSnapshot,
             context: (context != null && context.mounted) ? context : null,
@@ -981,31 +1096,37 @@ heal_dns() {
         if (!success) {
           int retries = 0;
           _accessControlRevertRetryTimer?.cancel();
-          _accessControlRevertRetryTimer =
-              Timer.periodic(const Duration(seconds: 3), (retryTimer) async {
-            retries++;
-            if (retries > 10) {
-              retryTimer.cancel();
-              _accessControlRevertRetryTimer = null;
-              return;
-            }
-            final retried = _pendingSectionName != null
-                ? await _apiService!.revertWirelessInterfaceConfig(
-                    ip, sysauth, _useHttps,
-                    sectionName: _pendingSectionName!,
-                    priorValues: _priorValuesSnapshot,
-                  )
-                : await _apiService!.revertWifiAccessControl(
-                    ip, sysauth, _useHttps,
-                    maclistByIface: _priorMaclistSnapshot,
-                    macfilterByIface: _priorMacfilterSnapshot,
-                  );
-            if (retried) {
-              retryTimer.cancel();
-              _accessControlRevertRetryTimer = null;
-              await _refreshDashboard();
-            }
-          });
+          _accessControlRevertRetryTimer = Timer.periodic(
+            const Duration(seconds: 3),
+            (retryTimer) async {
+              retries++;
+              if (retries > 10) {
+                retryTimer.cancel();
+                _accessControlRevertRetryTimer = null;
+                return;
+              }
+              final retried = _pendingSectionName != null
+                  ? await _apiService!.revertWirelessInterfaceConfig(
+                      ip,
+                      sysauth,
+                      _useHttps,
+                      sectionName: _pendingSectionName!,
+                      priorValues: _priorValuesSnapshot,
+                    )
+                  : await _apiService!.revertWifiAccessControl(
+                      ip,
+                      sysauth,
+                      _useHttps,
+                      maclistByIface: _priorMaclistSnapshot,
+                      macfilterByIface: _priorMacfilterSnapshot,
+                    );
+              if (retried) {
+                retryTimer.cancel();
+                _accessControlRevertRetryTimer = null;
+                await _refreshDashboard();
+              }
+            },
+          );
         }
       }
     }
@@ -1029,7 +1150,9 @@ heal_dns() {
     if (ip == null || sysauth == null || _apiService == null) return false;
 
     final res = await _apiService!.autoFixPermissions(
-      ip, sysauth, _useHttps,
+      ip,
+      sysauth,
+      _useHttps,
       context: context,
     );
     if (res) {
@@ -1059,7 +1182,9 @@ heal_dns() {
     if (ip == null || sysauth == null || _apiService == null) return false;
 
     final res = await _apiService!.disconnectWirelessClient(
-      ip, sysauth, _useHttps,
+      ip,
+      sysauth,
+      _useHttps,
       macAddress: macAddress,
       iface: iface,
       banTimeSeconds: banTimeSeconds,
@@ -1095,7 +1220,9 @@ heal_dns() {
     if (ip == null || sysauth == null || _apiService == null) return false;
 
     final res = await _apiService!.pauseClientInternet(
-      ip, sysauth, _useHttps,
+      ip,
+      sysauth,
+      _useHttps,
       macAddress: macAddress,
       pause: pause,
       context: context,
@@ -1109,6 +1236,84 @@ heal_dns() {
       _notifyListeners();
     }
     return res;
+  }
+
+  Future<bool> applyParentalProfileDns({
+    required String profileId,
+    required List<String> macAddresses,
+    required List<String>? dnsServers,
+    BuildContext? context,
+  }) async {
+    if (_isReviewerMode) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      return true;
+    }
+    final ip = _ip;
+    final sysauth = _sysauth;
+    if (ip == null || sysauth == null || _apiService == null) return false;
+
+    final res = await _apiService!.applyParentalProfileDns(
+      ip,
+      sysauth,
+      _useHttps,
+      profileId: profileId,
+      macAddresses: macAddresses,
+      dnsServers: dnsServers,
+      context: context,
+    );
+    if (res) {
+      _notifyListeners();
+    }
+    return res;
+  }
+
+  Future<List<ParentalProfile>?> fetchParentalProfiles({
+    BuildContext? context,
+  }) async {
+    final ip = _ip;
+    final sysauth = _sysauth;
+    if (ip == null || sysauth == null || _apiService == null) return [];
+
+    return await _apiService!.fetchParentalProfiles(
+      ip,
+      sysauth,
+      _useHttps,
+      context: context,
+    );
+  }
+
+  Future<bool> saveParentalProfile({
+    required ParentalProfile profile,
+    BuildContext? context,
+  }) async {
+    final ip = _ip;
+    final sysauth = _sysauth;
+    if (ip == null || sysauth == null || _apiService == null) return false;
+
+    return await _apiService!.saveParentalProfile(
+      ip,
+      sysauth,
+      _useHttps,
+      profile: profile,
+      context: context,
+    );
+  }
+
+  Future<bool> deleteParentalProfile({
+    required String profileId,
+    BuildContext? context,
+  }) async {
+    final ip = _ip;
+    final sysauth = _sysauth;
+    if (ip == null || sysauth == null || _apiService == null) return false;
+
+    return await _apiService!.deleteParentalProfile(
+      ip,
+      sysauth,
+      _useHttps,
+      profileId: profileId,
+      context: context,
+    );
   }
 
   Future<bool> addStaticLease({
@@ -1136,19 +1341,27 @@ heal_dns() {
           if (leaseTime != null && leaseTime.isNotEmpty) 'leasetime': leaseTime,
         };
 
-        final rawUciDhcp = dashboardData['uciDhcpConfig'] ?? dashboardData['dhcp'];
+        final rawUciDhcp =
+            dashboardData['uciDhcpConfig'] ?? dashboardData['dhcp'];
         if (rawUciDhcp is Map) {
           final values = rawUciDhcp['values'] ?? rawUciDhcp;
           if (values is Map) {
             bool updated = false;
             values.forEach((k, v) {
               if (v is Map && v['.type'] == 'host') {
-                final mac = v['mac']?.toString().toUpperCase().replaceAll('-', ':');
+                final mac = v['mac']?.toString().toUpperCase().replaceAll(
+                  '-',
+                  ':',
+                );
                 if (mac == macUpper) {
                   v['name'] = hostname;
                   v['ip'] = targetIp;
-                  if (targetIp6 != null && targetIp6.isNotEmpty) v['ip6addr'] = targetIp6;
-                  if (duid != null && duid.isNotEmpty) v['duid'] = duid;
+                  if (targetIp6 != null && targetIp6.isNotEmpty) {
+                    v['ip6addr'] = targetIp6;
+                  }
+                  if (duid != null && duid.isNotEmpty) {
+                    v['duid'] = duid;
+                  }
                   if (leaseTime != null && leaseTime.isNotEmpty) {
                     v['leasetime'] = leaseTime;
                   } else {
@@ -1166,7 +1379,8 @@ heal_dns() {
                 'name': hostname,
                 'mac': macUpper,
                 'ip': targetIp,
-                if (targetIp6 != null && targetIp6.isNotEmpty) 'ip6addr': targetIp6,
+                if (targetIp6 != null && targetIp6.isNotEmpty)
+                  'ip6addr': targetIp6,
                 if (duid != null && duid.isNotEmpty) 'duid': duid,
               };
               if (leaseTime != null && leaseTime.isNotEmpty) {
@@ -1186,7 +1400,9 @@ heal_dns() {
     if (ip == null || sysauth == null || _apiService == null) return false;
 
     final res = await _apiService!.addStaticLease(
-      ip, sysauth, _useHttps,
+      ip,
+      sysauth,
+      _useHttps,
       macAddress: macAddress,
       targetIp: targetIp,
       hostname: hostname,
@@ -1208,10 +1424,12 @@ heal_dns() {
             'isStaticLease': true,
             if (targetIp6 != null && targetIp6.isNotEmpty) 'ip6addr': targetIp6,
             if (duid != null && duid.isNotEmpty) 'duid': duid,
-            if (leaseTime != null && leaseTime.isNotEmpty) 'leasetime': leaseTime,
+            if (leaseTime != null && leaseTime.isNotEmpty)
+              'leasetime': leaseTime,
           };
         }
-        final rawUciDhcp = dashboardData['uciDhcpConfig'] ?? dashboardData['dhcp'];
+        final rawUciDhcp =
+            dashboardData['uciDhcpConfig'] ?? dashboardData['dhcp'];
         if (rawUciDhcp is Map) {
           final values = rawUciDhcp['values'] ?? rawUciDhcp;
           if (values is Map) {
@@ -1221,15 +1439,28 @@ heal_dns() {
                 final rawMac = v['mac'];
                 final macList = <String>[];
                 if (rawMac is List) {
-                  macList.addAll(rawMac.map((e) => e.toString().toUpperCase().replaceAll('-', ':')));
+                  macList.addAll(
+                    rawMac.map(
+                      (e) => e.toString().toUpperCase().replaceAll('-', ':'),
+                    ),
+                  );
                 } else if (rawMac != null) {
-                  macList.addAll(rawMac.toString().split(RegExp(r'\s+')).map((e) => e.toUpperCase().replaceAll('-', ':')));
+                  macList.addAll(
+                    rawMac
+                        .toString()
+                        .split(RegExp(r'\s+'))
+                        .map((e) => e.toUpperCase().replaceAll('-', ':')),
+                  );
                 }
                 if (macList.contains(macUpper)) {
                   v['name'] = hostname;
                   v['ip'] = targetIp;
-                  if (targetIp6 != null && targetIp6.isNotEmpty) v['ip6addr'] = targetIp6;
-                  if (duid != null && duid.isNotEmpty) v['duid'] = duid;
+                  if (targetIp6 != null && targetIp6.isNotEmpty) {
+                    v['ip6addr'] = targetIp6;
+                  }
+                  if (duid != null && duid.isNotEmpty) {
+                    v['duid'] = duid;
+                  }
                   if (leaseTime != null && leaseTime.isNotEmpty) {
                     v['leasetime'] = leaseTime;
                   } else {
@@ -1247,9 +1478,11 @@ heal_dns() {
                 'name': hostname,
                 'mac': macUpper,
                 'ip': targetIp,
-                if (targetIp6 != null && targetIp6.isNotEmpty) 'ip6addr': targetIp6,
+                if (targetIp6 != null && targetIp6.isNotEmpty)
+                  'ip6addr': targetIp6,
                 if (duid != null && duid.isNotEmpty) 'duid': duid,
-                if (leaseTime != null && leaseTime.isNotEmpty) 'leasetime': leaseTime,
+                if (leaseTime != null && leaseTime.isNotEmpty)
+                  'leasetime': leaseTime,
               };
             }
           }
@@ -1270,9 +1503,12 @@ heal_dns() {
       final dashboardData = _dashboardDataRef();
       if (dashboardData != null) {
         final hints = dashboardData['hostHints'] as Map<String, dynamic>? ?? {};
-        hints.removeWhere((key, val) => key.toUpperCase().replaceAll('-', ':') == macUpper);
+        hints.removeWhere(
+          (key, val) => key.toUpperCase().replaceAll('-', ':') == macUpper,
+        );
 
-        final rawUciDhcp = dashboardData['uciDhcpConfig'] ?? dashboardData['dhcp'];
+        final rawUciDhcp =
+            dashboardData['uciDhcpConfig'] ?? dashboardData['dhcp'];
         if (rawUciDhcp is Map) {
           final values = rawUciDhcp['values'] ?? rawUciDhcp;
           if (values is Map) {
@@ -1280,9 +1516,14 @@ heal_dns() {
               if (v is Map && v['.type'] == 'host') {
                 final mac = v['mac'];
                 if (mac is List) {
-                  return mac.map((e) => e.toString().toUpperCase().replaceAll('-', ':')).contains(macUpper);
+                  return mac
+                      .map(
+                        (e) => e.toString().toUpperCase().replaceAll('-', ':'),
+                      )
+                      .contains(macUpper);
                 }
-                return mac?.toString().toUpperCase().replaceAll('-', ':') == macUpper;
+                return mac?.toString().toUpperCase().replaceAll('-', ':') ==
+                    macUpper;
               }
               return false;
             });
@@ -1298,7 +1539,9 @@ heal_dns() {
     if (ip == null || sysauth == null || _apiService == null) return false;
 
     final res = await _apiService!.deleteStaticLease(
-      ip, sysauth, _useHttps,
+      ip,
+      sysauth,
+      _useHttps,
       macAddress: macAddress,
       context: context,
     );
@@ -1307,9 +1550,13 @@ heal_dns() {
       if (dashboardData != null) {
         if (dashboardData['hostHints'] is Map) {
           final hints = dashboardData['hostHints'] as Map;
-          hints.removeWhere((key, val) => key.toString().toUpperCase().replaceAll('-', ':') == macUpper);
+          hints.removeWhere(
+            (key, val) =>
+                key.toString().toUpperCase().replaceAll('-', ':') == macUpper,
+          );
         }
-        final rawUciDhcp = dashboardData['uciDhcpConfig'] ?? dashboardData['dhcp'];
+        final rawUciDhcp =
+            dashboardData['uciDhcpConfig'] ?? dashboardData['dhcp'];
         if (rawUciDhcp is Map) {
           final values = rawUciDhcp['values'] ?? rawUciDhcp;
           if (values is Map) {
@@ -1317,9 +1564,14 @@ heal_dns() {
               if (v is Map && v['.type'] == 'host') {
                 final mac = v['mac'];
                 if (mac is List) {
-                  return mac.map((e) => e.toString().toUpperCase().replaceAll('-', ':')).contains(macUpper);
+                  return mac
+                      .map(
+                        (e) => e.toString().toUpperCase().replaceAll('-', ':'),
+                      )
+                      .contains(macUpper);
                 }
-                return mac?.toString().toUpperCase().replaceAll('-', ':') == macUpper;
+                return mac?.toString().toUpperCase().replaceAll('-', ':') ==
+                    macUpper;
               }
               return false;
             });
@@ -1347,7 +1599,9 @@ heal_dns() {
     if (ip == null || sysauth == null || _apiService == null) return false;
 
     final res = await _apiService!.refreshClientConnection(
-      ip, sysauth, _useHttps,
+      ip,
+      sysauth,
+      _useHttps,
       macAddress: macUpper,
       context: context,
     );
@@ -1363,7 +1617,8 @@ heal_dns() {
     List<String>? macsToFlush,
     BuildContext? context,
   }) async {
-    final List<String> targetMacs = macsToFlush ??
+    final List<String> targetMacs =
+        macsToFlush ??
         (clients ?? [])
             .where((c) => !c.isConnected && !c.isStatic)
             .map((c) => c.macAddress.toUpperCase().replaceAll('-', ':'))
@@ -1374,15 +1629,22 @@ heal_dns() {
     if (_isReviewerMode) {
       final dashData = _dashboardDataRef();
       if (dashData != null) {
-        final targetUpper = targetMacs.map((m) => m.toUpperCase().replaceAll('-', ':')).toSet();
+        final targetUpper = targetMacs
+            .map((m) => m.toUpperCase().replaceAll('-', ':'))
+            .toSet();
 
         String extractMac(dynamic item) {
           if (item is Map) {
-            return (item['macaddr'] ?? item['mac'] ?? item['macAddress'] ?? '').toString().toUpperCase().replaceAll('-', ':');
+            return (item['macaddr'] ?? item['mac'] ?? item['macAddress'] ?? '')
+                .toString()
+                .toUpperCase()
+                .replaceAll('-', ':');
           }
           try {
             final dynamic m = (item as dynamic).macAddress;
-            if (m != null) return m.toString().toUpperCase().replaceAll('-', ':');
+            if (m != null) {
+              return m.toString().toUpperCase().replaceAll('-', ':');
+            }
           } catch (_) {}
           return '';
         }
@@ -1407,7 +1669,8 @@ heal_dns() {
         if (dhcp6Leases is List) {
           dashData['dhcp6Leases'] = dhcp6Leases.where(shouldKeep).toList();
         } else if (dhcp6Leases is Map) {
-          final inner6List = dhcp6Leases['dhcp6Leases'] ?? dhcp6Leases['leases'];
+          final inner6List =
+              dhcp6Leases['dhcp6Leases'] ?? dhcp6Leases['leases'];
           if (inner6List is List) {
             dhcp6Leases['dhcp6Leases'] = inner6List.where(shouldKeep).toList();
           }
@@ -1423,7 +1686,9 @@ heal_dns() {
     if (ip == null || sysauth == null || _apiService == null) return 0;
 
     final count = await _apiService!.deleteUnusedDhcpLeases(
-      ip, sysauth, _useHttps,
+      ip,
+      sysauth,
+      _useHttps,
       macsToFlush: targetMacs,
       context: context,
     );
@@ -1453,7 +1718,9 @@ heal_dns() {
     if (ip == null || sysauth == null || _apiService == null) return false;
 
     final res = await _apiService!.banWirelessClient(
-      ip, sysauth, _useHttps,
+      ip,
+      sysauth,
+      _useHttps,
       macAddress: macAddress,
       iface: iface,
       banTimeSeconds: banTimeSeconds,
@@ -1487,7 +1754,9 @@ heal_dns() {
     if (ip == null || sysauth == null || _apiService == null) return false;
 
     final res = await _apiService!.unbanWirelessClient(
-      ip, sysauth, _useHttps,
+      ip,
+      sysauth,
+      _useHttps,
       macAddress: macAddress,
       context: context,
     );
@@ -1500,9 +1769,7 @@ heal_dns() {
     return res;
   }
 
-  Future<bool> forceRefreshDhcpLeases({
-    BuildContext? context,
-  }) async {
+  Future<bool> forceRefreshDhcpLeases({BuildContext? context}) async {
     if (_isReviewerMode) {
       await Future.delayed(const Duration(milliseconds: 300));
       await _refreshDashboard();
@@ -1514,7 +1781,9 @@ heal_dns() {
     if (ip == null || sysauth == null || _apiService == null) return false;
 
     final res = await _apiService!.forceRefreshDhcpLeases(
-      ip, sysauth, _useHttps,
+      ip,
+      sysauth,
+      _useHttps,
       context: context,
     );
     if (res) {

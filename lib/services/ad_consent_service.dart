@@ -14,8 +14,8 @@ class AdConsentService {
 
   /// Initializes Google Mobile Ads SDK with GDPR/UK UMP consent check.
   static Future<void> initializeConsentAndAds() async {
-    if (!AppConfig.isMonetizationEnabled) {
-      // Community build flavor: zero ad SDK activity
+    if (!AppConfig.isAdsEnabled || !AppConfig.isMonetizationEnabled) {
+      // Zero ad/consent SDK activity when ads or monetization are disabled
       return;
     }
 
@@ -34,15 +34,19 @@ class AdConsentService {
       ConsentInformation.instance.requestConsentInfoUpdate(
         params,
         () {
-          unawaited(
+          try {
             ConsentForm.loadAndShowConsentFormIfRequired((formError) {
               if (formError != null) {
                 debugPrint('Consent form error: ${formError.message}');
               }
               _initMobileAds();
               if (!completer.isCompleted) completer.complete();
-            }),
-          );
+            });
+          } catch (e) {
+            debugPrint('ConsentForm exception: $e');
+            _initMobileAds();
+            if (!completer.isCompleted) completer.complete();
+          }
         },
         (FormError error) {
           debugPrint('Consent info update error: ${error.message}');
@@ -67,6 +71,10 @@ class AdConsentService {
   static void _initMobileAds() {
     if (_isInitialized) return;
     _isInitialized = true;
-    MobileAds.instance.initialize();
+    try {
+      MobileAds.instance.initialize();
+    } catch (e) {
+      debugPrint('MobileAds initialization exception: $e');
+    }
   }
 }

@@ -12,7 +12,9 @@ class NetworkMonitoringCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appState = ref.watch(appStateProvider);
-    final netInfo = NetworkMonitoringInfo.fromDashboardData(appState.dashboardData);
+    final netInfo = NetworkMonitoringInfo.fromDashboardData(
+      appState.dashboardData,
+    );
     final gw = netInfo.defaultGatewayInterface;
 
     return Card(
@@ -39,9 +41,8 @@ class NetworkMonitoringCard extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           'Network Monitoring',
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -52,7 +53,9 @@ class NetworkMonitoringCard extends ConsumerWidget {
                 Text(
                   '${netInfo.upCount} Active / ${netInfo.interfaces.length} Total',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
               ],

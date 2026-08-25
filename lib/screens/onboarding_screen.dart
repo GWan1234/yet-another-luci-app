@@ -99,11 +99,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           showShadow: true,
                         ),
                         const SizedBox(height: 36),
-                        Icon(
-                          page.icon,
-                          size: 40,
-                          color: colorScheme.primary,
-                        ),
+                        Icon(page.icon, size: 40, color: colorScheme.primary),
                         const SizedBox(height: 16),
                         Text(
                           page.title,
@@ -126,7 +122,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           page.description,
                           textAlign: TextAlign.center,
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurface.withValues(alpha: 0.75),
+                            color: colorScheme.onSurface.withValues(
+                              alpha: 0.75,
+                            ),
                             height: 1.4,
                           ),
                         ),
@@ -167,7 +165,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ),
                   child: Text(
-                    _currentPage == _pages.length - 1 ? 'Get Started' : 'Continue',
+                    _currentPage == _pages.length - 1
+                        ? 'Get Started'
+                        : 'Continue',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,

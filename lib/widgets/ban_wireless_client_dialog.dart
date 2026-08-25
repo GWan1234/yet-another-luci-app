@@ -33,7 +33,8 @@ class BanWirelessClientDialog extends StatefulWidget {
   final Future<void> Function()? onUnbanConfirmed;
 
   @override
-  State<BanWirelessClientDialog> createState() => _BanWirelessClientDialogState();
+  State<BanWirelessClientDialog> createState() =>
+      _BanWirelessClientDialogState();
 }
 
 class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
@@ -58,7 +59,10 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
   }
 
   Future<void> _checkSelfDeviceStatus() async {
-    final isSelf = await SelfDeviceGuard.isSelfDevice(widget.macAddress, widget.ipAddress);
+    final isSelf = await SelfDeviceGuard.isSelfDevice(
+      widget.macAddress,
+      widget.ipAddress,
+    );
     if (mounted) {
       setState(() => _isSelfDevice = isSelf);
     }
@@ -93,7 +97,20 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
   }
 
   String _formatDateTime(DateTime dt, {bool includeYear = true}) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
     final weekday = weekdays[dt.weekday - 1];
@@ -113,7 +130,9 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
 
   Future<void> _selectCustomDateTime() async {
     final now = DateTime.now();
-    final initialDate = _customEndDateTime.isAfter(now) ? _customEndDateTime : now.add(const Duration(minutes: 30));
+    final initialDate = _customEndDateTime.isAfter(now)
+        ? _customEndDateTime
+        : now.add(const Duration(minutes: 30));
 
     final pickedDate = await showDatePicker(
       context: context,
@@ -146,7 +165,9 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Ban end time must be at least 30 seconds in the future.'),
+            content: Text(
+              'Ban end time must be at least 30 seconds in the future.',
+            ),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -165,9 +186,15 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final formattedCustomDate = _formatDateTime(_customEndDateTime, includeYear: true);
+    final formattedCustomDate = _formatDateTime(
+      _customEndDateTime,
+      includeYear: true,
+    );
     final effectiveSeconds = _effectiveBanSeconds;
-    final banEndTimeStr = _formatDateTime(DateTime.now().add(Duration(seconds: effectiveSeconds)), includeYear: false);
+    final banEndTimeStr = _formatDateTime(
+      DateTime.now().add(Duration(seconds: effectiveSeconds)),
+      includeYear: false,
+    );
 
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -179,12 +206,18 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: widget.isAlreadyBanned ? Colors.orange.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
+              color: widget.isAlreadyBanned
+                  ? Colors.orange.withValues(alpha: 0.15)
+                  : Colors.red.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: Icon(
-              widget.isAlreadyBanned ? Icons.timer_outlined : Icons.block_rounded,
-              color: widget.isAlreadyBanned ? Colors.orange.shade800 : Colors.red.shade700,
+              widget.isAlreadyBanned
+                  ? Icons.timer_outlined
+                  : Icons.block_rounded,
+              color: widget.isAlreadyBanned
+                  ? Colors.orange.shade800
+                  : Colors.red.shade700,
               size: 24,
             ),
           ),
@@ -194,12 +227,20 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.isAlreadyBanned ? 'Edit Ban Duration' : 'Ban Client from Wi-Fi',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  widget.isAlreadyBanned
+                      ? 'Edit Ban Duration'
+                      : 'Ban Client from Wi-Fi',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 Text(
                   'Layer-2 Association Prevention',
-                  style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -223,7 +264,11 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 24),
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.red.shade700,
+                      size: 24,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -244,21 +289,34 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.5,
+                ),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6)),
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.6,
+                  ),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.devices_rounded, size: 16, color: theme.colorScheme.primary),
+                      Icon(
+                        Icons.devices_rounded,
+                        size: 16,
+                        color: theme.colorScheme.primary,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           widget.displayName,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -267,13 +325,20 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
                   const SizedBox(height: 6),
                   Text(
                     'MAC: ${widget.macAddress.toUpperCase()}${widget.ipAddress != null ? " • IP: ${widget.ipAddress}" : ""}',
-                    style: TextStyle(fontSize: 11, fontFamily: 'monospace', color: theme.colorScheme.onSurfaceVariant),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                   if (widget.ssid != null && widget.ssid!.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(
                       'Target SSID: ${widget.ssid}${widget.iface != null ? " (${widget.iface})" : ""}',
-                      style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ],
@@ -309,10 +374,16 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
                   selectedColor: Colors.orange.shade800.withValues(alpha: 0.2),
                   labelStyle: TextStyle(
                     fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    color: isSelected ? Colors.orange.shade900 : theme.colorScheme.onSurface,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: isSelected
+                        ? Colors.orange.shade900
+                        : theme.colorScheme.onSurface,
                   ),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 );
               }).toList(),
             ),
@@ -323,14 +394,21 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
               onTap: _selectCustomDateTime,
               borderRadius: BorderRadius.circular(14),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: _selectedPresetSeconds == -1
                       ? Colors.orange.shade50.withValues(alpha: 0.5)
-                      : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                      : theme.colorScheme.surfaceContainerHighest.withValues(
+                          alpha: 0.3,
+                        ),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: _selectedPresetSeconds == -1 ? Colors.orange.shade700 : theme.colorScheme.outlineVariant,
+                    color: _selectedPresetSeconds == -1
+                        ? Colors.orange.shade700
+                        : theme.colorScheme.outlineVariant,
                     width: _selectedPresetSeconds == -1 ? 1.5 : 1.0,
                   ),
                 ),
@@ -338,7 +416,9 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
                   children: [
                     Icon(
                       Icons.access_time_filled_rounded,
-                      color: _selectedPresetSeconds == -1 ? Colors.orange.shade900 : theme.colorScheme.primary,
+                      color: _selectedPresetSeconds == -1
+                          ? Colors.orange.shade900
+                          : theme.colorScheme.primary,
                       size: 22,
                     ),
                     const SizedBox(width: 12),
@@ -347,11 +427,15 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _selectedPresetSeconds == -1 ? 'Custom Ban Expiry' : 'Set Custom Date & Time...',
+                            _selectedPresetSeconds == -1
+                                ? 'Custom Ban Expiry'
+                                : 'Set Custom Date & Time...',
                             style: TextStyle(
                               fontSize: 11,
                               color: theme.colorScheme.onSurfaceVariant,
-                              fontWeight: _selectedPresetSeconds == -1 ? FontWeight.bold : FontWeight.normal,
+                              fontWeight: _selectedPresetSeconds == -1
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -360,13 +444,19 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: _selectedPresetSeconds == -1 ? Colors.orange.shade900 : theme.colorScheme.onSurface,
+                              color: _selectedPresetSeconds == -1
+                                  ? Colors.orange.shade900
+                                  : theme.colorScheme.onSurface,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    Icon(Icons.edit_calendar_rounded, color: theme.colorScheme.primary, size: 20),
+                    Icon(
+                      Icons.edit_calendar_rounded,
+                      color: theme.colorScheme.primary,
+                      size: 20,
+                    ),
                   ],
                 ),
               ),
@@ -377,18 +467,26 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: _isValidDuration ? Colors.orange.shade900.withValues(alpha: 0.08) : Colors.red.shade900.withValues(alpha: 0.08),
+                color: _isValidDuration
+                    ? Colors.orange.shade900.withValues(alpha: 0.08)
+                    : Colors.red.shade900.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: _isValidDuration ? Colors.orange.shade700.withValues(alpha: 0.4) : Colors.red.shade400,
+                  color: _isValidDuration
+                      ? Colors.orange.shade700.withValues(alpha: 0.4)
+                      : Colors.red.shade400,
                 ),
               ),
               child: Row(
                 children: [
                   Icon(
-                    _isValidDuration ? Icons.info_outline_rounded : Icons.error_outline_rounded,
+                    _isValidDuration
+                        ? Icons.info_outline_rounded
+                        : Icons.error_outline_rounded,
                     size: 20,
-                    color: _isValidDuration ? Colors.orange.shade900 : Colors.red.shade700,
+                    color: _isValidDuration
+                        ? Colors.orange.shade900
+                        : Colors.red.shade700,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -399,7 +497,9 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: _isValidDuration ? Colors.orange.shade900 : Colors.red.shade800,
+                        color: _isValidDuration
+                            ? Colors.orange.shade900
+                            : Colors.red.shade800,
                       ),
                     ),
                   ),
@@ -423,8 +523,18 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
                       if (mounted) setState(() => _isSubmitting = false);
                     }
                   },
-            icon: const Icon(Icons.lock_open_rounded, size: 16, color: Colors.green),
-            label: const Text('Unban Client', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+            icon: const Icon(
+              Icons.lock_open_rounded,
+              size: 16,
+              color: Colors.green,
+            ),
+            label: const Text(
+              'Unban Client',
+              style: TextStyle(
+                color: Colors.green,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         TextButton(
           onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
@@ -443,13 +553,22 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
                 }
               : null,
           icon: _isSubmitting
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
               : const Icon(Icons.block_rounded, size: 16),
           label: Text(widget.isAlreadyBanned ? 'Update Ban' : 'Ban Client'),
           style: FilledButton.styleFrom(
             backgroundColor: Colors.orange.shade900,
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         ),
       ],

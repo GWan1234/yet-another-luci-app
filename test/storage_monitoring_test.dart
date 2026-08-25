@@ -30,8 +30,10 @@ tmpfs                      512         0       512   0% /dev
       expect(overlay.usedBytes, equals(5124 * 1024));
     });
 
-    test('Parses df output with split device names and spaces in mount target', () {
-      const dfOutput = '''
+    test(
+      'Parses df output with split device names and spaces in mount target',
+      () {
+        const dfOutput = '''
 Filesystem           1K-blocks      Used Available Use% Mounted on
 /dev/mapper/vg-root
                       10485760   5242880   5242880  50% /
@@ -39,12 +41,13 @@ Filesystem           1K-blocks      Used Available Use% Mounted on
                        1000000    100000    900000  10% /mnt/USB Drive
 ''';
 
-      final overview = StorageOverview.fromRpcData(dfOutput);
-      expect(overview.mountPoints.length, equals(2));
-      expect(overview.mountPoints[0].mountPath, equals('/'));
-      expect(overview.mountPoints[1].mountPath, equals('/mnt/USB Drive'));
-      expect(overview.mountPoints[1].sizeBytes, equals(1000000 * 1024));
-    });
+        final overview = StorageOverview.fromRpcData(dfOutput);
+        expect(overview.mountPoints.length, equals(2));
+        expect(overview.mountPoints[0].mountPath, equals('/'));
+        expect(overview.mountPoints[1].mountPath, equals('/mnt/USB Drive'));
+        expect(overview.mountPoints[1].sizeBytes, equals(1000000 * 1024));
+      },
+    );
 
     test('Parses /proc/mounts text fallback correctly', () {
       const procMounts = '''
@@ -85,42 +88,63 @@ overlayfs:/overlay / overlay rw,noatime 0 0
       expect(overview.mountPoints.length, equals(2));
       expect(overview.rootFs!.sizeBytes, equals(134217728));
       expect(overview.overlayFs!.sizeBytes, equals(67108864));
-      expect(StorageOverview.formatBytes(overview.rootFs!.sizeBytes), equals('128.0 MB'));
-      expect(StorageOverview.formatBytes(overview.overlayFs!.sizeBytes), equals('64.0 MB'));
+      expect(
+        StorageOverview.formatBytes(overview.rootFs!.sizeBytes),
+        equals('128.0 MB'),
+      );
+      expect(
+        StorageOverview.formatBytes(overview.overlayFs!.sizeBytes),
+        equals('64.0 MB'),
+      );
     });
 
-    test('Parses df -h human-readable format correctly without double conversion', () {
-      const dfHumanOutput = '''
+    test(
+      'Parses df -h human-readable format correctly without double conversion',
+      () {
+        const dfHumanOutput = '''
 Filesystem           Size  Used Avail Use% Mounted on
 /dev/root            128M  128M     0 100% /rom
 tmpfs                123M  2.0M  121M   2% /tmp
 /dev/mtdblock6        53M  5.0M   48M  10% /overlay
 ''';
 
-      final overview = StorageOverview.fromRpcData(dfHumanOutput);
-      expect(overview.mountPoints.length, equals(3));
-      expect(StorageOverview.formatBytes(overview.mountPoints[1].sizeBytes), equals('123.0 MB'));
-      expect(StorageOverview.formatBytes(overview.overlayFs!.sizeBytes), equals('53.0 MB'));
-    });
+        final overview = StorageOverview.fromRpcData(dfHumanOutput);
+        expect(overview.mountPoints.length, equals(3));
+        expect(
+          StorageOverview.formatBytes(overview.mountPoints[1].sizeBytes),
+          equals('123.0 MB'),
+        );
+        expect(
+          StorageOverview.formatBytes(overview.overlayFs!.sizeBytes),
+          equals('53.0 MB'),
+        );
+      },
+    );
 
-    test('Parses dynamic map representations without strict String generics', () {
-      final dynamicMap = {
-        'mountPoints': <dynamic, dynamic>{
-          '0': <dynamic, dynamic>{
-            'mount': '/',
-            'device': '/dev/root',
-            'sizeBytes': 134217728, // Explicit bytes
-            'usedBytes': 47185920,
-            'availableBytes': 87031808,
-          }
-        }
-      };
+    test(
+      'Parses dynamic map representations without strict String generics',
+      () {
+        final dynamicMap = {
+          'mountPoints': <dynamic, dynamic>{
+            '0': <dynamic, dynamic>{
+              'mount': '/',
+              'device': '/dev/root',
+              'sizeBytes': 134217728, // Explicit bytes
+              'usedBytes': 47185920,
+              'availableBytes': 87031808,
+            },
+          },
+        };
 
-      final overview = StorageOverview.fromRpcData(dynamicMap);
-      expect(overview.mountPoints.length, equals(1));
-      expect(overview.mountPoints[0].sizeBytes, equals(134217728));
-      expect(StorageOverview.formatBytes(overview.mountPoints[0].sizeBytes), equals('128.0 MB'));
-    });
+        final overview = StorageOverview.fromRpcData(dynamicMap);
+        expect(overview.mountPoints.length, equals(1));
+        expect(overview.mountPoints[0].sizeBytes, equals(134217728));
+        expect(
+          StorageOverview.formatBytes(overview.mountPoints[0].sizeBytes),
+          equals('128.0 MB'),
+        );
+      },
+    );
 
     test('Format bytes function returns human readable strings', () {
       expect(StorageOverview.formatBytes(512), equals('512 B'));
@@ -137,99 +161,131 @@ tmpfs                123M  2.0M  121M   2% /tmp
       expect(overview.totalSizeBytes, greaterThan(0));
     });
 
-    test('priorityDisplayMounts selects Overlay 1st, TempFS 2nd, and fallback partitions when missing', () {
-      // 1. Standard case: Overlay and /tmp present
-      const dfOutput = '''
+    test(
+      'priorityDisplayMounts selects Overlay 1st, TempFS 2nd, and fallback partitions when missing',
+      () {
+        // 1. Standard case: Overlay and /tmp present
+        const dfOutput = '''
 Filesystem           1K-blocks      Used Available Use% Mounted on
 /dev/root                15360     15360         0 100% /rom
 tmpfs                   124808       988    123820   1% /tmp
 /dev/ubi0_1              28468      5124     21876  19% /overlay
 overlayfs:/overlay       28468      5124     21876  19% /
 ''';
-      final overview = StorageOverview.fromRpcData(dfOutput);
-      final priority = overview.priorityDisplayMounts;
-      expect(priority.length, equals(2));
-      expect(priority[0].mountPath, equals('/overlay'));
-      expect(priority[1].mountPath, equals('/tmp'));
+        final overview = StorageOverview.fromRpcData(dfOutput);
+        final priority = overview.priorityDisplayMounts;
+        expect(priority.length, equals(2));
+        expect(priority[0].mountPath, equals('/overlay'));
+        expect(priority[1].mountPath, equals('/tmp'));
 
-      // 2. Missing /tmp case: Overlay present, Root present
-      const dfOutputNoTmp = '''
+        // 2. Missing /tmp case: Overlay present, Root present
+        const dfOutputNoTmp = '''
 Filesystem           1K-blocks      Used Available Use% Mounted on
 /dev/ubi0_1              28468      5124     21876  19% /overlay
 overlayfs:/overlay       28468      5124     21876  19% /
 ''';
-      final overviewNoTmp = StorageOverview.fromRpcData(dfOutputNoTmp);
-      final priorityNoTmp = overviewNoTmp.priorityDisplayMounts;
-      expect(priorityNoTmp.length, equals(2));
-      expect(priorityNoTmp[0].mountPath, equals('/overlay'));
-      expect(priorityNoTmp[1].mountPath, equals('/'));
+        final overviewNoTmp = StorageOverview.fromRpcData(dfOutputNoTmp);
+        final priorityNoTmp = overviewNoTmp.priorityDisplayMounts;
+        expect(priorityNoTmp.length, equals(2));
+        expect(priorityNoTmp[0].mountPath, equals('/overlay'));
+        expect(priorityNoTmp[1].mountPath, equals('/'));
 
-      // 3. Missing Overlay case: only /tmp and /mnt/usb
-      const dfOutputNoOverlay = '''
+        // 3. Missing Overlay case: only /tmp and /mnt/usb
+        const dfOutputNoOverlay = '''
 Filesystem           1K-blocks      Used Available Use% Mounted on
 tmpfs                   124808       988    123820   1% /tmp
 /dev/sda1              1000000    100000    900000  10% /mnt/usb
 ''';
-      final overviewNoOverlay = StorageOverview.fromRpcData(dfOutputNoOverlay);
-      final priorityNoOverlay = overviewNoOverlay.priorityDisplayMounts;
-      expect(priorityNoOverlay.length, equals(2));
-      expect(priorityNoOverlay[0].mountPath, equals('/tmp'));
-      expect(priorityNoOverlay[1].mountPath, equals('/mnt/usb'));
-    });
+        final overviewNoOverlay = StorageOverview.fromRpcData(
+          dfOutputNoOverlay,
+        );
+        final priorityNoOverlay = overviewNoOverlay.priorityDisplayMounts;
+        expect(priorityNoOverlay.length, equals(2));
+        expect(priorityNoOverlay[0].mountPath, equals('/tmp'));
+        expect(priorityNoOverlay[1].mountPath, equals('/mnt/usb'));
+      },
+    );
 
-    test('Scales 1K-blocks from OpenWrt RPC getMountPoints correctly for 384 MB router', () {
-      final rpcData = [
-        {
-          'mount': '/',
-          'device': 'overlayfs:/overlay',
-          'fs': 'overlay',
-          'size': 393216,  // 393216 KB = 384 MB
-          'used': 196608,  // 196608 KB = 192 MB
-          'avail': 196608,
-        }
-      ];
+    test(
+      'Scales 1K-blocks from OpenWrt RPC getMountPoints correctly for 384 MB router',
+      () {
+        final rpcData = [
+          {
+            'mount': '/',
+            'device': 'overlayfs:/overlay',
+            'fs': 'overlay',
+            'size': 393216, // 393216 KB = 384 MB
+            'used': 196608, // 196608 KB = 192 MB
+            'avail': 196608,
+          },
+        ];
 
-      final overview = StorageOverview.fromRpcData(rpcData);
-      expect(overview.rootFs, isNotNull);
-      expect(StorageOverview.formatBytes(overview.rootFs!.sizeBytes), equals('384.0 MB'));
-      expect(StorageOverview.formatBytes(overview.rootFs!.usedBytes), equals('192.0 MB'));
-    });
+        final overview = StorageOverview.fromRpcData(rpcData);
+        expect(overview.rootFs, isNotNull);
+        expect(
+          StorageOverview.formatBytes(overview.rootFs!.sizeBytes),
+          equals('384.0 MB'),
+        );
+        expect(
+          StorageOverview.formatBytes(overview.rootFs!.usedBytes),
+          equals('192.0 MB'),
+        );
+      },
+    );
 
-    test('Parses RPC mount points with size ALREADY in Bytes (e.g. 10.0.0.0 router) correctly', () {
-      final rpcDataBytes = [
-        {
-          'mount': '/',
-          'device': '/dev/root',
-          'fs': 'squashfs',
-          'size': 402653184, // 384 MB in Bytes
-          'used': 201326592, // 192 MB in Bytes
-          'avail': 201326592,
-        }
-      ];
+    test(
+      'Parses RPC mount points with size ALREADY in Bytes (e.g. 10.0.0.0 router) correctly',
+      () {
+        final rpcDataBytes = [
+          {
+            'mount': '/',
+            'device': '/dev/root',
+            'fs': 'squashfs',
+            'size': 402653184, // 384 MB in Bytes
+            'used': 201326592, // 192 MB in Bytes
+            'avail': 201326592,
+          },
+        ];
 
-      final overview = StorageOverview.fromRpcData(rpcDataBytes);
-      expect(overview.rootFs, isNotNull);
-      expect(StorageOverview.formatBytes(overview.rootFs!.sizeBytes), equals('384.0 MB'));
-      expect(StorageOverview.formatBytes(overview.rootFs!.usedBytes), equals('192.0 MB'));
-    });
+        final overview = StorageOverview.fromRpcData(rpcDataBytes);
+        expect(overview.rootFs, isNotNull);
+        expect(
+          StorageOverview.formatBytes(overview.rootFs!.sizeBytes),
+          equals('384.0 MB'),
+        );
+        expect(
+          StorageOverview.formatBytes(overview.rootFs!.usedBytes),
+          equals('192.0 MB'),
+        );
+      },
+    );
 
-    test('Parses RPC mount points with 1K-blocks (e.g. 192.168.1.1 router) correctly', () {
-      final rpcDataKb = [
-        {
-          'mount': '/',
-          'device': 'overlayfs:/overlay',
-          'fs': 'overlay',
-          'size': 131072, // 128 MB in 1K-blocks
-          'used': 65536,  // 64 MB in 1K-blocks
-          'avail': 65536,
-        }
-      ];
+    test(
+      'Parses RPC mount points with 1K-blocks (e.g. 192.168.1.1 router) correctly',
+      () {
+        final rpcDataKb = [
+          {
+            'mount': '/',
+            'device': 'overlayfs:/overlay',
+            'fs': 'overlay',
+            'size': 131072, // 128 MB in 1K-blocks
+            'used': 65536, // 64 MB in 1K-blocks
+            'avail': 65536,
+          },
+        ];
 
-      final overview = StorageOverview.fromRpcData(rpcDataKb);
-      expect(overview.rootFs, isNotNull);
-      expect(StorageOverview.formatBytes(overview.rootFs!.sizeBytes), equals('128.0 MB'));
-      expect(StorageOverview.formatBytes(overview.rootFs!.usedBytes), equals('64.0 MB'));
-    });
+        final overview = StorageOverview.fromRpcData(rpcDataKb);
+        expect(overview.rootFs, isNotNull);
+        expect(
+          StorageOverview.formatBytes(overview.rootFs!.sizeBytes),
+          equals('128.0 MB'),
+        );
+        expect(
+          StorageOverview.formatBytes(overview.rootFs!.usedBytes),
+          equals('64.0 MB'),
+        );
+      },
+    );
 
     test('Parses RPC mount points with size in Megabytes correctly', () {
       final rpcDataMb = [
@@ -240,13 +296,19 @@ tmpfs                   124808       988    123820   1% /tmp
           'size': 384, // in Megabytes
           'used': 192,
           'avail': 192,
-        }
+        },
       ];
 
       final overview = StorageOverview.fromRpcData(rpcDataMb);
       expect(overview.rootFs, isNotNull);
-      expect(StorageOverview.formatBytes(overview.rootFs!.sizeBytes), equals('384.0 MB'));
-      expect(StorageOverview.formatBytes(overview.rootFs!.usedBytes), equals('192.0 MB'));
+      expect(
+        StorageOverview.formatBytes(overview.rootFs!.sizeBytes),
+        equals('384.0 MB'),
+      );
+      expect(
+        StorageOverview.formatBytes(overview.rootFs!.usedBytes),
+        equals('192.0 MB'),
+      );
     });
 
     test('Parses ubus system mounts with explicit block_size correctly', () {
@@ -259,38 +321,47 @@ tmpfs                   124808       988    123820   1% /tmp
           'used': 49152,
           'avail': 49152,
           'bsize': 4096, // 98304 * 4096 = 402,653,184 Bytes (384 MB)
-        }
+        },
       ];
 
       final overview = StorageOverview.fromRpcData(ubusData);
       expect(overview.overlayFs, isNotNull);
-      expect(StorageOverview.formatBytes(overview.overlayFs!.sizeBytes), equals('384.0 MB'));
-      expect(StorageOverview.formatBytes(overview.overlayFs!.usedBytes), equals('192.0 MB'));
+      expect(
+        StorageOverview.formatBytes(overview.overlayFs!.sizeBytes),
+        equals('384.0 MB'),
+      );
+      expect(
+        StorageOverview.formatBytes(overview.overlayFs!.usedBytes),
+        equals('192.0 MB'),
+      );
     });
 
-    test('Parses /rom squashfs mount with non-exact MB multiple byte size correctly', () {
-      final romRpcData = [
-        {
-          'mount': '/rom',
-          'device': '/dev/root',
-          'fs': 'squashfs',
-          'size': 15400960, // 14.68 MB in Bytes (not an exact 1MB multiple)
-          'used': 15400960,
-          'avail': 0,
-        }
-      ];
+    test(
+      'Parses /rom squashfs mount with non-exact MB multiple byte size correctly',
+      () {
+        final romRpcData = [
+          {
+            'mount': '/rom',
+            'device': '/dev/root',
+            'fs': 'squashfs',
+            'size': 15400960, // 14.68 MB in Bytes (not an exact 1MB multiple)
+            'used': 15400960,
+            'avail': 0,
+          },
+        ];
 
-      final overview = StorageOverview.fromRpcData(romRpcData);
-      expect(overview.mountPoints.length, equals(1));
-      final rom = overview.mountPoints.first;
-      expect(rom.mountPath, equals('/rom'));
-      expect(rom.sizeBytes, equals(15400960));
-      expect(rom.usedBytes, equals(15400960));
-      expect(rom.availableBytes, equals(0));
-      expect(rom.usedPercent, equals(100.0));
-      expect(StorageOverview.formatBytes(rom.sizeBytes), equals('14.7 MB'));
-      expect(StorageOverview.formatBytes(rom.usedBytes), equals('14.7 MB'));
-      expect(StorageOverview.formatBytes(rom.availableBytes), equals('0 MB'));
-    });
+        final overview = StorageOverview.fromRpcData(romRpcData);
+        expect(overview.mountPoints.length, equals(1));
+        final rom = overview.mountPoints.first;
+        expect(rom.mountPath, equals('/rom'));
+        expect(rom.sizeBytes, equals(15400960));
+        expect(rom.usedBytes, equals(15400960));
+        expect(rom.availableBytes, equals(0));
+        expect(rom.usedPercent, equals(100.0));
+        expect(StorageOverview.formatBytes(rom.sizeBytes), equals('14.7 MB'));
+        expect(StorageOverview.formatBytes(rom.usedBytes), equals('14.7 MB'));
+        expect(StorageOverview.formatBytes(rom.availableBytes), equals('0 MB'));
+      },
+    );
   });
 }

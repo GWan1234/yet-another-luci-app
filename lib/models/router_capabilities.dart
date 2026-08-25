@@ -2,11 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Package manager engine available on the router.
-enum PackageManagerEngine {
-  opkg,
-  apk,
-  none,
-}
+enum PackageManagerEngine { opkg, apk, none }
 
 /// Firewall engine backend detected on OpenWrt.
 enum FirewallBackend {
@@ -17,7 +13,7 @@ enum FirewallBackend {
 
 /// Network switch topology model.
 enum NetworkModel {
-  dsa,      // Distributed Switch Architecture (bridge-vlan)
+  dsa, // Distributed Switch Architecture (bridge-vlan)
   swconfig, // Legacy swconfig (switch_vlan)
   unknown,
 }
@@ -132,11 +128,13 @@ class RouterCapabilities {
 
   /// Helper to check if ubus session has write authorization for uci configs
   bool get hasUciWriteAccess {
-    if (probeFailed || ubusObjects.isEmpty) return true; // conservative optimistic default
+    if (probeFailed || ubusObjects.isEmpty)
+      return true; // conservative optimistic default
     if (!ubusObjects.contains('uci')) return false;
     final methods = ubusMethods['uci'];
     if (methods == null) return ubusObjects.contains('uci');
-    return methods.contains('set') && (methods.contains('apply') || methods.contains('commit'));
+    return methods.contains('set') &&
+        (methods.contains('apply') || methods.contains('commit'));
   }
 
   /// Serialize for secure storage cache
@@ -190,7 +188,9 @@ class RouterCapabilities {
         lastProbeError: json['lastProbeError'] as String?,
       );
     } catch (_) {
-      return RouterCapabilities.conservative(json['routerId'] as String? ?? 'default');
+      return RouterCapabilities.conservative(
+        json['routerId'] as String? ?? 'default',
+      );
     }
   }
 

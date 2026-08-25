@@ -38,9 +38,8 @@ class DhcpDnsCard extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           'DHCP & DNS Server',
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -51,7 +50,9 @@ class DhcpDnsCard extends ConsumerWidget {
                 Text(
                   '.${overview.dnsConfig.localDomain} Domain',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.7),
                   ),
                 ),
               ],
@@ -81,7 +82,9 @@ class DhcpDnsCard extends ConsumerWidget {
                   child: _buildMetricTile(
                     context,
                     label: 'Upstream DNS',
-                    value: overview.dnsConfig.upstreamDnsServers.firstOrNull ?? '1.1.1.1',
+                    value:
+                        overview.dnsConfig.upstreamDnsServers.firstOrNull ??
+                        '1.1.1.1',
                     icon: Icons.public_outlined,
                     color: Colors.indigo,
                   ),
@@ -92,7 +95,9 @@ class DhcpDnsCard extends ConsumerWidget {
                     label: 'DNS Rebind',
                     value: overview.dnsConfig.rebindProtection ? 'ON' : 'OFF',
                     icon: Icons.verified_user_outlined,
-                    color: overview.dnsConfig.rebindProtection ? Colors.green : Colors.grey,
+                    color: overview.dnsConfig.rebindProtection
+                        ? Colors.green
+                        : Colors.grey,
                   ),
                 ),
               ],

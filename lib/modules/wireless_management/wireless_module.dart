@@ -13,7 +13,8 @@ class WirelessManagementModule extends LuciModule {
   String get name => 'Wireless Management';
 
   @override
-  String get description => 'Radios (radio0, radio1), associated SSIDs, operating mode, channels, TX power, security and connected stations';
+  String get description =>
+      'Radios (radio0, radio1), associated SSIDs, operating mode, channels, TX power, security and connected stations';
 
   @override
   IconData get icon => Icons.wifi_outlined;

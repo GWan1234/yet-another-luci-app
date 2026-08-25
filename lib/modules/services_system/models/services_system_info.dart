@@ -21,7 +21,9 @@ class ProcdService {
     bool running = false;
     String? pidStr = json['pid']?.toString();
 
-    if (json['running'] == true || json['running'] == 1 || json['pid'] != null) {
+    if (json['running'] == true ||
+        json['running'] == 1 ||
+        json['pid'] != null) {
       running = true;
     }
 
@@ -35,7 +37,9 @@ class ProcdService {
         bool hasStopped = false;
         for (final inst in instances.values) {
           if (inst is Map) {
-            if (inst['running'] == true || inst['running'] == 1 || inst['pid'] != null) {
+            if (inst['running'] == true ||
+                inst['running'] == 1 ||
+                inst['pid'] != null) {
               hasRunning = true;
               pidStr ??= inst['pid']?.toString();
             } else if (inst['running'] == false || inst['running'] == 0) {
@@ -118,8 +122,14 @@ class InitScript {
   }
 
   factory InitScript.fromJson(String name, Map<String, dynamic> json) {
-    final enabled = json['enabled'] == true || json['enabled'] == 1 || json['enabled'] == '1';
-    bool running = json['running'] == true || json['running'] == 1 || json['running'] == '1';
+    final enabled =
+        json['enabled'] == true ||
+        json['enabled'] == 1 ||
+        json['enabled'] == '1';
+    bool running =
+        json['running'] == true ||
+        json['running'] == 1 ||
+        json['running'] == '1';
     if (!running && json['running'] == null && enabled) {
       running = true;
     }
@@ -127,7 +137,10 @@ class InitScript {
       name: name,
       isEnabled: enabled,
       isRunning: running,
-      startPriority: (json['index'] as num?)?.toInt() ?? (json['start'] as num?)?.toInt() ?? 50,
+      startPriority:
+          (json['index'] as num?)?.toInt() ??
+          (json['start'] as num?)?.toInt() ??
+          50,
     );
   }
 }
@@ -205,7 +218,10 @@ class ServicesSystemOverview {
     required this.cronJobs,
   });
 
-  factory ServicesSystemOverview.fromDashboardData(Map<String, dynamic>? data, {bool isReviewerMode = false}) {
+  factory ServicesSystemOverview.fromDashboardData(
+    Map<String, dynamic>? data, {
+    bool isReviewerMode = false,
+  }) {
     final serviceList = <ProcdService>[];
     final initList = <InitScript>[];
     final cronList = <CronJob>[];
@@ -243,29 +259,98 @@ class ServicesSystemOverview {
     if (isReviewerMode) {
       if (serviceList.isEmpty) {
         serviceList.addAll([
-          const ProcdService(name: 'dnsmasq', isRunning: true, isEnabled: true, pid: '1240', description: 'DNS Forwarder & DHCP Server'),
-          const ProcdService(name: 'firewall', isRunning: true, isEnabled: true, pid: '890', description: 'OpenWrt Netfilter Firewall Utility'),
-          const ProcdService(name: 'dropbear', isRunning: true, isEnabled: true, pid: '1532', description: 'Lightweight SSH Server'),
-          const ProcdService(name: 'uhttpd', isRunning: true, isEnabled: true, pid: '1620', description: 'LuCI Web Interface Webserver'),
-          const ProcdService(name: 'network', isRunning: true, isEnabled: true, pid: '912', description: 'Core Network Interface Manager'),
-          const ProcdService(name: 'odhcpd', isRunning: true, isEnabled: true, pid: '1310', description: 'Embedded DHCPv6 & RA Daemon'),
+          const ProcdService(
+            name: 'dnsmasq',
+            isRunning: true,
+            isEnabled: true,
+            pid: '1240',
+            description: 'DNS Forwarder & DHCP Server',
+          ),
+          const ProcdService(
+            name: 'firewall',
+            isRunning: true,
+            isEnabled: true,
+            pid: '890',
+            description: 'OpenWrt Netfilter Firewall Utility',
+          ),
+          const ProcdService(
+            name: 'dropbear',
+            isRunning: true,
+            isEnabled: true,
+            pid: '1532',
+            description: 'Lightweight SSH Server',
+          ),
+          const ProcdService(
+            name: 'uhttpd',
+            isRunning: true,
+            isEnabled: true,
+            pid: '1620',
+            description: 'LuCI Web Interface Webserver',
+          ),
+          const ProcdService(
+            name: 'network',
+            isRunning: true,
+            isEnabled: true,
+            pid: '912',
+            description: 'Core Network Interface Manager',
+          ),
+          const ProcdService(
+            name: 'odhcpd',
+            isRunning: true,
+            isEnabled: true,
+            pid: '1310',
+            description: 'Embedded DHCPv6 & RA Daemon',
+          ),
         ]);
       }
 
       if (initList.isEmpty) {
         initList.addAll([
-          const InitScript(name: 'boot', isEnabled: true, isRunning: false, startPriority: 10),
-          const InitScript(name: 'network', isEnabled: true, isRunning: true, startPriority: 20),
-          const InitScript(name: 'dnsmasq', isEnabled: true, isRunning: true, startPriority: 60),
-          const InitScript(name: 'dropbear', isEnabled: true, isRunning: true, startPriority: 50),
-          const InitScript(name: 'firewall', isEnabled: true, isRunning: true, startPriority: 19),
+          const InitScript(
+            name: 'boot',
+            isEnabled: true,
+            isRunning: false,
+            startPriority: 10,
+          ),
+          const InitScript(
+            name: 'network',
+            isEnabled: true,
+            isRunning: true,
+            startPriority: 20,
+          ),
+          const InitScript(
+            name: 'dnsmasq',
+            isEnabled: true,
+            isRunning: true,
+            startPriority: 60,
+          ),
+          const InitScript(
+            name: 'dropbear',
+            isEnabled: true,
+            isRunning: true,
+            startPriority: 50,
+          ),
+          const InitScript(
+            name: 'firewall',
+            isEnabled: true,
+            isRunning: true,
+            startPriority: 19,
+          ),
         ]);
       }
 
       if (cronList.isEmpty) {
         cronList.addAll([
-          const CronJob(expression: '0 4 * * *', command: '/sbin/reboot', rawLine: '0 4 * * * /sbin/reboot'),
-          const CronJob(expression: '*/15 * * * *', command: '/usr/bin/ping-check.sh', rawLine: '*/15 * * * * /usr/bin/ping-check.sh'),
+          const CronJob(
+            expression: '0 4 * * *',
+            command: '/sbin/reboot',
+            rawLine: '0 4 * * * /sbin/reboot',
+          ),
+          const CronJob(
+            expression: '*/15 * * * *',
+            command: '/usr/bin/ping-check.sh',
+            rawLine: '*/15 * * * * /usr/bin/ping-check.sh',
+          ),
         ]);
       }
     }

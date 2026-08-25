@@ -15,8 +15,16 @@ import 'logger.dart';
 class HttpClientManager {
   static final HttpClientManager _instance = HttpClientManager._internal();
   factory HttpClientManager() => _instance;
+  Future<void>? _initFuture;
+
+  /// Ensures accepted certificates are fully loaded from secure storage before network calls
+  Future<void> ensureInitialized() {
+    _initFuture ??= _loadAcceptedCertificates();
+    return _initFuture!;
+  }
+
   HttpClientManager._internal() {
-    _loadAcceptedCertificates();
+    ensureInitialized();
   }
 
   final Map<String, Dio> _clients = {};
@@ -26,11 +34,7 @@ class HttpClientManager {
   /// Creates or returns a cached HTTP client for the given host
   /// In production builds, certificate validation is enforced with user warnings
   /// In debug builds, self-signed certificates can be allowed automatically
-  Dio getClient(
-    String hostWithPort,
-    bool useHttps, {
-    BuildContext? context,
-  }) {
+  Dio getClient(String hostWithPort, bool useHttps, {BuildContext? context}) {
     // Extract just the hostname without port for certificate validation
     final host = _extractHostname(hostWithPort);
     final key = '$hostWithPort-$useHttps';
@@ -66,11 +70,7 @@ class HttpClientManager {
     return hostWithPort;
   }
 
-  Dio _createSecureClient(
-    String host,
-    bool useHttps, {
-    BuildContext? context,
-  }) {
+  Dio _createSecureClient(String host, bool useHttps, {BuildContext? context}) {
     final dio = Dio(
       BaseOptions(
         connectTimeout: const Duration(seconds: 15),
@@ -96,7 +96,9 @@ class HttpClientManager {
               e.type == DioExceptionType.receiveTimeout ||
               e.type == DioExceptionType.connectionError ||
               e.error is SocketException) {
-            Logger.info('Network transition or socket failure detected for $host. Evicting stale client.');
+            Logger.info(
+              'Network transition or socket failure detected for $host. Evicting stale client.',
+            );
             disposeClient(host, useHttps, forceCloseAdapter: false);
           }
 
@@ -109,18 +111,75 @@ class HttpClientManager {
     adapter.createHttpClient = () {
       final httpClient = HttpClient();
       httpClient.connectionTimeout = const Duration(seconds: 15);
-      if (useHttps) {
-        httpClient.badCertificateCallback = (cert, certHost, port) {
-          final certKey = '$certHost:$port';
-          // Allow only if previously accepted
-          return _userAcceptedCerts[certKey] == true;
-        };
-      }
+      httpClient.badCertificateCallback = (cert, certHost, port) {
+        final certKey = '$certHost:$port';
+        if (_userAcceptedCerts[certKey] == true ||
+            _userAcceptedCerts[certHost] == true) {
+          return true;
+        }
+        // Self-signed SSL certificates are standard on local OpenWrt routers
+        if (_isLocalOrPrivateHost(certHost) || _isLocalOrPrivateHost(host)) {
+          return true;
+        }
+        return false;
+      };
       return httpClient;
     };
     dio.httpClientAdapter = adapter;
 
     return dio;
+  }
+
+  /// Helper to check if a hostname/IP belongs to private/local router networks
+  static bool _isLocalOrPrivateHost(String host) {
+    if (host.isEmpty) return false;
+    var lowerHost = host.toLowerCase().trim();
+    if (lowerHost.startsWith('[') && lowerHost.endsWith(']')) {
+      lowerHost = lowerHost.substring(1, lowerHost.length - 1).trim();
+    }
+
+    // Check for localhost / local domains
+    if (lowerHost == 'localhost' ||
+        lowerHost == 'openwrt' ||
+        lowerHost.endsWith('.local') ||
+        lowerHost.endsWith('.lan')) {
+      return true;
+    }
+
+    // Try parsing as IPv4
+    try {
+      final parts = host.split('.');
+      if (parts.length == 4) {
+        final octets = parts.map(int.tryParse).toList();
+        if (octets.every((o) => o != null && o >= 0 && o <= 255)) {
+          final o0 = octets[0]!;
+          final o1 = octets[1]!;
+
+          // 127.0.0.0/8 (Loopback)
+          if (o0 == 127) return true;
+          // 10.0.0.0/8 (Private Class A)
+          if (o0 == 10) return true;
+          // 172.16.0.0/12 (Private Class B)
+          if (o0 == 172 && o1 >= 16 && o1 <= 31) return true;
+          // 192.168.0.0/16 (Private Class C)
+          if (o0 == 192 && o1 == 168) return true;
+          // 169.254.0.0/16 (Link-Local)
+          if (o0 == 169 && o1 == 254) return true;
+        }
+      }
+    } catch (_) {}
+
+    // Try parsing as IPv6 (link-local fe80::, unique local fc00::/fd00::, loopback ::1)
+    if (host.contains(':')) {
+      if (lowerHost == '::1' ||
+          lowerHost.startsWith('fe80:') ||
+          lowerHost.startsWith('fc00:') ||
+          lowerHost.startsWith('fd00:')) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /// Load accepted certificates from secure storage
@@ -156,7 +215,11 @@ class HttpClientManager {
   }
 
   /// Disposes of a specific client
-  void disposeClient(String host, bool useHttps, {bool forceCloseAdapter = false}) {
+  void disposeClient(
+    String host,
+    bool useHttps, {
+    bool forceCloseAdapter = false,
+  }) {
     // Remove any cached clients that match the host (with or without port)
     final hostname = _extractHostname(host);
     final keysToRemove = _clients.keys
@@ -210,9 +273,10 @@ class HttpClientManager {
 
   /// Clear certificates for a specific host
   Future<void> clearCertificatesForHost(String host) async {
-    // Remove certificates for this host on port 443
-    final certKey = '$host:443';
-    _userAcceptedCerts.remove(certKey);
+    // Remove certificates for this host across all ports
+    _userAcceptedCerts.removeWhere(
+      (key, _) => key == host || key.startsWith('$host:'),
+    );
 
     // Close and remove cached HTTP clients for this host
     final keysToRemove = _clients.keys
@@ -248,9 +312,11 @@ class HttpClientManager {
       }
     }
 
-    // Check if already accepted
+    // Check if already accepted or local router host
     final certKey = '$host:$port';
-    if (_userAcceptedCerts[certKey] == true) {
+    if (_userAcceptedCerts[certKey] == true ||
+        _userAcceptedCerts[host] == true ||
+        _isLocalOrPrivateHost(host)) {
       return true;
     }
 
@@ -260,7 +326,9 @@ class HttpClientManager {
 
     // Apply the same certificate validation logic
     testClient.badCertificateCallback = (cert, certHost, port) {
-      return _userAcceptedCerts['$certHost:$port'] == true;
+      return _userAcceptedCerts['$certHost:$port'] == true ||
+          _userAcceptedCerts[certHost] == true ||
+          _isLocalOrPrivateHost(certHost);
     };
 
     try {

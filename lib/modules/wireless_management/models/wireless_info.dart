@@ -31,15 +31,15 @@ enum PmfState {
 
 /// Structured Wi-Fi Security Mode classification.
 enum WifiSecurityMode {
-  saeOnly,   // WPA3-SAE Only (PMF mandatory)
-  saeMixed,  // WPA2/WPA3 Transitional Mode
-  wpa2Psk,   // WPA2-PSK
-  wpaPsk,    // WPA-PSK (Legacy)
-  owe,       // Enhanced Open (OWE) - 802.11w without PSK
-  wep,       // WEP (Legacy)
-  open,      // Open (No encryption)
-  enterprise,// WPA-Enterprise / EAP
-  unknown;   // Fallback for unclassified encryption
+  saeOnly, // WPA3-SAE Only (PMF mandatory)
+  saeMixed, // WPA2/WPA3 Transitional Mode
+  wpa2Psk, // WPA2-PSK
+  wpaPsk, // WPA-PSK (Legacy)
+  owe, // Enhanced Open (OWE) - 802.11w without PSK
+  wep, // WEP (Legacy)
+  open, // Open (No encryption)
+  enterprise, // WPA-Enterprise / EAP
+  unknown; // Fallback for unclassified encryption
 
   String get displayName {
     switch (this) {
@@ -115,7 +115,8 @@ enum WifiSecurityMode {
     String? rawConfigEnc,
   }) {
     final configEnc = (rawConfigEnc ?? '').toLowerCase().trim();
-    final description = (iwinfoEnc?['description']?.toString() ?? '').toUpperCase();
+    final description = (iwinfoEnc?['description']?.toString() ?? '')
+        .toUpperCase();
     final enabled = iwinfoEnc?['enabled'] as bool? ?? true;
 
     final authSuitesRaw = iwinfoEnc?['auth_suites'];
@@ -124,18 +125,33 @@ enum WifiSecurityMode {
       authSuites.addAll(authSuitesRaw.map((e) => e.toString().toUpperCase()));
     }
 
-    if (configEnc == 'none' || (!enabled && description.isEmpty && configEnc.isEmpty)) {
+    if (configEnc == 'none' ||
+        (!enabled && description.isEmpty && configEnc.isEmpty)) {
       return WifiSecurityMode.open;
     }
 
-    final hasSaeSuite = authSuites.contains('SAE') || description.contains('SAE') || configEnc.contains('sae');
-    final hasOweSuite = description.contains('OWE') || configEnc.contains('owe') || configEnc == 'owe';
-    final hasPsk2Suite = authSuites.contains('PSK') || description.contains('WPA2') || configEnc.contains('psk2');
-    final hasPsk1Suite = configEnc == 'psk' || (description.contains('WPA') && !description.contains('WPA2'));
+    final hasSaeSuite =
+        authSuites.contains('SAE') ||
+        description.contains('SAE') ||
+        configEnc.contains('sae');
+    final hasOweSuite =
+        description.contains('OWE') ||
+        configEnc.contains('owe') ||
+        configEnc == 'owe';
+    final hasPsk2Suite =
+        authSuites.contains('PSK') ||
+        description.contains('WPA2') ||
+        configEnc.contains('psk2');
+    final hasPsk1Suite =
+        configEnc == 'psk' ||
+        (description.contains('WPA') && !description.contains('WPA2'));
 
     // 1. SAE Only vs SAE Mixed
     if (hasSaeSuite) {
-      if (configEnc == 'sae' || (!hasPsk2Suite && !description.contains('WPA2') && !description.contains('PSK'))) {
+      if (configEnc == 'sae' ||
+          (!hasPsk2Suite &&
+              !description.contains('WPA2') &&
+              !description.contains('PSK'))) {
         return WifiSecurityMode.saeOnly;
       }
       return WifiSecurityMode.saeMixed;
@@ -147,7 +163,9 @@ enum WifiSecurityMode {
     }
 
     // 2. WPA Enterprise
-    if (description.contains('802.1X') || description.contains('EAP') || (configEnc.startsWith('wpa') && !configEnc.contains('psk'))) {
+    if (description.contains('802.1X') ||
+        description.contains('EAP') ||
+        (configEnc.startsWith('wpa') && !configEnc.contains('psk'))) {
       return WifiSecurityMode.enterprise;
     }
 
@@ -162,7 +180,9 @@ enum WifiSecurityMode {
     }
 
     // 5. WEP
-    if (configEnc.contains('wep') || description.contains('WEP') || (iwinfoEnc?['wep'] == true)) {
+    if (configEnc.contains('wep') ||
+        description.contains('WEP') ||
+        (iwinfoEnc?['wep'] == true)) {
       return WifiSecurityMode.wep;
     }
 
@@ -193,16 +213,26 @@ class WirelessStation {
   });
 
   factory WirelessStation.fromJson(String mac, Map<String, dynamic> json) {
-    final rx = json['rx_rate'] as num? ??
+    final rx =
+        json['rx_rate'] as num? ??
         json['rx_bitrate'] as num? ??
-        (json['rx'] is Map ? (json['rx']['rate'] as num? ?? json['rx']['bitrate'] as num?) : null);
-    final tx = json['tx_rate'] as num? ??
+        (json['rx'] is Map
+            ? (json['rx']['rate'] as num? ?? json['rx']['bitrate'] as num?)
+            : null);
+    final tx =
+        json['tx_rate'] as num? ??
         json['tx_bitrate'] as num? ??
-        (json['tx'] is Map ? (json['tx']['rate'] as num? ?? json['tx']['bitrate'] as num?) : null);
+        (json['tx'] is Map
+            ? (json['tx']['rate'] as num? ?? json['tx']['bitrate'] as num?)
+            : null);
     return WirelessStation(
       macAddress: mac,
-      signalDbm: (json['signal'] as num?)?.toInt() ?? (json['signal_dbm'] as num?)?.toInt(),
-      noiseDbm: (json['noise'] as num?)?.toInt() ?? (json['noise_dbm'] as num?)?.toInt(),
+      signalDbm:
+          (json['signal'] as num?)?.toInt() ??
+          (json['signal_dbm'] as num?)?.toInt(),
+      noiseDbm:
+          (json['noise'] as num?)?.toInt() ??
+          (json['noise_dbm'] as num?)?.toInt(),
       rxRate: rx,
       txRate: tx,
       inactiveSeconds: (json['inactive'] as num?)?.toInt(),
@@ -244,7 +274,9 @@ String generateWifiQrUri({
 
   final hiddenVal = isHidden ? 'true' : 'false';
 
-  if (securityMode == WifiSecurityMode.open || password == null || password.isEmpty) {
+  if (securityMode == WifiSecurityMode.open ||
+      password == null ||
+      password.isEmpty) {
     return 'WIFI:T:$authType;S:$escapedSsid;;H:$hiddenVal;;';
   } else {
     final escapedPass = escape(password);
@@ -399,7 +431,8 @@ class WirelessInterface {
       inactivityLimit: inactivityLimit ?? this.inactivityLimit,
       maxListenInterval: maxListenInterval ?? this.maxListenInterval,
       disassocLowAck: disassocLowAck ?? this.disassocLowAck,
-      fastTransitionEnabled: fastTransitionEnabled ?? this.fastTransitionEnabled,
+      fastTransitionEnabled:
+          fastTransitionEnabled ?? this.fastTransitionEnabled,
       ftOverDs: ftOverDs ?? this.ftOverDs,
       ftPskGenerateLocal: ftPskGenerateLocal ?? this.ftPskGenerateLocal,
       mobilityDomain: mobilityDomain ?? this.mobilityDomain,
@@ -409,7 +442,8 @@ class WirelessInterface {
   }
 
   String get wifiQrUri {
-    final rawQr = rawConfig['qrcode']?.toString() ?? rawConfig['qr_payload']?.toString();
+    final rawQr =
+        rawConfig['qrcode']?.toString() ?? rawConfig['qr_payload']?.toString();
     if (rawQr != null && rawQr.isNotEmpty) {
       return rawQr;
     }
@@ -424,15 +458,20 @@ class WirelessInterface {
   /// Auto-detect if this interface functions as a Guest Wi-Fi network.
   /// Evaluates attached network bridge, section name, SSID naming heuristics,
   /// client isolation status, and optional manual tagging/exclusion overrides.
-  bool isGuestInterface([Set<String>? customGuestSections, Set<String>? excludedGuestSections]) {
+  bool isGuestInterface([
+    Set<String>? customGuestSections,
+    Set<String>? excludedGuestSections,
+  ]) {
     // 1. User explicit exclusion takes precedence over auto-detection heuristics
     if (excludedGuestSections != null &&
-        (excludedGuestSections.contains(sectionName) || excludedGuestSections.contains(ifName))) {
+        (excludedGuestSections.contains(sectionName) ||
+            excludedGuestSections.contains(ifName))) {
       return false;
     }
     // 2. User explicit guest tag
     if (customGuestSections != null &&
-        (customGuestSections.contains(sectionName) || customGuestSections.contains(ifName))) {
+        (customGuestSections.contains(sectionName) ||
+            customGuestSections.contains(ifName))) {
       return true;
     }
 
@@ -444,7 +483,11 @@ class WirelessInterface {
     // 3. Attached network is 'guest' or contains 'guest' / 'gst'
     if (net.contains('guest') || net.contains('gst')) return true;
     // 4. Section name or ifname contains 'guest' or 'gst'
-    if (sName.contains('guest') || sName.contains('gst') || ifcName.contains('guest') || ifcName.contains('gst')) return true;
+    if (sName.contains('guest') ||
+        sName.contains('gst') ||
+        ifcName.contains('guest') ||
+        ifcName.contains('gst'))
+      return true;
     // 5. SSID contains 'guest', 'gst', 'visitor', or 'visit' (e.g. TitanicGst, Home_Guest, Visitor-WiFi)
     if (sSsid.contains('guest') ||
         sSsid.contains('gst') ||
@@ -462,9 +505,12 @@ class WirelessInterface {
 
   /// Check if current hardware supports a specific encryption type
   /// Uses dynamic hardware capabilities fetched from iwinfo/ubus
-  bool supportsEncryption(String encryptionValue,
-      {Map<String, List<Map<String, String>>>? hardwareCapabilities}) {
-    if (hardwareCapabilities == null || hardwareCapabilities['encryptions'] == null) {
+  bool supportsEncryption(
+    String encryptionValue, {
+    Map<String, List<Map<String, String>>>? hardwareCapabilities,
+  }) {
+    if (hardwareCapabilities == null ||
+        hardwareCapabilities['encryptions'] == null) {
       // Fallback: assume common encryptions are supported based on band
       return _fallbackSupportsEncryption(encryptionValue);
     }
@@ -474,9 +520,12 @@ class WirelessInterface {
   }
 
   /// Check if current hardware supports a specific cipher
-  bool supportsCipher(String cipherValue,
-      {Map<String, List<Map<String, String>>>? hardwareCapabilities}) {
-    if (hardwareCapabilities == null || hardwareCapabilities['ciphers'] == null) {
+  bool supportsCipher(
+    String cipherValue, {
+    Map<String, List<Map<String, String>>>? hardwareCapabilities,
+  }) {
+    if (hardwareCapabilities == null ||
+        hardwareCapabilities['ciphers'] == null) {
       return _fallbackSupportsCipher(cipherValue);
     }
 
@@ -491,8 +540,10 @@ class WirelessInterface {
 
     // WPA3-SAE requires 802.11w/PMF support - typically 5/6GHz or newer 2.4GHz
     if (encryptionValue == 'sae') return is5GHzOr6GHz;
-    if (encryptionValue == 'sae-mixed') return true; // Transitional mode widely supported
-    if (encryptionValue == 'owe') return is5GHzOr6GHz; // Enhanced Open typically 5/6GHz
+    if (encryptionValue == 'sae-mixed')
+      return true; // Transitional mode widely supported
+    if (encryptionValue == 'owe')
+      return is5GHzOr6GHz; // Enhanced Open typically 5/6GHz
     return true; // psk2, psk, none are widely supported
   }
 
@@ -594,14 +645,14 @@ class WirelessInterface {
   }
 
   static const List<WifiSecurityMode> _securityOrder = [
-    WifiSecurityMode.saeOnly,      // Most secure
+    WifiSecurityMode.saeOnly, // Most secure
     WifiSecurityMode.saeMixed,
     WifiSecurityMode.wpa2Psk,
     WifiSecurityMode.wpaPsk,
     WifiSecurityMode.owe,
     WifiSecurityMode.wep,
-    WifiSecurityMode.open,         // Least secure
-    WifiSecurityMode.enterprise,   // Special case - depends on EAP method
+    WifiSecurityMode.open, // Least secure
+    WifiSecurityMode.enterprise, // Special case - depends on EAP method
     WifiSecurityMode.unknown,
   ];
 
@@ -612,14 +663,20 @@ class WirelessInterface {
     final config = json['config'] as Map<String, dynamic>? ?? {};
     final iwinfo = json['iwinfo'] as Map<String, dynamic>? ?? {};
 
-    final name = json['ifname']?.toString() ?? config['ifname']?.toString() ?? 'wlan';
-    final ssidStr = iwinfo['ssid']?.toString() ?? config['ssid']?.toString() ?? 'Unnamed';
-    final modeStr = (iwinfo['mode']?.toString() ?? config['mode']?.toString() ?? 'ap').toUpperCase();
-    final encStr = iwinfo['encryption']?['description']?.toString() ??
+    final name =
+        json['ifname']?.toString() ?? config['ifname']?.toString() ?? 'wlan';
+    final ssidStr =
+        iwinfo['ssid']?.toString() ?? config['ssid']?.toString() ?? 'Unnamed';
+    final modeStr =
+        (iwinfo['mode']?.toString() ?? config['mode']?.toString() ?? 'ap')
+            .toUpperCase();
+    final encStr =
+        iwinfo['encryption']?['description']?.toString() ??
         config['encryption']?.toString() ??
         'WPA2-PSK';
     final chStr = (iwinfo['channel'] ?? config['channel'] ?? 'Auto').toString();
-    final enabled = !(config['disabled'] as bool? ?? (json['disabled'] as bool? ?? false));
+    final enabled =
+        !(config['disabled'] as bool? ?? (json['disabled'] as bool? ?? false));
 
     final iwEncMap = iwinfo['encryption'] is Map<String, dynamic>
         ? iwinfo['encryption'] as Map<String, dynamic>
@@ -635,7 +692,8 @@ class WirelessInterface {
     final pmf = PmfState.parse(rawPmf);
 
     // Parse Key / Passphrase
-    final passphraseStr = config['key']?.toString() ??
+    final passphraseStr =
+        config['key']?.toString() ??
         config['passphrase']?.toString() ??
         config['sae_password']?.toString() ??
         config['psk']?.toString() ??
@@ -645,7 +703,8 @@ class WirelessInterface {
         json['psk']?.toString();
 
     // Parse Cipher
-    final cipherStr = config['cipher']?.toString() ?? iwEncMap?['ciphers']?.toString();
+    final cipherStr =
+        config['cipher']?.toString() ?? iwEncMap?['ciphers']?.toString();
 
     // Parse boolean flags
     bool parseBool(dynamic val) {
@@ -661,16 +720,27 @@ class WirelessInterface {
 
     final hiddenBool = parseBool(config['hidden'] ?? json['hidden']);
     final ocvBool = parseBool(config['ocv'] ?? json['ocv']);
-    final krackBool = parseBool(config['wpa_disable_eapol_key_retries'] ?? json['wpa_disable_eapol_key_retries']);
+    final krackBool = parseBool(
+      config['wpa_disable_eapol_key_retries'] ??
+          json['wpa_disable_eapol_key_retries'],
+    );
     final gcmpBool = parseBool(config['gcmp256'] ?? json['gcmp256']);
     final saeExtBool = parseBool(config['sae_ext_key'] ?? json['sae_ext_key']);
-    final multi2UniBool = parseBool(config['multicast_to_unicast'] ?? json['multicast_to_unicast']);
+    final multi2UniBool = parseBool(
+      config['multicast_to_unicast'] ?? json['multicast_to_unicast'],
+    );
     final isoClientBool = parseBool(config['isolate'] ?? json['isolate']);
-    final isoBridgeBool = parseBool(config['isolate_bridge'] ?? json['isolate_bridge']);
-    final disassocAckBool = config['disassoc_low_ack'] != null ? parseBool(config['disassoc_low_ack']) : true;
+    final isoBridgeBool = parseBool(
+      config['isolate_bridge'] ?? json['isolate_bridge'],
+    );
+    final disassocAckBool = config['disassoc_low_ack'] != null
+        ? parseBool(config['disassoc_low_ack'])
+        : true;
     final ftBool = parseBool(config['ieee80211r'] ?? json['ieee80211r']);
     final ftDsBool = parseBool(config['ft_over_ds'] ?? json['ft_over_ds']);
-    final ftPskLocalBool = parseBool(config['ft_psk_generate_local'] ?? json['ft_psk_generate_local']);
+    final ftPskLocalBool = parseBool(
+      config['ft_psk_generate_local'] ?? json['ft_psk_generate_local'],
+    );
 
     final stationList = <WirelessStation>[];
     if (assocData != null) {
@@ -692,11 +762,15 @@ class WirelessInterface {
       }
 
       if (rawStations is Map<String, dynamic>) {
-        final stationMapOrList = rawStations['results'] ?? rawStations['assoclist'] ?? rawStations;
+        final stationMapOrList =
+            rawStations['results'] ?? rawStations['assoclist'] ?? rawStations;
         if (stationMapOrList is List) {
           for (final item in stationMapOrList) {
             if (item is Map<String, dynamic>) {
-              final mac = item['mac']?.toString() ?? item['macaddr']?.toString() ?? 'Unknown';
+              final mac =
+                  item['mac']?.toString() ??
+                  item['macaddr']?.toString() ??
+                  'Unknown';
               stationList.add(WirelessStation.fromJson(mac, item));
             }
           }
@@ -710,14 +784,18 @@ class WirelessInterface {
       } else if (rawStations is List) {
         for (final item in rawStations) {
           if (item is Map<String, dynamic>) {
-            final mac = item['mac']?.toString() ?? item['macaddr']?.toString() ?? 'Unknown';
+            final mac =
+                item['mac']?.toString() ??
+                item['macaddr']?.toString() ??
+                'Unknown';
             stationList.add(WirelessStation.fromJson(mac, item));
           }
         }
       }
     }
 
-    final sectionStr = json['section']?.toString() ??
+    final sectionStr =
+        json['section']?.toString() ??
         json['.name']?.toString() ??
         config['.name']?.toString() ??
         json['ifname']?.toString() ??
@@ -801,7 +879,9 @@ class WirelessRadio {
     final config = json['config'] as Map<String, dynamic>? ?? {};
     final iwinfo = json['iwinfo'] as Map<String, dynamic>? ?? {};
     final up = json['up'] as bool? ?? true;
-    final ch = (json['channel'] ?? config['channel'] ?? iwinfo['channel'] ?? 'Auto').toString();
+    final ch =
+        (json['channel'] ?? config['channel'] ?? iwinfo['channel'] ?? 'Auto')
+            .toString();
     int? freq = (json['frequency'] as num?)?.toInt();
     if (freq == null && config.isNotEmpty) {
       freq = (config['frequency'] as num?)?.toInt();
@@ -809,15 +889,22 @@ class WirelessRadio {
     if (freq == null && iwinfo.isNotEmpty) {
       freq = (iwinfo['frequency'] as num?)?.toInt();
     }
-    final txp = (json['txpower'] as num?)?.toInt() ??
+    final txp =
+        (json['txpower'] as num?)?.toInt() ??
         (config['txpower'] as num?)?.toInt() ??
         (iwinfo['txpower'] as num?)?.toInt();
-    final ctry = json['country']?.toString() ??
+    final ctry =
+        json['country']?.toString() ??
         config['country']?.toString() ??
         iwinfo['country']?.toString() ??
         'Global';
-    final ht = json['htmode']?.toString() ?? config['htmode']?.toString() ?? iwinfo['htmode']?.toString();
-    final hwName = json['hardware']?['name']?.toString() ?? iwinfo['hardware']?['name']?.toString();
+    final ht =
+        json['htmode']?.toString() ??
+        config['htmode']?.toString() ??
+        iwinfo['htmode']?.toString();
+    final hwName =
+        json['hardware']?['name']?.toString() ??
+        iwinfo['hardware']?['name']?.toString();
 
     final rawDisabled = json['disabled'] ?? config['disabled'];
     bool disabled = false;
@@ -914,10 +1001,21 @@ class WirelessRadio {
     } else if (band == '5 GHz') {
       // 5 GHz UNII bands - simplified
       return [
-        36, 40, 44, 48,      // UNII-1
-        52, 56, 60, 64,      // UNII-2A (DFS)
-        100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144, // UNII-2C/3 (DFS)
-        149, 153, 157, 161, 165 // UNII-4
+        36, 40, 44, 48, // UNII-1
+        52, 56, 60, 64, // UNII-2A (DFS)
+        100,
+        104,
+        108,
+        112,
+        116,
+        120,
+        124,
+        128,
+        132,
+        136,
+        140,
+        144, // UNII-2C/3 (DFS)
+        149, 153, 157, 161, 165, // UNII-4
       ];
     } else if (band == '6 GHz') {
       // 6 GHz channels (Wi-Fi 6E/7)
@@ -938,20 +1036,29 @@ class WirelessOverview {
 
   const WirelessOverview({required this.radios});
 
-  factory WirelessOverview.fromDashboardData(Map<String, dynamic>? data, {bool isReviewerMode = false}) {
+  factory WirelessOverview.fromDashboardData(
+    Map<String, dynamic>? data, {
+    bool isReviewerMode = false,
+  }) {
     final radioList = <WirelessRadio>[];
     Map<String, dynamic>? assocData;
 
     if (data != null) {
       assocData = data['wirelessStations'] as Map<String, dynamic>?;
 
-      final wirelessMap = (data['wireless'] ?? data['wirelessInterfaces']) as Map<String, dynamic>?;
+      final wirelessMap =
+          (data['wireless'] ?? data['wirelessInterfaces'])
+              as Map<String, dynamic>?;
       if (wirelessMap != null && wirelessMap.isNotEmpty) {
         wirelessMap.forEach((radioName, radioData) {
           if (radioData is Map<String, dynamic>) {
             // Check if radioData contains valid radio structure (e.g. interfaces or config)
-            if (radioData.containsKey('interfaces') || radioData.containsKey('up') || radioData.containsKey('channel')) {
-              radioList.add(WirelessRadio.fromJson(radioName, radioData, assocData));
+            if (radioData.containsKey('interfaces') ||
+                radioData.containsKey('up') ||
+                radioData.containsKey('channel')) {
+              radioList.add(
+                WirelessRadio.fromJson(radioName, radioData, assocData),
+              );
             }
           }
         });
@@ -986,10 +1093,16 @@ class WirelessOverview {
               radioList.add(
                 WirelessRadio(
                   name: radioName,
-                  isUp: radioMap['disabled'] != '1' && radioMap['disabled'] != true,
+                  isUp:
+                      radioMap['disabled'] != '1' &&
+                      radioMap['disabled'] != true,
                   channel: radioMap['channel']?.toString() ?? 'Auto',
-                  frequency: int.tryParse(radioMap['frequency']?.toString() ?? ''),
-                  txPowerDbm: int.tryParse(radioMap['txpower']?.toString() ?? ''),
+                  frequency: int.tryParse(
+                    radioMap['frequency']?.toString() ?? '',
+                  ),
+                  txPowerDbm: int.tryParse(
+                    radioMap['txpower']?.toString() ?? '',
+                  ),
                   country: radioMap['country']?.toString() ?? 'Global',
                   interfaces: const [],
                 ),
@@ -1012,31 +1125,47 @@ class WirelessOverview {
             }
 
             final currentRadio = radioList[rIdx];
-            final updatedIfaces = List<WirelessInterface>.from(currentRadio.interfaces);
+            final updatedIfaces = List<WirelessInterface>.from(
+              currentRadio.interfaces,
+            );
 
             for (final ifaceMap in ifaceMaps) {
-              final sectionName = ifaceMap['.name']?.toString() ?? ifaceMap['section']?.toString() ?? 'wifinet';
+              final sectionName =
+                  ifaceMap['.name']?.toString() ??
+                  ifaceMap['section']?.toString() ??
+                  'wifinet';
               final ssid = ifaceMap['ssid']?.toString() ?? 'Unnamed';
               final rawDisabled = ifaceMap['disabled'];
-              final isDisabled = rawDisabled == '1' || rawDisabled == true || rawDisabled == 'true' || rawDisabled == 'yes';
+              final isDisabled =
+                  rawDisabled == '1' ||
+                  rawDisabled == true ||
+                  rawDisabled == 'true' ||
+                  rawDisabled == 'yes';
 
               final existingIdx = updatedIfaces.indexWhere(
-                (i) => i.sectionName == sectionName || (i.ssid.isNotEmpty && i.ssid == ssid),
+                (i) =>
+                    i.sectionName == sectionName ||
+                    (i.ssid.isNotEmpty && i.ssid == ssid),
               );
 
               if (existingIdx >= 0) {
                 final existing = updatedIfaces[existingIdx];
                 updatedIfaces[existingIdx] = existing.copyWith(
                   isEnabled: isDisabled ? false : existing.isEnabled,
-                  sectionName: existing.sectionName.isNotEmpty ? existing.sectionName : sectionName,
+                  sectionName: existing.sectionName.isNotEmpty
+                      ? existing.sectionName
+                      : sectionName,
                   key: existing.key ?? ifaceMap['key']?.toString(),
-                  networkBridge: existing.networkBridge ?? ifaceMap['network']?.toString(),
+                  networkBridge:
+                      existing.networkBridge ?? ifaceMap['network']?.toString(),
                   rawConfig: {...ifaceMap, ...existing.rawConfig},
                 );
               } else {
-                final mode = (ifaceMap['mode']?.toString() ?? 'ap').toUpperCase();
+                final mode = (ifaceMap['mode']?.toString() ?? 'ap')
+                    .toUpperCase();
                 final enc = ifaceMap['encryption']?.toString() ?? 'WPA2-PSK';
-                final ch = ifaceMap['channel']?.toString() ?? currentRadio.channel;
+                final ch =
+                    ifaceMap['channel']?.toString() ?? currentRadio.channel;
 
                 final newIface = WirelessInterface(
                   ifName: ifaceMap['ifname']?.toString() ?? sectionName,
@@ -1050,10 +1179,14 @@ class WirelessOverview {
                   isEnabled: !isDisabled,
                   stations: const [],
                   radio: currentRadio,
-                  key: ifaceMap['key']?.toString() ?? ifaceMap['passphrase']?.toString(),
+                  key:
+                      ifaceMap['key']?.toString() ??
+                      ifaceMap['passphrase']?.toString(),
                   networkBridge: ifaceMap['network']?.toString(),
-                  isolateClients: ifaceMap['isolate'] == '1' || ifaceMap['isolate'] == true,
-                  isHidden: ifaceMap['hidden'] == '1' || ifaceMap['hidden'] == true,
+                  isolateClients:
+                      ifaceMap['isolate'] == '1' || ifaceMap['isolate'] == true,
+                  isHidden:
+                      ifaceMap['hidden'] == '1' || ifaceMap['hidden'] == true,
                   rawConfig: Map<String, dynamic>.from(ifaceMap),
                 );
                 updatedIfaces.add(newIface);
@@ -1111,8 +1244,20 @@ class WirelessOverview {
               mobilityDomain: '4f57',
               networkBridge: 'lan',
               stations: [
-                WirelessStation(macAddress: 'AA:BB:CC:11:22:33', signalDbm: -48, noiseDbm: -95, rxRate: 144, txRate: 72),
-                WirelessStation(macAddress: 'AA:BB:CC:44:55:66', signalDbm: -62, noiseDbm: -92, rxRate: 108, txRate: 54),
+                WirelessStation(
+                  macAddress: 'AA:BB:CC:11:22:33',
+                  signalDbm: -48,
+                  noiseDbm: -95,
+                  rxRate: 144,
+                  txRate: 72,
+                ),
+                WirelessStation(
+                  macAddress: 'AA:BB:CC:44:55:66',
+                  signalDbm: -62,
+                  noiseDbm: -92,
+                  rxRate: 108,
+                  txRate: 54,
+                ),
               ],
             ),
             const WirelessInterface(
@@ -1162,7 +1307,13 @@ class WirelessOverview {
               mobilityDomain: '4f57',
               networkBridge: 'lan',
               stations: [
-                WirelessStation(macAddress: 'AA:BB:CC:77:88:99', signalDbm: -38, noiseDbm: -98, rxRate: 433, txRate: 433),
+                WirelessStation(
+                  macAddress: 'AA:BB:CC:77:88:99',
+                  signalDbm: -38,
+                  noiseDbm: -98,
+                  rxRate: 433,
+                  txRate: 433,
+                ),
               ],
             ),
           ],
@@ -1173,20 +1324,22 @@ class WirelessOverview {
     // Priority sorting: Active / UP radios, interfaces, and connected stations FIRST at top priority!
     for (int i = 0; i < radioList.length; i++) {
       final r = radioList[i];
-      final sortedInterfaces = List<WirelessInterface>.from(r.interfaces)..sort((a, b) {
-        if (a.isEnabled != b.isEnabled) {
-          return a.isEnabled ? -1 : 1;
-        }
-        return a.ssid.compareTo(b.ssid);
-      });
+      final sortedInterfaces = List<WirelessInterface>.from(r.interfaces)
+        ..sort((a, b) {
+          if (a.isEnabled != b.isEnabled) {
+            return a.isEnabled ? -1 : 1;
+          }
+          return a.ssid.compareTo(b.ssid);
+        });
 
       for (int j = 0; j < sortedInterfaces.length; j++) {
         final ifc = sortedInterfaces[j];
-        final sortedStations = List<WirelessStation>.from(ifc.stations)..sort((a, b) {
-          final aSig = a.signalDbm ?? -999;
-          final bSig = b.signalDbm ?? -999;
-          return aSig.compareTo(bSig); // Higher dBm at bottom of list
-        });
+        final sortedStations = List<WirelessStation>.from(ifc.stations)
+          ..sort((a, b) {
+            final aSig = a.signalDbm ?? -999;
+            final bSig = b.signalDbm ?? -999;
+            return aSig.compareTo(bSig); // Higher dBm at bottom of list
+          });
         sortedInterfaces[j] = ifc.copyWith(stations: sortedStations);
       }
 

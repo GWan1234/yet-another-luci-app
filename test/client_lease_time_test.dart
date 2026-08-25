@@ -68,56 +68,82 @@ void main() {
       expect(client.isStatic, isTrue);
     });
 
-    test('static lease client with null leaseTime returns "Static (Permanent)"', () {
-      final client = Client(
-        ipAddress: '10.0.0.60',
-        macAddress: 'AA:11:22:33:44:55',
-        hostname: 'Reserved-Device',
-        isStaticLease: true,
-        leaseTime: null,
-      );
-      expect(client.formattedLeaseTime, equals('Static (Permanent)'));
-    });
+    test(
+      'static lease client with null leaseTime returns "Static (Permanent)"',
+      () {
+        final client = Client(
+          ipAddress: '10.0.0.60',
+          macAddress: 'AA:11:22:33:44:55',
+          hostname: 'Reserved-Device',
+          isStaticLease: true,
+          leaseTime: null,
+        );
+        expect(client.formattedLeaseTime, equals('Static (Permanent)'));
+      },
+    );
 
-    test('Option A retention rule excludes disconnected non-static devices with no active lease', () {
-      bool shouldRetainClient({
-        required bool isConnected,
-        required int? leaseTime,
-        required bool isStaticLease,
-      }) {
-        final hasActiveLease = leaseTime != null && leaseTime > 0;
-        return isConnected || hasActiveLease || isStaticLease;
-      }
+    test(
+      'Option A retention rule excludes disconnected non-static devices with no active lease',
+      () {
+        bool shouldRetainClient({
+          required bool isConnected,
+          required int? leaseTime,
+          required bool isStaticLease,
+        }) {
+          final hasActiveLease = leaseTime != null && leaseTime > 0;
+          return isConnected || hasActiveLease || isStaticLease;
+        }
 
-      // Disconnected sub-router (no active lease, no static reservation) -> EXCLUDED
-      expect(
-        shouldRetainClient(isConnected: false, leaseTime: null, isStaticLease: false),
-        isFalse,
-      );
+        // Disconnected sub-router (no active lease, no static reservation) -> EXCLUDED
+        expect(
+          shouldRetainClient(
+            isConnected: false,
+            leaseTime: null,
+            isStaticLease: false,
+          ),
+          isFalse,
+        );
 
-      // Disconnected client with expired lease -> EXCLUDED
-      expect(
-        shouldRetainClient(isConnected: false, leaseTime: -100, isStaticLease: false),
-        isFalse,
-      );
+        // Disconnected client with expired lease -> EXCLUDED
+        expect(
+          shouldRetainClient(
+            isConnected: false,
+            leaseTime: -100,
+            isStaticLease: false,
+          ),
+          isFalse,
+        );
 
-      // Connected client -> RETAINED
-      expect(
-        shouldRetainClient(isConnected: true, leaseTime: null, isStaticLease: false),
-        isTrue,
-      );
+        // Connected client -> RETAINED
+        expect(
+          shouldRetainClient(
+            isConnected: true,
+            leaseTime: null,
+            isStaticLease: false,
+          ),
+          isTrue,
+        );
 
-      // Offline client with active dynamic lease timer -> RETAINED
-      expect(
-        shouldRetainClient(isConnected: false, leaseTime: 1800, isStaticLease: false),
-        isTrue,
-      );
+        // Offline client with active dynamic lease timer -> RETAINED
+        expect(
+          shouldRetainClient(
+            isConnected: false,
+            leaseTime: 1800,
+            isStaticLease: false,
+          ),
+          isTrue,
+        );
 
-      // Offline client with static lease reservation -> RETAINED
-      expect(
-        shouldRetainClient(isConnected: false, leaseTime: null, isStaticLease: true),
-        isTrue,
-      );
-    });
+        // Offline client with static lease reservation -> RETAINED
+        expect(
+          shouldRetainClient(
+            isConnected: false,
+            leaseTime: null,
+            isStaticLease: true,
+          ),
+          isTrue,
+        );
+      },
+    );
   });
 }

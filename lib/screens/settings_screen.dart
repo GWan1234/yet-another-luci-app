@@ -105,7 +105,10 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                   ),
                   Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     elevation: 2,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -119,7 +122,9 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                         child: Icon(
                           Icons.dashboard_customize,
-                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onPrimaryContainer,
                           size: 24,
                         ),
                       ),
@@ -127,7 +132,9 @@ class SettingsScreen extends ConsumerWidget {
                         'Customize Dashboard',
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
-                      subtitle: const Text('Configure interface visibility and throughput monitoring'),
+                      subtitle: const Text(
+                        'Configure interface visibility and throughput monitoring',
+                      ),
                       trailing: Icon(
                         Icons.arrow_forward_ios,
                         size: 16,
@@ -154,7 +161,10 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                   ),
                   Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     elevation: 2,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -163,12 +173,16 @@ class SettingsScreen extends ConsumerWidget {
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.secondaryContainer,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.secondaryContainer,
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
                           Icons.radar_rounded,
-                          color: Theme.of(context).colorScheme.onSecondaryContainer,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSecondaryContainer,
                           size: 24,
                         ),
                       ),
@@ -189,24 +203,31 @@ class SettingsScreen extends ConsumerWidget {
                       onTap: () async {
                         await appState.redetectCapabilities();
                         if (context.mounted) {
-                          context.showToastSuccess('Capabilities Detected', subtitle: 'Router capabilities re-detected & cached successfully!');
+                          context.showToastSuccess(
+                            'Capabilities Detected',
+                            subtitle:
+                                'Router capabilities re-detected & cached successfully!',
+                          );
                         }
                       },
                     ),
                   ),
-                  if (AppConfig.isMonetizationEnabled && AppConfig.isSupportDevEnabled) ...[
+                  if (AppConfig.isMonetizationEnabled &&
+                      AppConfig.isSupportDevEnabled) ...[
                     const Divider(height: 32),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                       child: Text(
                         'Subscription',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                     ),
                     Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       elevation: 2,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -215,12 +236,16 @@ class SettingsScreen extends ConsumerWidget {
                         leading: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.tertiaryContainer,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.tertiaryContainer,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Icon(
                             Icons.workspace_premium_rounded,
-                            color: Theme.of(context).colorScheme.onTertiaryContainer,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onTertiaryContainer,
                             size: 24,
                           ),
                         ),
@@ -231,7 +256,9 @@ class SettingsScreen extends ConsumerWidget {
                         subtitle: Consumer(
                           builder: (context, ref, _) {
                             final entitlement = ref.watch(entitlementProvider);
-                            return Text('Current Tier: ${entitlement.tier.displayName}');
+                            return Text(
+                              'Current Tier: ${entitlement.tier.displayName}',
+                            );
                           },
                         ),
                         trailing: Icon(
@@ -255,13 +282,15 @@ class SettingsScreen extends ConsumerWidget {
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                       child: Text(
                         'App Updates',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                     ),
                     Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       elevation: 2,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -270,12 +299,16 @@ class SettingsScreen extends ConsumerWidget {
                         leading: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primaryContainer,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primaryContainer,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Icon(
                             Icons.system_update_rounded,
-                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onPrimaryContainer,
                             size: 24,
                           ),
                         ),
@@ -283,7 +316,9 @@ class SettingsScreen extends ConsumerWidget {
                           'Check for Updates',
                           style: TextStyle(fontWeight: FontWeight.w600),
                         ),
-                        subtitle: const Text('Check for new releases on GitHub'),
+                        subtitle: const Text(
+                          'Check for new releases on GitHub',
+                        ),
                         trailing: Icon(
                           Icons.arrow_forward_ios,
                           size: 16,
@@ -306,7 +341,10 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                   ),
                   Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     elevation: 2,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -325,7 +363,9 @@ class SettingsScreen extends ConsumerWidget {
                               ? Icons.verified_user_rounded
                               : Icons.gpp_maybe_rounded,
                           color: AppConfig.isOfficialBuild
-                              ? Theme.of(context).colorScheme.onTertiaryContainer
+                              ? Theme.of(
+                                  context,
+                                ).colorScheme.onTertiaryContainer
                               : Theme.of(context).colorScheme.onErrorContainer,
                           size: 24,
                         ),
@@ -378,7 +418,9 @@ class SettingsScreen extends ConsumerWidget {
                               children: [
                                 Text(
                                   'Build Channel: ${AppConfig.flavorName} Edition ${AppConfig.isOfficialBuild ? "(Official)" : "(Unofficial / Local)"}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
@@ -392,8 +434,12 @@ class SettingsScreen extends ConsumerWidget {
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                const Text('• 100% On-Device RPC Communication'),
-                                const Text('• Zero Analytics, Tracking, or Telemetry'),
+                                const Text(
+                                  '• 100% On-Device RPC Communication',
+                                ),
+                                const Text(
+                                  '• Zero Analytics, Tracking, or Telemetry',
+                                ),
                                 const SizedBox(height: 12),
                                 SelectableText(
                                   'Repository: ${AppConfig.githubRepositoryUrl}',
@@ -432,8 +478,13 @@ class SettingsScreen extends ConsumerWidget {
                           const Text('Reviewer Mode Active'),
                           const SizedBox(width: 6),
                           Tooltip(
-                            message: 'Bypasses live router connection and populates mock metrics for testing and review.',
-                            child: Icon(Icons.info_outline, size: 16, color: Theme.of(context).colorScheme.primary),
+                            message:
+                                'Bypasses live router connection and populates mock metrics for testing and review.',
+                            child: Icon(
+                              Icons.info_outline,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
                           ),
                         ],
                       ),

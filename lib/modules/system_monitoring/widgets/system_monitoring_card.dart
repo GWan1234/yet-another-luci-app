@@ -13,7 +13,8 @@ class SystemMonitoringCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final appState = ref.watch(appStateProvider);
     final sysInfo = appState.dashboardData?['sysInfo'] as Map<String, dynamic>?;
-    final boardInfo = appState.dashboardData?['boardInfo'] as Map<String, dynamic>?;
+    final boardInfo =
+        appState.dashboardData?['boardInfo'] as Map<String, dynamic>?;
     final metrics = SystemMetrics.fromSysInfo(sysInfo, boardInfo: boardInfo);
 
     return Card(
@@ -46,7 +47,9 @@ class SystemMonitoringCard extends ConsumerWidget {
             ),
             LayoutBuilder(
               builder: (context, constraints) {
-                final isNarrow = constraints.maxWidth < 340 || MediaQuery.textScalerOf(context).scale(14) > 17;
+                final isNarrow =
+                    constraints.maxWidth < 340 ||
+                    MediaQuery.textScalerOf(context).scale(14) > 17;
                 final cpuTile = _buildMetricTile(
                   context,
                   label: 'CPU Load',

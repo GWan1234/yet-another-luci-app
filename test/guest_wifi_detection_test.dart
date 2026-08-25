@@ -98,26 +98,29 @@ void main() {
       expect(iface.isGuestInterface({'custom_section_abc'}), isTrue);
     });
 
-    test('Excluding a falsely-detected guest SSID overrides heuristics and forces standard network', () {
-      const iface = WirelessInterface(
-        ifName: 'wlan0-1',
-        sectionName: 'wifinet1',
-        ssid: 'VisitorCenter_Staff',
-        mode: 'AP',
-        encryption: 'psk2',
-        securityMode: WifiSecurityMode.wpa2Psk,
-        pmfState: PmfState.optional,
-        channel: '36',
-        isEnabled: true,
-        networkBridge: 'br-custom',
-        stations: [],
-      );
+    test(
+      'Excluding a falsely-detected guest SSID overrides heuristics and forces standard network',
+      () {
+        const iface = WirelessInterface(
+          ifName: 'wlan0-1',
+          sectionName: 'wifinet1',
+          ssid: 'VisitorCenter_Staff',
+          mode: 'AP',
+          encryption: 'psk2',
+          securityMode: WifiSecurityMode.wpa2Psk,
+          pmfState: PmfState.optional,
+          channel: '36',
+          isEnabled: true,
+          networkBridge: 'br-custom',
+          stations: [],
+        );
 
-      // Heuristic auto-detects 'visit' in SSID as Guest
-      expect(iface.isGuest, isTrue);
+        // Heuristic auto-detects 'visit' in SSID as Guest
+        expect(iface.isGuest, isTrue);
 
-      // User explicit exclusion overrides heuristic
-      expect(iface.isGuestInterface(null, {'wifinet1'}), isFalse);
-    });
+        // User explicit exclusion overrides heuristic
+        expect(iface.isGuestInterface(null, {'wifinet1'}), isFalse);
+      },
+    );
   });
 }

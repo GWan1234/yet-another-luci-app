@@ -189,7 +189,9 @@ class DdnsInstance {
       if (val == null) return defaultValue;
       if (val is bool) return val;
       final str = val.toString().trim();
-      return str == '1' || str.toLowerCase() == 'true' || str.toLowerCase() == 'yes';
+      return str == '1' ||
+          str.toLowerCase() == 'true' ||
+          str.toLowerCase() == 'yes';
     }
 
     int parseInt(dynamic val, {int defaultValue = 10}) {
@@ -265,12 +267,20 @@ class DdnsOverview {
     required this.instances,
   });
 
-  factory DdnsOverview.fromDashboardData(Map<String, dynamic>? data, {bool isReviewerMode = false}) {
+  factory DdnsOverview.fromDashboardData(
+    Map<String, dynamic>? data, {
+    bool isReviewerMode = false,
+  }) {
     if (isReviewerMode) {
       return const DdnsOverview(
         isInstalled: true,
         isGlobalEnabled: true,
-        installedPackages: ['ddns-scripts', 'ddns-scripts-cloudflare', 'ddns-scripts-noip', 'luci-app-ddns'],
+        installedPackages: [
+          'ddns-scripts',
+          'ddns-scripts-cloudflare',
+          'ddns-scripts-noip',
+          'luci-app-ddns',
+        ],
         instances: [
           DdnsInstance(
             name: 'myddns_ipv4',
@@ -320,9 +330,17 @@ class DdnsOverview {
     }
 
     final ddnsData = data['ddns'] as Map<String, dynamic>;
-    final installedPkgs = (data['installedPackages'] as List?)?.map((e) => e.toString()).toList() ?? [];
-    
-    bool installed = installedPkgs.any((p) => p.contains('ddns-scripts') || p.contains('ddns')) || ddnsData.isNotEmpty;
+    final installedPkgs =
+        (data['installedPackages'] as List?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        [];
+
+    bool installed =
+        installedPkgs.any(
+          (p) => p.contains('ddns-scripts') || p.contains('ddns'),
+        ) ||
+        ddnsData.isNotEmpty;
     bool? explicitGlobalEnabled;
 
     final instList = <DdnsInstance>[];
@@ -331,10 +349,19 @@ class DdnsOverview {
       if (key == 'global' && value is Map) {
         final ge = value['is_enabled'] ?? value['enabled'];
         if (ge != null) {
-          explicitGlobalEnabled = ge == '1' || ge == 1 || ge == true || ge.toString().toLowerCase() == 'true';
+          explicitGlobalEnabled =
+              ge == '1' ||
+              ge == 1 ||
+              ge == true ||
+              ge.toString().toLowerCase() == 'true';
         }
-      } else if (value is Map && (value['.type'] == 'service' || value['service_name'] != null || value['domain'] != null)) {
-        instList.add(DdnsInstance.fromUci(key, Map<String, dynamic>.from(value)));
+      } else if (value is Map &&
+          (value['.type'] == 'service' ||
+              value['service_name'] != null ||
+              value['domain'] != null)) {
+        instList.add(
+          DdnsInstance.fromUci(key, Map<String, dynamic>.from(value)),
+        );
       }
     });
 
@@ -348,13 +375,25 @@ class DdnsOverview {
 
       if (services != null && services['ddns'] is Map) {
         final ddnsSvc = services['ddns'] as Map;
-        final running = ddnsSvc['running'] == true || ddnsSvc['running'] == 1 || ddnsSvc['running'] == '1';
-        final enabled = ddnsSvc['enabled'] == true || ddnsSvc['enabled'] == 1 || ddnsSvc['enabled'] == '1';
+        final running =
+            ddnsSvc['running'] == true ||
+            ddnsSvc['running'] == 1 ||
+            ddnsSvc['running'] == '1';
+        final enabled =
+            ddnsSvc['enabled'] == true ||
+            ddnsSvc['enabled'] == 1 ||
+            ddnsSvc['enabled'] == '1';
         globalEnabled = running || enabled;
       } else if (initScripts != null && initScripts['ddns'] is Map) {
         final ddnsInit = initScripts['ddns'] as Map;
-        final running = ddnsInit['running'] == true || ddnsInit['running'] == 1 || ddnsInit['running'] == '1';
-        final enabled = ddnsInit['enabled'] == true || ddnsInit['enabled'] == 1 || ddnsInit['enabled'] == '1';
+        final running =
+            ddnsInit['running'] == true ||
+            ddnsInit['running'] == 1 ||
+            ddnsInit['running'] == '1';
+        final enabled =
+            ddnsInit['enabled'] == true ||
+            ddnsInit['enabled'] == 1 ||
+            ddnsInit['enabled'] == '1';
         globalEnabled = running || enabled;
       } else if (instList.isNotEmpty) {
         // Default to true if any instance is enabled, otherwise false
@@ -397,6 +436,10 @@ class DdnsValidationResult {
   }
 
   factory DdnsValidationResult.failure(String message, {String? testOutput}) {
-    return DdnsValidationResult(isValid: false, errorMessage: message, testOutput: testOutput);
+    return DdnsValidationResult(
+      isValid: false,
+      errorMessage: message,
+      testOutput: testOutput,
+    );
   }
 }

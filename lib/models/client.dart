@@ -70,11 +70,15 @@ class Client {
   // Helper function to determine connection type from interface parameters
   static ConnectionType _determineConnectionType(Map<String, dynamic> lease) {
     // Check for explicit wireless fields
-    if (lease['signal'] != null || lease['noise'] != null || lease['ssid'] != null) {
+    if (lease['signal'] != null ||
+        lease['noise'] != null ||
+        lease['ssid'] != null) {
       return ConnectionType.wireless;
     }
 
-    final hostname = (lease['hostname'] ?? lease['name'] ?? '').toString().toLowerCase();
+    final hostname = (lease['hostname'] ?? lease['name'] ?? '')
+        .toString()
+        .toLowerCase();
     final vendor = (lease['vendor'] ?? '').toString().toLowerCase();
     if (hostname.contains('iphone') ||
         hostname.contains('ipad') ||
@@ -101,7 +105,9 @@ class Client {
       return ConnectionType.wireless;
     }
 
-    final ifname = (lease['ifname'] ?? lease['device'] ?? '').toString().toLowerCase();
+    final ifname = (lease['ifname'] ?? lease['device'] ?? '')
+        .toString()
+        .toLowerCase();
     if (ifname.startsWith('wlan') ||
         ifname.startsWith('phy') ||
         ifname.startsWith('ra') ||
@@ -169,10 +175,12 @@ class Client {
       }
     }
 
-    final rawName = toStringValue(lease['hostname']) ??
+    final rawName =
+        toStringValue(lease['hostname']) ??
         toStringValue(lease['name']) ??
         toStringValue(lease['dnsname']);
-    final parsedHostname = (rawName != null && rawName.trim().isNotEmpty && rawName.trim() != '*')
+    final parsedHostname =
+        (rawName != null && rawName.trim().isNotEmpty && rawName.trim() != '*')
         ? rawName.trim()
         : 'Unknown';
 
@@ -191,19 +199,26 @@ class Client {
       ipv6Addresses: ipv6Addresses,
       staticLeaseName: toStringValue(lease['staticLeaseName']),
       isStaticLease: lease['isStaticLease'] == true,
-      staticLeaseTime: toStringValue(lease['staticLeaseTime'] ?? lease['leasetime']),
+      staticLeaseTime: toStringValue(
+        lease['staticLeaseTime'] ?? lease['leasetime'],
+      ),
     );
   }
 
   /// Creates a Client from a wireless association MAC address (no DHCP data).
   /// Used as a fallback for AP-mode routers where DHCP is handled upstream.
-  factory Client.fromWirelessStation(String macAddress, {String? ssid, String? wirelessIface}) {
+  factory Client.fromWirelessStation(
+    String macAddress, {
+    String? ssid,
+    String? wirelessIface,
+  }) {
     return Client(
       ipAddress: 'N/A',
       macAddress: macAddress,
       hostname: 'Unknown',
       connectionType: ConnectionType.wireless,
-      neighState: NeighborReachability.reachable, // Wireless stations are confirmed live by association
+      neighState: NeighborReachability
+          .reachable, // Wireless stations are confirmed live by association
       ssid: ssid,
       wirelessIface: wirelessIface,
     );
@@ -213,7 +228,10 @@ class Client {
   String get formattedLeaseTime {
     if (isStatic) {
       final lt = staticLeaseTime?.trim();
-      if (lt != null && lt.isNotEmpty && lt.toLowerCase() != 'infinite' && lt.toLowerCase() != '0') {
+      if (lt != null &&
+          lt.isNotEmpty &&
+          lt.toLowerCase() != 'infinite' &&
+          lt.toLowerCase() != '0') {
         return 'Static ($lt)';
       }
       return 'Static (Permanent)';
@@ -297,7 +315,9 @@ class Client {
   }
 
   /// Whether this client is configured as a static lease in UCI dhcp
-  bool get isStatic => isStaticLease || (staticLeaseName != null && staticLeaseName!.trim().isNotEmpty);
+  bool get isStatic =>
+      isStaticLease ||
+      (staticLeaseName != null && staticLeaseName!.trim().isNotEmpty);
 
   Client copyWith({
     String? ipAddress,
@@ -363,7 +383,9 @@ class Client {
       final macNorm = norm(client.macAddress);
       final isWireless = normalizedWireless.contains(macNorm);
       clients[macNorm] = client.copyWith(
-        connectionType: isWireless ? ConnectionType.wireless : ConnectionType.wired,
+        connectionType: isWireless
+            ? ConnectionType.wireless
+            : ConnectionType.wired,
       );
     }
 
@@ -386,7 +408,9 @@ class Client {
         }
       }
 
-      final cmpType = typeOrder(a.connectionType).compareTo(typeOrder(b.connectionType));
+      final cmpType = typeOrder(
+        a.connectionType,
+      ).compareTo(typeOrder(b.connectionType));
       if (cmpType != 0) return cmpType;
       return a.hostname.toLowerCase().compareTo(b.hostname.toLowerCase());
     });

@@ -8,33 +8,34 @@ import 'package:yet_another_luci_app/modules/wireless_management/models/wireless
 import 'package:yet_another_luci_app/modules/wireless_management/widgets/wifi_qr_dialog.dart';
 
 void main() {
-  testWidgets('WifiQrDialog renders without intrinsic dimension assertion error', (WidgetTester tester) async {
-    const mockIface = WirelessInterface(
-      ifName: 'wlan0',
-      sectionName: 'default_radio0',
-      ssid: 'Test_Network',
-      mode: 'ap',
-      encryption: 'psk2',
-      securityMode: WifiSecurityMode.wpa2Psk,
-      pmfState: PmfState.disabled,
-      channel: '6',
-      isEnabled: true,
-      stations: [],
-      key: 'SecretPassword123',
-    );
+  testWidgets(
+    'WifiQrDialog renders without intrinsic dimension assertion error',
+    (WidgetTester tester) async {
+      const mockIface = WirelessInterface(
+        ifName: 'wlan0',
+        sectionName: 'default_radio0',
+        ssid: 'Test_Network',
+        mode: 'ap',
+        encryption: 'psk2',
+        securityMode: WifiSecurityMode.wpa2Psk,
+        pmfState: PmfState.disabled,
+        channel: '6',
+        isEnabled: true,
+        stations: [],
+        key: 'SecretPassword123',
+      );
 
-    await tester.pumpWidget(
-      const ProviderScope(
-        child: MaterialApp(
-          home: Scaffold(
-            body: WifiQrDialog(interface: mockIface),
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(body: WifiQrDialog(interface: mockIface)),
           ),
         ),
-      ),
-    );
+      );
 
-    expect(find.text('Wi-Fi Quick Connect'), findsOneWidget);
-    expect(find.text('Test_Network'), findsOneWidget);
-    expect(find.text('Close'), findsOneWidget);
-  });
+      expect(find.text('Wi-Fi Quick Connect'), findsOneWidget);
+      expect(find.text('Test_Network'), findsOneWidget);
+      expect(find.text('Close'), findsOneWidget);
+    },
+  );
 }

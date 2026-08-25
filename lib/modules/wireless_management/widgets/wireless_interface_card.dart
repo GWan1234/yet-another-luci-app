@@ -25,7 +25,8 @@ class WirelessInterfaceCard extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<WirelessInterfaceCard> createState() => _WirelessInterfaceCardState();
+  ConsumerState<WirelessInterfaceCard> createState() =>
+      _WirelessInterfaceCardState();
 }
 
 class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
@@ -34,19 +35,15 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
   void _showEditSsidDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => EditSsidDialog(
-        radio: widget.radio,
-        interface: widget.interface,
-      ),
+      builder: (context) =>
+          EditSsidDialog(radio: widget.radio, interface: widget.interface),
     );
   }
 
   void _showQrCodeDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => WifiQrDialog(
-        interface: widget.interface,
-      ),
+      builder: (context) => WifiQrDialog(interface: widget.interface),
     );
   }
 
@@ -93,14 +90,23 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
     final theme = Theme.of(context);
     final appState = ref.watch(appStateProvider);
     final iface = widget.interface;
-    final isGuest = iface.isGuestInterface(appState.customGuestSections, appState.excludedGuestSections);
+    final isGuest = iface.isGuestInterface(
+      appState.customGuestSections,
+      appState.excludedGuestSections,
+    );
     final isCustomTagged = appState.isCustomGuestSection(iface.sectionName);
     final isExcluded = appState.isExcludedGuestSection(iface.sectionName);
-    final hasWriteAccess = (appState.capabilities?.hasUciWriteAccess ?? true) && appState.isAdministrativeUser;
+    final hasWriteAccess =
+        (appState.capabilities?.hasUciWriteAccess ?? true) &&
+        appState.isAdministrativeUser;
 
     final isDarkMode = theme.brightness == Brightness.dark;
-    final guestCardBg = isDarkMode ? const Color(0xFF231E16) : const Color(0xFFFFF9EE);
-    final guestBorderColor = isDarkMode ? Colors.amber.shade700.withValues(alpha: 0.45) : Colors.amber.shade400.withValues(alpha: 0.7);
+    final guestCardBg = isDarkMode
+        ? const Color(0xFF231E16)
+        : const Color(0xFFFFF9EE);
+    final guestBorderColor = isDarkMode
+        ? Colors.amber.shade700.withValues(alpha: 0.45)
+        : Colors.amber.shade400.withValues(alpha: 0.7);
 
     return Card(
       elevation: isGuest ? 1.5 : 0,
@@ -111,8 +117,8 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
           color: isGuest
               ? guestBorderColor
               : (iface.isEnabled
-                  ? theme.colorScheme.outlineVariant.withValues(alpha: 0.6)
-                  : theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                    ? theme.colorScheme.outlineVariant.withValues(alpha: 0.6)
+                    : theme.colorScheme.outlineVariant.withValues(alpha: 0.3)),
           width: isGuest ? 1.2 : 1.0,
         ),
       ),
@@ -121,7 +127,10 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
         children: [
           // Primary Card Header & Controls
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12.0,
+              vertical: 10.0,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -135,20 +144,27 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                         color: isGuest
                             ? Colors.amber.shade800.withValues(alpha: 0.15)
                             : (iface.isEnabled
-                                ? theme.colorScheme.primaryContainer.withValues(alpha: 0.6)
-                                : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)),
+                                  ? theme.colorScheme.primaryContainer
+                                        .withValues(alpha: 0.6)
+                                  : theme.colorScheme.surfaceContainerHighest
+                                        .withValues(alpha: 0.5)),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         isGuest
                             ? Icons.shield_moon_rounded
-                            : (iface.isEnabled ? Icons.wifi : Icons.wifi_off_rounded),
+                            : (iface.isEnabled
+                                  ? Icons.wifi
+                                  : Icons.wifi_off_rounded),
                         size: 19,
                         color: isGuest
-                            ? (isDarkMode ? Colors.amber.shade400 : Colors.amber.shade900)
+                            ? (isDarkMode
+                                  ? Colors.amber.shade400
+                                  : Colors.amber.shade900)
                             : (iface.isEnabled
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.onSurfaceVariant
+                                        .withValues(alpha: 0.5)),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -169,13 +185,21 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                           ),
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: iface.stations.isNotEmpty
                                   ? (isGuest
-                                      ? Colors.amber.shade800.withValues(alpha: 0.15)
-                                      : theme.colorScheme.primary.withValues(alpha: 0.12))
-                                  : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                        ? Colors.amber.shade800.withValues(
+                                            alpha: 0.15,
+                                          )
+                                        : theme.colorScheme.primary.withValues(
+                                            alpha: 0.12,
+                                          ))
+                                  : theme.colorScheme.surfaceContainerHighest
+                                        .withValues(alpha: 0.5),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
@@ -185,8 +209,10 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                                 fontWeight: FontWeight.bold,
                                 color: iface.stations.isNotEmpty
                                     ? (isGuest
-                                        ? (isDarkMode ? Colors.amber.shade300 : Colors.amber.shade900)
-                                        : theme.colorScheme.primary)
+                                          ? (isDarkMode
+                                                ? Colors.amber.shade300
+                                                : Colors.amber.shade900)
+                                          : theme.colorScheme.primary)
                                     : theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
@@ -202,7 +228,9 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                         onChanged: hasWriteAccess
                             ? widget.onToggleEnabled
                             : (val) {
-                                context.showToastError('Read-only session: Wireless interface toggle is disabled.');
+                                context.showToastError(
+                                  'Read-only session: Wireless interface toggle is disabled.',
+                                );
                               },
                       ),
                     ),
@@ -236,11 +264,16 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                         children: [
                           if (!iface.isEnabled)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.red.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(5),
-                                border: Border.all(color: Colors.red.withValues(alpha: 0.4)),
+                                border: Border.all(
+                                  color: Colors.red.withValues(alpha: 0.4),
+                                ),
                               ),
                               child: const Text(
                                 'DISABLED',
@@ -253,30 +286,60 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                             ),
                           if (isGuest)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
-                                color: Colors.amber.shade800.withValues(alpha: 0.15),
+                                color: Colors.amber.shade800.withValues(
+                                  alpha: 0.15,
+                                ),
                                 borderRadius: BorderRadius.circular(5),
-                                border: Border.all(color: Colors.amber.shade800.withValues(alpha: 0.4)),
+                                border: Border.all(
+                                  color: Colors.amber.shade800.withValues(
+                                    alpha: 0.4,
+                                  ),
+                                ),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.shield_moon_rounded, size: 10, color: isDarkMode ? Colors.amber.shade300 : Colors.amber.shade900),
+                                  Icon(
+                                    Icons.shield_moon_rounded,
+                                    size: 10,
+                                    color: isDarkMode
+                                        ? Colors.amber.shade300
+                                        : Colors.amber.shade900,
+                                  ),
                                   const SizedBox(width: 3),
                                   Text(
                                     'Guest Network',
-                                    style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: isDarkMode ? Colors.amber.shade300 : Colors.amber.shade900),
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDarkMode
+                                          ? Colors.amber.shade300
+                                          : Colors.amber.shade900,
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: iface.securityMode.badgeColor.withValues(alpha: 0.15),
+                              color: iface.securityMode.badgeColor.withValues(
+                                alpha: 0.15,
+                              ),
                               borderRadius: BorderRadius.circular(5),
-                              border: Border.all(color: iface.securityMode.badgeColor.withValues(alpha: 0.3)),
+                              border: Border.all(
+                                color: iface.securityMode.badgeColor.withValues(
+                                  alpha: 0.3,
+                                ),
+                              ),
                             ),
                             child: Text(
                               iface.securityMode.shortBadgeLabel,
@@ -288,9 +351,13 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1.5,
+                            ),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.8),
+                              color: theme.colorScheme.secondaryContainer
+                                  .withValues(alpha: 0.8),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -304,14 +371,21 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                           ),
                           if (iface.isHidden)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                                vertical: 1.5,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.grey.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: const Text(
                                 'HIDDEN',
-                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey),
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey,
+                                ),
                               ),
                             ),
                         ],
@@ -327,15 +401,23 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                           icon: Icon(
                             Icons.edit_outlined,
                             size: 17,
-                            color: hasWriteAccess ? null : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                            color: hasWriteAccess
+                                ? null
+                                : theme.colorScheme.onSurfaceVariant.withValues(
+                                    alpha: 0.4,
+                                  ),
                           ),
-                          tooltip: hasWriteAccess ? 'Edit Security & Parameters' : 'Edit Restricted (Read-Only)',
+                          tooltip: hasWriteAccess
+                              ? 'Edit Security & Parameters'
+                              : 'Edit Restricted (Read-Only)',
                           visualDensity: VisualDensity.compact,
                           padding: const EdgeInsets.all(3),
                           constraints: const BoxConstraints(),
                           onPressed: () {
                             if (!hasWriteAccess) {
-                              context.showToastError('Read-only session: UCI write permission required.');
+                              context.showToastError(
+                                'Read-only session: UCI write permission required.',
+                              );
                               return;
                             }
                             _showEditSsidDialog(context);
@@ -357,15 +439,21 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                           icon: Icon(
                             Icons.delete_outline_rounded,
                             size: 17,
-                            color: hasWriteAccess ? Colors.redAccent : Colors.grey,
+                            color: hasWriteAccess
+                                ? Colors.redAccent
+                                : Colors.grey,
                           ),
-                          tooltip: hasWriteAccess ? 'Delete Virtual Interface' : 'Delete Restricted (Read-Only)',
+                          tooltip: hasWriteAccess
+                              ? 'Delete Virtual Interface'
+                              : 'Delete Restricted (Read-Only)',
                           visualDensity: VisualDensity.compact,
                           padding: const EdgeInsets.all(3),
                           constraints: const BoxConstraints(),
                           onPressed: () {
                             if (!hasWriteAccess) {
-                              context.showToastError('Read-only session: UCI write permission required to delete interface.');
+                              context.showToastError(
+                                'Read-only session: UCI write permission required to delete interface.',
+                              );
                               return;
                             }
                             _confirmDeleteInterface();
@@ -375,11 +463,15 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                         // Tagging & Override Popup Menu
                         PopupMenuButton<String>(
                           icon: Icon(
-                            (isCustomTagged || isExcluded) ? Icons.bookmark_rounded : Icons.more_vert_rounded,
+                            (isCustomTagged || isExcluded)
+                                ? Icons.bookmark_rounded
+                                : Icons.more_vert_rounded,
                             size: 17,
                             color: isCustomTagged
                                 ? Colors.amber.shade800
-                                : (isExcluded ? theme.colorScheme.primary : null),
+                                : (isExcluded
+                                      ? theme.colorScheme.primary
+                                      : null),
                           ),
                           tooltip: 'More Options',
                           padding: const EdgeInsets.all(3),
@@ -387,13 +479,21 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                           onSelected: (val) {
                             if (val == 'mark_guest') {
                               appState.markAsGuestSection(iface.sectionName);
-                              context.showToastSuccess('Marked "${iface.ssid}" as Guest Network');
+                              context.showToastSuccess(
+                                'Marked "${iface.ssid}" as Guest Network',
+                              );
                             } else if (val == 'mark_standard') {
                               appState.markAsStandardSection(iface.sectionName);
-                              context.showToastSuccess('Moved "${iface.ssid}" to Primary Networks');
+                              context.showToastSuccess(
+                                'Moved "${iface.ssid}" to Primary Networks',
+                              );
                             } else if (val == 'reset_override') {
-                              appState.resetGuestSectionOverride(iface.sectionName);
-                              context.showToastSuccess('Reset detection override for "${iface.ssid}"');
+                              appState.resetGuestSectionOverride(
+                                iface.sectionName,
+                              );
+                              context.showToastSuccess(
+                                'Reset detection override for "${iface.ssid}"',
+                              );
                             }
                           },
                           itemBuilder: (ctx) => [
@@ -402,9 +502,16 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                                 value: 'mark_standard',
                                 child: Row(
                                   children: const [
-                                    Icon(Icons.wifi_rounded, size: 16, color: Colors.blueAccent),
+                                    Icon(
+                                      Icons.wifi_rounded,
+                                      size: 16,
+                                      color: Colors.blueAccent,
+                                    ),
                                     SizedBox(width: 8),
-                                    Text('Move to Primary Networks', style: TextStyle(fontSize: 12)),
+                                    Text(
+                                      'Move to Primary Networks',
+                                      style: TextStyle(fontSize: 12),
+                                    ),
                                   ],
                                 ),
                               )
@@ -413,9 +520,16 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                                 value: 'mark_guest',
                                 child: Row(
                                   children: [
-                                    Icon(Icons.shield_moon_rounded, size: 16, color: Colors.amber.shade800),
+                                    Icon(
+                                      Icons.shield_moon_rounded,
+                                      size: 16,
+                                      color: Colors.amber.shade800,
+                                    ),
                                     const SizedBox(width: 8),
-                                    const Text('Move to Guest Networks', style: TextStyle(fontSize: 12)),
+                                    const Text(
+                                      'Move to Guest Networks',
+                                      style: TextStyle(fontSize: 12),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -426,7 +540,10 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                                   children: const [
                                     Icon(Icons.restart_alt_rounded, size: 16),
                                     SizedBox(width: 8),
-                                    Text('Reset to Auto-Detection', style: TextStyle(fontSize: 12)),
+                                    Text(
+                                      'Reset to Auto-Detection',
+                                      style: TextStyle(fontSize: 12),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -436,14 +553,19 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
                         // Expand Details Toggle Button
                         IconButton(
                           icon: Icon(
-                            _isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                            _isExpanded
+                                ? Icons.keyboard_arrow_up_rounded
+                                : Icons.keyboard_arrow_down_rounded,
                             size: 19,
                           ),
-                          tooltip: _isExpanded ? 'Collapse Details' : 'Expand Details',
+                          tooltip: _isExpanded
+                              ? 'Collapse Details'
+                              : 'Expand Details',
                           visualDensity: VisualDensity.compact,
                           padding: const EdgeInsets.all(3),
                           constraints: const BoxConstraints(),
-                          onPressed: () => setState(() => _isExpanded = !_isExpanded),
+                          onPressed: () =>
+                              setState(() => _isExpanded = !_isExpanded),
                         ),
                       ],
                     ),
@@ -458,13 +580,18 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
             const Divider(height: 1),
             Container(
               padding: const EdgeInsets.all(12.0),
-              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.15),
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.15,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     'Wireless Interface Technical Parameters',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12.5,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   _buildDetailGrid(context, iface, isGuest),
@@ -477,39 +604,99 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
     );
   }
 
-  Widget _buildDetailGrid(BuildContext context, WirelessInterface iface, bool isGuest) {
+  Widget _buildDetailGrid(
+    BuildContext context,
+    WirelessInterface iface,
+    bool isGuest,
+  ) {
     return Column(
       children: [
         Row(
           children: [
-            Expanded(child: _buildDetailChip(context, 'Mode', iface.mode, Icons.router_rounded)),
+            Expanded(
+              child: _buildDetailChip(
+                context,
+                'Mode',
+                iface.mode,
+                Icons.router_rounded,
+              ),
+            ),
             const SizedBox(width: 8),
-            Expanded(child: _buildDetailChip(context, 'PMF 802.11w', iface.pmfState.displayName, Icons.security_rounded)),
+            Expanded(
+              child: _buildDetailChip(
+                context,
+                'PMF 802.11w',
+                iface.pmfState.displayName,
+                Icons.security_rounded,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 6),
         Row(
           children: [
-            Expanded(child: _buildDetailChip(context, 'Encryption', iface.securityMode.displayName, Icons.lock_rounded)),
+            Expanded(
+              child: _buildDetailChip(
+                context,
+                'Encryption',
+                iface.securityMode.displayName,
+                Icons.lock_rounded,
+              ),
+            ),
             const SizedBox(width: 8),
-            Expanded(child: _buildDetailChip(context, 'Client Isolation', iface.isolateClients ? 'Enabled' : 'Disabled', Icons.do_not_disturb_on_rounded)),
+            Expanded(
+              child: _buildDetailChip(
+                context,
+                'Client Isolation',
+                iface.isolateClients ? 'Enabled' : 'Disabled',
+                Icons.do_not_disturb_on_rounded,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 6),
         Row(
           children: [
-            Expanded(child: _buildDetailChip(context, 'Network Bridge', iface.networkBridge ?? (isGuest ? 'br-guest' : 'lan'), Icons.alt_route_rounded)),
+            Expanded(
+              child: _buildDetailChip(
+                context,
+                'Network Bridge',
+                iface.networkBridge ?? (isGuest ? 'br-guest' : 'lan'),
+                Icons.alt_route_rounded,
+              ),
+            ),
             const SizedBox(width: 8),
-            Expanded(child: _buildDetailChip(context, 'Broadcast SSID', iface.isHidden ? 'Hidden' : 'Visible', Icons.cell_tower_rounded)),
+            Expanded(
+              child: _buildDetailChip(
+                context,
+                'Broadcast SSID',
+                iface.isHidden ? 'Hidden' : 'Visible',
+                Icons.cell_tower_rounded,
+              ),
+            ),
           ],
         ),
         if (iface.fastTransitionEnabled) ...[
           const SizedBox(height: 6),
           Row(
             children: [
-              Expanded(child: _buildDetailChip(context, '802.11r Fast Roaming', 'Enabled (FT)', Icons.bolt_rounded)),
+              Expanded(
+                child: _buildDetailChip(
+                  context,
+                  '802.11r Fast Roaming',
+                  'Enabled (FT)',
+                  Icons.bolt_rounded,
+                ),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: _buildDetailChip(context, 'Mobility Domain', iface.mobilityDomain ?? '4f4b', Icons.domain_rounded)),
+              Expanded(
+                child: _buildDetailChip(
+                  context,
+                  'Mobility Domain',
+                  iface.mobilityDomain ?? '4f4b',
+                  Icons.domain_rounded,
+                ),
+              ),
             ],
           ),
         ],
@@ -517,14 +704,21 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
     );
   }
 
-  Widget _buildDetailChip(BuildContext context, String label, String value, IconData icon) {
+  Widget _buildDetailChip(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+  ) {
     final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
       ),
       child: Row(
         children: [
@@ -536,12 +730,18 @@ class _WirelessInterfaceCardState extends ConsumerState<WirelessInterfaceCard> {
               children: [
                 Text(
                   label,
-                  style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   value,
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],

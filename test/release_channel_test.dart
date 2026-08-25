@@ -127,14 +127,11 @@ void main() {
     });
 
     test('detects GL.iNet distribution and extracts base OpenWrt version', () {
-      final info = deriveDistributionInfo(
-        {
-          'distribution': 'GL.iNet',
-          'version': '4.6.2',
-          'description': 'GL.iNet v4.6.2 (OpenWrt 23.05.3)',
-        },
-        model: 'GL-MT6000',
-      );
+      final info = deriveDistributionInfo({
+        'distribution': 'GL.iNet',
+        'version': '4.6.2',
+        'description': 'GL.iNet v4.6.2 (OpenWrt 23.05.3)',
+      }, model: 'GL-MT6000');
       expect(info.distribution, RouterDistribution.glInet);
       expect(info.distributionName, 'GL.iNet');
       expect(info.displayName, 'GL.iNet 4.6.2');
@@ -154,15 +151,24 @@ void main() {
 
     test('detects X-WRT, DD-WRT, FreshTomato distributions', () {
       expect(
-        deriveDistributionInfo({'distribution': 'X-WRT', 'version': '24.01'}).distribution,
+        deriveDistributionInfo({
+          'distribution': 'X-WRT',
+          'version': '24.01',
+        }).distribution,
         RouterDistribution.xWrt,
       );
       expect(
-        deriveDistributionInfo({'distribution': 'DD-WRT', 'version': 'v3.0'}).distribution,
+        deriveDistributionInfo({
+          'distribution': 'DD-WRT',
+          'version': 'v3.0',
+        }).distribution,
         RouterDistribution.ddWrt,
       );
       expect(
-        deriveDistributionInfo({'distribution': 'FreshTomato', 'version': '2024.1'}).distribution,
+        deriveDistributionInfo({
+          'distribution': 'FreshTomato',
+          'version': '2024.1',
+        }).distribution,
         RouterDistribution.tomato,
       );
     });

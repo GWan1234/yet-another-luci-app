@@ -36,7 +36,9 @@ class ThemeRouterLogo extends StatelessWidget {
         width: size,
         height: size,
         fit: fit,
-        color: theme.brightness == Brightness.dark ? Colors.white : colorScheme.onSurface,
+        color: theme.brightness == Brightness.dark
+            ? Colors.white
+            : colorScheme.onSurface,
         colorBlendMode: BlendMode.srcIn,
         errorBuilder: (context, error, stackTrace) {
           return Image.asset(
@@ -44,7 +46,9 @@ class ThemeRouterLogo extends StatelessWidget {
             width: size,
             height: size,
             fit: fit,
-            color: theme.brightness == Brightness.dark ? Colors.white : colorScheme.onSurface,
+            color: theme.brightness == Brightness.dark
+                ? Colors.white
+                : colorScheme.onSurface,
             colorBlendMode: BlendMode.srcIn,
             errorBuilder: (context, error, stackTrace) {
               return CustomPaint(
@@ -84,8 +88,6 @@ class ModularRouterLogoPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-
-
     final dotPaint = Paint()
       ..color = chassisColor.withValues(alpha: 0.4)
       ..style = PaintingStyle.fill;
@@ -113,8 +115,6 @@ class ModularRouterLogoPainter extends CustomPainter {
       Offset(w * 0.78, h * 0.28),
       chassisPaint,
     );
-
-
 
     // 3. Router Main Body / Chassis Base
     final RRect chassisBody = RRect.fromRectAndRadius(

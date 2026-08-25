@@ -20,37 +20,55 @@ abstract class ServiceFactory {
 }
 
 class ProductionServiceFactory implements ServiceFactory {
-  @override
-  IAuthService createAuthService() => RealAuthService(createApiService());
+  RealApiService? _apiService;
+  RealAuthService? _authService;
+  SecureStorageService? _secureStorageService;
+  RouterService? _routerService;
+  ThroughputService? _throughputService;
 
   @override
-  IApiService createApiService() => RealApiService();
+  IApiService createApiService() => _apiService ??= RealApiService();
 
   @override
-  SecureStorageService createSecureStorageService() => SecureStorageService();
+  IAuthService createAuthService() =>
+      _authService ??= RealAuthService(createApiService());
 
   @override
-  RouterService createRouterService() => RouterService();
+  SecureStorageService createSecureStorageService() =>
+      _secureStorageService ??= SecureStorageService();
 
   @override
-  ThroughputService createThroughputService() => ThroughputService();
+  RouterService createRouterService() => _routerService ??= RouterService();
+
+  @override
+  ThroughputService createThroughputService() =>
+      _throughputService ??= ThroughputService();
 }
 
 class ReviewerModeServiceFactory implements ServiceFactory {
-  @override
-  IAuthService createAuthService() => MockAuthService();
+  MockApiService? _apiService;
+  MockAuthService? _authService;
+  SecureStorageService? _secureStorageService;
+  RouterService? _routerService;
+  ThroughputService? _throughputService;
 
   @override
-  IApiService createApiService() => MockApiService();
+  IAuthService createAuthService() => _authService ??= MockAuthService();
 
   @override
-  SecureStorageService createSecureStorageService() => SecureStorageService();
+  IApiService createApiService() => _apiService ??= MockApiService();
 
   @override
-  RouterService createRouterService() => RouterService(isReviewerMode: true);
+  SecureStorageService createSecureStorageService() =>
+      _secureStorageService ??= SecureStorageService();
 
   @override
-  ThroughputService createThroughputService() => ThroughputService();
+  RouterService createRouterService() =>
+      _routerService ??= RouterService(isReviewerMode: true);
+
+  @override
+  ThroughputService createThroughputService() =>
+      _throughputService ??= ThroughputService();
 }
 
 class ServiceContainer {
@@ -59,6 +77,11 @@ class ServiceContainer {
 
   ServiceContainer._();
 
+  final ProductionServiceFactory _productionFactory =
+      ProductionServiceFactory();
+  final ReviewerModeServiceFactory _reviewerFactory =
+      ReviewerModeServiceFactory();
+
   ServiceFactory? _factory;
 
   void setFactory(ServiceFactory factory) {
@@ -66,17 +89,13 @@ class ServiceContainer {
   }
 
   ServiceFactory get factory {
-    if (_factory == null) {
-      throw StateError(
-        'ServiceFactory not initialized. Call setFactory() first.',
-      );
-    }
+    _factory ??= _productionFactory;
     return _factory!;
   }
 
   static void configure({required bool reviewerMode}) {
     instance.setFactory(
-      reviewerMode ? ReviewerModeServiceFactory() : ProductionServiceFactory(),
+      reviewerMode ? instance._reviewerFactory : instance._productionFactory,
     );
   }
 }

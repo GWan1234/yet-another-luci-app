@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Flavor types supported by the build pipeline
-enum AppFlavor {
-  community,
-  playstore,
-}
+enum AppFlavor { community, playstore }
 
 /// Central configuration for build flavor detection and compile-time feature toggling.
 class AppConfig {
@@ -43,11 +40,13 @@ class AppConfig {
 
   /// Whether the ads SDK should be compiled, initialized, and rendered.
   /// Controlled via compile-time flag --dart-define=ENABLE_ADS=true. Defaults to false.
-  static bool get isAdsEnabled => const bool.fromEnvironment('ENABLE_ADS', defaultValue: false);
+  static bool get isAdsEnabled =>
+      const bool.fromEnvironment('ENABLE_ADS', defaultValue: false);
 
   /// Whether voluntary Support the Developer feature is enabled in UI.
   /// Controlled via compile-time flag --dart-define=ENABLE_SUPPORT_DEV=true. Defaults to false.
-  static bool get isSupportDevEnabled => const bool.fromEnvironment('ENABLE_SUPPORT_DEV', defaultValue: false);
+  static bool get isSupportDevEnabled =>
+      const bool.fromEnvironment('ENABLE_SUPPORT_DEV', defaultValue: false);
 
   /// Whether monetization features (Play Billing, Paywalls, Router Gating) are enabled.
   /// Explicitly disabled across all builds.
@@ -69,5 +68,6 @@ class AppConfig {
   static bool get isCommunityFlavor => flavor == AppFlavor.community;
 
   /// Human-readable build channel description.
-  static String get flavorName => flavor == AppFlavor.playstore ? 'Play Store' : 'Community';
+  static String get flavorName =>
+      flavor == AppFlavor.playstore ? 'Play Store' : 'Community';
 }

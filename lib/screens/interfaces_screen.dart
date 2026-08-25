@@ -48,7 +48,10 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
     return false;
   }
 
-  bool _isWirelessAccessInterface(Map<String, dynamic> iface, String? routerIp) {
+  bool _isWirelessAccessInterface(
+    Map<String, dynamic> iface,
+    String? routerIp,
+  ) {
     if (routerIp == null || routerIp.isEmpty) return false;
     final details = iface['details'] as Map<String, dynamic>?;
     if (details != null) {
@@ -101,7 +104,11 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
                   Expanded(
                     child: Text(
                       'Are you absolutely sure you want to proceed?',
-                      style: TextStyle(fontSize: 11, color: Colors.red, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.red,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -115,9 +122,7 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade800,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade800),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Disable Interface'),
           ),
@@ -170,7 +175,11 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
                   Expanded(
                     child: Text(
                       'Temporary Disconnection: Please allow a few seconds for the router to complete interface re-binding.',
-                      style: TextStyle(fontSize: 11, color: Colors.orange, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.orange,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -231,9 +240,7 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.indigo,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: Colors.indigo),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Restart WAN Interface'),
           ),
@@ -248,7 +255,9 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Restart Interface "$interfaceName"?'),
-        content: Text('Are you sure you want to restart network interface "$interfaceName"?'),
+        content: Text(
+          'Are you sure you want to restart network interface "$interfaceName"?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -264,9 +273,13 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
     return confirm ?? false;
   }
 
-  Future<void> _restartWiredInterface(NetworkInterface iface, String? routerIp) async {
+  Future<void> _restartWiredInterface(
+    NetworkInterface iface,
+    String? routerIp,
+  ) async {
     final isAccess = _isWiredAccessInterface(iface, routerIp);
-    final isWan = iface.name.toLowerCase().contains('wan') || iface.gateway != null;
+    final isWan =
+        iface.name.toLowerCase().contains('wan') || iface.gateway != null;
 
     bool confirm = false;
     if (isAccess) {
@@ -289,7 +302,10 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
     );
 
     final appState = ref.read(appStateProvider);
-    final success = await appState.restartWiredInterface(iface.name, context: context);
+    final success = await appState.restartWiredInterface(
+      iface.name,
+      context: context,
+    );
 
     if (!mounted) return;
 
@@ -361,7 +377,11 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
     }
   }
 
-  Future<void> _toggleWiredInterface(NetworkInterface iface, bool newValue, String? routerIp) async {
+  Future<void> _toggleWiredInterface(
+    NetworkInterface iface,
+    bool newValue,
+    String? routerIp,
+  ) async {
     final isAccess = _isWiredAccessInterface(iface, routerIp);
     if (!newValue && isAccess) {
       final confirm = await _showCriticalLockoutWarningDialog(iface.name);
@@ -399,7 +419,9 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
   }
 
   Future<void> _saveChanges() async {
-    if (_stagedWiredInterfaceStates.isEmpty && _stagedWirelessInterfaceStates.isEmpty) return;
+    if (_stagedWiredInterfaceStates.isEmpty &&
+        _stagedWirelessInterfaceStates.isEmpty)
+      return;
 
     setState(() {
       _isSaving = true;
@@ -439,10 +461,16 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
     });
 
     if (overallSuccess) {
-      context.showToastSuccess('Changes Applied', subtitle: 'Interface state changes applied successfully.');
+      context.showToastSuccess(
+        'Changes Applied',
+        subtitle: 'Interface state changes applied successfully.',
+      );
       await appState.fetchDashboardData();
     } else {
-      context.showToastError('Apply Failed', subtitle: 'Some interface state changes failed to apply.');
+      context.showToastError(
+        'Apply Failed',
+        subtitle: 'Some interface state changes failed to apply.',
+      );
     }
   }
 
@@ -455,7 +483,9 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
 
   Widget _buildUnsavedChangesBottomBar(BuildContext context) {
     final theme = Theme.of(context);
-    final count = _stagedWiredInterfaceStates.length + _stagedWirelessInterfaceStates.length;
+    final count =
+        _stagedWiredInterfaceStates.length +
+        _stagedWirelessInterfaceStates.length;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -492,7 +522,10 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
                   ? const SizedBox(
                       width: 14,
                       height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Icon(Icons.check, size: 18),
               label: const Text('Save'),
@@ -612,7 +645,9 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
         if (dashboardData != null) {
           // Check wired interfaces first
           final rawWired = dashboardData['interfaceDump']?['interface'];
-          final wiredInterfaces = rawWired is List ? rawWired : (rawWired is Map ? rawWired.values.toList() : null);
+          final wiredInterfaces = rawWired is List
+              ? rawWired
+              : (rawWired is Map ? rawWired.values.toList() : null);
           if (wiredInterfaces != null) {
             for (int i = 0; i < wiredInterfaces.length; i++) {
               final iface = wiredInterfaces[i] as Map<String, dynamic>;
@@ -633,7 +668,9 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
             final normalizedTarget = _normalizeInterfaceKey(interfaceName);
             wirelessData.forEach((radioName, radioData) {
               final rawIfaces = radioData['interfaces'];
-              final interfaces = rawIfaces is List ? rawIfaces : (rawIfaces is Map ? rawIfaces.values.toList() : null);
+              final interfaces = rawIfaces is List
+                  ? rawIfaces
+                  : (rawIfaces is Map ? rawIfaces.values.toList() : null);
               if (interfaces != null) {
                 for (var i = 0; i < interfaces.length; i++) {
                   final interface = interfaces[i];
@@ -818,11 +855,15 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
   Widget build(BuildContext context) {
     final appState = ref.read(appStateProvider);
 
-    final hasStagedChanges = _stagedWiredInterfaceStates.isNotEmpty || _stagedWirelessInterfaceStates.isNotEmpty;
+    final hasStagedChanges =
+        _stagedWiredInterfaceStates.isNotEmpty ||
+        _stagedWirelessInterfaceStates.isNotEmpty;
 
     return Scaffold(
       appBar: const LuciAppBar(title: 'Interfaces'),
-      bottomNavigationBar: hasStagedChanges ? _buildUnsavedChangesBottomBar(context) : null,
+      bottomNavigationBar: hasStagedChanges
+          ? _buildUnsavedChangesBottomBar(context)
+          : null,
       body: SafeArea(
         top: true,
         bottom: false,
@@ -889,7 +930,10 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
 
                   final isWiredAvailable = wiredList.isNotEmpty;
                   final isWirelessAvailable = wirelessList.isNotEmpty;
-                  final isTopologyAvailable = topology != null && topology.isAvailable && !topology.isZeroVlans;
+                  final isTopologyAvailable =
+                      topology != null &&
+                      topology.isAvailable &&
+                      !topology.isZeroVlans;
 
                   final routerIp = appState.currentRouterIp;
 
@@ -897,20 +941,27 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
                     _SectionSpec(
                       defaultOrder: 0,
                       isAvailable: isWiredAvailable,
-                      header: const LuciSectionHeader('Wired', icon: Icons.settings_ethernet),
+                      header: const LuciSectionHeader(
+                        'Wired',
+                        icon: Icons.settings_ethernet,
+                      ),
                       sliverOrWidget: isWiredAvailable
                           ? _buildWiredSliverList(wiredList, routerIp)
                           : _buildCompactUnavailableCard(
                               icon: Icons.lan_outlined,
                               title: 'Wired Interfaces Unavailable',
-                              subtitle: 'No active or configured ethernet network interfaces detected.',
+                              subtitle:
+                                  'No active or configured ethernet network interfaces detected.',
                             ),
                       isSliver: isWiredAvailable,
                     ),
                     _SectionSpec(
                       defaultOrder: 1,
                       isAvailable: isTopologyAvailable,
-                      header: const LuciSectionHeader('Switch Topology & VLANs', icon: Icons.hub_outlined),
+                      header: const LuciSectionHeader(
+                        'Switch Topology & VLANs',
+                        icon: Icons.hub_outlined,
+                      ),
                       sliverOrWidget: NetworkTopologyCard(
                         topology: topology,
                         onRetry: () => appState.redetectCapabilities(),
@@ -920,13 +971,17 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
                     _SectionSpec(
                       defaultOrder: 2,
                       isAvailable: isWirelessAvailable,
-                      header: const LuciSectionHeader('Wireless', icon: Icons.wifi),
+                      header: const LuciSectionHeader(
+                        'Wireless',
+                        icon: Icons.wifi,
+                      ),
                       sliverOrWidget: isWirelessAvailable
                           ? _buildWirelessSliverList(wirelessList, routerIp)
                           : _buildCompactUnavailableCard(
                               icon: Icons.wifi_off_rounded,
                               title: 'Wireless Interfaces Unavailable',
-                              subtitle: 'No wireless physical radios or SSIDs configured on this router.',
+                              subtitle:
+                                  'No wireless physical radios or SSIDs configured on this router.',
                             ),
                       isSliver: isWirelessAvailable,
                     ),
@@ -945,10 +1000,14 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
                     if (sec.isSliver) {
                       slivers.add(sec.sliverOrWidget);
                     } else {
-                      slivers.add(SliverToBoxAdapter(child: sec.sliverOrWidget));
+                      slivers.add(
+                        SliverToBoxAdapter(child: sec.sliverOrWidget),
+                      );
                     }
                   }
-                  slivers.add(const SliverToBoxAdapter(child: SizedBox(height: 100)));
+                  slivers.add(
+                    const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                  );
 
                   return CustomScrollView(
                     controller: _scrollController,
@@ -975,7 +1034,9 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
       shape: RoundedRectangleBorder(
         borderRadius: LuciCardStyles.standardRadius,
-        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.2)),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.2),
+        ),
       ),
       color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
       child: Padding(
@@ -1113,7 +1174,10 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
     return interfacesList;
   }
 
-  Widget _buildWiredSliverList(List<NetworkInterface> interfaces, String? routerIp) {
+  Widget _buildWiredSliverList(
+    List<NetworkInterface> interfaces,
+    String? routerIp,
+  ) {
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {
         final iface = interfaces[index];
@@ -1125,13 +1189,18 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
         final key = _interfaceKeys.putIfAbsent(keyStr, () => GlobalKey());
 
         final isStaged = _stagedWiredInterfaceStates.containsKey(iface.name);
-        final currentEnabled = _stagedWiredInterfaceStates[iface.name] ?? iface.isUp;
+        final currentEnabled =
+            _stagedWiredInterfaceStates[iface.name] ?? iface.isUp;
         final isAccess = _isWiredAccessInterface(iface, routerIp);
-        final isWan = iface.name.toLowerCase().contains('wan') || iface.gateway != null;
+        final isWan =
+            iface.name.toLowerCase().contains('wan') || iface.gateway != null;
 
         return RepaintBoundary(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
             child: _UnifiedNetworkCard(
               key: key,
               name: iface.name.toUpperCase(),
@@ -1139,7 +1208,8 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
               isUp: currentEnabled,
               icon: _getInterfaceIcon(iface.protocol),
               details: _buildWiredDetails(context, iface),
-              initiallyExpanded: isTargetInterface || _expandedInterface == keyStr,
+              initiallyExpanded:
+                  isTargetInterface || _expandedInterface == keyStr,
               isAccessInterface: isAccess,
               isWanInterface: isWan,
               isStaged: isStaged,
@@ -1179,7 +1249,9 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
     if (wirelessData != null) {
       wirelessData.forEach((radioName, radioData) {
         final rawIfaces = radioData['interfaces'];
-        final interfaces = rawIfaces is List ? rawIfaces : (rawIfaces is Map ? rawIfaces.values.toList() : null);
+        final interfaces = rawIfaces is List
+            ? rawIfaces
+            : (rawIfaces is Map ? rawIfaces.values.toList() : null);
         if (interfaces != null) {
           for (final iface in interfaces) {
             final config = iface['config'] ?? {};
@@ -1202,7 +1274,9 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
                 ? _uciString(config['mode']).toUpperCase()
                 : (iwinfo['mode']?.toString().toUpperCase() ?? 'N/A');
             interfacesList.add({
-              'section': uciName ?? (iface['section'] as String? ?? '$radioName-$ssid'),
+              'section':
+                  uciName ??
+                  (iface['section'] as String? ?? '$radioName-$ssid'),
               'name': _uciString(config['ssid']).isNotEmpty
                   ? _uciString(config['ssid'])
                   : (iwinfo['ssid']?.toString() ?? 'Unnamed'),
@@ -1265,10 +1339,14 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
     interfacesList.sort((a, b) {
       final sectionA = a['section'] as String?;
       final sectionB = b['section'] as String?;
-      final aEnabled = (sectionA != null && _stagedWirelessInterfaceStates.containsKey(sectionA))
+      final aEnabled =
+          (sectionA != null &&
+              _stagedWirelessInterfaceStates.containsKey(sectionA))
           ? _stagedWirelessInterfaceStates[sectionA]!
           : (a['isEnabled'] == true);
-      final bEnabled = (sectionB != null && _stagedWirelessInterfaceStates.containsKey(sectionB))
+      final bEnabled =
+          (sectionB != null &&
+              _stagedWirelessInterfaceStates.containsKey(sectionB))
           ? _stagedWirelessInterfaceStates[sectionB]!
           : (b['isEnabled'] == true);
       if (aEnabled != bEnabled) {
@@ -1280,7 +1358,10 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
     return interfacesList;
   }
 
-  Widget _buildWirelessSliverList(List<Map<String, dynamic>> interfaces, String? routerIp) {
+  Widget _buildWirelessSliverList(
+    List<Map<String, dynamic>> interfaces,
+    String? routerIp,
+  ) {
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {
         final iface = interfaces[index];
@@ -1310,17 +1391,29 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
 
         final shouldExpand = isTargetInterface || _expandedInterface == keyStr;
 
-        final sectionKey = iface['section']?.toString() ?? (radioName.toString().isNotEmpty ? radioName.toString() : displayName);
+        final sectionKey =
+            iface['section']?.toString() ??
+            (radioName.toString().isNotEmpty
+                ? radioName.toString()
+                : displayName);
         final isStaged = _stagedWirelessInterfaceStates.containsKey(sectionKey);
         final originalEnabled = iface['isEnabled'] as bool? ?? false;
-        final currentEnabled = _stagedWirelessInterfaceStates[sectionKey] ?? originalEnabled;
+        final currentEnabled =
+            _stagedWirelessInterfaceStates[sectionKey] ?? originalEnabled;
         final isAccess = _isWirelessAccessInterface(iface, routerIp);
-        final isWan = iface['details']?['Network']?.toString().toLowerCase().contains('wan') == true ||
+        final isWan =
+            iface['details']?['Network']?.toString().toLowerCase().contains(
+                  'wan',
+                ) ==
+                true ||
             displayName.toLowerCase().contains('wan');
 
         return RepaintBoundary(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
             child: _UnifiedNetworkCard(
               key: key,
               name: displayName,
@@ -1333,8 +1426,20 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
               isWanInterface: isWan,
               isStaged: isStaged,
               currentEnabled: currentEnabled,
-              onToggle: (val) => _toggleWirelessInterface(sectionKey, displayName, originalEnabled, isAccess, val),
-              onRestart: () => _restartWirelessInterface(sectionKey, displayName, isAccess, isWan, radioName: radioName.toString()),
+              onToggle: (val) => _toggleWirelessInterface(
+                sectionKey,
+                displayName,
+                originalEnabled,
+                isAccess,
+                val,
+              ),
+              onRestart: () => _restartWirelessInterface(
+                sectionKey,
+                displayName,
+                isAccess,
+                isWan,
+                radioName: radioName.toString(),
+              ),
               isSaving: _isSaving,
             ),
           ),
@@ -1354,16 +1459,25 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
             decoration: BoxDecoration(
               color: Colors.amber.shade900.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.amber.shade700.withValues(alpha: 0.5)),
+              border: Border.all(
+                color: Colors.amber.shade700.withValues(alpha: 0.5),
+              ),
             ),
             child: Row(
               children: [
-                Icon(Icons.warning_amber_rounded, color: Colors.amber.shade700, size: 18),
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.amber.shade700,
+                  size: 18,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Unrecognized proto (${interface.protocol}) — showing raw fields',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
@@ -1377,8 +1491,8 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
             _isPublicIp(interface.ipAddress!)
                 ? 'Public IP Address'
                 : (interface.name.toLowerCase().contains('wan')
-                    ? 'IP Address (WAN)'
-                    : 'IP Address'),
+                      ? 'IP Address (WAN)'
+                      : 'IP Address'),
             interface.ipAddress!,
             onTap: () =>
                 _copyToClipboard(context, interface.ipAddress!, 'IP Address'),
@@ -1663,7 +1777,9 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
                       child: Icon(
                         Icons.copy_all_outlined,
                         size: 14,
-                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                        color: colorScheme.onSurfaceVariant.withValues(
+                          alpha: 0.6,
+                        ),
                       ),
                     ),
                 ],
@@ -1681,7 +1797,10 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
   }
 
   bool _isPublicIp(String ipText) {
-    if (ipText.isEmpty || ipText == 'No IPv4' || ipText == 'No IPv6' || ipText == 'N/A') {
+    if (ipText.isEmpty ||
+        ipText == 'No IPv4' ||
+        ipText == 'No IPv6' ||
+        ipText == 'N/A') {
       return false;
     }
     final raw = ipText.split('/')[0].trim();
@@ -1731,7 +1850,9 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.35,
+        ),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -1740,7 +1861,11 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.arrow_downward_rounded, size: 14, color: Colors.green),
+                const Icon(
+                  Icons.arrow_downward_rounded,
+                  size: 14,
+                  color: Colors.green,
+                ),
                 const SizedBox(width: 6),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1748,11 +1873,17 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
                   children: [
                     Text(
                       'Received',
-                      style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     Text(
                       rxStr,
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
@@ -1768,7 +1899,11 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.arrow_upward_rounded, size: 14, color: Colors.orange),
+                const Icon(
+                  Icons.arrow_upward_rounded,
+                  size: 14,
+                  color: Colors.orange,
+                ),
                 const SizedBox(width: 6),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1776,11 +1911,17 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
                   children: [
                     Text(
                       'Transmitted',
-                      style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     Text(
                       txStr,
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
@@ -2044,18 +2185,22 @@ class _UnifiedNetworkCardState extends State<_UnifiedNetworkCard>
                               Flexible(
                                 child: Text(
                                   widget.name,
-                                  style: LuciTextStyles.cardTitle(context).copyWith(
-                                    fontSize: 14.5,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  style: LuciTextStyles.cardTitle(context)
+                                      .copyWith(
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                   overflow: TextOverflow.ellipsis,
                                   softWrap: false,
-                                  semanticsLabel: 'Interface name: ${widget.name}',
+                                  semanticsLabel:
+                                      'Interface name: ${widget.name}',
                                 ),
                               ),
                             ],
                           ),
-                          if (widget.isAccessInterface || widget.isWanInterface || widget.isStaged) ...[
+                          if (widget.isAccessInterface ||
+                              widget.isWanInterface ||
+                              widget.isStaged) ...[
                             const SizedBox(height: 3),
                             Wrap(
                               spacing: 4,
@@ -2063,18 +2208,31 @@ class _UnifiedNetworkCardState extends State<_UnifiedNetworkCard>
                               children: [
                                 if (widget.isAccessInterface)
                                   Tooltip(
-                                    message: 'Active management access interface',
+                                    message:
+                                        'Active management access interface',
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 5,
+                                        vertical: 1.5,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: Colors.red.withValues(alpha: 0.15),
+                                        color: Colors.red.withValues(
+                                          alpha: 0.15,
+                                        ),
                                         borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(color: Colors.red.shade400, width: 0.8),
+                                        border: Border.all(
+                                          color: Colors.red.shade400,
+                                          width: 0.8,
+                                        ),
                                       ),
                                       child: const Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(Icons.lock, size: 9, color: Colors.red),
+                                          Icon(
+                                            Icons.lock,
+                                            size: 9,
+                                            color: Colors.red,
+                                          ),
                                           SizedBox(width: 2),
                                           Text(
                                             'ACTIVE ACCESS',
@@ -2092,16 +2250,27 @@ class _UnifiedNetworkCardState extends State<_UnifiedNetworkCard>
                                   Tooltip(
                                     message: 'WAN / Gateway Interface',
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 5,
+                                        vertical: 1.5,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: Colors.indigo.shade800.withValues(alpha: 0.2),
+                                        color: Colors.indigo.shade800
+                                            .withValues(alpha: 0.2),
                                         borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(color: Colors.indigo.shade400, width: 0.8),
+                                        border: Border.all(
+                                          color: Colors.indigo.shade400,
+                                          width: 0.8,
+                                        ),
                                       ),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(Icons.public, size: 9, color: Colors.indigo.shade300),
+                                          Icon(
+                                            Icons.public,
+                                            size: 9,
+                                            color: Colors.indigo.shade300,
+                                          ),
                                           const SizedBox(width: 2),
                                           Text(
                                             'WAN / GATEWAY',
@@ -2117,11 +2286,19 @@ class _UnifiedNetworkCardState extends State<_UnifiedNetworkCard>
                                   ),
                                 if (widget.isStaged)
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 5,
+                                      vertical: 1.5,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: Colors.amber.withValues(alpha: 0.2),
+                                      color: Colors.amber.withValues(
+                                        alpha: 0.2,
+                                      ),
                                       borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(color: Colors.amber.shade700, width: 0.8),
+                                      border: Border.all(
+                                        color: Colors.amber.shade700,
+                                        width: 0.8,
+                                      ),
                                     ),
                                     child: Text(
                                       'STAGED',
@@ -2140,9 +2317,9 @@ class _UnifiedNetworkCardState extends State<_UnifiedNetworkCard>
                             widget.isStaged
                                 ? '${widget.subtitle} • Original: ${widget.isUp ? "UP" : "DOWN"}'
                                 : widget.subtitle,
-                            style: LuciTextStyles.cardSubtitle(context).copyWith(
-                              fontSize: 12.0,
-                            ),
+                            style: LuciTextStyles.cardSubtitle(
+                              context,
+                            ).copyWith(fontSize: 12.0),
                             semanticsLabel:
                                 'Interface details: ${widget.subtitle}',
                           ),
@@ -2171,7 +2348,9 @@ class _UnifiedNetworkCardState extends State<_UnifiedNetworkCard>
                       ),
                     ],
                     Icon(
-                      _isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                      _isExpanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
                       color: colorScheme.onSurfaceVariant,
                       size: 22,
                       semanticLabel: _isExpanded
@@ -2196,10 +2375,7 @@ class _UnifiedNetworkCardState extends State<_UnifiedNetworkCard>
     );
 
     if (!effectiveEnabled && !widget.isStaged) {
-      return Opacity(
-        opacity: 0.60,
-        child: card,
-      );
+      return Opacity(opacity: 0.60, child: card);
     }
     return card;
   }

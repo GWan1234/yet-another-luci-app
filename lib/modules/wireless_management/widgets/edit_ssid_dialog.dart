@@ -74,7 +74,8 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
   bool _showAdvanced = false;
 
   /// Whether the selected encryption is 'none' (open) or 'owe' (Enhanced Open - no passphrase needed)
-  bool get isNone => _selectedEncryption == 'none' || _selectedEncryption == 'owe';
+  bool get isNone =>
+      _selectedEncryption == 'none' || _selectedEncryption == 'owe';
 
   @override
   void initState() {
@@ -84,14 +85,19 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
     _initialPassphrase = iface.key ?? '';
     _passphraseController = TextEditingController(text: _initialPassphrase);
 
-    _mobilityDomainController = TextEditingController(text: iface.mobilityDomain ?? '4f4b');
+    _mobilityDomainController = TextEditingController(
+      text: iface.mobilityDomain ?? '4f4b',
+    );
     _dtimPeriodController = TextEditingController(text: '2');
     _gtkRekeyController = TextEditingController(text: '3600');
     _inactivityLimitController = TextEditingController(text: '300');
     _maxListenIntervalController = TextEditingController(text: '65535');
     _maclistController = TextEditingController();
 
-    _selectedEncryption = _mapEncryptionToUci(iface.securityMode, iface.encryption);
+    _selectedEncryption = _mapEncryptionToUci(
+      iface.securityMode,
+      iface.encryption,
+    );
     _selectedCipher = _sanitizeCipher(iface.cipher);
     _selectedPmf = iface.pmfState == PmfState.required
         ? '2'
@@ -187,7 +193,8 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
         _dynamicCiphers = caps['ciphers'] ?? [];
 
         if (values != null) {
-          final liveKey = values['key']?.toString() ??
+          final liveKey =
+              values['key']?.toString() ??
               values['passphrase']?.toString() ??
               values['sae_password']?.toString() ??
               values['psk']?.toString();
@@ -215,12 +222,15 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
 
           setState(() {
             if (liveKey != null && liveKey.isNotEmpty) {
-              if (_passphraseController.text.isEmpty || _passphraseController.text == _initialPassphrase) {
+              if (_passphraseController.text.isEmpty ||
+                  _passphraseController.text == _initialPassphrase) {
                 _passphraseController.text = liveKey;
                 _initialPassphrase = liveKey;
               }
             }
-            if (liveSsid != null && liveSsid.isNotEmpty && _ssidController.text == widget.interface.ssid) {
+            if (liveSsid != null &&
+                liveSsid.isNotEmpty &&
+                _ssidController.text == widget.interface.ssid) {
               _ssidController.text = liveSsid;
             }
             if (liveCipher != null && liveCipher.isNotEmpty) {
@@ -242,16 +252,24 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
             if (liveFt != null) _ieee80211r = liveFt == '1';
             if (liveFtDs != null) _ftOverDs = liveFtDs == '1';
             if (liveFtLocal != null) _ftPskGenerateLocal = liveFtLocal == '1';
-            if (liveMobility != null && liveMobility.isNotEmpty) _mobilityDomainController.text = liveMobility;
+            if (liveMobility != null && liveMobility.isNotEmpty)
+              _mobilityDomainController.text = liveMobility;
             if (liveWmm != null) _wmmEnabled = liveWmm == '1';
             if (liveLowAck != null) _disassocLowAck = liveLowAck == '1';
-            if (liveMcast2Ucast != null) _multicastToUnicast = liveMcast2Ucast == '1';
+            if (liveMcast2Ucast != null)
+              _multicastToUnicast = liveMcast2Ucast == '1';
             if (liveWds != null) _wds = liveWds == '1';
-            if (liveDtim != null && liveDtim.isNotEmpty) _dtimPeriodController.text = liveDtim;
-            if (liveRekey != null && liveRekey.isNotEmpty) _gtkRekeyController.text = liveRekey;
-            if (liveInactivity != null && liveInactivity.isNotEmpty) _inactivityLimitController.text = liveInactivity;
-            if (liveMaxListen != null && liveMaxListen.isNotEmpty) _maxListenIntervalController.text = liveMaxListen;
-            if (liveMacFilter != null && liveMacFilter.isNotEmpty && liveMacFilter != 'none') {
+            if (liveDtim != null && liveDtim.isNotEmpty)
+              _dtimPeriodController.text = liveDtim;
+            if (liveRekey != null && liveRekey.isNotEmpty)
+              _gtkRekeyController.text = liveRekey;
+            if (liveInactivity != null && liveInactivity.isNotEmpty)
+              _inactivityLimitController.text = liveInactivity;
+            if (liveMaxListen != null && liveMaxListen.isNotEmpty)
+              _maxListenIntervalController.text = liveMaxListen;
+            if (liveMacFilter != null &&
+                liveMacFilter.isNotEmpty &&
+                liveMacFilter != 'none') {
               _macfilter = liveMacFilter;
             }
             if (liveMacList != null) {
@@ -318,7 +336,9 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
     final iface = widget.interface;
 
     bool isConnectedToThisSsid = false;
-    final activeSessionMac = appState.dashboardData?['activeSessionMac']?.toString().toUpperCase();
+    final activeSessionMac = appState.dashboardData?['activeSessionMac']
+        ?.toString()
+        .toUpperCase();
     for (final st in iface.stations) {
       if (st.macAddress.toUpperCase() == activeSessionMac) {
         isConnectedToThisSsid = true;
@@ -327,8 +347,12 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
     }
 
     final isSsidNameChanged = _ssidController.text.trim() != iface.ssid;
-    final isPassphraseChanged = _passphraseController.text.trim().isNotEmpty && _passphraseController.text.trim() != _initialPassphrase;
-    final isEncryptionChanged = _selectedEncryption != _mapEncryptionToUci(iface.securityMode, iface.encryption);
+    final isPassphraseChanged =
+        _passphraseController.text.trim().isNotEmpty &&
+        _passphraseController.text.trim() != _initialPassphrase;
+    final isEncryptionChanged =
+        _selectedEncryption !=
+        _mapEncryptionToUci(iface.securityMode, iface.encryption);
 
     // Security downgrade warning
     if (isEncryptionChanged && _isSecurityDowngrade()) {
@@ -336,7 +360,8 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
       final proceed = await LuciGuardrail.showConfirmation(
         context,
         title: 'Security Downgrade Warning',
-        subtitle: 'You are changing encryption from "${widget.interface.securityMode.displayName}" to "${_mapUciToSecurityMode(_selectedEncryption).displayName}". This reduces security and may expose your network to attacks.',
+        subtitle:
+            'You are changing encryption from "${widget.interface.securityMode.displayName}" to "${_mapUciToSecurityMode(_selectedEncryption).displayName}". This reduces security and may expose your network to attacks.',
         confirmLabel: 'Proceed Anyway',
         cancelLabel: 'Cancel',
         icon: Icons.security_update_warning_rounded,
@@ -346,12 +371,14 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
       if (!proceed) return;
     }
 
-    if (isConnectedToThisSsid && (isSsidNameChanged || isPassphraseChanged || isEncryptionChanged)) {
+    if (isConnectedToThisSsid &&
+        (isSsidNameChanged || isPassphraseChanged || isEncryptionChanged)) {
       if (!mounted) return;
       final proceed = await LuciGuardrail.showConfirmation(
         context,
         title: 'Self-Disconnection Warning',
-        subtitle: 'You are currently connected via Wi-Fi network "${iface.ssid}". Modifying its name, security mode, or passphrase will sever your active session.',
+        subtitle:
+            'You are currently connected via Wi-Fi network "${iface.ssid}". Modifying its name, security mode, or passphrase will sever your active session.',
         confirmLabel: 'Proceed & Disconnect',
         cancelLabel: 'Cancel',
         icon: Icons.warning_amber_rounded,
@@ -364,7 +391,8 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
     if (!mounted) return;
     setState(() => _isSubmitting = true);
 
-    final String resolvedPmf = (_selectedEncryption == 'sae' || _selectedEncryption == 'owe')
+    final String resolvedPmf =
+        (_selectedEncryption == 'sae' || _selectedEncryption == 'owe')
         ? '2'
         : (_selectedEncryption == 'none' ? '0' : _selectedPmf);
 
@@ -386,7 +414,9 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
     };
 
     if (_mobilityDomainController.text.trim().isNotEmpty) {
-      newValues['mobility_domain'] = _mobilityDomainController.text.trim().toLowerCase();
+      newValues['mobility_domain'] = _mobilityDomainController.text
+          .trim()
+          .toLowerCase();
     }
     if (_dtimPeriodController.text.trim().isNotEmpty) {
       newValues['dtim_period'] = _dtimPeriodController.text.trim();
@@ -398,7 +428,8 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
       newValues['inactivity_limit'] = _inactivityLimitController.text.trim();
     }
     if (_maxListenIntervalController.text.trim().isNotEmpty) {
-      newValues['max_listen_interval'] = _maxListenIntervalController.text.trim();
+      newValues['max_listen_interval'] = _maxListenIntervalController.text
+          .trim();
     }
 
     if (_macfilter != 'disable') {
@@ -428,7 +459,9 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
       'ssid': iface.ssid,
       'encryption': _mapEncryptionToUci(iface.securityMode, iface.encryption),
       'cipher': _sanitizeCipher(iface.cipher),
-      'ieee80211w': iface.pmfState == PmfState.required ? '2' : (iface.pmfState == PmfState.optional ? '1' : '0'),
+      'ieee80211w': iface.pmfState == PmfState.required
+          ? '2'
+          : (iface.pmfState == PmfState.optional ? '1' : '0'),
       'isolate': iface.isolateClients ? '1' : '0',
       'hidden': iface.isHidden ? '1' : '0',
     };
@@ -449,11 +482,16 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
       setState(() => _isSubmitting = false);
       if (success) {
         Navigator.pop(context, true);
-        context.showToastSuccess('Wireless SSID settings updated directly to router.');
+        context.showToastSuccess(
+          'Wireless SSID settings updated directly to router.',
+        );
       } else {
         final username = appState.sessionUsername;
-        if ((appState.capabilities?.hasUciWriteAccess ?? true) == false || !appState.isAdministrativeUser) {
-          context.showToastError('Access Denied: Account \'$username\' lacks UCI write authorization.');
+        if ((appState.capabilities?.hasUciWriteAccess ?? true) == false ||
+            !appState.isAdministrativeUser) {
+          context.showToastError(
+            'Access Denied: Account \'$username\' lacks UCI write authorization.',
+          );
         } else {
           context.showToastError('Failed to update wireless section in UCI.');
         }
@@ -464,7 +502,8 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
   bool _hasChanges() {
     if (_initialBaseline.isEmpty) return false;
     if (_ssidController.text.trim() != _initialBaseline['ssid']) return true;
-    if (_passphraseController.text != _initialBaseline['passphrase']) return true;
+    if (_passphraseController.text != _initialBaseline['passphrase'])
+      return true;
     if (_selectedEncryption != _initialBaseline['encryption']) return true;
     if (_selectedCipher != _initialBaseline['cipher']) return true;
     if (_selectedPmf != _initialBaseline['pmf']) return true;
@@ -473,18 +512,29 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
     if (_selectedNetwork != _initialBaseline['network']) return true;
     if (_ieee80211r != _initialBaseline['ieee80211r']) return true;
     if (_ftOverDs != _initialBaseline['ftOverDs']) return true;
-    if (_ftPskGenerateLocal != _initialBaseline['ftPskGenerateLocal']) return true;
-    if (_mobilityDomainController.text.trim() != _initialBaseline['mobilityDomain']) return true;
+    if (_ftPskGenerateLocal != _initialBaseline['ftPskGenerateLocal'])
+      return true;
+    if (_mobilityDomainController.text.trim() !=
+        _initialBaseline['mobilityDomain'])
+      return true;
     if (_wmmEnabled != _initialBaseline['wmm']) return true;
     if (_disassocLowAck != _initialBaseline['disassocLowAck']) return true;
-    if (_multicastToUnicast != _initialBaseline['multicastToUnicast']) return true;
+    if (_multicastToUnicast != _initialBaseline['multicastToUnicast'])
+      return true;
     if (_wds != _initialBaseline['wds']) return true;
-    if (_dtimPeriodController.text.trim() != _initialBaseline['dtimPeriod']) return true;
-    if (_gtkRekeyController.text.trim() != _initialBaseline['gtkRekey']) return true;
-    if (_inactivityLimitController.text.trim() != _initialBaseline['inactivityLimit']) return true;
-    if (_maxListenIntervalController.text.trim() != _initialBaseline['maxListenInterval']) return true;
+    if (_dtimPeriodController.text.trim() != _initialBaseline['dtimPeriod'])
+      return true;
+    if (_gtkRekeyController.text.trim() != _initialBaseline['gtkRekey'])
+      return true;
+    if (_inactivityLimitController.text.trim() !=
+        _initialBaseline['inactivityLimit'])
+      return true;
+    if (_maxListenIntervalController.text.trim() !=
+        _initialBaseline['maxListenInterval'])
+      return true;
     if (_macfilter != _initialBaseline['macfilter']) return true;
-    if (_maclistController.text.trim() != _initialBaseline['maclist']) return true;
+    if (_maclistController.text.trim() != _initialBaseline['maclist'])
+      return true;
     return false;
   }
 
@@ -498,7 +548,8 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
       if (pass.isNotEmpty) {
         if (pass.length < 8 || pass.length > 64) return false;
       } else {
-        final String initPass = _initialBaseline['passphrase'] ?? _initialPassphrase;
+        final String initPass =
+            _initialBaseline['passphrase'] ?? _initialPassphrase;
         if (initPass.isEmpty) return false;
       }
     }
@@ -532,7 +583,12 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
   }
 
   bool _isSecurityDowngrade() {
-    final curRank = _securityRank(_mapEncryptionToUci(widget.interface.securityMode, widget.interface.encryption));
+    final curRank = _securityRank(
+      _mapEncryptionToUci(
+        widget.interface.securityMode,
+        widget.interface.encryption,
+      ),
+    );
     final newRank = _securityRank(_selectedEncryption);
     return newRank < curRank;
   }
@@ -577,7 +633,9 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final appState = ref.watch(appStateProvider);
-    final hasWriteAccess = (appState.capabilities?.hasUciWriteAccess ?? true) && appState.isAdministrativeUser;
+    final hasWriteAccess =
+        (appState.capabilities?.hasUciWriteAccess ?? true) &&
+        appState.isAdministrativeUser;
 
     return PopScope(
       canPop: !_isSubmitting,
@@ -593,12 +651,17 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.edit_note_rounded, color: theme.colorScheme.primary),
+                    Icon(
+                      Icons.edit_note_rounded,
+                      color: theme.colorScheme.primary,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'Edit SSID & Advanced Settings',
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     if (_isPrefetching) ...[
@@ -611,7 +674,9 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                     ],
                     IconButton(
                       icon: const Icon(Icons.close_rounded, size: 20),
-                      onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => Navigator.pop(context),
                       visualDensity: VisualDensity.compact,
                     ),
                   ],
@@ -637,16 +702,26 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                               decoration: BoxDecoration(
                                 color: Colors.red.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: Colors.red.withValues(alpha: 0.4)),
+                                border: Border.all(
+                                  color: Colors.red.withValues(alpha: 0.4),
+                                ),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.lock_clock_outlined, color: Colors.red, size: 20),
+                                  const Icon(
+                                    Icons.lock_clock_outlined,
+                                    color: Colors.red,
+                                    size: 20,
+                                  ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       'Logged in as non-root user \'${appState.sessionUsername}\'. Saving requires root/UCI write privileges.',
-                                      style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface, fontWeight: FontWeight.w600),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: theme.colorScheme.onSurface,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -659,16 +734,25 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                             decoration: BoxDecoration(
                               color: Colors.amber.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                              border: Border.all(
+                                color: Colors.amber.withValues(alpha: 0.4),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.shield_outlined, color: Colors.amber, size: 20),
+                                const Icon(
+                                  Icons.shield_outlined,
+                                  color: Colors.amber,
+                                  size: 20,
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     'Changes will be applied directly to the router.',
-                                    style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: theme.colorScheme.onSurface,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -686,7 +770,9 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                               helperText: '$_ssidByteLength / 32 UTF-8 bytes',
                               helperStyle: TextStyle(
                                 color: _ssidByteLength > 32 ? Colors.red : null,
-                                fontWeight: _ssidByteLength > 32 ? FontWeight.bold : null,
+                                fontWeight: _ssidByteLength > 32
+                                    ? FontWeight.bold
+                                    : null,
                               ),
                               prefixIcon: const Icon(Icons.wifi, size: 20),
                               border: const OutlineInputBorder(),
@@ -710,7 +796,10 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                             isExpanded: true,
                             decoration: const InputDecoration(
                               labelText: 'Encryption / Security Mode',
-                              prefixIcon: Icon(Icons.lock_outline_rounded, size: 20),
+                              prefixIcon: Icon(
+                                Icons.lock_outline_rounded,
+                                size: 20,
+                              ),
                               border: OutlineInputBorder(),
                             ),
                             items: _buildEncryptionDropdownItems(appState),
@@ -722,7 +811,8 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                                   _selectedPmf = '2';
                                 } else if (val == 'none') {
                                   _selectedPmf = '0';
-                                } else if (_selectedPmf == '0' && val == 'sae-mixed') {
+                                } else if (_selectedPmf == '0' &&
+                                    val == 'sae-mixed') {
                                   _selectedPmf = '1';
                                 }
                               });
@@ -741,22 +831,34 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                                 helperText: _initialPassphrase.isEmpty
                                     ? 'Leave blank to retain existing router passphrase'
                                     : '8–63 characters or 64 hex characters',
-                                prefixIcon: const Icon(Icons.key_rounded, size: 20),
+                                prefixIcon: const Icon(
+                                  Icons.key_rounded,
+                                  size: 20,
+                                ),
                                 suffixIcon: IconButton(
-                                  icon: Icon(_showPassphrase ? Icons.visibility_off : Icons.visibility),
-                                  onPressed: () => setState(() => _showPassphrase = !_showPassphrase),
+                                  icon: Icon(
+                                    _showPassphrase
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                  ),
+                                  onPressed: () => setState(
+                                    () => _showPassphrase = !_showPassphrase,
+                                  ),
                                 ),
                                 border: const OutlineInputBorder(),
                               ),
                               validator: (val) {
-                                if (val == null || val.isEmpty) return null; // allow empty to retain existing
+                                if (val == null || val.isEmpty)
+                                  return null; // allow empty to retain existing
                                 if (val.length < 8 || val.length > 64) {
                                   return 'Passphrase must be between 8 and 64 characters';
                                 }
                                 return null;
                               },
                             ),
-                            PasswordStrengthMeter(password: _passphraseController.text),
+                            PasswordStrengthMeter(
+                              password: _passphraseController.text,
+                            ),
                             const SizedBox(height: 16),
                           ],
 
@@ -765,19 +867,41 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                             initialValue: _selectedPmf,
                             isExpanded: true,
                             decoration: const InputDecoration(
-                              labelText: 'Protected Management Frames (802.11w)',
-                              prefixIcon: Icon(Icons.security_rounded, size: 20),
+                              labelText:
+                                  'Protected Management Frames (802.11w)',
+                              prefixIcon: Icon(
+                                Icons.security_rounded,
+                                size: 20,
+                              ),
                               border: OutlineInputBorder(),
                             ),
                             items: const [
-                              DropdownMenuItem(value: '0', child: Text('Disabled — Maximum legacy client compatibility')),
-                              DropdownMenuItem(value: '1', child: Text('Optional — Preferred default for WPA2/WPA3 mixed')),
-                              DropdownMenuItem(value: '2', child: Text('Required — Mandated for strict WPA3-SAE')),
+                              DropdownMenuItem(
+                                value: '0',
+                                child: Text(
+                                  'Disabled — Maximum legacy client compatibility',
+                                ),
+                              ),
+                              DropdownMenuItem(
+                                value: '1',
+                                child: Text(
+                                  'Optional — Preferred default for WPA2/WPA3 mixed',
+                                ),
+                              ),
+                              DropdownMenuItem(
+                                value: '2',
+                                child: Text(
+                                  'Required — Mandated for strict WPA3-SAE',
+                                ),
+                              ),
                             ],
-                            onChanged: (_selectedEncryption == 'sae' || _selectedEncryption == 'none')
+                            onChanged:
+                                (_selectedEncryption == 'sae' ||
+                                    _selectedEncryption == 'none')
                                 ? null
                                 : (val) {
-                                    if (val != null) setState(() => _selectedPmf = val);
+                                    if (val != null)
+                                      setState(() => _selectedPmf = val);
                                   },
                           ),
                           const SizedBox(height: 16),
@@ -793,7 +917,8 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                             ),
                             items: _buildCipherDropdownItems(),
                             onChanged: (val) {
-                              if (val != null) setState(() => _selectedCipher = val);
+                              if (val != null)
+                                setState(() => _selectedCipher = val);
                             },
                           ),
                           const SizedBox(height: 12),
@@ -801,17 +926,36 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                           // Isolate Clients Switch
                           SwitchListTile(
                             contentPadding: EdgeInsets.zero,
-                            title: const Text('Isolate Wireless Clients', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
-                            subtitle: const Text('Blocks direct peer-to-peer traffic between connected stations', style: TextStyle(fontSize: 11.5)),
+                            title: const Text(
+                              'Isolate Wireless Clients',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: const Text(
+                              'Blocks direct peer-to-peer traffic between connected stations',
+                              style: TextStyle(fontSize: 11.5),
+                            ),
                             value: _isolateClients,
-                            onChanged: (val) => setState(() => _isolateClients = val),
+                            onChanged: (val) =>
+                                setState(() => _isolateClients = val),
                           ),
 
                           // Hidden SSID Switch
                           SwitchListTile(
                             contentPadding: EdgeInsets.zero,
-                            title: const Text('Hide Broadcast SSID', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
-                            subtitle: const Text('Suppresses beacon SSID broadcast to hide network from scanner lists', style: TextStyle(fontSize: 11.5)),
+                            title: const Text(
+                              'Hide Broadcast SSID',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: const Text(
+                              'Suppresses beacon SSID broadcast to hide network from scanner lists',
+                              style: TextStyle(fontSize: 11.5),
+                            ),
                             value: _isHidden,
                             onChanged: (val) => setState(() => _isHidden = val),
                           ),
@@ -819,71 +963,124 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
 
                           // ── Expandable Advanced Wireless & Network Settings ──
                           Theme(
-                            data: theme.copyWith(dividerColor: Colors.transparent),
+                            data: theme.copyWith(
+                              dividerColor: Colors.transparent,
+                            ),
                             child: ExpansionTile(
                               tilePadding: EdgeInsets.zero,
                               title: Row(
                                 children: [
-                                  Icon(Icons.tune_rounded, size: 18, color: theme.colorScheme.primary),
+                                  Icon(
+                                    Icons.tune_rounded,
+                                    size: 18,
+                                    color: theme.colorScheme.primary,
+                                  ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       'Advanced Network & Roaming Settings',
-                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: theme.colorScheme.primary,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
-                              onExpansionChanged: (exp) => setState(() => _showAdvanced = exp),
+                              onExpansionChanged: (exp) =>
+                                  setState(() => _showAdvanced = exp),
                               initiallyExpanded: _showAdvanced,
                               childrenPadding: const EdgeInsets.only(top: 8),
                               children: [
                                 // Network Attachment Dropdown
                                 DropdownButtonFormField<String>(
-                                  initialValue: _availableNetworks.contains(_selectedNetwork) ? _selectedNetwork : _availableNetworks.first,
+                                  initialValue:
+                                      _availableNetworks.contains(
+                                        _selectedNetwork,
+                                      )
+                                      ? _selectedNetwork
+                                      : _availableNetworks.first,
                                   isExpanded: true,
                                   decoration: const InputDecoration(
                                     labelText: 'Attached Network Bridge',
-                                    prefixIcon: Icon(Icons.alt_route_rounded, size: 20),
+                                    prefixIcon: Icon(
+                                      Icons.alt_route_rounded,
+                                      size: 20,
+                                    ),
                                     border: OutlineInputBorder(),
-                                    helperText: 'Select network interface (lan, guest, wan, etc.)',
+                                    helperText:
+                                        'Select network interface (lan, guest, wan, etc.)',
                                   ),
                                   items: _availableNetworks.map((net) {
                                     return DropdownMenuItem(
                                       value: net,
-                                      child: Text(net, overflow: TextOverflow.ellipsis, maxLines: 1),
+                                      child: Text(
+                                        net,
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
+                                      ),
                                     );
                                   }).toList(),
                                   onChanged: (val) {
-                                    if (val != null) setState(() => _selectedNetwork = val);
+                                    if (val != null)
+                                      setState(() => _selectedNetwork = val);
                                   },
                                 ),
                                 const SizedBox(height: 16),
 
                                 // Fast Roaming Section
-                                _buildSubHeader('802.11r / 802.11k / 802.11v Fast Roaming', Icons.bolt_rounded),
+                                _buildSubHeader(
+                                  '802.11r / 802.11k / 802.11v Fast Roaming',
+                                  Icons.bolt_rounded,
+                                ),
                                 const SizedBox(height: 8),
                                 SwitchListTile(
                                   contentPadding: EdgeInsets.zero,
-                                  title: const Text('802.11r Fast BSS Transition (FT)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                                  subtitle: const Text('Enables fast seamless handoff between access points', style: TextStyle(fontSize: 11)),
+                                  title: const Text(
+                                    '802.11r Fast BSS Transition (FT)',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: const Text(
+                                    'Enables fast seamless handoff between access points',
+                                    style: TextStyle(fontSize: 11),
+                                  ),
                                   value: _ieee80211r,
-                                  onChanged: (val) => setState(() => _ieee80211r = val),
+                                  onChanged: (val) =>
+                                      setState(() => _ieee80211r = val),
                                 ),
                                 if (_ieee80211r) ...[
                                   SwitchListTile(
                                     contentPadding: EdgeInsets.zero,
-                                    title: const Text('FT over DS (Distributed System)', style: TextStyle(fontSize: 12.5)),
-                                    subtitle: const Text('Pre-authenticates over ethernet backbone', style: TextStyle(fontSize: 10.5)),
+                                    title: const Text(
+                                      'FT over DS (Distributed System)',
+                                      style: TextStyle(fontSize: 12.5),
+                                    ),
+                                    subtitle: const Text(
+                                      'Pre-authenticates over ethernet backbone',
+                                      style: TextStyle(fontSize: 10.5),
+                                    ),
                                     value: _ftOverDs,
-                                    onChanged: (val) => setState(() => _ftOverDs = val),
+                                    onChanged: (val) =>
+                                        setState(() => _ftOverDs = val),
                                   ),
                                   SwitchListTile(
                                     contentPadding: EdgeInsets.zero,
-                                    title: const Text('Generate Local FT PSK Keys', style: TextStyle(fontSize: 12.5)),
-                                    subtitle: const Text('Derives roaming keys locally per AP', style: TextStyle(fontSize: 10.5)),
+                                    title: const Text(
+                                      'Generate Local FT PSK Keys',
+                                      style: TextStyle(fontSize: 12.5),
+                                    ),
+                                    subtitle: const Text(
+                                      'Derives roaming keys locally per AP',
+                                      style: TextStyle(fontSize: 10.5),
+                                    ),
                                     value: _ftPskGenerateLocal,
-                                    onChanged: (val) => setState(() => _ftPskGenerateLocal = val),
+                                    onChanged: (val) => setState(
+                                      () => _ftPskGenerateLocal = val,
+                                    ),
                                   ),
                                   const SizedBox(height: 8),
                                   TextFormField(
@@ -892,9 +1089,13 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                                     decoration: const InputDecoration(
                                       labelText: 'Mobility Domain ID',
                                       hintText: '4f4b',
-                                      prefixIcon: Icon(Icons.domain_rounded, size: 20),
+                                      prefixIcon: Icon(
+                                        Icons.domain_rounded,
+                                        size: 20,
+                                      ),
                                       border: OutlineInputBorder(),
-                                      helperText: '4-character hex identifier (must match across all APs)',
+                                      helperText:
+                                          '4-character hex identifier (must match across all APs)',
                                     ),
                                     maxLength: 4,
                                   ),
@@ -902,40 +1103,80 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                                 ],
 
                                 // QoS & Performance Toggles
-                                _buildSubHeader('QoS & Wireless Connection Parameters', Icons.speed_rounded),
+                                _buildSubHeader(
+                                  'QoS & Wireless Connection Parameters',
+                                  Icons.speed_rounded,
+                                ),
                                 const SizedBox(height: 8),
                                 SwitchListTile(
                                   contentPadding: EdgeInsets.zero,
-                                  title: const Text('WMM (Wi-Fi Multimedia QoS)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                                  subtitle: const Text('Prioritizes voice and video traffic queues', style: TextStyle(fontSize: 11)),
+                                  title: const Text(
+                                    'WMM (Wi-Fi Multimedia QoS)',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: const Text(
+                                    'Prioritizes voice and video traffic queues',
+                                    style: TextStyle(fontSize: 11),
+                                  ),
                                   value: _wmmEnabled,
-                                  onChanged: (val) => setState(() => _wmmEnabled = val),
+                                  onChanged: (val) =>
+                                      setState(() => _wmmEnabled = val),
                                 ),
                                 SwitchListTile(
                                   contentPadding: EdgeInsets.zero,
-                                  title: const Text('Disassociate on Low ACK Rates', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                                  subtitle: const Text('Disconnects weak clients failing packet ACKs to preserve airtime', style: TextStyle(fontSize: 11)),
+                                  title: const Text(
+                                    'Disassociate on Low ACK Rates',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: const Text(
+                                    'Disconnects weak clients failing packet ACKs to preserve airtime',
+                                    style: TextStyle(fontSize: 11),
+                                  ),
                                   value: _disassocLowAck,
-                                  onChanged: (val) => setState(() => _disassocLowAck = val),
+                                  onChanged: (val) =>
+                                      setState(() => _disassocLowAck = val),
                                 ),
                                 SwitchListTile(
                                   contentPadding: EdgeInsets.zero,
-                                  title: const Text('Multicast to Unicast Conversion', style: TextStyle(fontSize: 13)),
-                                  subtitle: const Text('Converts multicast frames to unicast for reliable reception', style: TextStyle(fontSize: 11)),
+                                  title: const Text(
+                                    'Multicast to Unicast Conversion',
+                                    style: TextStyle(fontSize: 13),
+                                  ),
+                                  subtitle: const Text(
+                                    'Converts multicast frames to unicast for reliable reception',
+                                    style: TextStyle(fontSize: 11),
+                                  ),
                                   value: _multicastToUnicast,
-                                  onChanged: (val) => setState(() => _multicastToUnicast = val),
+                                  onChanged: (val) =>
+                                      setState(() => _multicastToUnicast = val),
                                 ),
                                 SwitchListTile(
                                   contentPadding: EdgeInsets.zero,
-                                  title: const Text('WDS (Wireless Distribution System)', style: TextStyle(fontSize: 13)),
-                                  subtitle: const Text('Transparent L2 bridge for multi-AP mesh connections', style: TextStyle(fontSize: 11)),
+                                  title: const Text(
+                                    'WDS (Wireless Distribution System)',
+                                    style: TextStyle(fontSize: 13),
+                                  ),
+                                  subtitle: const Text(
+                                    'Transparent L2 bridge for multi-AP mesh connections',
+                                    style: TextStyle(fontSize: 11),
+                                  ),
                                   value: _wds,
-                                  onChanged: (val) => setState(() => _wds = val),
+                                  onChanged: (val) =>
+                                      setState(() => _wds = val),
                                 ),
                                 const SizedBox(height: 12),
 
                                 // Intervals & Limits
-                                _buildSubHeader('Performance & Interval Controls', Icons.timer_rounded),
+                                _buildSubHeader(
+                                  'Performance & Interval Controls',
+                                  Icons.timer_rounded,
+                                ),
                                 const SizedBox(height: 8),
                                 Row(
                                   children: [
@@ -984,7 +1225,8 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: TextFormField(
-                                        controller: _maxListenIntervalController,
+                                        controller:
+                                            _maxListenIntervalController,
                                         onChanged: (_) => setState(() {}),
                                         decoration: const InputDecoration(
                                           labelText: 'Max Listen Int.',
@@ -999,23 +1241,43 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                                 const SizedBox(height: 16),
 
                                 // MAC Address Filtering
-                                _buildSubHeader('MAC Address Access Control', Icons.filter_alt_rounded),
+                                _buildSubHeader(
+                                  'MAC Address Access Control',
+                                  Icons.filter_alt_rounded,
+                                ),
                                 const SizedBox(height: 8),
                                 DropdownButtonFormField<String>(
                                   initialValue: _macfilter,
                                   isExpanded: true,
                                   decoration: const InputDecoration(
                                     labelText: 'MAC Filter Mode',
-                                    prefixIcon: Icon(Icons.security_rounded, size: 20),
+                                    prefixIcon: Icon(
+                                      Icons.security_rounded,
+                                      size: 20,
+                                    ),
                                     border: OutlineInputBorder(),
                                   ),
                                   items: const [
-                                    DropdownMenuItem(value: 'disable', child: Text('Disabled')),
-                                    DropdownMenuItem(value: 'allow', child: Text('Allow List (only listed MACs)')),
-                                    DropdownMenuItem(value: 'deny', child: Text('Deny List (block listed MACs)')),
+                                    DropdownMenuItem(
+                                      value: 'disable',
+                                      child: Text('Disabled'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'allow',
+                                      child: Text(
+                                        'Allow List (only listed MACs)',
+                                      ),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'deny',
+                                      child: Text(
+                                        'Deny List (block listed MACs)',
+                                      ),
+                                    ),
                                   ],
                                   onChanged: (val) {
-                                    if (val != null) setState(() => _macfilter = val);
+                                    if (val != null)
+                                      setState(() => _macfilter = val);
                                   },
                                 ),
                                 const SizedBox(height: 12),
@@ -1026,10 +1288,15 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                                     onChanged: (_) => setState(() {}),
                                     decoration: const InputDecoration(
                                       labelText: 'MAC Address List',
-                                      hintText: 'AA:BB:CC:DD:EE:FF\n11:22:33:44:55:66',
-                                      prefixIcon: Icon(Icons.list_alt_rounded, size: 20),
+                                      hintText:
+                                          'AA:BB:CC:DD:EE:FF\n11:22:33:44:55:66',
+                                      prefixIcon: Icon(
+                                        Icons.list_alt_rounded,
+                                        size: 20,
+                                      ),
                                       border: OutlineInputBorder(),
-                                      helperText: 'One MAC per line or separated by space/comma',
+                                      helperText:
+                                          'One MAC per line or separated by space/comma',
                                     ),
                                   ),
                                   const SizedBox(height: 12),
@@ -1047,19 +1314,33 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => Navigator.pop(context),
                       child: const Text('Cancel'),
                     ),
                     const SizedBox(width: 8),
                     Builder(
                       builder: (context) {
-                        final canSave = !_isSubmitting && !_isPrefetching && _hasChanges() && _isFormValid();
+                        final canSave =
+                            !_isSubmitting &&
+                            !_isPrefetching &&
+                            _hasChanges() &&
+                            _isFormValid();
                         return ElevatedButton.icon(
                           onPressed: canSave ? _submitChanges : null,
                           icon: _isSubmitting
-                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
                               : const Icon(Icons.save_rounded, size: 18),
-                          label: Text(hasWriteAccess ? 'Save & Apply' : 'Save (Non-Root)'),
+                          label: Text(
+                            hasWriteAccess ? 'Save & Apply' : 'Save (Non-Root)',
+                          ),
                         );
                       },
                     ),
@@ -1081,20 +1362,44 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
         const SizedBox(width: 6),
         Text(
           title,
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.primary,
+          ),
         ),
       ],
     );
   }
 
-  List<DropdownMenuItem<String>> _buildEncryptionDropdownItems(AppState appState) {
+  List<DropdownMenuItem<String>> _buildEncryptionDropdownItems(
+    AppState appState,
+  ) {
     final staticItems = [
-      const DropdownMenuItem(value: 'sae-mixed', child: Text('WPA2/WPA3 Mixed — Recommended default')),
-      const DropdownMenuItem(value: 'sae',       child: Text('WPA3-SAE Personal — Strict / Max security')),
-      const DropdownMenuItem(value: 'psk2',      child: Text('WPA2-PSK (CCMP/AES) — Legacy compatible')),
-      const DropdownMenuItem(value: 'psk',       child: Text('WPA-PSK — Legacy only (WPA1)')),
-      const DropdownMenuItem(value: 'owe',       child: Text('Enhanced Open (OWE) — Encrypted, no password')),
-      const DropdownMenuItem(value: 'none',      child: Text('Open / None — Unencrypted public network')),
+      const DropdownMenuItem(
+        value: 'sae-mixed',
+        child: Text('WPA2/WPA3 Mixed — Recommended default'),
+      ),
+      const DropdownMenuItem(
+        value: 'sae',
+        child: Text('WPA3-SAE Personal — Strict / Max security'),
+      ),
+      const DropdownMenuItem(
+        value: 'psk2',
+        child: Text('WPA2-PSK (CCMP/AES) — Legacy compatible'),
+      ),
+      const DropdownMenuItem(
+        value: 'psk',
+        child: Text('WPA-PSK — Legacy only (WPA1)'),
+      ),
+      const DropdownMenuItem(
+        value: 'owe',
+        child: Text('Enhanced Open (OWE) — Encrypted, no password'),
+      ),
+      const DropdownMenuItem(
+        value: 'none',
+        child: Text('Open / None — Unencrypted public network'),
+      ),
     ];
 
     if (_dynamicEncryptions.isEmpty) return staticItems;
@@ -1103,20 +1408,34 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
     for (final enc in _dynamicEncryptions) {
       final val = enc['value']!;
       final label = enc['label']!;
-      items.add(DropdownMenuItem(
-        value: val,
-        child: Text(label, overflow: TextOverflow.ellipsis),
-      ));
+      items.add(
+        DropdownMenuItem(
+          value: val,
+          child: Text(label, overflow: TextOverflow.ellipsis),
+        ),
+      );
     }
     return items;
   }
 
   List<DropdownMenuItem<String>> _buildCipherDropdownItems() {
     final staticItems = [
-      const DropdownMenuItem(value: 'auto',     child: Text('Auto — Router auto-selects best cipher')),
-      const DropdownMenuItem(value: 'ccmp',     child: Text('CCMP (AES) — Recommended default')),
-      const DropdownMenuItem(value: 'gcmp256', child: Text('GCMP-256 — High security / Wi-Fi 6')),
-      const DropdownMenuItem(value: 'tkip',     child: Text('TKIP — Legacy (Not recommended)')),
+      const DropdownMenuItem(
+        value: 'auto',
+        child: Text('Auto — Router auto-selects best cipher'),
+      ),
+      const DropdownMenuItem(
+        value: 'ccmp',
+        child: Text('CCMP (AES) — Recommended default'),
+      ),
+      const DropdownMenuItem(
+        value: 'gcmp256',
+        child: Text('GCMP-256 — High security / Wi-Fi 6'),
+      ),
+      const DropdownMenuItem(
+        value: 'tkip',
+        child: Text('TKIP — Legacy (Not recommended)'),
+      ),
     ];
 
     if (_dynamicCiphers.isEmpty) return staticItems;
@@ -1125,10 +1444,12 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
     for (final cipher in _dynamicCiphers) {
       final val = cipher['value']!;
       final label = cipher['label']!;
-      items.add(DropdownMenuItem(
-        value: val,
-        child: Text(label, overflow: TextOverflow.ellipsis),
-      ));
+      items.add(
+        DropdownMenuItem(
+          value: val,
+          child: Text(label, overflow: TextOverflow.ellipsis),
+        ),
+      );
     }
     return items;
   }

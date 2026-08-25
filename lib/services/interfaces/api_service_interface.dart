@@ -2,7 +2,48 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'package:flutter/material.dart';
+import 'package:yet_another_luci_app/modules/parental_controls/models/parental_profile.dart';
 import 'package:yet_another_luci_app/modules/services_system/models/ddns_info.dart';
+
+enum AuthStatus { success, invalidCredentials, unreachable, unknownError }
+
+class AuthResult {
+  final AuthStatus status;
+  final String? token;
+  final bool actualUseHttps;
+  final String? errorMessage;
+
+  const AuthResult({
+    required this.status,
+    this.token,
+    this.actualUseHttps = false,
+    this.errorMessage,
+  });
+
+  factory AuthResult.success(String token, {bool actualUseHttps = false}) =>
+      AuthResult(
+        status: AuthStatus.success,
+        token: token,
+        actualUseHttps: actualUseHttps,
+      );
+
+  factory AuthResult.invalidCredentials([String? message]) => AuthResult(
+    status: AuthStatus.invalidCredentials,
+    errorMessage: message ?? 'Invalid username or password',
+  );
+
+  factory AuthResult.unreachable([String? message]) => AuthResult(
+    status: AuthStatus.unreachable,
+    errorMessage:
+        message ??
+        'Router unreachable. Check network connection and IP address.',
+  );
+
+  factory AuthResult.unknownError(String message) =>
+      AuthResult(status: AuthStatus.unknownError, errorMessage: message);
+
+  bool get isSuccess => status == AuthStatus.success;
+}
 
 /// API service interface for LuCI RPC communication.
 ///
@@ -13,6 +54,13 @@ import 'package:yet_another_luci_app/modules/services_system/models/ddns_info.da
 ///
 /// Example: [0, {"hostname": "router", "model": "TP-Link"}]
 abstract class IApiService {
+  Future<AuthResult> authenticate(
+    String ipAddress,
+    String username,
+    String password,
+    bool useHttps, {
+    BuildContext? context,
+  });
   Future<String> login(
     String ipAddress,
     String username,
@@ -273,7 +321,8 @@ abstract class IApiService {
     required String macAddress,
     BuildContext? context,
   });
-  Future<Map<String, List<Map<String, dynamic>>>> fetchRestrictedAndBannedClientsLive(
+  Future<Map<String, List<Map<String, dynamic>>>>
+  fetchRestrictedAndBannedClientsLive(
     String ipAddress,
     String sysauth,
     bool useHttps, {
@@ -361,7 +410,8 @@ abstract class IApiService {
   });
 
   /// Fetches hardware-supported encryptions and ciphers from iwinfo for a wireless device
-  Future<Map<String, List<Map<String, String>>>> fetchWirelessHardwareCapabilities({
+  Future<Map<String, List<Map<String, String>>>>
+  fetchWirelessHardwareCapabilities({
     required String sectionName,
     String? radioName,
     required String ipAddress,
@@ -379,12 +429,43 @@ abstract class IApiService {
     BuildContext? context,
   });
 
-  /// Detects anonymous `cfg######` wifi-iface sections (created by uci add) and renames
-  /// them to named `wifinet#` identifiers so LuCI does not prompt a configuration migration.
   Future<int> migrateAnonymousWirelessSections(
     String ipAddress,
     String sysauth,
     bool useHttps, {
+    BuildContext? context,
+  });
+
+  Future<bool> applyParentalProfileDns(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String profileId,
+    required List<String> macAddresses,
+    required List<String>? dnsServers,
+    BuildContext? context,
+  });
+
+  Future<List<ParentalProfile>?> fetchParentalProfiles(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    BuildContext? context,
+  });
+
+  Future<bool> saveParentalProfile(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required ParentalProfile profile,
+    BuildContext? context,
+  });
+
+  Future<bool> deleteParentalProfile(
+    String ipAddress,
+    String sysauth,
+    bool useHttps, {
+    required String profileId,
     BuildContext? context,
   });
 }

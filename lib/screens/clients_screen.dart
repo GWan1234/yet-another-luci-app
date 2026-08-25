@@ -32,8 +32,10 @@ class ClientsScreen extends ConsumerStatefulWidget {
 }
 
 class _ClientsScreenState extends ConsumerState<ClientsScreen>
-    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
-
+    with
+        SingleTickerProviderStateMixin,
+        AutomaticKeepAliveClientMixin,
+        WidgetsBindingObserver {
   @override
   bool get wantKeepAlive => true;
   String _searchQuery = '';
@@ -55,6 +57,7 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = AnimationController(
       duration: const Duration(milliseconds: 200),
       vsync: this,
@@ -74,7 +77,8 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
   Future<void> _checkRestrictedTooltipState() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final seen = prefs.getBool('has_seen_restricted_clients_tooltip') ?? false;
+      final seen =
+          prefs.getBool('has_seen_restricted_clients_tooltip') ?? false;
       if (mounted) {
         setState(() {
           _hasSeenRestrictedTooltip = seen;
@@ -130,11 +134,26 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _autoRefreshTimer?.cancel();
     _searchDebounceTimer?.cancel();
     _controller.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (_autoRefreshTimer == null || !_autoRefreshTimer!.isActive) {
+        _startAutoRefreshTimer();
+        _computeClientsFuture();
+      }
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      _autoRefreshTimer?.cancel();
+    }
   }
 
   @override
@@ -157,7 +176,8 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
     // Recompute future when selected router or dashboard data timestamp changes
     final currentId = watchedAppState.selectedRouter?.id;
     final lastUpdated = watchedAppState.dashboardData?['_lastUpdated'];
-    if (currentId != _lastSelectedRouterId || lastUpdated != _lastDashboardUpdated) {
+    if (currentId != _lastSelectedRouterId ||
+        lastUpdated != _lastDashboardUpdated) {
       _lastSelectedRouterId = currentId;
       _lastDashboardUpdated = lastUpdated;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -175,23 +195,27 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
         if (snapshot.hasData && snapshot.data != null) {
           _cachedClients = snapshot.data!;
         }
-        final aggregatedClients = (snapshot.hasData && snapshot.data != null) ? snapshot.data! : _cachedClients;
+        final aggregatedClients = (snapshot.hasData && snapshot.data != null)
+            ? snapshot.data!
+            : _cachedClients;
         return Scaffold(
-          appBar: const LuciAppBar(
-            title: 'Clients',
-          ),
+          appBar: const LuciAppBar(title: 'Clients'),
           body: Stack(
             children: [
               LuciPullToRefresh(
                 onRefresh: () async {
                   // Trigger a refresh by re-fetching dashboard data for selected router
                   await ref.read(appStateProvider).fetchDashboardData();
-                  setState(() { _computeClientsFuture(); });
+                  setState(() {
+                    _computeClientsFuture();
+                  });
                 },
                 child: Builder(
                   builder: (context) {
                     final appState = ref.watch(appStateProvider);
-                    final isLoading = snapshot.connectionState == ConnectionState.waiting && (aggregatedClients.isEmpty);
+                    final isLoading =
+                        snapshot.connectionState == ConnectionState.waiting &&
+                        (aggregatedClients.isEmpty);
                     final dashboardError = appState.dashboardError;
 
                     if (isLoading) {
@@ -244,28 +268,45 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                     final clients = aggregatedClients;
 
                     // Include synthetic client entries for banned/paused MACs that are not in aggregatedClients
-                    final allBannedMacs = <String>{...appState.bannedWirelessMacs, ...appState.pausedInternetMacs};
-                    final existingMacs = clients.map((c) => c.macAddress.toUpperCase().replaceAll('-', ':')).toSet();
+                    final allBannedMacs = <String>{
+                      ...appState.bannedWirelessMacs,
+                      ...appState.pausedInternetMacs,
+                    };
+                    final existingMacs = clients
+                        .map(
+                          (c) =>
+                              c.macAddress.toUpperCase().replaceAll('-', ':'),
+                        )
+                        .toSet();
 
                     final extraBannedClients = <Client>[];
                     for (final mac in allBannedMacs) {
                       final normMac = mac.toUpperCase().replaceAll('-', ':');
                       if (!existingMacs.contains(normMac)) {
-                        extraBannedClients.add(Client(
-                          ipAddress: 'N/A',
-                          macAddress: normMac,
-                          hostname: normMac,
-                          isConnected: false,
-                          connectionType: ConnectionType.wireless,
-                        ));
+                        extraBannedClients.add(
+                          Client(
+                            ipAddress: 'N/A',
+                            macAddress: normMac,
+                            hostname: normMac,
+                            isConnected: false,
+                            connectionType: ConnectionType.wireless,
+                          ),
+                        );
                       }
                     }
 
-                    final allClientsForView = [...clients, ...extraBannedClients];
+                    final allClientsForView = [
+                      ...clients,
+                      ...extraBannedClients,
+                    ];
 
                     final filteredClients = allClientsForView.where((client) {
-                      final normMac = client.macAddress.toUpperCase().replaceAll('-', ':');
-                      final isBannedOrPaused = appState.isWirelessBanned(normMac) || appState.isInternetPaused(normMac);
+                      final normMac = client.macAddress
+                          .toUpperCase()
+                          .replaceAll('-', ':');
+                      final isBannedOrPaused =
+                          appState.isWirelessBanned(normMac) ||
+                          appState.isInternetPaused(normMac);
 
                       if (_categoryFilter == ClientCategoryFilter.banned) {
                         if (!isBannedOrPaused) return false;
@@ -277,11 +318,15 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                           return false;
                         }
                         if (_categoryFilter == ClientCategoryFilter.wired &&
-                            (!client.isConnected || client.connectionType != ConnectionType.wired)) {
+                            (!client.isConnected ||
+                                client.connectionType !=
+                                    ConnectionType.wired)) {
                           return false;
                         }
                         if (_categoryFilter == ClientCategoryFilter.wireless &&
-                            (!client.isConnected || client.connectionType != ConnectionType.wireless)) {
+                            (!client.isConnected ||
+                                client.connectionType !=
+                                    ConnectionType.wireless)) {
                           return false;
                         }
                       }
@@ -303,13 +348,20 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                       children: [
                         if (!_hasSeenRestrictedTooltip)
                           Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: 16.0,
+                              vertical: 6.0,
+                            ),
                             padding: const EdgeInsets.all(12.0),
                             decoration: BoxDecoration(
-                              color: colorScheme.primaryContainer.withValues(alpha: 0.7),
+                              color: colorScheme.primaryContainer.withValues(
+                                alpha: 0.7,
+                              ),
                               borderRadius: BorderRadius.circular(16.0),
                               border: Border.all(
-                                color: colorScheme.primary.withValues(alpha: 0.3),
+                                color: colorScheme.primary.withValues(
+                                  alpha: 0.3,
+                                ),
                                 width: 1.2,
                               ),
                             ),
@@ -318,7 +370,9 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: colorScheme.primary.withValues(alpha: 0.15),
+                                    color: colorScheme.primary.withValues(
+                                      alpha: 0.15,
+                                    ),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(
@@ -330,7 +384,8 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Banned Clients Hub',
@@ -345,7 +400,8 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                                         'All banned Wi-Fi devices and internet-paused clients are automatically moved to the Banned Clients section. Tap the "Banned" count in the summary bar to view and manage them.',
                                         style: TextStyle(
                                           fontSize: 11,
-                                          color: colorScheme.onPrimaryContainer.withValues(alpha: 0.85),
+                                          color: colorScheme.onPrimaryContainer
+                                              .withValues(alpha: 0.85),
                                         ),
                                       ),
                                     ],
@@ -400,7 +456,10 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                           ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20.0,
+                            vertical: 0,
+                          ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -420,7 +479,9 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                                     'Active Connected Only',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      fontWeight: _showOnlyActiveConnected ? FontWeight.bold : FontWeight.w500,
+                                      fontWeight: _showOnlyActiveConnected
+                                          ? FontWeight.bold
+                                          : FontWeight.w500,
                                       color: _showOnlyActiveConnected
                                           ? colorScheme.primary
                                           : colorScheme.onSurfaceVariant,
@@ -443,22 +504,32 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                             ],
                           ),
                         ),
-                        _buildClientSummaryRow(clients, colorScheme, theme.textTheme),
+                        _buildClientSummaryRow(
+                          clients,
+                          colorScheme,
+                          theme.textTheme,
+                        ),
                         const SizedBox(height: 4),
                         Expanded(
                           child: filteredClients.isEmpty
                               ? LuciEmptyState(
-                                  title: _categoryFilter == ClientCategoryFilter.banned
+                                  title:
+                                      _categoryFilter ==
+                                          ClientCategoryFilter.banned
                                       ? 'No Banned Clients'
                                       : (_searchQuery.isEmpty
-                                          ? 'No Active Clients Found'
-                                          : 'No Matching Clients'),
-                                  message: _categoryFilter == ClientCategoryFilter.banned
+                                            ? 'No Active Clients Found'
+                                            : 'No Matching Clients'),
+                                  message:
+                                      _categoryFilter ==
+                                          ClientCategoryFilter.banned
                                       ? 'No clients are currently banned from Wi-Fi or internet access.'
                                       : (_searchQuery.isEmpty
-                                          ? 'No clients are currently connected to the router. Pull down to refresh the list.'
-                                          : 'No clients match your search criteria. Try a different search term.'),
-                                  icon: _categoryFilter == ClientCategoryFilter.banned
+                                            ? 'No clients are currently connected to the router. Pull down to refresh the list.'
+                                            : 'No clients match your search criteria. Try a different search term.'),
+                                  icon:
+                                      _categoryFilter ==
+                                          ClientCategoryFilter.banned
                                       ? Icons.shield_outlined
                                       : Icons.people_outline,
                                 )
@@ -466,12 +537,16 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                                   padding: const EdgeInsets.only(bottom: 100),
                                   // ignore: deprecated_member_use
                                   cacheExtent: 500.0,
-                                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  keyboardDismissBehavior:
+                                      ScrollViewKeyboardDismissBehavior.onDrag,
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
                                   // ignore: deprecated_member_use
                                   findChildIndexCallback: (Key key) {
                                     if (key is ValueKey<String>) {
-                                      final index = filteredClients.indexWhere((c) => c.macAddress == key.value);
+                                      final index = filteredClients.indexWhere(
+                                        (c) => c.macAddress == key.value,
+                                      );
                                       return index != -1 ? index : null;
                                     }
                                     return null;
@@ -484,53 +559,57 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                                     final isExpanded = _expandedClientMacs
                                         .contains(client.macAddress);
 
-                                    final isIpv6Expanded = _expandedIpv6Macs.contains(client.macAddress);
-                                     return RepaintBoundary(
-                                       key: ValueKey<String>(client.macAddress),
-                                       child: Padding(
-                                         padding: const EdgeInsets.symmetric(
-                                           horizontal: 16.0,
-                                           vertical: 8.0,
-                                         ),
-                                         child: _UnifiedClientCard(
-                                           client: client,
-                                           isExpanded: isExpanded,
-                                           isIpv6Expanded: isIpv6Expanded,
-                                           allClients: clients,
-                                           onRefreshNeeded: () {
-                                             setState(() {
-                                               _computeClientsFuture();
-                                             });
-                                           },
-                                           onToggleIpv6: () {
-                                             setState(() {
-                                               if (isIpv6Expanded) {
-                                                 _expandedIpv6Macs.remove(client.macAddress);
-                                               } else {
-                                                 _expandedIpv6Macs.add(client.macAddress);
-                                               }
-                                             });
-                                           },
-                                           onTap: () {
-                                             setState(() {
-                                               if (isExpanded) {
-                                                 _expandedClientMacs.remove(
-                                                   client.macAddress,
-                                                 );
-                                               } else {
-                                                 _expandedClientMacs.add(
-                                                   client.macAddress,
-                                                 );
-                                               }
-                                             });
-                                           },
-                                         ),
-                                       ),
-                                     );
+                                    final isIpv6Expanded = _expandedIpv6Macs
+                                        .contains(client.macAddress);
+                                    return RepaintBoundary(
+                                      key: ValueKey<String>(client.macAddress),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16.0,
+                                          vertical: 8.0,
+                                        ),
+                                        child: _UnifiedClientCard(
+                                          client: client,
+                                          isExpanded: isExpanded,
+                                          isIpv6Expanded: isIpv6Expanded,
+                                          allClients: clients,
+                                          onRefreshNeeded: () {
+                                            setState(() {
+                                              _computeClientsFuture();
+                                            });
+                                          },
+                                          onToggleIpv6: () {
+                                            setState(() {
+                                              if (isIpv6Expanded) {
+                                                _expandedIpv6Macs.remove(
+                                                  client.macAddress,
+                                                );
+                                              } else {
+                                                _expandedIpv6Macs.add(
+                                                  client.macAddress,
+                                                );
+                                              }
+                                            });
+                                          },
+                                          onTap: () {
+                                            setState(() {
+                                              if (isExpanded) {
+                                                _expandedClientMacs.remove(
+                                                  client.macAddress,
+                                                );
+                                              } else {
+                                                _expandedClientMacs.add(
+                                                  client.macAddress,
+                                                );
+                                              }
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                    );
                                   },
                                 ),
                         ),
-
                       ],
                     );
                   },
@@ -551,16 +630,24 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
     final appState = ref.watch(appStateProvider);
     final unbannedClients = clients.where((c) {
       final normMac = c.macAddress.toUpperCase().replaceAll('-', ':');
-      return !appState.isWirelessBanned(normMac) && !appState.isInternetPaused(normMac);
+      return !appState.isWirelessBanned(normMac) &&
+          !appState.isInternetPaused(normMac);
     }).toList();
 
     final totalCount = _showOnlyActiveConnected
         ? unbannedClients.where((c) => c.isConnected).length
         : unbannedClients.length;
 
-    final wiredCount = unbannedClients.where((c) => c.isConnected && c.connectionType == ConnectionType.wired).length;
-    final wirelessCount = unbannedClients.where((c) => c.isConnected && c.connectionType == ConnectionType.wireless).length;
-    final bannedCount = appState.pausedInternetMacs.length + appState.bannedWirelessMacs.length;
+    final wiredCount = unbannedClients
+        .where((c) => c.isConnected && c.connectionType == ConnectionType.wired)
+        .length;
+    final wirelessCount = unbannedClients
+        .where(
+          (c) => c.isConnected && c.connectionType == ConnectionType.wireless,
+        )
+        .length;
+    final bannedCount =
+        appState.pausedInternetMacs.length + appState.bannedWirelessMacs.length;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
@@ -591,7 +678,11 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                 colorScheme: colorScheme,
               ),
             ),
-            Container(width: 1, height: 20, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+            Container(
+              width: 1,
+              height: 20,
+              color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+            ),
             Expanded(
               child: _buildSummaryItem(
                 icon: Icons.lan_outlined,
@@ -607,7 +698,11 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                 colorScheme: colorScheme,
               ),
             ),
-            Container(width: 1, height: 20, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+            Container(
+              width: 1,
+              height: 20,
+              color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+            ),
             Expanded(
               child: _buildSummaryItem(
                 icon: Icons.wifi_rounded,
@@ -623,13 +718,19 @@ class _ClientsScreenState extends ConsumerState<ClientsScreen>
                 colorScheme: colorScheme,
               ),
             ),
-            Container(width: 1, height: 20, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+            Container(
+              width: 1,
+              height: 20,
+              color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+            ),
             Expanded(
               child: _buildSummaryItem(
                 icon: Icons.block_rounded,
                 label: 'Banned',
                 count: bannedCount,
-                color: bannedCount > 0 ? Colors.red : colorScheme.onSurfaceVariant,
+                color: bannedCount > 0
+                    ? Colors.red
+                    : colorScheme.onSurfaceVariant,
                 isSelected: _categoryFilter == ClientCategoryFilter.banned,
                 onTap: () {
                   setState(() {
@@ -783,7 +884,9 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
       case NeighborReachability.failed:
         return Colors.grey.shade400;
       case NeighborReachability.unknown:
-        return client.isConnected ? LuciStatusColors.connected : Colors.grey.shade400;
+        return client.isConnected
+            ? LuciStatusColors.connected
+            : Colors.grey.shade400;
     }
   }
 
@@ -798,7 +901,9 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
       case NeighborReachability.failed:
         return 'Client is offline (Lease active)';
       case NeighborReachability.unknown:
-        return client.isConnected ? 'Client is online' : 'Client is offline (Lease active)';
+        return client.isConnected
+            ? 'Client is online'
+            : 'Client is offline (Lease active)';
     }
   }
 
@@ -915,7 +1020,8 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                semanticsLabel: 'Vendor: ${widget.client.vendor}',
+                                semanticsLabel:
+                                    'Vendor: ${widget.client.vendor}',
                               ),
                             _buildBadgePills(context, widget.client),
                           ],
@@ -923,7 +1029,9 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                       ),
                       const SizedBox(width: 8),
                       Icon(
-                        widget.isExpanded ? Icons.expand_less : Icons.expand_more,
+                        widget.isExpanded
+                            ? Icons.expand_less
+                            : Icons.expand_more,
                         color: colorScheme.onSurfaceVariant,
                         size: 26,
                         semanticLabel: widget.isExpanded
@@ -956,14 +1064,22 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
     );
     final guestIfaces = overview.radios
         .expand((r) => r.interfaces)
-        .where((i) => i.isGuestInterface(appState.customGuestSections, appState.excludedGuestSections))
+        .where(
+          (i) => i.isGuestInterface(
+            appState.customGuestSections,
+            appState.excludedGuestSections,
+          ),
+        )
         .toList();
     for (final g in guestIfaces) {
-      if (client.ssid != null && client.ssid!.isNotEmpty && g.ssid == client.ssid) {
+      if (client.ssid != null &&
+          client.ssid!.isNotEmpty &&
+          g.ssid == client.ssid) {
         return true;
       }
       if (client.wirelessIface != null && client.wirelessIface!.isNotEmpty) {
-        if (g.sectionName == client.wirelessIface || g.ifName == client.wirelessIface) {
+        if (g.sectionName == client.wirelessIface ||
+            g.ifName == client.wirelessIface) {
           return true;
         }
       }
@@ -982,7 +1098,9 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
     final isGuest = _isGuestClient(client, appState);
     final isPaused = appState.isInternetPaused(client.macAddress);
     final isBanned = appState.isWirelessBanned(client.macAddress);
-    final isStatic = client.isStatic || appState.findStaticLeaseByMac(client.macAddress) != null;
+    final isStatic =
+        client.isStatic ||
+        appState.findStaticLeaseByMac(client.macAddress) != null;
 
     Widget buildPill({
       required String label,
@@ -1018,7 +1136,8 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
     }
 
     // 1. Connection & SSID Pill
-    if (client.isConnected && client.connectionType == ConnectionType.wireless) {
+    if (client.isConnected &&
+        client.connectionType == ConnectionType.wireless) {
       final labelText = (client.ssid != null && client.ssid!.isNotEmpty)
           ? 'Wi-Fi • ${client.ssid}'
           : 'Wi-Fi';
@@ -1031,7 +1150,8 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
           fg: colorScheme.onPrimaryContainer,
         ),
       );
-    } else if (client.isConnected && client.connectionType == ConnectionType.wired) {
+    } else if (client.isConnected &&
+        client.connectionType == ConnectionType.wired) {
       pills.add(
         buildPill(
           label: 'Wired',
@@ -1051,7 +1171,9 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
           icon: Icons.push_pin_rounded,
           bg: Colors.teal.shade700.withValues(alpha: 0.15),
           border: Colors.teal.shade600.withValues(alpha: 0.4),
-          fg: theme.brightness == Brightness.dark ? Colors.teal.shade200 : Colors.teal.shade800,
+          fg: theme.brightness == Brightness.dark
+              ? Colors.teal.shade200
+              : Colors.teal.shade800,
         ),
       );
     }
@@ -1064,7 +1186,9 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
           icon: Icons.shield_moon_rounded,
           bg: Colors.amber.shade700.withValues(alpha: 0.15),
           border: Colors.amber.shade700.withValues(alpha: 0.4),
-          fg: theme.brightness == Brightness.dark ? Colors.amber.shade300 : Colors.amber.shade900,
+          fg: theme.brightness == Brightness.dark
+              ? Colors.amber.shade300
+              : Colors.amber.shade900,
         ),
       );
     }
@@ -1077,7 +1201,9 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
           icon: Icons.block_rounded,
           bg: Colors.red.shade700.withValues(alpha: 0.15),
           border: Colors.red.shade700.withValues(alpha: 0.4),
-          fg: theme.brightness == Brightness.dark ? Colors.red.shade300 : Colors.red.shade900,
+          fg: theme.brightness == Brightness.dark
+              ? Colors.red.shade300
+              : Colors.red.shade900,
         ),
       );
     } else if (isPaused) {
@@ -1087,7 +1213,9 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
           icon: Icons.pause_circle_filled_rounded,
           bg: Colors.orange.shade700.withValues(alpha: 0.15),
           border: Colors.orange.shade700.withValues(alpha: 0.4),
-          fg: theme.brightness == Brightness.dark ? Colors.orange.shade300 : Colors.orange.shade900,
+          fg: theme.brightness == Brightness.dark
+              ? Colors.orange.shade300
+              : Colors.orange.shade900,
         ),
       );
     }
@@ -1109,7 +1237,8 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
   static String _classifyIPv6(String ipv6) {
     final lower = ipv6.toLowerCase().split('/').first.split('%').first;
     if (lower.startsWith('fe80')) return 'Link-Local IPv6';
-    if (lower.startsWith('fd') || lower.startsWith('fc')) return 'Private IPv6 (ULA)';
+    if (lower.startsWith('fd') || lower.startsWith('fc'))
+      return 'Private IPv6 (ULA)';
     return 'Public IPv6';
   }
 
@@ -1135,10 +1264,7 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
         onTap: onTap,
         borderRadius: BorderRadius.circular(6),
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 14.0,
-            vertical: 3.5,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 3.5),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -1159,10 +1285,13 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                     Flexible(
                       child: Text(
                         isIpv6Value ? value.replaceAll(':', ':\u200B') : value,
-                        style: (valueColor != null
-                                ? LuciTextStyles.detailValue(context).copyWith(color: valueColor)
-                                : LuciTextStyles.detailValue(context))
-                            .copyWith(fontSize: 12),
+                        style:
+                            (valueColor != null
+                                    ? LuciTextStyles.detailValue(
+                                        context,
+                                      ).copyWith(color: valueColor)
+                                    : LuciTextStyles.detailValue(context))
+                                .copyWith(fontSize: 12),
                         textAlign: TextAlign.end,
                       ),
                     ),
@@ -1174,7 +1303,8 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                           child: Icon(
                             Icons.copy_all_rounded,
                             size: 14,
-                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                            color: theme.colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.7),
                             semanticLabel: 'Copy',
                           ),
                         ),
@@ -1205,31 +1335,43 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
         final label = _classifyIPv6(ipv6);
         return (label: label, address: ipv6);
       }).toList();
-      classified.sort((a, b) => _ipv6SortPriority(a.label).compareTo(_ipv6SortPriority(b.label)));
+      classified.sort(
+        (a, b) =>
+            _ipv6SortPriority(a.label).compareTo(_ipv6SortPriority(b.label)),
+      );
 
       final displayEntries = (classified.length > 1 && !widget.isIpv6Expanded)
           ? classified.take(1).toList()
           : classified;
 
-      ipv6Rows = displayEntries.map(
-        (entry) => detailRow(
-          entry.label,
-          entry.address,
-          onTap: () => _copyToClipboard(context, entry.address, entry.label),
-          semanticsLabel: '${entry.label}: ${entry.address}',
-        ),
-      ).toList();
+      ipv6Rows = displayEntries
+          .map(
+            (entry) => detailRow(
+              entry.label,
+              entry.address,
+              onTap: () =>
+                  _copyToClipboard(context, entry.address, entry.label),
+              semanticsLabel: '${entry.label}: ${entry.address}',
+            ),
+          )
+          .toList();
 
       if (classified.length > 1) {
         final remainingCount = classified.length - 1;
         ipv6Rows.add(
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 2.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14.0,
+              vertical: 2.0,
+            ),
             child: InkWell(
               onTap: widget.onToggleIpv6,
               borderRadius: BorderRadius.circular(6),
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3.0, horizontal: 6.0),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 3.0,
+                  horizontal: 6.0,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -1245,7 +1387,9 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                     ),
                     const SizedBox(width: 4),
                     Icon(
-                      widget.isIpv6Expanded ? Icons.expand_less : Icons.expand_more,
+                      widget.isIpv6Expanded
+                          ? Icons.expand_less
+                          : Icons.expand_more,
                       size: 15,
                       color: theme.colorScheme.primary,
                     ),
@@ -1306,14 +1450,17 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
             valueColor: client.formattedLeaseTime == 'Expired'
                 ? theme.colorScheme.error
                 : (client.formattedLeaseTime == 'No active lease'
-                    ? theme.colorScheme.onSurfaceVariant
-                    : null),
+                      ? theme.colorScheme.onSurfaceVariant
+                      : null),
             semanticsLabel:
                 'Lease Time Remaining: ${client.formattedLeaseTime}',
           ),
           const SizedBox(height: 4),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 6.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14.0,
+              vertical: 6.0,
+            ),
             child: ListenableBuilder(
               listenable: AppState.instance,
               builder: (ctx, _) {
@@ -1329,7 +1476,11 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                   actionButtons.add(
                     OutlinedButton.icon(
                       onPressed: () => _unbanWirelessClient(context, client),
-                      icon: const Icon(Icons.check_circle_outline_rounded, size: 14, color: Colors.blue),
+                      icon: const Icon(
+                        Icons.check_circle_outline_rounded,
+                        size: 14,
+                        color: Colors.blue,
+                      ),
                       label: const Text(
                         'Unban Client',
                         style: TextStyle(
@@ -1339,18 +1490,30 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         minimumSize: const Size(0, 32),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        side: BorderSide(color: Colors.blue.shade400, width: 0.9),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        side: BorderSide(
+                          color: Colors.blue.shade400,
+                          width: 0.9,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                   );
                   actionButtons.add(
                     OutlinedButton.icon(
                       onPressed: () => _banWirelessClient(context, client),
-                      icon: const Icon(Icons.timer_outlined, size: 14, color: Colors.orange),
+                      icon: const Icon(
+                        Icons.timer_outlined,
+                        size: 14,
+                        color: Colors.orange,
+                      ),
                       label: const Text(
                         'Edit Ban',
                         style: TextStyle(
@@ -1360,11 +1523,19 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         minimumSize: const Size(0, 32),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        side: BorderSide(color: Colors.orange.shade400, width: 0.9),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        side: BorderSide(
+                          color: Colors.orange.shade400,
+                          width: 0.9,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                   );
@@ -1374,29 +1545,43 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                 if (canPause && !isBanned) {
                   actionButtons.add(
                     OutlinedButton.icon(
-                      onPressed: () => _toggleInternetPause(context, client, !isPaused),
+                      onPressed: () =>
+                          _toggleInternetPause(context, client, !isPaused),
                       icon: Icon(
-                        isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                        isPaused
+                            ? Icons.play_arrow_rounded
+                            : Icons.pause_rounded,
                         size: 15,
-                        color: isPaused ? Colors.green.shade700 : Colors.red.shade700,
+                        color: isPaused
+                            ? Colors.green.shade700
+                            : Colors.red.shade700,
                       ),
                       label: Text(
                         isPaused ? 'Resume Access' : 'Pause Access',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: isPaused ? Colors.green.shade700 : Colors.red.shade700,
+                          color: isPaused
+                              ? Colors.green.shade700
+                              : Colors.red.shade700,
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         minimumSize: const Size(0, 32),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         side: BorderSide(
-                          color: isPaused ? Colors.green.shade400 : Colors.red.shade300,
+                          color: isPaused
+                              ? Colors.green.shade400
+                              : Colors.red.shade300,
                           width: 0.9,
                         ),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                   );
@@ -1407,7 +1592,11 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                   actionButtons.add(
                     OutlinedButton.icon(
                       onPressed: () => _banWirelessClient(context, client),
-                      icon: const Icon(Icons.block_rounded, size: 14, color: Colors.orange),
+                      icon: const Icon(
+                        Icons.block_rounded,
+                        size: 14,
+                        color: Colors.orange,
+                      ),
                       label: const Text(
                         'Ban Client',
                         style: TextStyle(
@@ -1417,24 +1606,39 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         minimumSize: const Size(0, 32),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        side: BorderSide(color: Colors.orange.shade300, width: 0.9),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        side: BorderSide(
+                          color: Colors.orange.shade300,
+                          width: 0.9,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                   );
                 }
 
                 // 3. Static Lease Controls (Add / Edit / Remove)
-                final isStatic = client.isStatic || appState.findStaticLeaseByMac(client.macAddress) != null;
+                final isStatic =
+                    client.isStatic ||
+                    appState.findStaticLeaseByMac(client.macAddress) != null;
 
                 if (!isStatic && !_isIpv6Only(client)) {
                   actionButtons.add(
                     OutlinedButton.icon(
-                      onPressed: () => _showAddStaticLeaseDialog(context, client),
-                      icon: const Icon(Icons.push_pin_outlined, size: 14, color: Colors.teal),
+                      onPressed: () =>
+                          _showAddStaticLeaseDialog(context, client),
+                      icon: const Icon(
+                        Icons.push_pin_outlined,
+                        size: 14,
+                        color: Colors.teal,
+                      ),
                       label: Text(
                         'Static Lease',
                         style: TextStyle(
@@ -1444,11 +1648,19 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         minimumSize: const Size(0, 32),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        side: BorderSide(color: Colors.teal.shade400, width: 0.9),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        side: BorderSide(
+                          color: Colors.teal.shade400,
+                          width: 0.9,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                   );
@@ -1457,8 +1669,13 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                 if (isStatic) {
                   actionButtons.add(
                     OutlinedButton.icon(
-                      onPressed: () => _showAddStaticLeaseDialog(context, client),
-                      icon: const Icon(Icons.edit_outlined, size: 14, color: Colors.teal),
+                      onPressed: () =>
+                          _showAddStaticLeaseDialog(context, client),
+                      icon: const Icon(
+                        Icons.edit_outlined,
+                        size: 14,
+                        color: Colors.teal,
+                      ),
                       label: Text(
                         'Edit Static Lease',
                         style: TextStyle(
@@ -1468,19 +1685,32 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         minimumSize: const Size(0, 32),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        side: BorderSide(color: Colors.teal.shade400, width: 0.9),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        side: BorderSide(
+                          color: Colors.teal.shade400,
+                          width: 0.9,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                   );
 
                   actionButtons.add(
                     OutlinedButton.icon(
-                      onPressed: () => _confirmRemoveStaticLease(context, client),
-                      icon: const Icon(Icons.delete_outline, size: 14, color: Colors.redAccent),
+                      onPressed: () =>
+                          _confirmRemoveStaticLease(context, client),
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        size: 14,
+                        color: Colors.redAccent,
+                      ),
                       label: const Text(
                         'Remove Lease',
                         style: TextStyle(
@@ -1490,11 +1720,19 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                         ),
                       ),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         minimumSize: const Size(0, 32),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.5), width: 0.9),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        side: BorderSide(
+                          color: Colors.redAccent.withValues(alpha: 0.5),
+                          width: 0.9,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                   );
@@ -1512,13 +1750,16 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
 
   bool _isValidIPv4(String ip) {
     if (ip == 'N/A' || ip.trim().isEmpty) return false;
-    final reg = RegExp(r'^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.){3}(25[0-5]|(2[0-4]|1\d|[1-9]|)\d)$');
+    final reg = RegExp(
+      r'^((25[0-5]|(2[0-4]|1\d|[1-9]|)\d)\.){3}(25[0-5]|(2[0-4]|1\d|[1-9]|)\d)$',
+    );
     return reg.hasMatch(ip.trim());
   }
 
   bool _isIpv6Only(Client client) {
     final hasV4 = _isValidIPv4(client.ipAddress);
-    final hasV6 = client.ipv6Addresses != null && client.ipv6Addresses!.isNotEmpty;
+    final hasV6 =
+        client.ipv6Addresses != null && client.ipv6Addresses!.isNotEmpty;
     return !hasV4 && hasV6;
   }
 
@@ -1548,10 +1789,18 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
     );
   }
 
-  Future<void> _confirmRemoveStaticLease(BuildContext context, Client client) async {
-    if (ActionRateLimiter.isRateLimited('delete_static_lease_${client.macAddress}', cooldown: const Duration(milliseconds: 1200))) {
+  Future<void> _confirmRemoveStaticLease(
+    BuildContext context,
+    Client client,
+  ) async {
+    if (ActionRateLimiter.isRateLimited(
+      'delete_static_lease_${client.macAddress}',
+      cooldown: const Duration(milliseconds: 1200),
+    )) {
       if (context.mounted) {
-        context.showToastWarning('Removal in progress. Please wait a moment...');
+        context.showToastWarning(
+          'Removal in progress. Please wait a moment...',
+        );
       }
       return;
     }
@@ -1568,7 +1817,11 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                 color: Colors.red.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 24),
+              child: const Icon(
+                Icons.delete_outline,
+                color: Colors.redAccent,
+                size: 24,
+              ),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -1592,7 +1845,9 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: const Text('Remove Reservation'),
           ),
@@ -1630,7 +1885,11 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
     }
   }
 
-  Future<void> _toggleInternetPause(BuildContext context, Client client, bool pause) async {
+  Future<void> _toggleInternetPause(
+    BuildContext context,
+    Client client,
+    bool pause,
+  ) async {
     if (pause) {
       final safe = await SelfDeviceGuard.checkSelfActionGuardrail(
         context,
@@ -1644,9 +1903,18 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
     }
 
     final actionKey = 'pause_internet_${client.macAddress}';
-    if (ActionRateLimiter.isRateLimited(actionKey, cooldown: const Duration(seconds: 2))) {
-      final remaining = ActionRateLimiter.getRemainingCooldown(actionKey, cooldown: const Duration(seconds: 2));
-      context.showToastRateLimited('${pause ? "Pause" : "Resume"} Internet (${client.displayName})', remaining);
+    if (ActionRateLimiter.isRateLimited(
+      actionKey,
+      cooldown: const Duration(seconds: 2),
+    )) {
+      final remaining = ActionRateLimiter.getRemainingCooldown(
+        actionKey,
+        cooldown: const Duration(seconds: 2),
+      );
+      context.showToastRateLimited(
+        '${pause ? "Pause" : "Resume"} Internet (${client.displayName})',
+        remaining,
+      );
       return;
     }
 
@@ -1702,16 +1970,27 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
         },
         onBanConfirmed: (int banTimeSeconds) async {
           final actionKey = 'ban_client_${client.macAddress}';
-          if (ActionRateLimiter.isRateLimited(actionKey, cooldown: const Duration(seconds: 2))) {
-            final remaining = ActionRateLimiter.getRemainingCooldown(actionKey, cooldown: const Duration(seconds: 2));
-            if (context.mounted) context.showToastRateLimited('Ban Client (${client.displayName})', remaining);
+          if (ActionRateLimiter.isRateLimited(
+            actionKey,
+            cooldown: const Duration(seconds: 2),
+          )) {
+            final remaining = ActionRateLimiter.getRemainingCooldown(
+              actionKey,
+              cooldown: const Duration(seconds: 2),
+            );
+            if (context.mounted)
+              context.showToastRateLimited(
+                'Ban Client (${client.displayName})',
+                remaining,
+              );
             return;
           }
 
           if (context.mounted) {
             context.showToastLoading(
               'Banning ${client.displayName}...',
-              subtitle: 'Setting hostapd ban for ${(banTimeSeconds / 60).round()} mins',
+              subtitle:
+                  'Setting hostapd ban for ${(banTimeSeconds / 60).round()} mins',
               actionKey: actionKey,
             );
           }
@@ -1751,9 +2030,19 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
 
   Future<void> _unbanWirelessClient(BuildContext context, Client client) async {
     final actionKey = 'unban_client_${client.macAddress}';
-    if (ActionRateLimiter.isRateLimited(actionKey, cooldown: const Duration(seconds: 2))) {
-      final remaining = ActionRateLimiter.getRemainingCooldown(actionKey, cooldown: const Duration(seconds: 2));
-      if (context.mounted) context.showToastRateLimited('Unban Client (${client.displayName})', remaining);
+    if (ActionRateLimiter.isRateLimited(
+      actionKey,
+      cooldown: const Duration(seconds: 2),
+    )) {
+      final remaining = ActionRateLimiter.getRemainingCooldown(
+        actionKey,
+        cooldown: const Duration(seconds: 2),
+      );
+      if (context.mounted)
+        context.showToastRateLimited(
+          'Unban Client (${client.displayName})',
+          remaining,
+        );
       return;
     }
 
@@ -1769,7 +2058,11 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                 color: Colors.blue.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.check_circle_outline_rounded, color: Colors.blue, size: 24),
+              child: const Icon(
+                Icons.check_circle_outline_rounded,
+                color: Colors.blue,
+                size: 24,
+              ),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -1795,7 +2088,9 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
             style: FilledButton.styleFrom(
               backgroundColor: Colors.blue.shade700,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ],
@@ -1821,13 +2116,21 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
     if (success) {
       unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
       if (context.mounted) {
-        LuciToastManager.safeShowSuccess(context, '${client.displayName} unbanned successfully.', actionKey: actionKey);
+        LuciToastManager.safeShowSuccess(
+          context,
+          '${client.displayName} unbanned successfully.',
+          actionKey: actionKey,
+        );
         widget.onRefreshNeeded();
       }
     } else {
       unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
       if (context.mounted) {
-        LuciToastManager.safeShowError(context, 'Failed to unban ${client.displayName}.', actionKey: actionKey);
+        LuciToastManager.safeShowError(
+          context,
+          'Failed to unban ${client.displayName}.',
+          actionKey: actionKey,
+        );
       }
     }
   }
@@ -1878,13 +2181,7 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
                 ),
               );
             } else {
-              rows.add(
-                Row(
-                  children: [
-                    Expanded(child: buttons[i]),
-                  ],
-                ),
-              );
+              rows.add(Row(children: [Expanded(child: buttons[i])]));
             }
           }
           return Column(
@@ -1913,4 +2210,3 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
     );
   }
 }
-

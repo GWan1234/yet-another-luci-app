@@ -27,11 +27,13 @@ class WirelessManagementScreen extends ConsumerStatefulWidget {
   const WirelessManagementScreen({super.key, this.showBack = false});
 
   @override
-  ConsumerState<WirelessManagementScreen> createState() => _WirelessManagementScreenState();
+  ConsumerState<WirelessManagementScreen> createState() =>
+      _WirelessManagementScreenState();
 }
 
-class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScreen>
-    with AutomaticKeepAliveClientMixin {
+class _WirelessManagementScreenState
+    extends ConsumerState<WirelessManagementScreen>
+    with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   Timer? _refreshTimer;
   bool _isStationsExpanded = false;
   bool _migrationChecked = false;
@@ -42,6 +44,7 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _startRefreshTimerIfNeeded();
     // Run migration check after first frame so BuildContext is fully mounted
     WidgetsBinding.instance.addPostFrameCallback((_) => _runMigrationCheck());
@@ -49,6 +52,7 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
     super.dispose();
   }
@@ -65,7 +69,8 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
     if (migrated > 0 && mounted) {
       context.showToastSuccess(
         'Auto-fixed $migrated anonymous wireless section${migrated > 1 ? 's' : ''}',
-        subtitle: 'Renamed to wifinet# — LuCI migration dialog will no longer appear.',
+        subtitle:
+            'Renamed to wifinet# — LuCI migration dialog will no longer appear.',
       );
       // Refresh so the UI picks up the new section names
       await appState.fetchDashboardData();
@@ -89,6 +94,21 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
         _isStationsExpanded = expanded;
       });
       _startRefreshTimerIfNeeded();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (_isStationsExpanded &&
+          (_refreshTimer == null || !_refreshTimer!.isActive)) {
+        _startRefreshTimerIfNeeded();
+        ref.read(appStateProvider).fetchDashboardData();
+      }
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      _refreshTimer?.cancel();
     }
   }
 
@@ -121,66 +141,78 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
       canPop: !appState.isAccessControlPendingConfirmation,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        final canExit = await LuciGuardrail.confirmStagedChangesOrExit(context, appState);
+        final canExit = await LuciGuardrail.confirmStagedChangesOrExit(
+          context,
+          appState,
+        );
         if (canExit && context.mounted) {
           Navigator.pop(context);
         }
       },
       child: Scaffold(
-        appBar: LuciAppBar(
-          title: 'Wireless',
-          showBack: widget.showBack,
-        ),
+        appBar: LuciAppBar(title: 'Wireless', showBack: widget.showBack),
         body: Column(
           children: [
             const WirelessRollbackBanner(),
             Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async {
-                await appState.fetchDashboardData();
-              },
-              child: ListView(
-                padding: const EdgeInsets.all(16.0),
-                children: [
-            // Top Summary Header & Action Bar
-            _buildWirelessHeaderCard(context, overview, hasGuestNetworks),
-            const SizedBox(height: 14),
-            if (overview.radios.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 32.0),
-                child: LuciEmptyState(
-                  title: 'No Wireless Radios Found',
-                  message: 'No active wireless devices or radios were detected on this router. Pull down to refresh data.',
-                  icon: Icons.wifi_off_rounded,
-                  actionLabel: 'Refresh',
-                  onAction: () async {
-                    await appState.fetchDashboardData();
-                  },
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  await appState.fetchDashboardData();
+                },
+                child: ListView(
+                  padding: const EdgeInsets.all(16.0),
+                  children: [
+                    // Top Summary Header & Action Bar
+                    _buildWirelessHeaderCard(
+                      context,
+                      overview,
+                      hasGuestNetworks,
+                    ),
+                    const SizedBox(height: 14),
+                    if (overview.radios.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32.0),
+                        child: LuciEmptyState(
+                          title: 'No Wireless Radios Found',
+                          message:
+                              'No active wireless devices or radios were detected on this router. Pull down to refresh data.',
+                          icon: Icons.wifi_off_rounded,
+                          actionLabel: 'Refresh',
+                          onAction: () async {
+                            await appState.fetchDashboardData();
+                          },
+                        ),
+                      )
+                    else
+                      ...overview.radios.map(
+                        (radio) =>
+                            _buildRadioCard(context, radio, overview, appState),
+                      ),
+                    const SizedBox(height: 16),
+                    LuciCollapsibleCard(
+                      title: 'Connected Wireless Stations',
+                      icon: Icons.devices_other_outlined,
+                      count: totalStationCount,
+                      initiallyExpanded: _isStationsExpanded,
+                      onExpansionChanged: _toggleStationsExpansion,
+                      child: _buildStationsList(context, overview, appState),
+                    ),
+                    const SizedBox(height: 100),
+                  ],
                 ),
-              )
-            else
-              ...overview.radios.map((radio) => _buildRadioCard(context, radio, overview, appState)),
-            const SizedBox(height: 16),
-            LuciCollapsibleCard(
-              title: 'Connected Wireless Stations',
-              icon: Icons.devices_other_outlined,
-              count: totalStationCount,
-              initiallyExpanded: _isStationsExpanded,
-              onExpansionChanged: _toggleStationsExpansion,
-              child: _buildStationsList(context, overview, appState),
+              ),
             ),
-            const SizedBox(height: 100),
           ],
         ),
       ),
-    ),
-  ],
-),
-),
-);
+    );
   }
 
-  Widget _buildWirelessHeaderCard(BuildContext context, WirelessOverview overview, bool hasGuestNetworks) {
+  Widget _buildWirelessHeaderCard(
+    BuildContext context,
+    WirelessOverview overview,
+    bool hasGuestNetworks,
+  ) {
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
 
@@ -194,13 +226,19 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
       ),
       child: Column(
         children: [
           Row(
             children: [
-              Icon(Icons.cell_tower_outlined, size: 20, color: theme.colorScheme.primary),
+              Icon(
+                Icons.cell_tower_outlined,
+                size: 20,
+                color: theme.colorScheme.primary,
+              ),
               const SizedBox(width: 8),
               Text(
                 'Wireless Overview',
@@ -213,7 +251,9 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+                  color: theme.colorScheme.primaryContainer.withValues(
+                    alpha: 0.5,
+                  ),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -243,17 +283,27 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
                   icon: Icon(
                     Icons.shield_moon_rounded,
                     size: 16,
-                    color: hasGuestNetworks ? Colors.amber.shade300 : theme.colorScheme.onSecondary,
+                    color: hasGuestNetworks
+                        ? Colors.amber.shade300
+                        : theme.colorScheme.onSecondary,
                   ),
                   label: Text(
                     'Guest Networks',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   style: FilledButton.styleFrom(
                     backgroundColor: hasGuestNetworks
-                        ? (isDarkMode ? Colors.amber.shade900.withValues(alpha: 0.8) : Colors.amber.shade800)
+                        ? (isDarkMode
+                              ? Colors.amber.shade900.withValues(alpha: 0.8)
+                              : Colors.amber.shade800)
                         : theme.colorScheme.secondary,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                     visualDensity: VisualDensity.compact,
                   ),
                 ),
@@ -270,9 +320,15 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
                     );
                   },
                   icon: const Icon(Icons.security_rounded, size: 16),
-                  label: const Text('Access Control', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  label: const Text(
+                    'Access Control',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                     visualDensity: VisualDensity.compact,
                   ),
                 ),
@@ -292,17 +348,32 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
     return Colors.blue;
   }
 
-  Widget _buildRadioCard(BuildContext context, WirelessRadio radio, WirelessOverview overview, AppState appState) {
+  Widget _buildRadioCard(
+    BuildContext context,
+    WirelessRadio radio,
+    WirelessOverview overview,
+    AppState appState,
+  ) {
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
     final freqStr = radio.formattedFrequency ?? 'Ch ${radio.channel}';
     final bandColor = _getBandColor(radio.bandLabel);
 
     final regularIfaces = radio.interfaces
-        .where((i) => !i.isGuestInterface(appState.customGuestSections, appState.excludedGuestSections))
+        .where(
+          (i) => !i.isGuestInterface(
+            appState.customGuestSections,
+            appState.excludedGuestSections,
+          ),
+        )
         .toList();
     final guestIfaces = radio.interfaces
-        .where((i) => i.isGuestInterface(appState.customGuestSections, appState.excludedGuestSections))
+        .where(
+          (i) => i.isGuestInterface(
+            appState.customGuestSections,
+            appState.excludedGuestSections,
+          ),
+        )
         .toList();
 
     final minimalSummary = radio.isUp
@@ -318,7 +389,11 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
         child: ExpansionTile(
           initiallyExpanded: true,
           tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          childrenPadding: const EdgeInsets.only(left: 14, right: 14, bottom: 14),
+          childrenPadding: const EdgeInsets.only(
+            left: 14,
+            right: 14,
+            bottom: 14,
+          ),
           leading: CircleAvatar(
             backgroundColor: bandColor.withValues(alpha: 0.15),
             child: Icon(Icons.wifi, color: bandColor),
@@ -332,7 +407,10 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
                   alignment: Alignment.centerLeft,
                   child: Text(
                     radio.name.toUpperCase(),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14.5,
+                    ),
                   ),
                 ),
               ),
@@ -340,7 +418,9 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: radio.isUp ? LuciStatusColors.connected.withValues(alpha: 0.15) : Colors.red.withValues(alpha: 0.15),
+                  color: radio.isUp
+                      ? LuciStatusColors.connected.withValues(alpha: 0.15)
+                      : Colors.red.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
@@ -358,7 +438,10 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
             padding: const EdgeInsets.only(top: 2),
             child: Text(
               minimalSummary,
-              style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 11.5),
+              style: TextStyle(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 11.5,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -371,7 +454,8 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
                 visualDensity: VisualDensity.compact,
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(),
-                onPressed: () => _showAddSsidDialog(context, overview.radios, radio),
+                onPressed: () =>
+                    _showAddSsidDialog(context, overview.radios, radio),
               ),
               const SizedBox(width: 4),
               IconButton(
@@ -390,7 +474,9 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.35,
+                ),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -428,7 +514,11 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
             if (regularIfaces.isNotEmpty) ...[
               Row(
                 children: [
-                  Icon(Icons.wifi_rounded, size: 15, color: theme.colorScheme.primary),
+                  Icon(
+                    Icons.wifi_rounded,
+                    size: 15,
+                    color: theme.colorScheme.primary,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     'Primary Networks & SSIDs',
@@ -440,7 +530,10 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
                   ),
                   const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 1.5,
+                    ),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
@@ -461,7 +554,8 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
                 (iface) => WirelessInterfaceCard(
                   radio: radio,
                   interface: iface,
-                  onToggleEnabled: (val) => _handleToggleSsid(context, radio, iface, val, appState),
+                  onToggleEnabled: (val) =>
+                      _handleToggleSsid(context, radio, iface, val, appState),
                 ),
               ),
             ],
@@ -472,7 +566,9 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
                   Icon(
                     Icons.shield_moon_rounded,
                     size: 15,
-                    color: isDarkMode ? Colors.amber.shade400 : Colors.amber.shade800,
+                    color: isDarkMode
+                        ? Colors.amber.shade400
+                        : Colors.amber.shade800,
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -480,12 +576,17 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 12.5,
-                      color: isDarkMode ? Colors.amber.shade300 : Colors.amber.shade900,
+                      color: isDarkMode
+                          ? Colors.amber.shade300
+                          : Colors.amber.shade900,
                     ),
                   ),
                   const SizedBox(width: 6),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 1.5,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.amber.shade800.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
@@ -495,7 +596,9 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
-                        color: isDarkMode ? Colors.amber.shade300 : Colors.amber.shade900,
+                        color: isDarkMode
+                            ? Colors.amber.shade300
+                            : Colors.amber.shade900,
                       ),
                     ),
                   ),
@@ -506,7 +609,8 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
                 (iface) => WirelessInterfaceCard(
                   radio: radio,
                   interface: iface,
-                  onToggleEnabled: (val) => _handleToggleSsid(context, radio, iface, val, appState),
+                  onToggleEnabled: (val) =>
+                      _handleToggleSsid(context, radio, iface, val, appState),
                 ),
               ),
             ],
@@ -516,7 +620,12 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
     );
   }
 
-  Widget _buildRadioMetricPill(BuildContext context, String label, String value, IconData icon) {
+  Widget _buildRadioMetricPill(
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+  ) {
     final theme = Theme.of(context);
     return Row(
       children: [
@@ -528,12 +637,18 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
             children: [
               Text(
                 label,
-                style: TextStyle(fontSize: 9.5, color: theme.colorScheme.onSurfaceVariant),
+                style: TextStyle(
+                  fontSize: 9.5,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
               Text(
                 value,
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ],
@@ -553,7 +668,10 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
     bool isConnectedToThisSsid = false;
     // Check if any connected client station matches active app session or router connection
     for (final st in iface.stations) {
-      if (st.macAddress.toUpperCase() == (appState.dashboardData?['activeSessionMac']?.toString().toUpperCase())) {
+      if (st.macAddress.toUpperCase() ==
+          (appState.dashboardData?['activeSessionMac']
+              ?.toString()
+              .toUpperCase())) {
         isConnectedToThisSsid = true;
         break;
       }
@@ -565,7 +683,8 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
           .where((i) => i.mode.toLowerCase() == 'ap' && i.isEnabled)
           .toList();
 
-      if (enabledInterfacesOnRadio.length == 1 && enabledInterfacesOnRadio.first.sectionName == iface.sectionName) {
+      if (enabledInterfacesOnRadio.length == 1 &&
+          enabledInterfacesOnRadio.first.sectionName == iface.sectionName) {
         if (!context.mounted) return;
         await showDialog<bool>(
           context: context,
@@ -592,7 +711,11 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
       final proceed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          icon: const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 36),
+          icon: const Icon(
+            Icons.warning_amber_rounded,
+            color: Colors.orange,
+            size: 36,
+          ),
           title: const Text('Self-Disconnect Warning'),
           content: Text(
             'You\'re currently connected via network "${iface.ssid}". Disabling it will disconnect your session; the app will attempt to reconnect automatically once you rejoin a working network.',
@@ -662,7 +785,11 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
     }
   }
 
-  Widget _buildStationsList(BuildContext context, WirelessOverview overview, AppState appState) {
+  Widget _buildStationsList(
+    BuildContext context,
+    WirelessOverview overview,
+    AppState appState,
+  ) {
     final dhcpOverview = DhcpDnsOverview.fromDashboardData(
       appState.dashboardData,
       isReviewerMode: appState.reviewerModeEnabled,
@@ -693,24 +820,31 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
       return const Card(
         child: Padding(
           padding: EdgeInsets.all(16.0),
-          child: Center(
-            child: Text('No wireless stations connected.'),
-          ),
+          child: Center(child: Text('No wireless stations connected.')),
         ),
       );
     }
 
-    String normMac(String m) => m.toUpperCase().replaceAll('-', ':').split(':').map((b) => b.length == 1 ? '0$b' : b).join(':');
+    String normMac(String m) => m
+        .toUpperCase()
+        .replaceAll('-', ':')
+        .split(':')
+        .map((b) => b.length == 1 ? '0$b' : b)
+        .join(':');
 
     String? resolveHostname(String macStr) {
       final macNorm = normMac(macStr);
       for (final st in dhcpOverview.staticMappings) {
-        if (normMac(st.macAddress) == macNorm && st.hostname.isNotEmpty && st.hostname != 'Unnamed Host') {
+        if (normMac(st.macAddress) == macNorm &&
+            st.hostname.isNotEmpty &&
+            st.hostname != 'Unnamed Host') {
           return st.hostname;
         }
       }
       for (final l in dhcpOverview.activeLeases) {
-        if (normMac(l.macAddress) == macNorm && l.hostname.isNotEmpty && l.hostname != 'Anonymous Device') {
+        if (normMac(l.macAddress) == macNorm &&
+            l.hostname.isNotEmpty &&
+            l.hostname != 'Anonymous Device') {
           return l.hostname;
         }
       }
@@ -724,20 +858,29 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
         final band = item['band'] as String;
 
         final hostname = resolveHostname(st.macAddress);
-        final hasName = hostname != null && hostname.isNotEmpty && normMac(hostname) != normMac(st.macAddress);
+        final hasName =
+            hostname != null &&
+            hostname.isNotEmpty &&
+            normMac(hostname) != normMac(st.macAddress);
         final titleText = hasName ? hostname : st.macAddress;
-        final subtitleText = hasName ? 'MAC: ${st.macAddress} • SSID: $ssid ($band)' : 'SSID: $ssid ($band)';
+        final subtitleText = hasName
+            ? 'MAC: ${st.macAddress} • SSID: $ssid ($band)'
+            : 'SSID: $ssid ($band)';
 
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
           elevation: 1,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: _getSignalColor(st.signalDbm).withValues(alpha: 0.12),
+                  backgroundColor: _getSignalColor(
+                    st.signalDbm,
+                  ).withValues(alpha: 0.12),
                   child: Icon(
                     Icons.wifi,
                     color: _getSignalColor(st.signalDbm),
@@ -751,7 +894,10 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
                     children: [
                       Text(
                         titleText,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -802,7 +948,10 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
                     if (st.rxRate == null && st.txRate == null)
                       Text(
                         st.signalQualityLabel,
-                        style: const TextStyle(fontSize: 10, color: Colors.grey),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey,
+                        ),
                       ),
                   ],
                 ),
@@ -812,7 +961,13 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
                   onSelected: (val) {
                     final isPaused = appState.isInternetPaused(st.macAddress);
                     if (val == 'pause') {
-                      _toggleInternetPause(context, st.macAddress, titleText, !isPaused, appState);
+                      _toggleInternetPause(
+                        context,
+                        st.macAddress,
+                        titleText,
+                        !isPaused,
+                        appState,
+                      );
                     }
                   },
                   itemBuilder: (ctx) {
@@ -823,12 +978,18 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
                         child: Row(
                           children: [
                             Icon(
-                              isPaused ? Icons.play_circle_outline : Icons.pause_circle_outline,
-                              color: isPaused ? LuciStatusColors.connected : Colors.orange,
+                              isPaused
+                                  ? Icons.play_circle_outline
+                                  : Icons.pause_circle_outline,
+                              color: isPaused
+                                  ? LuciStatusColors.connected
+                                  : Colors.orange,
                               size: 18,
                             ),
                             const SizedBox(width: 8),
-                            Text(isPaused ? 'Resume Internet' : 'Pause Internet'),
+                            Text(
+                              isPaused ? 'Resume Internet' : 'Pause Internet',
+                            ),
                           ],
                         ),
                       ),
@@ -915,8 +1076,6 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
     return Colors.red;
   }
 
-
-
   void _showEditRadioDialog(BuildContext context, WirelessRadio radio) {
     showDialog<bool>(
       context: context,
@@ -924,7 +1083,11 @@ class _WirelessManagementScreenState extends ConsumerState<WirelessManagementScr
     );
   }
 
-  void _showAddSsidDialog(BuildContext context, List<WirelessRadio> radios, WirelessRadio targetRadio) {
+  void _showAddSsidDialog(
+    BuildContext context,
+    List<WirelessRadio> radios,
+    WirelessRadio targetRadio,
+  ) {
     showDialog<bool>(
       context: context,
       builder: (ctx) => AddSsidDialog(radios: radios, targetRadio: targetRadio),

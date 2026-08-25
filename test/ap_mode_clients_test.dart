@@ -50,7 +50,10 @@ void main() {
       final clients = Client.buildMergedClientList(dhcpLeases, wirelessMacs);
 
       expect(clients, hasLength(2));
-      expect(clients.every((c) => c.connectionType == ConnectionType.wireless), isTrue);
+      expect(
+        clients.every((c) => c.connectionType == ConnectionType.wireless),
+        isTrue,
+      );
       expect(
         clients.map((c) => c.macAddress.toUpperCase()).toSet(),
         wirelessMacs,
@@ -96,12 +99,14 @@ void main() {
       // 2 from DHCP + 1 wireless-only = 3
       expect(clients, hasLength(3));
 
-      final wirelessClients =
-          clients.where((c) => c.connectionType == ConnectionType.wireless).toList();
+      final wirelessClients = clients
+          .where((c) => c.connectionType == ConnectionType.wireless)
+          .toList();
       expect(wirelessClients, hasLength(2));
 
-      final wiredClients =
-          clients.where((c) => c.connectionType == ConnectionType.wired).toList();
+      final wiredClients = clients
+          .where((c) => c.connectionType == ConnectionType.wired)
+          .toList();
       expect(wiredClients, hasLength(1));
       expect(wiredClients.first.hostname, 'Desktop-PC');
     });

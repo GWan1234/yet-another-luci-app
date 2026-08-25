@@ -36,7 +36,8 @@ class ActionRateLimiter {
     if (last != null) {
       final elapsed = now.difference(last);
       if (elapsed < cooldown) {
-        _actionSuppressionCounts[actionKey] = (_actionSuppressionCounts[actionKey] ?? 0) + 1;
+        _actionSuppressionCounts[actionKey] =
+            (_actionSuppressionCounts[actionKey] ?? 0) + 1;
         return true;
       }
     }
@@ -59,7 +60,8 @@ class ActionRateLimiter {
   }
 
   /// Returns how many rapid repeated calls were suppressed for an action.
-  static int getSuppressionCount(String actionKey) => _actionSuppressionCounts[actionKey] ?? 0;
+  static int getSuppressionCount(String actionKey) =>
+      _actionSuppressionCounts[actionKey] ?? 0;
 
   /// Clears rate limiting state for a given action key or all keys.
   static void reset([String? actionKey]) {
@@ -74,7 +76,10 @@ class ActionRateLimiter {
 }
 
 /// Returns style parameters matching the unified LuciDesignSystem theme tokens.
-({Color background, Color accent, IconData icon}) getLuciToastStyle(LuciToastType type, bool isDark) {
+({Color background, Color accent, IconData icon}) getLuciToastStyle(
+  LuciToastType type,
+  bool isDark,
+) {
   switch (type) {
     case LuciToastType.success:
       return (
@@ -129,7 +134,8 @@ class _KeyedToastItem {
 
 /// Global Toast Notification Manager for modern animated toasts with rate limiting & guardrails.
 class LuciToastManager {
-  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
   static final List<_ToastItem> _activeToasts = [];
   static final Map<String, DateTime> _recentToastMessages = {};
   static final Map<String, _KeyedToastItem> _activeKeyedToasts = {};
@@ -163,7 +169,10 @@ class LuciToastManager {
   }
 
   /// Guardrail to ensure technical, internal debug errors or raw exceptions are NEVER presented to users in toasts.
-  static ({String title, String? subtitle}) _sanitizeToastText(String rawTitle, String? rawSubtitle) {
+  static ({String title, String? subtitle}) _sanitizeToastText(
+    String rawTitle,
+    String? rawSubtitle,
+  ) {
     bool isDebugString(String? text) {
       if (text == null || text.trim().isEmpty) return false;
       final t = text.toLowerCase();
@@ -194,7 +203,8 @@ class LuciToastManager {
     }
 
     if (isDebugString(rawSubtitle)) {
-      subtitle = 'Unable to complete request. Please verify network connection and try again.';
+      subtitle =
+          'Unable to complete request. Please verify network connection and try again.';
     }
 
     return (title: title, subtitle: subtitle);
@@ -254,7 +264,9 @@ class LuciToastManager {
         margin: EdgeInsets.only(
           left: 16,
           right: 16,
-          bottom: OsPlatformIntegration.getSafeAreaBottomPadding(context) + extraBottomOffset,
+          bottom:
+              OsPlatformIntegration.getSafeAreaBottomPadding(context) +
+              extraBottomOffset,
         ),
         backgroundColor: style.background,
         shape: RoundedRectangleBorder(
@@ -279,11 +291,7 @@ class LuciToastManager {
                       strokeWidth: 2.2,
                       color: style.accent,
                     )
-                  : Icon(
-                      style.icon,
-                      color: style.accent,
-                      size: 20,
-                    ),
+                  : Icon(style.icon, color: style.accent, size: 20),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -305,10 +313,7 @@ class LuciToastManager {
                     const SizedBox(height: 2),
                     Text(
                       cleanSubtitle,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: subtitleColor,
-                      ),
+                      style: TextStyle(fontSize: 11.5, color: subtitleColor),
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -321,7 +326,10 @@ class LuciToastManager {
               TextButton(
                 style: TextButton.styleFrom(
                   foregroundColor: style.accent,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -331,7 +339,10 @@ class LuciToastManager {
                 },
                 child: Text(
                   actionLabel,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ],
@@ -363,7 +374,8 @@ class LuciToastManager {
     final normalizedActionKey = actionKey?.toLowerCase();
 
     // Replace and dismiss any active keyed loading toast for this action key
-    if (normalizedActionKey != null && _activeKeyedToasts.containsKey(normalizedActionKey)) {
+    if (normalizedActionKey != null &&
+        _activeKeyedToasts.containsKey(normalizedActionKey)) {
       final oldKeyed = _activeKeyedToasts.remove(normalizedActionKey);
       oldKeyed?.timeoutTimer.cancel();
       oldKeyed?.toastItem.dismiss();
@@ -375,9 +387,17 @@ class LuciToastManager {
 
     // 1. Guardrail & Rate Limiting Check on Action Key if provided
     if (normalizedActionKey != null && actionCooldown != null) {
-      if (ActionRateLimiter.isRateLimited(normalizedActionKey, cooldown: actionCooldown)) {
-        final remaining = ActionRateLimiter.getRemainingCooldown(normalizedActionKey, cooldown: actionCooldown);
-        final count = ActionRateLimiter.getSuppressionCount(normalizedActionKey);
+      if (ActionRateLimiter.isRateLimited(
+        normalizedActionKey,
+        cooldown: actionCooldown,
+      )) {
+        final remaining = ActionRateLimiter.getRemainingCooldown(
+          normalizedActionKey,
+          cooldown: actionCooldown,
+        );
+        final count = ActionRateLimiter.getSuppressionCount(
+          normalizedActionKey,
+        );
         showRateLimited(
           context,
           actionName: title,
@@ -403,11 +423,20 @@ class LuciToastManager {
 
     final shouldUseNative = useNativeOs ?? preferNativeOsToast;
     final isAndroid12OrHigher = OsPlatformIntegration.isAndroid12OrHigher;
-    final isMultiLineOrCustom = (subtitle != null && subtitle.isNotEmpty) || title.contains('\n') || title.length > 40;
+    final isMultiLineOrCustom =
+        (subtitle != null && subtitle.isNotEmpty) ||
+        title.contains('\n') ||
+        title.length > 40;
 
     // Android 12 (API level 31+) restricts native text toasts to 2 lines max and prepends the app icon automatically.
-    if (shouldUseNative && !isAndroid12OrHigher && onAction == null && !isMultiLineOrCustom && type != LuciToastType.loading) {
-      final text = subtitle != null && subtitle.isNotEmpty ? '$title\n$subtitle' : title;
+    if (shouldUseNative &&
+        !isAndroid12OrHigher &&
+        onAction == null &&
+        !isMultiLineOrCustom &&
+        type != LuciToastType.loading) {
+      final text = subtitle != null && subtitle.isNotEmpty
+          ? '$title\n$subtitle'
+          : title;
       try {
         showNativeToast(message: text, type: type);
         return;
@@ -417,10 +446,14 @@ class LuciToastManager {
     }
 
     // 3. Resolve context dynamically with app-wide navigatorKey fallback for 100% context awareness
-    final BuildContext? effectiveContext = context.mounted ? context : navigatorKey.currentContext;
+    final BuildContext? effectiveContext = context.mounted
+        ? context
+        : navigatorKey.currentContext;
     if (effectiveContext == null || !effectiveContext.mounted) return;
 
-    final overlayState = Overlay.maybeOf(effectiveContext, rootOverlay: true) ?? navigatorKey.currentState?.overlay;
+    final overlayState =
+        Overlay.maybeOf(effectiveContext, rootOverlay: true) ??
+        navigatorKey.currentState?.overlay;
 
     // 4. Fallback to custom ScaffoldMessenger SnackBar if OverlayState is unavailable
     if (overlayState == null) {
@@ -445,7 +478,9 @@ class LuciToastManager {
     late _ToastItem toastItem;
 
     late OverlayEntry entry;
-    toastItem = _ToastItem(entry: OverlayEntry(builder: (_) => const SizedBox.shrink()));
+    toastItem = _ToastItem(
+      entry: OverlayEntry(builder: (_) => const SizedBox.shrink()),
+    );
 
     entry = OverlayEntry(
       builder: (ctx) => _LuciToastWidget(
@@ -471,17 +506,21 @@ class LuciToastManager {
 
     // Context-Aware loading auto-timeout registration
     if (type == LuciToastType.loading) {
-      final effectiveKey = normalizedActionKey ?? '$title:${subtitle ?? ''}'.toLowerCase();
+      final effectiveKey =
+          normalizedActionKey ?? '$title:${subtitle ?? ''}'.toLowerCase();
       final timeoutTimer = Timer(duration, () {
         if (_activeKeyedToasts.containsKey(effectiveKey)) {
           final item = _activeKeyedToasts.remove(effectiveKey);
           item?.toastItem.dismiss();
-          final timeoutContext = effectiveContext.mounted ? effectiveContext : navigatorKey.currentContext;
+          final timeoutContext = effectiveContext.mounted
+              ? effectiveContext
+              : navigatorKey.currentContext;
           if (timeoutContext != null && timeoutContext.mounted) {
             showError(
               timeoutContext,
               'Operation Timed Out',
-              subtitle: 'The request took too long to complete. Please check network connection.',
+              subtitle:
+                  'The request took too long to complete. Please check network connection.',
             );
           }
         }
@@ -544,7 +583,9 @@ class LuciToastManager {
     Duration timeout = const Duration(seconds: 60),
     bool? useNativeOs,
   }) {
-    final ctx = (context != null && context.mounted) ? context : navigatorKey.currentContext;
+    final ctx = (context != null && context.mounted)
+        ? context
+        : navigatorKey.currentContext;
     if (ctx == null) return;
     showLoading(
       ctx,
@@ -566,7 +607,9 @@ class LuciToastManager {
     bool? useNativeOs,
     bool showProgressBar = true,
   }) {
-    final ctx = (context != null && context.mounted) ? context : navigatorKey.currentContext;
+    final ctx = (context != null && context.mounted)
+        ? context
+        : navigatorKey.currentContext;
     if (ctx == null) return;
     showSuccess(
       ctx,
@@ -590,7 +633,9 @@ class LuciToastManager {
     bool? useNativeOs,
     bool showProgressBar = true,
   }) {
-    final ctx = (context != null && context.mounted) ? context : navigatorKey.currentContext;
+    final ctx = (context != null && context.mounted)
+        ? context
+        : navigatorKey.currentContext;
     if (ctx == null) return;
     showError(
       ctx,
@@ -722,12 +767,15 @@ class LuciToastManager {
     bool? useNativeOs,
   }) {
     final seconds = (remaining.inMilliseconds / 1000.0).toStringAsFixed(1);
-    final countInfo = suppressedCount > 1 ? ' ($suppressedCount taps blocked)' : '';
+    final countInfo = suppressedCount > 1
+        ? ' ($suppressedCount taps blocked)'
+        : '';
 
     show(
       context,
       title: 'Action Cooldown Active',
-      subtitle: 'Please wait ${seconds}s before triggering "$actionName" again$countInfo.',
+      subtitle:
+          'Please wait ${seconds}s before triggering "$actionName" again$countInfo.',
       type: LuciToastType.rateLimited,
       duration: const Duration(seconds: 3),
       useNativeOs: useNativeOs,
@@ -806,7 +854,8 @@ class _LuciToastWidget extends StatefulWidget {
   State<_LuciToastWidget> createState() => _LuciToastWidgetState();
 }
 
-class _LuciToastWidgetState extends State<_LuciToastWidget> with TickerProviderStateMixin {
+class _LuciToastWidgetState extends State<_LuciToastWidget>
+    with TickerProviderStateMixin {
   late AnimationController _animController;
   late AnimationController _progressController;
   late Animation<double> _scaleAnimation;
@@ -840,22 +889,25 @@ class _LuciToastWidgetState extends State<_LuciToastWidget> with TickerProviderS
       CurvedAnimation(parent: _animController, curve: Curves.easeOutBack),
     );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0.0, 0.7),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
-    );
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0.0, 0.7), end: Offset.zero).animate(
+          CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
+        );
 
-    _fadeAnimation = CurvedAnimation(parent: _animController, curve: Curves.easeIn);
+    _fadeAnimation = CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeIn,
+    );
 
     _animController.forward();
     _progressController.reverse(from: 1.0);
 
     // Trigger haptic feedback via OsPlatformIntegration
-    if (widget.type == LuciToastType.error || widget.type == LuciToastType.guardrail) {
+    if (widget.type == LuciToastType.error ||
+        widget.type == LuciToastType.guardrail) {
       OsPlatformIntegration.triggerHaptic(OsHapticType.heavy);
-    } else if (widget.type == LuciToastType.warning || widget.type == LuciToastType.rateLimited) {
+    } else if (widget.type == LuciToastType.warning ||
+        widget.type == LuciToastType.rateLimited) {
       OsPlatformIntegration.triggerHaptic(OsHapticType.medium);
     } else {
       OsPlatformIntegration.triggerHaptic(OsHapticType.light);
@@ -898,7 +950,9 @@ class _LuciToastWidgetState extends State<_LuciToastWidget> with TickerProviderS
     super.dispose();
   }
 
-  ({Color background, Color accent, IconData icon}) _getTypeStyle(BuildContext context) {
+  ({Color background, Color accent, IconData icon}) _getTypeStyle(
+    BuildContext context,
+  ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final base = getLuciToastStyle(widget.type, isDark);
     return (
@@ -913,8 +967,12 @@ class _LuciToastWidgetState extends State<_LuciToastWidget> with TickerProviderS
     final style = _getTypeStyle(context);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final bottomPadding = OsPlatformIntegration.getSafeAreaBottomPadding(context);
-    final hasNav = LuciToastManager._hasBottomNavigationBar(widget.parentContext) || LuciToastManager._hasBottomNavigationBar(context);
+    final bottomPadding = OsPlatformIntegration.getSafeAreaBottomPadding(
+      context,
+    );
+    final hasNav =
+        LuciToastManager._hasBottomNavigationBar(widget.parentContext) ||
+        LuciToastManager._hasBottomNavigationBar(context);
     final extraBottomOffset = hasNav ? 78.0 : 12.0;
 
     final textColor = theme.colorScheme.onSurface;
@@ -931,7 +989,8 @@ class _LuciToastWidgetState extends State<_LuciToastWidget> with TickerProviderS
         child: Semantics(
           liveRegion: true,
           container: true,
-          label: '${widget.type.name} alert: ${widget.title}. ${widget.subtitle ?? ""}',
+          label:
+              '${widget.type.name} alert: ${widget.title}. ${widget.subtitle ?? ""}',
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
             child: RepaintBoundary(
@@ -952,12 +1011,16 @@ class _LuciToastWidgetState extends State<_LuciToastWidget> with TickerProviderS
                             color: style.background,
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: style.accent.withValues(alpha: isDark ? 0.35 : 0.22),
+                              color: style.accent.withValues(
+                                alpha: isDark ? 0.35 : 0.22,
+                              ),
                               width: 1.0,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: theme.shadowColor.withValues(alpha: isDark ? 0.35 : 0.08),
+                                color: theme.shadowColor.withValues(
+                                  alpha: isDark ? 0.35 : 0.08,
+                                ),
                                 blurRadius: 12,
                                 offset: const Offset(0, 4),
                               ),
@@ -965,70 +1028,83 @@ class _LuciToastWidgetState extends State<_LuciToastWidget> with TickerProviderS
                           ),
                           clipBehavior: Clip.antiAlias,
                           child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.center,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(6),
-                                          decoration: BoxDecoration(
-                                            color: style.accent.withValues(alpha: 0.14),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: widget.type == LuciToastType.loading
-                                              ? LuciSmoothSpinner(
-                                                  size: 16,
-                                                  strokeWidth: 2.0,
-                                                  color: style.accent,
-                                                )
-                                              : Icon(
-                                                  style.icon,
-                                                  color: style.accent,
-                                                  size: 16,
-                                                ),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12.0,
+                                  vertical: 8.0,
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: style.accent.withValues(
+                                          alpha: 0.14,
                                         ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                widget.title,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 13.0,
-                                                  color: textColor,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child:
+                                          widget.type == LuciToastType.loading
+                                          ? LuciSmoothSpinner(
+                                              size: 16,
+                                              strokeWidth: 2.0,
+                                              color: style.accent,
+                                            )
+                                          : Icon(
+                                              style.icon,
+                                              color: style.accent,
+                                              size: 16,
+                                            ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            widget.title,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 13.0,
+                                              color: textColor,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (widget.subtitle != null &&
+                                              widget.subtitle!.isNotEmpty) ...[
+                                            const SizedBox(height: 1),
+                                            Text(
+                                              widget.subtitle!,
+                                              style: TextStyle(
+                                                fontSize: 11.0,
+                                                color: subtitleColor,
                                               ),
-                                              if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
-                                                const SizedBox(height: 1),
-                                                Text(
-                                                  widget.subtitle!,
-                                                  style: TextStyle(
-                                                    fontSize: 11.0,
-                                                    color: subtitleColor,
-                                                  ),
-                                                  maxLines: 2,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                        ),
-                                    if (widget.onAction != null && widget.actionLabel != null) ...[
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    if (widget.onAction != null &&
+                                        widget.actionLabel != null) ...[
                                       const SizedBox(width: 6),
                                       TextButton(
                                         style: TextButton.styleFrom(
                                           foregroundColor: style.accent,
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 2,
+                                          ),
                                           minimumSize: Size.zero,
-                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          tapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
                                         ),
                                         onPressed: () {
                                           widget.onAction!();
@@ -1036,21 +1112,32 @@ class _LuciToastWidgetState extends State<_LuciToastWidget> with TickerProviderS
                                         },
                                         child: Text(
                                           widget.actionLabel!,
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 11.5,
+                                          ),
                                         ),
                                       ),
                                     ],
                                     IconButton(
-                                      icon: Icon(Icons.close, size: 14, color: subtitleColor),
+                                      icon: Icon(
+                                        Icons.close,
+                                        size: 14,
+                                        color: subtitleColor,
+                                      ),
                                       padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 24,
+                                        minHeight: 24,
+                                      ),
                                       onPressed: _dismissToast,
                                       tooltip: 'Dismiss',
                                     ),
                                   ],
                                 ),
                               ),
-                              if (widget.showProgressBar && widget.type != LuciToastType.loading)
+                              if (widget.showProgressBar &&
+                                  widget.type != LuciToastType.loading)
                                 AnimatedBuilder(
                                   animation: _progressController,
                                   builder: (context, child) {
@@ -1082,35 +1169,159 @@ class _LuciToastWidgetState extends State<_LuciToastWidget> with TickerProviderS
 
 /// Extension on BuildContext for quick access to modern Toast Notifications.
 extension LuciToastExtension on BuildContext {
-  void showToastLoading(String title, {String? subtitle, String? actionKey, Duration? timeout, bool? useNativeOs}) {
-    LuciToastManager.showLoading(this, title, subtitle: subtitle, actionKey: actionKey, timeout: timeout ?? const Duration(seconds: 60), useNativeOs: useNativeOs);
+  void showToastLoading(
+    String title, {
+    String? subtitle,
+    String? actionKey,
+    Duration? timeout,
+    bool? useNativeOs,
+  }) {
+    LuciToastManager.showLoading(
+      this,
+      title,
+      subtitle: subtitle,
+      actionKey: actionKey,
+      timeout: timeout ?? const Duration(seconds: 60),
+      useNativeOs: useNativeOs,
+    );
   }
 
-  void showToastSuccess(String title, {String? subtitle, Duration? duration, String? actionKey, bool? useNativeOs, bool showProgressBar = true, IconData? customIcon, Color? customAccentColor}) {
-    LuciToastManager.show(this, title: title, subtitle: subtitle, type: LuciToastType.success, duration: duration ?? const Duration(seconds: 3), actionKey: actionKey, useNativeOs: useNativeOs, showProgressBar: showProgressBar, customIcon: customIcon, customAccentColor: customAccentColor);
+  void showToastSuccess(
+    String title, {
+    String? subtitle,
+    Duration? duration,
+    String? actionKey,
+    bool? useNativeOs,
+    bool showProgressBar = true,
+    IconData? customIcon,
+    Color? customAccentColor,
+  }) {
+    LuciToastManager.show(
+      this,
+      title: title,
+      subtitle: subtitle,
+      type: LuciToastType.success,
+      duration: duration ?? const Duration(seconds: 3),
+      actionKey: actionKey,
+      useNativeOs: useNativeOs,
+      showProgressBar: showProgressBar,
+      customIcon: customIcon,
+      customAccentColor: customAccentColor,
+    );
   }
 
-  void showToastError(String title, {String? subtitle, Duration? duration, VoidCallback? onRetry, String? actionKey, bool? useNativeOs, bool showProgressBar = true, IconData? customIcon, Color? customAccentColor}) {
-    LuciToastManager.show(this, title: title, subtitle: subtitle, type: LuciToastType.error, duration: duration ?? const Duration(seconds: 5), onAction: onRetry, actionLabel: onRetry != null ? 'Retry' : null, actionKey: actionKey, useNativeOs: useNativeOs, showProgressBar: showProgressBar, customIcon: customIcon, customAccentColor: customAccentColor);
+  void showToastError(
+    String title, {
+    String? subtitle,
+    Duration? duration,
+    VoidCallback? onRetry,
+    String? actionKey,
+    bool? useNativeOs,
+    bool showProgressBar = true,
+    IconData? customIcon,
+    Color? customAccentColor,
+  }) {
+    LuciToastManager.show(
+      this,
+      title: title,
+      subtitle: subtitle,
+      type: LuciToastType.error,
+      duration: duration ?? const Duration(seconds: 5),
+      onAction: onRetry,
+      actionLabel: onRetry != null ? 'Retry' : null,
+      actionKey: actionKey,
+      useNativeOs: useNativeOs,
+      showProgressBar: showProgressBar,
+      customIcon: customIcon,
+      customAccentColor: customAccentColor,
+    );
   }
 
-  void showToastWarning(String title, {String? subtitle, Duration? duration, String? actionKey, bool? useNativeOs, bool showProgressBar = true, IconData? customIcon, Color? customAccentColor}) {
-    LuciToastManager.show(this, title: title, subtitle: subtitle, type: LuciToastType.warning, duration: duration ?? const Duration(seconds: 4), actionKey: actionKey, useNativeOs: useNativeOs, showProgressBar: showProgressBar, customIcon: customIcon, customAccentColor: customAccentColor);
+  void showToastWarning(
+    String title, {
+    String? subtitle,
+    Duration? duration,
+    String? actionKey,
+    bool? useNativeOs,
+    bool showProgressBar = true,
+    IconData? customIcon,
+    Color? customAccentColor,
+  }) {
+    LuciToastManager.show(
+      this,
+      title: title,
+      subtitle: subtitle,
+      type: LuciToastType.warning,
+      duration: duration ?? const Duration(seconds: 4),
+      actionKey: actionKey,
+      useNativeOs: useNativeOs,
+      showProgressBar: showProgressBar,
+      customIcon: customIcon,
+      customAccentColor: customAccentColor,
+    );
   }
 
-  void showToastInfo(String title, {String? subtitle, Duration? duration, String? actionKey, bool? useNativeOs, bool showProgressBar = true, IconData? customIcon, Color? customAccentColor}) {
-    LuciToastManager.show(this, title: title, subtitle: subtitle, type: LuciToastType.info, duration: duration ?? const Duration(seconds: 3), actionKey: actionKey, useNativeOs: useNativeOs, showProgressBar: showProgressBar, customIcon: customIcon, customAccentColor: customAccentColor);
+  void showToastInfo(
+    String title, {
+    String? subtitle,
+    Duration? duration,
+    String? actionKey,
+    bool? useNativeOs,
+    bool showProgressBar = true,
+    IconData? customIcon,
+    Color? customAccentColor,
+  }) {
+    LuciToastManager.show(
+      this,
+      title: title,
+      subtitle: subtitle,
+      type: LuciToastType.info,
+      duration: duration ?? const Duration(seconds: 3),
+      actionKey: actionKey,
+      useNativeOs: useNativeOs,
+      showProgressBar: showProgressBar,
+      customIcon: customIcon,
+      customAccentColor: customAccentColor,
+    );
   }
 
-  void showToastGuardrail(String title, {String? subtitle, Duration? duration, bool? useNativeOs, IconData? customIcon, Color? customAccentColor}) {
-    LuciToastManager.show(this, title: title, subtitle: subtitle ?? 'Self-device safety guardrail engaged.', type: LuciToastType.guardrail, duration: duration ?? const Duration(seconds: 5), useNativeOs: useNativeOs, customIcon: customIcon, customAccentColor: customAccentColor);
+  void showToastGuardrail(
+    String title, {
+    String? subtitle,
+    Duration? duration,
+    bool? useNativeOs,
+    IconData? customIcon,
+    Color? customAccentColor,
+  }) {
+    LuciToastManager.show(
+      this,
+      title: title,
+      subtitle: subtitle ?? 'Self-device safety guardrail engaged.',
+      type: LuciToastType.guardrail,
+      duration: duration ?? const Duration(seconds: 5),
+      useNativeOs: useNativeOs,
+      customIcon: customIcon,
+      customAccentColor: customAccentColor,
+    );
   }
 
-  void showToastRateLimited(String actionName, Duration remaining, {bool? useNativeOs}) {
-    LuciToastManager.showRateLimited(this, actionName: actionName, remaining: remaining, useNativeOs: useNativeOs);
+  void showToastRateLimited(
+    String actionName,
+    Duration remaining, {
+    bool? useNativeOs,
+  }) {
+    LuciToastManager.showRateLimited(
+      this,
+      actionName: actionName,
+      remaining: remaining,
+      useNativeOs: useNativeOs,
+    );
   }
 
-  void showNativeOsToast(String message, {LuciToastType type = LuciToastType.info}) {
+  void showNativeOsToast(
+    String message, {
+    LuciToastType type = LuciToastType.info,
+  }) {
     LuciToastManager.showNativeToast(message: message, type: type);
   }
 }

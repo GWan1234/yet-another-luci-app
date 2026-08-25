@@ -13,10 +13,7 @@ import '../models/wireless_info.dart';
 class EditRadioDialog extends ConsumerStatefulWidget {
   final WirelessRadio radio;
 
-  const EditRadioDialog({
-    super.key,
-    required this.radio,
-  });
+  const EditRadioDialog({super.key, required this.radio});
 
   @override
   ConsumerState<EditRadioDialog> createState() => _EditRadioDialogState();
@@ -95,7 +92,9 @@ class _EditRadioDialogState extends ConsumerState<EditRadioDialog> {
 
   bool _hasChanges() {
     final radio = widget.radio;
-    final initCountry = radio.country.toUpperCase().isEmpty ? '00' : radio.country.toUpperCase();
+    final initCountry = radio.country.toUpperCase().isEmpty
+        ? '00'
+        : radio.country.toUpperCase();
     final initChannel = radio.channel;
     final initHtMode = radio.htMode ?? _defaultHtModeForBand(radio.bandLabel);
     final initTxPower = radio.txPowerDbm?.toString() ?? 'auto';
@@ -113,7 +112,10 @@ class _EditRadioDialogState extends ConsumerState<EditRadioDialog> {
         : _getCuratedCountryCodes();
 
     if (!list.any((item) => item['code'] == _selectedCountry)) {
-      list.insert(0, {'code': _selectedCountry, 'label': '$_selectedCountry — Router Active Domain'});
+      list.insert(0, {
+        'code': _selectedCountry,
+        'label': '$_selectedCountry — Router Active Domain',
+      });
     }
     return list;
   }
@@ -178,13 +180,50 @@ class _EditRadioDialogState extends ConsumerState<EditRadioDialog> {
       if (band.contains('5 GHz') || band.contains('6 GHz')) {
         channels.addAll([
           'auto',
-          '36', '40', '44', '48',
-          '52', '56', '60', '64',
-          '100', '104', '108', '112', '116', '120', '124', '128', '132', '136', '140', '144',
-          '149', '153', '157', '161', '165',
+          '36',
+          '40',
+          '44',
+          '48',
+          '52',
+          '56',
+          '60',
+          '64',
+          '100',
+          '104',
+          '108',
+          '112',
+          '116',
+          '120',
+          '124',
+          '128',
+          '132',
+          '136',
+          '140',
+          '144',
+          '149',
+          '153',
+          '157',
+          '161',
+          '165',
         ]);
       } else {
-        channels.addAll(['auto', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14']);
+        channels.addAll([
+          'auto',
+          '1',
+          '2',
+          '3',
+          '4',
+          '5',
+          '6',
+          '7',
+          '8',
+          '9',
+          '10',
+          '11',
+          '12',
+          '13',
+          '14',
+        ]);
       }
     }
 
@@ -196,7 +235,9 @@ class _EditRadioDialogState extends ConsumerState<EditRadioDialog> {
 
   /// Validate channel against country code
   bool _isValidChannelForCountry(int channel, String countryCode) {
-    final validChannels = widget.radio.getValidChannelsForBand(countryCode: countryCode.toUpperCase());
+    final validChannels = widget.radio.getValidChannelsForBand(
+      countryCode: countryCode.toUpperCase(),
+    );
     return validChannels.contains(channel);
   }
 
@@ -209,7 +250,9 @@ class _EditRadioDialogState extends ConsumerState<EditRadioDialog> {
     if (channel == null) return null;
 
     if (!_isValidChannelForCountry(channel, countryCode)) {
-      final validChannels = widget.radio.getValidChannelsForBand(countryCode: countryCode);
+      final validChannels = widget.radio.getValidChannelsForBand(
+        countryCode: countryCode,
+      );
       return 'Channel $_selectedChannel is not valid for country $countryCode. Valid channels: ${validChannels.join(', ')}';
     }
     return null;
@@ -224,7 +267,19 @@ class _EditRadioDialogState extends ConsumerState<EditRadioDialog> {
     } else {
       final band = widget.radio.bandLabel;
       if (band.contains('5 GHz') || band.contains('6 GHz')) {
-        htModes.addAll(['HT20', 'HT40', 'VHT20', 'VHT40', 'VHT80', 'VHT160', 'HE20', 'HE40', 'HE80', 'HE160', 'EHT320']);
+        htModes.addAll([
+          'HT20',
+          'HT40',
+          'VHT20',
+          'VHT40',
+          'VHT80',
+          'VHT160',
+          'HE20',
+          'HE40',
+          'HE80',
+          'HE160',
+          'EHT320',
+        ]);
       } else {
         htModes.addAll(['HT20', 'HT40']);
       }
@@ -272,7 +327,9 @@ class _EditRadioDialogState extends ConsumerState<EditRadioDialog> {
     final radio = widget.radio;
 
     if (_isDisabled && !radio.isDisabled) {
-      final activeMac = appState.dashboardData?['activeSessionMac']?.toString().toUpperCase();
+      final activeMac = appState.dashboardData?['activeSessionMac']
+          ?.toString()
+          .toUpperCase();
       bool hasActiveSessionOnRadio = false;
       for (final iface in radio.interfaces) {
         for (final st in iface.stations) {
@@ -288,7 +345,8 @@ class _EditRadioDialogState extends ConsumerState<EditRadioDialog> {
         final proceed = await LuciGuardrail.showConfirmation(
           context,
           title: 'Disabling Active Radio',
-          subtitle: 'Disabling physical radio "${radio.name}" will turn off all wireless networks hosted on it and disconnect your active session.',
+          subtitle:
+              'Disabling physical radio "${radio.name}" will turn off all wireless networks hosted on it and disconnect your active session.',
           confirmLabel: 'Proceed & Disable',
           cancelLabel: 'Cancel',
           icon: Icons.warning_amber_rounded,
@@ -333,8 +391,11 @@ class _EditRadioDialogState extends ConsumerState<EditRadioDialog> {
         context.showToastSuccess('Radio settings applied directly to router.');
       } else {
         final username = appState.sessionUsername;
-        if ((appState.capabilities?.hasUciWriteAccess ?? true) == false || !appState.isAdministrativeUser) {
-          context.showToastError('Access Denied: Account \'$username\' lacks ubus UCI write authorization.');
+        if ((appState.capabilities?.hasUciWriteAccess ?? true) == false ||
+            !appState.isAdministrativeUser) {
+          context.showToastError(
+            'Access Denied: Account \'$username\' lacks ubus UCI write authorization.',
+          );
         } else {
           context.showToastError('Failed to apply radio settings to router.');
         }
@@ -346,7 +407,9 @@ class _EditRadioDialogState extends ConsumerState<EditRadioDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final appState = ref.watch(appStateProvider);
-    final hasUciWrite = (appState.capabilities?.hasUciWriteAccess ?? true) && appState.isAdministrativeUser;
+    final hasUciWrite =
+        (appState.capabilities?.hasUciWriteAccess ?? true) &&
+        appState.isAdministrativeUser;
 
     final channels = _getAvailableChannels();
     final htModes = _getAvailableHtModes();
@@ -357,215 +420,257 @@ class _EditRadioDialogState extends ConsumerState<EditRadioDialog> {
       canPop: !_isSubmitting,
       child: AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Row(
-        children: [
-          Icon(Icons.router_rounded, color: theme.colorScheme.primary),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Edit Physical Radio (${widget.radio.name})',
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        title: Row(
+          children: [
+            Icon(Icons.router_rounded, color: theme.colorScheme.primary),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Edit Physical Radio (${widget.radio.name})',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
-          ),
-        ],
-      ),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_isPrefetching) ...[
-                const LinearProgressIndicator(),
-                const SizedBox(height: 12),
-              ],
-              // ACL & User Authorization Warning Banner
-              if (!hasUciWrite) ...[
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_isPrefetching) ...[
+                  const LinearProgressIndicator(),
+                  const SizedBox(height: 12),
+                ],
+                // ACL & User Authorization Warning Banner
+                if (!hasUciWrite) ...[
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: Colors.red.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.lock_clock_outlined,
+                          color: Colors.red,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Logged in as non-root user \'${appState.sessionUsername}\'. Saving requires root/UCI write privileges.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: theme.colorScheme.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // Safety Warning Banner
                 Container(
                   padding: const EdgeInsets.all(10),
-                  margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.12),
+                    color: Colors.amber.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.red.withValues(alpha: 0.4)),
+                    border: Border.all(
+                      color: Colors.amber.withValues(alpha: 0.4),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.lock_clock_outlined, color: Colors.red, size: 20),
+                      const Icon(
+                        Icons.shield_outlined,
+                        color: Colors.amber,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Logged in as non-root user \'${appState.sessionUsername}\'. Saving requires root/UCI write privileges.',
-                          style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface, fontWeight: FontWeight.w600),
+                          'Changes will be applied directly to the router.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurface,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
+                const SizedBox(height: 16),
 
-              // Safety Warning Banner
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                // Radio Hardware Enabled Switch
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Radio Enabled',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    'Physical ${widget.radio.bandLabel} wireless transceivers',
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  value: !_isDisabled,
+                  onChanged: (enabled) =>
+                      setState(() => _isDisabled = !enabled),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.shield_outlined, color: Colors.amber, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
+                const SizedBox(height: 12),
+
+                // Operating Channel Selection
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedChannel,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Operating Channel',
+                    prefixIcon: Icon(Icons.cell_tower_rounded, size: 20),
+                    border: OutlineInputBorder(),
+                  ),
+                  items: channels.map((ch) {
+                    return DropdownMenuItem(
+                      value: ch,
                       child: Text(
-                        'Changes will be applied directly to the router.',
-                        style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface),
+                        ch == 'auto' ? 'Auto (ACS)' : 'Channel $ch',
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
-                    ),
-                  ],
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) setState(() => _selectedChannel = val);
+                  },
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // Radio Hardware Enabled Switch
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Radio Enabled', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                subtitle: Text('Physical ${widget.radio.bandLabel} wireless transceivers', style: const TextStyle(fontSize: 11)),
-                value: !_isDisabled,
-                onChanged: (enabled) => setState(() => _isDisabled = !enabled),
-              ),
-              const SizedBox(height: 12),
-
-              // Operating Channel Selection
-              DropdownButtonFormField<String>(
-                initialValue: _selectedChannel,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Operating Channel',
-                  prefixIcon: Icon(Icons.cell_tower_rounded, size: 20),
-                  border: OutlineInputBorder(),
+                // Channel Width / HT Mode Selection
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedHtMode,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: 'Channel Width / HT Mode',
+                    helperText: widget.radio.supportedHtModes.isNotEmpty
+                        ? 'Modes reported by physical driver'
+                        : null,
+                    prefixIcon: const Icon(Icons.swap_calls_rounded, size: 20),
+                    border: const OutlineInputBorder(),
+                  ),
+                  items: htModes.map((mode) {
+                    return DropdownMenuItem(
+                      value: mode,
+                      child: Text(
+                        mode,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) setState(() => _selectedHtMode = val);
+                  },
                 ),
-                items: channels.map((ch) {
-                  return DropdownMenuItem(
-                    value: ch,
-                    child: Text(
-                      ch == 'auto' ? 'Auto (ACS)' : 'Channel $ch',
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _selectedChannel = val);
-                },
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // Channel Width / HT Mode Selection
-              DropdownButtonFormField<String>(
-                initialValue: _selectedHtMode,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: 'Channel Width / HT Mode',
-                  helperText: widget.radio.supportedHtModes.isNotEmpty ? 'Modes reported by physical driver' : null,
-                  prefixIcon: const Icon(Icons.swap_calls_rounded, size: 20),
-                  border: const OutlineInputBorder(),
+                // Transmit Power Dropdown
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedTxPower,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Transmit Power (Tx Power)',
+                    prefixIcon: Icon(Icons.bolt_rounded, size: 20),
+                    border: OutlineInputBorder(),
+                  ),
+                  items: txPowers.map((tx) {
+                    String label = tx == 'auto'
+                        ? 'Auto (Maximum Allowed)'
+                        : '$tx dBm';
+                    if (tx == '30') label += ' (1000 mW)';
+                    if (tx == '23') label += ' (200 mW)';
+                    if (tx == '20') label += ' (100 mW)';
+                    if (tx == '17') label += ' (50 mW)';
+                    if (tx == '14') label += ' (25 mW)';
+                    if (tx == '10') label += ' (10 mW)';
+                    return DropdownMenuItem(
+                      value: tx,
+                      child: Text(
+                        label,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) setState(() => _selectedTxPower = val);
+                  },
                 ),
-                items: htModes.map((mode) {
-                  return DropdownMenuItem(
-                    value: mode,
-                    child: Text(
-                      mode,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _selectedHtMode = val);
-                },
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // Transmit Power Dropdown
-              DropdownButtonFormField<String>(
-                initialValue: _selectedTxPower,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Transmit Power (Tx Power)',
-                  prefixIcon: Icon(Icons.bolt_rounded, size: 20),
-                  border: OutlineInputBorder(),
+                // Country Code Dropdown
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedCountry,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: 'Country Code (Regulatory Domain)',
+                    prefixIcon: const Icon(Icons.public_rounded, size: 20),
+                    border: const OutlineInputBorder(),
+                    helperText:
+                        _getChannelValidationMessage() ??
+                        'Regulatory domain options reported by router',
+                    errorText: _getChannelValidationMessage(),
+                  ),
+                  items: countryCodes.map((item) {
+                    return DropdownMenuItem<String>(
+                      value: item['code']!,
+                      child: Text(
+                        item['label']!,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() => _selectedCountry = val);
+                    }
+                  },
                 ),
-                items: txPowers.map((tx) {
-                  String label = tx == 'auto' ? 'Auto (Maximum Allowed)' : '$tx dBm';
-                  if (tx == '30') label += ' (1000 mW)';
-                  if (tx == '23') label += ' (200 mW)';
-                  if (tx == '20') label += ' (100 mW)';
-                  if (tx == '17') label += ' (50 mW)';
-                  if (tx == '14') label += ' (25 mW)';
-                  if (tx == '10') label += ' (10 mW)';
-                  return DropdownMenuItem(
-                    value: tx,
-                    child: Text(
-                      label,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _selectedTxPower = val);
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Country Code Dropdown
-              DropdownButtonFormField<String>(
-                initialValue: _selectedCountry,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: 'Country Code (Regulatory Domain)',
-                  prefixIcon: const Icon(Icons.public_rounded, size: 20),
-                  border: const OutlineInputBorder(),
-                  helperText: _getChannelValidationMessage() ?? 'Regulatory domain options reported by router',
-                  errorText: _getChannelValidationMessage(),
-                ),
-                items: countryCodes.map((item) {
-                  return DropdownMenuItem<String>(
-                    value: item['code']!,
-                    child: Text(
-                      item['label']!,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) {
-                    setState(() => _selectedCountry = val);
-                  }
-                },
-              ),
-            ],
+              ],
+            ),
           ),
         ),
+        actions: [
+          TextButton(
+            onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            onPressed: (_isSubmitting || !_hasChanges())
+                ? null
+                : _submitChanges,
+            icon: _isSubmitting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.verified_user_rounded, size: 18),
+            label: Text(
+              hasUciWrite ? 'Save & Apply' : 'Attempt Save (Non-Root)',
+            ),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: _isSubmitting ? null : () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton.icon(
-          onPressed: (_isSubmitting || !_hasChanges()) ? null : _submitChanges,
-          icon: _isSubmitting
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Icon(Icons.verified_user_rounded, size: 18),
-          label: Text(hasUciWrite ? 'Save & Apply' : 'Attempt Save (Non-Root)'),
-        ),
-      ],
-    ),
-  );
+    );
   }
 }

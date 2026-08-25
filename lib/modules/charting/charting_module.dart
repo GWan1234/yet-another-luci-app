@@ -13,7 +13,8 @@ class ChartingModule extends LuciModule {
   String get name => 'Real-Time Charts';
 
   @override
-  String get description => 'Dynamic real-time charting system for CPU, RAM, and Network RX/TX throughput';
+  String get description =>
+      'Dynamic real-time charting system for CPU, RAM, and Network RX/TX throughput';
 
   @override
   IconData get icon => Icons.show_chart_outlined;

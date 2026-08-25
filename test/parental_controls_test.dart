@@ -37,16 +37,25 @@ void main() {
       expect(id, 'test_1');
       expect(store.profiles.length, 1);
       expect(store.profiles.first.name, 'Kids Tablet');
-      expect(store.activityLog.first.eventType, ParentalEventType.profileCreated);
+      expect(
+        store.activityLog.first.eventType,
+        ParentalEventType.profileCreated,
+      );
 
       final updated = profile.copyWith(name: 'Kids Tablet (Updated)');
       store.updateProfile(updated);
       expect(store.profiles.first.name, 'Kids Tablet (Updated)');
-      expect(store.activityLog.first.eventType, ParentalEventType.profileUpdated);
+      expect(
+        store.activityLog.first.eventType,
+        ParentalEventType.profileUpdated,
+      );
 
       store.deleteProfile('test_1');
       expect(store.profiles, isEmpty);
-      expect(store.activityLog.first.eventType, ParentalEventType.profileDeleted);
+      expect(
+        store.activityLog.first.eventType,
+        ParentalEventType.profileDeleted,
+      );
     });
 
     test('Pause and resume state management', () {
@@ -159,10 +168,13 @@ void main() {
   });
 
   group('ParentalControls Widget & Overflow Tests', () {
-    testWidgets('ParentalProfileCard renders correctly without bounds issues', (tester) async {
+    testWidgets('ParentalProfileCard renders correctly without bounds issues', (
+      tester,
+    ) async {
       final profile = ParentalProfile(
         id: 'card_test',
-        name: 'Extremely Long Device Profile Name That Could Cause Right Overflow',
+        name:
+            'Extremely Long Device Profile Name That Could Cause Right Overflow',
         icon: '💻',
         color: '#10B981',
         macAddresses: const ['AA:BB:CC:DD:EE:FF', '11:22:33:44:55:66'],
@@ -202,72 +214,84 @@ void main() {
         ),
       );
 
-      expect(find.textContaining('Extremely Long Device Profile Name'), findsOneWidget);
+      expect(
+        find.textContaining('Extremely Long Device Profile Name'),
+        findsOneWidget,
+      );
       expect(find.text('2 devices'), findsOneWidget);
       expect(find.text('Resume Internet'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('AddEditProfileDialog renders and scrolls without overflow on small screens', (tester) async {
-      tester.view.physicalSize = const Size(360, 580);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
+    testWidgets(
+      'AddEditProfileDialog renders and scrolls without overflow on small screens',
+      (tester) async {
+        tester.view.physicalSize = const Size(360, 580);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
 
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp(
-            home: Scaffold(
-              body: AddEditProfileDialog(
-                allProfiles: const [],
-                onSave: (_) {},
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp(
+              home: Scaffold(
+                body: AddEditProfileDialog(
+                  allProfiles: const [],
+                  onSave: (_) {},
+                ),
               ),
             ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('New Profile'), findsOneWidget);
-      expect(find.text('Profile Name *'), findsOneWidget);
-      expect(find.text('Create Profile'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
+        expect(find.text('New Profile'), findsOneWidget);
+        expect(find.text('Profile Name *'), findsOneWidget);
+        expect(find.text('Create Profile'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
 
-    testWidgets('AddEditProfileDialog context awareness disables save until modified when editing', (tester) async {
-      final existing = ParentalProfile(
-        id: 'p1',
-        name: 'Kids Tablet',
-        icon: '👦',
-        color: '#F97316',
-        macAddresses: const ['AA:BB:CC:DD:EE:FF'],
-      );
+    testWidgets(
+      'AddEditProfileDialog context awareness disables save until modified when editing',
+      (tester) async {
+        final existing = ParentalProfile(
+          id: 'p1',
+          name: 'Kids Tablet',
+          icon: '👦',
+          color: '#F97316',
+          macAddresses: const ['AA:BB:CC:DD:EE:FF'],
+        );
 
-      await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp(
-            home: Scaffold(
-              body: AddEditProfileDialog(
-                existing: existing,
-                allProfiles: [existing],
-                onSave: (_) {},
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp(
+              home: Scaffold(
+                body: AddEditProfileDialog(
+                  existing: existing,
+                  allProfiles: [existing],
+                  onSave: (_) {},
+                ),
               ),
             ),
           ),
-        ),
-      );
+        );
 
-      // Initially, Save Changes button should be disabled (onPressed is null)
-      final saveBtnFinder = find.widgetWithText(FilledButton, 'Save Changes');
-      expect(saveBtnFinder, findsOneWidget);
-      final initialButton = tester.widget<FilledButton>(saveBtnFinder);
-      expect(initialButton.onPressed, isNull);
+        // Initially, Save Changes button should be disabled (onPressed is null)
+        final saveBtnFinder = find.widgetWithText(FilledButton, 'Save Changes');
+        expect(saveBtnFinder, findsOneWidget);
+        final initialButton = tester.widget<FilledButton>(saveBtnFinder);
+        expect(initialButton.onPressed, isNull);
 
-      // Type a new character in profile name
-      await tester.enterText(find.byType(TextFormField).first, 'Kids Tablet 2');
-      await tester.pump();
+        // Type a new character in profile name
+        await tester.enterText(
+          find.byType(TextFormField).first,
+          'Kids Tablet 2',
+        );
+        await tester.pump();
 
-      // Now Save Changes button should be enabled
-      final updatedButton = tester.widget<FilledButton>(saveBtnFinder);
-      expect(updatedButton.onPressed, isNotNull);
-    });
+        // Now Save Changes button should be enabled
+        final updatedButton = tester.widget<FilledButton>(saveBtnFinder);
+        expect(updatedButton.onPressed, isNotNull);
+      },
+    );
   });
 }

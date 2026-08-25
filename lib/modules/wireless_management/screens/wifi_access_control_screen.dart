@@ -23,10 +23,12 @@ class WifiAccessControlScreen extends ConsumerStatefulWidget {
   const WifiAccessControlScreen({super.key});
 
   @override
-  ConsumerState<WifiAccessControlScreen> createState() => _WifiAccessControlScreenState();
+  ConsumerState<WifiAccessControlScreen> createState() =>
+      _WifiAccessControlScreenState();
 }
 
-class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScreen> {
+class _WifiAccessControlScreenState
+    extends ConsumerState<WifiAccessControlScreen> {
   final TextEditingController _macController = TextEditingController();
   List<Client> _availableClients = [];
   Client? _selectedClient;
@@ -51,7 +53,6 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
 
   // ... (keeping internal state methods)
 
-
   Future<void> _loadClients() async {
     final appState = ref.read(appStateProvider);
     try {
@@ -65,7 +66,10 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
         for (final c in clients) {
           final normMac = _normalizeMac(c.macAddress);
           final normIp = c.ipAddress.toLowerCase().trim();
-          if (localAddresses.contains(normIp) || localAddresses.any((a) => SelfDeviceGuard.normalizeMac(a) == normMac)) {
+          if (localAddresses.contains(normIp) ||
+              localAddresses.any(
+                (a) => SelfDeviceGuard.normalizeMac(a) == normMac,
+              )) {
             _phoneMac = normMac;
             break;
           }
@@ -76,7 +80,9 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() { _isLoadingClients = false; });
+      setState(() {
+        _isLoadingClients = false;
+      });
     }
   }
 
@@ -164,13 +170,16 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
     if (rawUci == null) return null;
 
     if (rawUci is Map<String, dynamic>) {
-      if (rawUci.containsKey(secName) && rawUci[secName] is Map<String, dynamic>) {
+      if (rawUci.containsKey(secName) &&
+          rawUci[secName] is Map<String, dynamic>) {
         return rawUci[secName] as Map<String, dynamic>;
       }
 
-      if (rawUci.containsKey('values') && rawUci['values'] is Map<String, dynamic>) {
+      if (rawUci.containsKey('values') &&
+          rawUci['values'] is Map<String, dynamic>) {
         final valuesMap = rawUci['values'] as Map<String, dynamic>;
-        if (valuesMap.containsKey(secName) && valuesMap[secName] is Map<String, dynamic>) {
+        if (valuesMap.containsKey(secName) &&
+            valuesMap[secName] is Map<String, dynamic>) {
           return valuesMap[secName] as Map<String, dynamic>;
         }
       }
@@ -184,7 +193,9 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
             for (final ifc in val['interfaces']) {
               if (ifc is Map<String, dynamic>) {
                 final cfg = ifc['config'] as Map<String, dynamic>?;
-                if (ifc['section'] == secName || ifc['.name'] == secName || cfg?['.name'] == secName) {
+                if (ifc['section'] == secName ||
+                    ifc['.name'] == secName ||
+                    cfg?['.name'] == secName) {
                   return cfg ?? ifc;
                 }
               }
@@ -206,7 +217,9 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
       isReviewerMode: appState.reviewerModeEnabled,
     );
 
-    final rawUci = appState.dashboardData?['uciWirelessConfig'] ?? appState.dashboardData?['wireless'];
+    final rawUci =
+        appState.dashboardData?['uciWirelessConfig'] ??
+        appState.dashboardData?['wireless'];
     final newAllows = <String, bool>{};
 
     for (final radio in overview.radios) {
@@ -217,16 +230,21 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
 
         final secMap = _findSecMap(rawUci, secName);
         if (secMap != null) {
-          filterMode = secMap['macfilter']?.toString().toLowerCase() ?? 'disable';
+          filterMode =
+              secMap['macfilter']?.toString().toLowerCase() ?? 'disable';
           final rawList = secMap['maclist'];
           if (rawList is List) {
             maclist = rawList.map((e) => _normalizeMac(e.toString())).toList();
           } else if (rawList is String) {
-            maclist = rawList.split(RegExp(r'\s+')).map((e) => _normalizeMac(e)).toList();
+            maclist = rawList
+                .split(RegExp(r'\s+'))
+                .map((e) => _normalizeMac(e))
+                .toList();
           }
         }
 
-        final inAllowList = (filterMode == 'allow') && maclist.contains(normTarget);
+        final inAllowList =
+            (filterMode == 'allow') && maclist.contains(normTarget);
         newAllows[secName] = inAllowList;
       }
     }
@@ -274,7 +292,10 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
       canPop: !appState.isAccessControlPendingConfirmation,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        final canExit = await LuciGuardrail.confirmStagedChangesOrExit(context, appState);
+        final canExit = await LuciGuardrail.confirmStagedChangesOrExit(
+          context,
+          appState,
+        );
         if (canExit && context.mounted) {
           Navigator.pop(context);
         }
@@ -285,49 +306,55 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
           children: [
             const WirelessRollbackBanner(),
             Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeaderCard(context),
-                  const SizedBox(height: 16),
-                  _buildDeviceSelectionCard(context),
-                  const SizedBox(height: 16),
-                  if (_isValidMac(_selectedMac)) ...[
-                    _buildStaticLeaseOptionCard(context, appState),
-                    _buildAccessControlMatrix(context, overview, appState),
-                    const SizedBox(height: 24),
-                    _buildApplyButton(context, overview, appState),
-                  ] else ...[
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Center(
-                          child: Column(
-                            children: [
-                              Icon(Icons.touch_app_rounded, size: 48, color: theme.colorScheme.primary.withValues(alpha: 0.4)),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Select a device from the dropdown above or enter a valid MAC address to configure Wi-Fi access rules.',
-                                textAlign: TextAlign.center,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 100.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeaderCard(context),
+                    const SizedBox(height: 16),
+                    _buildDeviceSelectionCard(context),
+                    const SizedBox(height: 16),
+                    if (_isValidMac(_selectedMac)) ...[
+                      _buildStaticLeaseOptionCard(context, appState),
+                      _buildAccessControlMatrix(context, overview, appState),
+                      const SizedBox(height: 24),
+                      _buildApplyButton(context, overview, appState),
+                    ] else ...[
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.touch_app_rounded,
+                                  size: 48,
+                                  color: theme.colorScheme.primary.withValues(
+                                    alpha: 0.4,
+                                  ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Select a device from the dropdown above or enter a valid MAC address to configure Wi-Fi access rules.',
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
     );
   }
 
@@ -342,18 +369,28 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
           children: [
             CircleAvatar(
               backgroundColor: theme.colorScheme.primaryContainer,
-              child: Icon(Icons.security_rounded, color: theme.colorScheme.onPrimaryContainer),
+              child: Icon(
+                Icons.security_rounded,
+                color: theme.colorScheme.onPrimaryContainer,
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('MAC Access Control (LuCI Filter)', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  Text(
+                    'MAC Access Control (LuCI Filter)',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     'Configure per-SSID MAC allow lists. Devices on an SSID\'s allow-list will be explicitly permitted to connect.',
-                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -374,7 +411,12 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('1. Select Target Device', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              '1. Select Target Device',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 12),
             if (_isLoadingClients)
               const Center(child: CircularProgressIndicator())
@@ -384,7 +426,9 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
                 hint: const Text('Select a connected client device...'),
                 decoration: InputDecoration(
                   labelText: 'Connected Clients',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   prefixIcon: const Icon(Icons.devices_rounded),
                 ),
                 isExpanded: true,
@@ -405,7 +449,13 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
                 const Expanded(child: Divider()),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: Text('OR Manual Entry', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
+                  child: Text(
+                    'OR Manual Entry',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 ),
                 const Expanded(child: Divider()),
               ],
@@ -426,9 +476,12 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
               decoration: InputDecoration(
                 labelText: 'MAC Address (XX:XX:XX:XX:XX:XX)',
                 hintText: 'AA:BB:CC:11:22:33',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 prefixIcon: const Icon(Icons.fingerprint_rounded),
-                errorText: (_selectedMac.isNotEmpty && !_isValidMac(_selectedMac))
+                errorText:
+                    (_selectedMac.isNotEmpty && !_isValidMac(_selectedMac))
                     ? 'Enter valid MAC address format (e.g. AA:BB:CC:11:22:33)'
                     : null,
               ),
@@ -463,7 +516,9 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: LuciStatusColors.connected.withValues(alpha: 0.3)),
+          side: BorderSide(
+            color: LuciStatusColors.connected.withValues(alpha: 0.3),
+          ),
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -479,18 +534,30 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
                       children: [
                         Text(
                           'Static Lease Active',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: LuciStatusColors.connected),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: LuciStatusColors.connected,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
-                            color: LuciStatusColors.connected.withValues(alpha: 0.2),
+                            color: LuciStatusColors.connected.withValues(
+                              alpha: 0.2,
+                            ),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             existingMapping.ipAddress,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                            ),
                           ),
                         ),
                       ],
@@ -498,7 +565,10 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
                     const SizedBox(height: 2),
                     Text(
                       'Custom DHCP Lease Name: ${existingMapping.hostname}',
-                      style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -512,11 +582,17 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
                   existingMapping: existingMapping,
                 ),
                 icon: const Icon(Icons.edit_rounded, size: 14),
-                label: const Text('Edit Lease', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                label: const Text(
+                  'Edit Lease',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: LuciStatusColors.connected,
                   side: BorderSide(color: LuciStatusColors.connected),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   visualDensity: VisualDensity.compact,
                 ),
               ),
@@ -532,13 +608,19 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: theme.colorScheme.tertiary.withValues(alpha: 0.3)),
+        side: BorderSide(
+          color: theme.colorScheme.tertiary.withValues(alpha: 0.3),
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: Row(
           children: [
-            Icon(Icons.push_pin_outlined, color: theme.colorScheme.tertiary, size: 20),
+            Icon(
+              Icons.push_pin_outlined,
+              color: theme.colorScheme.tertiary,
+              size: 20,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -546,24 +628,40 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
                 children: [
                   Text(
                     'No Static DHCP Reservation',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: theme.colorScheme.onTertiaryContainer),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: theme.colorScheme.onTertiaryContainer,
+                    ),
                   ),
                   Text(
                     'Optionally assign a custom DHCP lease name & fixed IP for $normMac.',
-                    style: TextStyle(fontSize: 11, color: theme.colorScheme.onTertiaryContainer.withValues(alpha: 0.8)),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: theme.colorScheme.onTertiaryContainer.withValues(
+                        alpha: 0.8,
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
             OutlinedButton.icon(
-              onPressed: () => _showAddStaticLeaseDialog(context, normMac, appState),
+              onPressed: () =>
+                  _showAddStaticLeaseDialog(context, normMac, appState),
               icon: const Icon(Icons.add, size: 14),
-              label: const Text('Add Static Lease', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              label: const Text(
+                'Add Static Lease',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+              ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: theme.colorScheme.tertiary,
                 side: BorderSide(color: theme.colorScheme.tertiary),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 visualDensity: VisualDensity.compact,
               ),
             ),
@@ -595,7 +693,11 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
     );
   }
 
-  Widget _buildAccessControlMatrix(BuildContext context, WirelessOverview overview, AppState appState) {
+  Widget _buildAccessControlMatrix(
+    BuildContext context,
+    WirelessOverview overview,
+    AppState appState,
+  ) {
     final theme = Theme.of(context);
     return Card(
       elevation: 2,
@@ -607,12 +709,16 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
           children: [
             Text(
               '2. Wi-Fi Allow Mode Rules for $_selectedMac',
-              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               'Check SSIDs where this device should be explicitly allowed to connect.',
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 16),
             ...overview.radios.map((radio) {
@@ -620,9 +726,14 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+                      color: theme.colorScheme.primaryContainer.withValues(
+                        alpha: 0.4,
+                      ),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -637,85 +748,138 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
                   const SizedBox(height: 8),
                   ...radio.interfaces.map((iface) {
                     final secName = iface.sectionName;
-                    final isStagedAllowed = _selectedIfaceAllows[secName] ?? false;
-                    final isInitialAllowed = _initialIfaceAllows[secName] ?? false;
+                    final isStagedAllowed =
+                        _selectedIfaceAllows[secName] ?? false;
+                    final isInitialAllowed =
+                        _initialIfaceAllows[secName] ?? false;
                     final isStagedChanged = isStagedAllowed != isInitialAllowed;
 
-                    final rawUci = appState.dashboardData?['uciWirelessConfig'] ?? appState.dashboardData?['wireless'];
+                    final rawUci =
+                        appState.dashboardData?['uciWirelessConfig'] ??
+                        appState.dashboardData?['wireless'];
                     final secMap = _findSecMap(rawUci, secName);
-                    final currentFilterMode = secMap?['macfilter']?.toString().toLowerCase() ?? 'disable';
+                    final currentFilterMode =
+                        secMap?['macfilter']?.toString().toLowerCase() ??
+                        'disable';
                     List<String> currentMacList = [];
                     final rawList = secMap?['maclist'];
                     if (rawList is List) {
-                      currentMacList = rawList.map((e) => _normalizeMac(e.toString())).toList();
+                      currentMacList = rawList
+                          .map((e) => _normalizeMac(e.toString()))
+                          .toList();
                     } else if (rawList is String) {
-                      currentMacList = rawList.split(RegExp(r'\s+')).map((e) => _normalizeMac(e)).toList();
+                      currentMacList = rawList
+                          .split(RegExp(r'\s+'))
+                          .map((e) => _normalizeMac(e))
+                          .toList();
                     }
 
                     final normMac = _normalizeMac(_selectedMac);
-                    final isCurrentlyInAllowList = (currentFilterMode == 'allow') && currentMacList.contains(normMac);
-                    final isCurrentlyInDenyList = (currentFilterMode == 'deny') && currentMacList.contains(normMac);
+                    final isCurrentlyInAllowList =
+                        (currentFilterMode == 'allow') &&
+                        currentMacList.contains(normMac);
+                    final isCurrentlyInDenyList =
+                        (currentFilterMode == 'deny') &&
+                        currentMacList.contains(normMac);
 
                     // Real Current Status Badge (Accurate router policy)
                     Widget currentStatusChip;
                     if (isCurrentlyInAllowList) {
                       currentStatusChip = Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: LuciStatusColors.connected.withValues(alpha: 0.15),
+                          color: LuciStatusColors.connected.withValues(
+                            alpha: 0.15,
+                          ),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           'Current: Allowed',
-                          style: TextStyle(color: LuciStatusColors.connected, fontWeight: FontWeight.bold, fontSize: 10),
+                          style: TextStyle(
+                            color: LuciStatusColors.connected,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
                         ),
                       );
                     } else if (isCurrentlyInDenyList) {
                       currentStatusChip = Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.red.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Text(
                           'Current: Blocked',
-                          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 10),
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
                         ),
                       );
                     } else if (currentFilterMode == 'allow') {
                       currentStatusChip = Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.orange.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Text(
                           'Current: Restricted (Not in allow list)',
-                          style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 10),
+                          style: TextStyle(
+                            color: Colors.orange,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
                         ),
                       );
                     } else if (currentFilterMode == 'deny') {
                       currentStatusChip = Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.blue.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Text(
                           'Current: Permitted (Not in deny list)',
-                          style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 10),
+                          style: TextStyle(
+                            color: Colors.blue,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
                         ),
                       );
                     } else {
                       currentStatusChip = Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.08,
+                          ),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           'Current: Open (Filter disabled)',
-                          style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 10),
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontSize: 10,
+                          ),
                         ),
                       );
                     }
@@ -724,19 +888,32 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
                     Widget? stagedChip;
                     if (isStagedChanged) {
                       stagedChip = Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: (isStagedAllowed ? Colors.teal : Colors.deepOrange).withValues(alpha: 0.2),
+                          color:
+                              (isStagedAllowed
+                                      ? Colors.teal
+                                      : Colors.deepOrange)
+                                  .withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                            color: isStagedAllowed ? Colors.teal : Colors.deepOrange,
+                            color: isStagedAllowed
+                                ? Colors.teal
+                                : Colors.deepOrange,
                             width: 1,
                           ),
                         ),
                         child: Text(
-                          isStagedAllowed ? 'STAGED: Will Allow' : 'STAGED: Will Remove',
+                          isStagedAllowed
+                              ? 'STAGED: Will Allow'
+                              : 'STAGED: Will Remove',
                           style: TextStyle(
-                            color: isStagedAllowed ? Colors.teal.shade300 : Colors.deepOrange.shade300,
+                            color: isStagedAllowed
+                                ? Colors.teal.shade300
+                                : Colors.deepOrange.shade300,
                             fontWeight: FontWeight.bold,
                             fontSize: 10,
                           ),
@@ -745,7 +922,9 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
                     }
 
                     return CheckboxListTile(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                       title: Wrap(
                         alignment: WrapAlignment.spaceBetween,
                         crossAxisAlignment: WrapCrossAlignment.center,
@@ -754,7 +933,10 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
                         children: [
                           Text(
                             iface.ssid,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                           ),
                           currentStatusChip,
                         ],
@@ -765,7 +947,10 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
                           const SizedBox(height: 2),
                           Text(
                             'Interface: ${iface.ifName} ($secName)',
-                            style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
                           if (stagedChip != null) ...[
                             const SizedBox(height: 4),
@@ -791,7 +976,11 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
     );
   }
 
-  Widget _buildApplyButton(BuildContext context, WirelessOverview overview, AppState appState) {
+  Widget _buildApplyButton(
+    BuildContext context,
+    WirelessOverview overview,
+    AppState appState,
+  ) {
     final hasChanges = _hasChanges;
     final isNewRule = _isNewClientRule;
 
@@ -811,7 +1000,8 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
         buttonLabel = 'Apply Access Control Rules';
         buttonIcon = Icons.shield_outlined;
       } else {
-        buttonLabel = 'Apply Access Control Rules ($_stagedChangesCount changes)';
+        buttonLabel =
+            'Apply Access Control Rules ($_stagedChangesCount changes)';
         buttonIcon = Icons.shield_rounded;
       }
     }
@@ -823,11 +1013,19 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
       child: FilledButton.icon(
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          backgroundColor: hasChanges ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHighest,
-          foregroundColor: hasChanges ? theme.colorScheme.onPrimary : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          backgroundColor: hasChanges
+              ? theme.colorScheme.primary
+              : theme.colorScheme.surfaceContainerHighest,
+          foregroundColor: hasChanges
+              ? theme.colorScheme.onPrimary
+              : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
         ),
-        onPressed: hasChanges ? () => _handleApplyChanges(context, overview, appState) : null,
+        onPressed: hasChanges
+            ? () => _handleApplyChanges(context, overview, appState)
+            : null,
         icon: Icon(buttonIcon),
         label: Text(
           buttonLabel,
@@ -837,11 +1035,17 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
     );
   }
 
-  Future<void> _handleApplyChanges(BuildContext context, WirelessOverview overview, AppState appState) async {
+  Future<void> _handleApplyChanges(
+    BuildContext context,
+    WirelessOverview overview,
+    AppState appState,
+  ) async {
     final targetMac = _normalizeMac(_selectedMac);
     if (!_isValidMac(targetMac)) return;
 
-    final rawUci = appState.dashboardData?['uciWirelessConfig'] ?? appState.dashboardData?['wireless'];
+    final rawUci =
+        appState.dashboardData?['uciWirelessConfig'] ??
+        appState.dashboardData?['wireless'];
 
     // Construct prior snapshots & new payload map
     final priorMaclistSnapshot = <String, List<String>>{};
@@ -861,12 +1065,18 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
 
         final secMap = _findSecMap(rawUci, secName);
         if (secMap != null) {
-          currentFilterMode = secMap['macfilter']?.toString().toLowerCase() ?? 'disable';
+          currentFilterMode =
+              secMap['macfilter']?.toString().toLowerCase() ?? 'disable';
           final rawList = secMap['maclist'];
           if (rawList is List) {
-            currentMaclist = rawList.map((e) => _normalizeMac(e.toString())).toList();
+            currentMaclist = rawList
+                .map((e) => _normalizeMac(e.toString()))
+                .toList();
           } else if (rawList is String) {
-            currentMaclist = rawList.split(RegExp(r'\s+')).map((e) => _normalizeMac(e)).toList();
+            currentMaclist = rawList
+                .split(RegExp(r'\s+'))
+                .map((e) => _normalizeMac(e))
+                .toList();
           }
         }
 
@@ -885,7 +1095,9 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
           affectedSsids.add('${iface.ssid} (${radio.name})');
 
           // Check phone lockout risk: If phone MAC is known and NOT in updated maclist for an allowed SSID
-          if (_phoneMac != null && _phoneMac!.isNotEmpty && !updatedMaclist.contains(_phoneMac)) {
+          if (_phoneMac != null &&
+              _phoneMac!.isNotEmpty &&
+              !updatedMaclist.contains(_phoneMac)) {
             phoneLockoutRisk = true;
           }
         } else {
@@ -905,7 +1117,11 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
       final addPhone = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          icon: const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 40),
+          icon: const Icon(
+            Icons.warning_amber_rounded,
+            color: Colors.red,
+            size: 40,
+          ),
           title: const Text('Device Lockout Warning'),
           content: Text(
             'You have not added this device (${_phoneMac ?? "current phone"}) to the allow-list for affected SSIDs. Enabling this filter may disconnect you from this network.',
@@ -940,7 +1156,11 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.verified_user_rounded, color: Colors.blue, size: 36),
+        icon: const Icon(
+          Icons.verified_user_rounded,
+          color: Colors.blue,
+          size: 36,
+        ),
         title: const Text('Confirm Wi-Fi Access Rules'),
         content: Text(
           'Updating Wi-Fi Access Control for $targetMac on SSIDs:\n\n'
@@ -962,7 +1182,10 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
 
     if (confirmed == true && context.mounted) {
       final actionKey = 'wifi_access_control_$targetMac';
-      context.showToastLoading('Applying Wi-Fi Access Control changes...', actionKey: actionKey);
+      context.showToastLoading(
+        'Applying Wi-Fi Access Control changes...',
+        actionKey: actionKey,
+      );
 
       final success = await appState.applyWifiAccessControl(
         newMaclistByIface: newMaclistByIface,
@@ -975,14 +1198,23 @@ class _WifiAccessControlScreenState extends ConsumerState<WifiAccessControlScree
       if (success) {
         unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
         if (context.mounted) {
-          LuciToastManager.safeShowSuccess(context, 'Access Control applied.', subtitle: 'Wi-Fi access rules updated successfully.', actionKey: actionKey);
+          LuciToastManager.safeShowSuccess(
+            context,
+            'Access Control applied.',
+            subtitle: 'Wi-Fi access rules updated successfully.',
+            actionKey: actionKey,
+          );
         }
       } else {
         unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
         if (context.mounted) {
-          LuciToastManager.safeShowError(context, 'Failed to apply Wi-Fi Access Control rules.', actionKey: actionKey);
+          LuciToastManager.safeShowError(
+            context,
+            'Failed to apply Wi-Fi Access Control rules.',
+            actionKey: actionKey,
+          );
         }
       }
     }
-    }
+  }
 }

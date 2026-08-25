@@ -14,7 +14,8 @@ class VpnConnectivityModule extends LuciModule {
   String get name => 'VPN & Connectivity';
 
   @override
-  String get description => 'WireGuard peers, OpenVPN instances, Tailscale mesh, NextDNS, and Cloudflare Tunnels (cloudflared)';
+  String get description =>
+      'WireGuard peers, OpenVPN instances, Tailscale mesh, NextDNS, and Cloudflare Tunnels (cloudflared)';
 
   @override
   IconData get icon => Icons.vpn_lock_outlined;

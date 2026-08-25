@@ -37,29 +37,40 @@ class GuestWifiManagementScreen extends ConsumerWidget {
       appState.dashboardData,
       isReviewerMode: appState.reviewerModeEnabled,
     );
-    final hasWriteAccess = (appState.capabilities?.hasUciWriteAccess ?? true) && appState.isAdministrativeUser;
+    final hasWriteAccess =
+        (appState.capabilities?.hasUciWriteAccess ?? true) &&
+        appState.isAdministrativeUser;
 
     final allGuestIfaces = overview.radios
         .expand((r) => r.interfaces)
-        .where((i) => i.isGuestInterface(appState.customGuestSections, appState.excludedGuestSections))
+        .where(
+          (i) => i.isGuestInterface(
+            appState.customGuestSections,
+            appState.excludedGuestSections,
+          ),
+        )
         .toList();
 
     final activeGuestCount = allGuestIfaces.where((i) => i.isEnabled).length;
-    
+
     final guestStationPairs = <_GuestStationPair>[];
     for (final iface in allGuestIfaces) {
       for (final st in iface.stations) {
         guestStationPairs.add(_GuestStationPair(station: st, interface: iface));
       }
     }
-    
-    final allEnabled = allGuestIfaces.isNotEmpty && activeGuestCount == allGuestIfaces.length;
+
+    final allEnabled =
+        allGuestIfaces.isNotEmpty && activeGuestCount == allGuestIfaces.length;
 
     return PopScope(
       canPop: !appState.isAccessControlPendingConfirmation,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        final canExit = await LuciGuardrail.confirmStagedChangesOrExit(context, appState);
+        final canExit = await LuciGuardrail.confirmStagedChangesOrExit(
+          context,
+          appState,
+        );
         if (canExit && context.mounted) {
           Navigator.pop(context);
         }
@@ -104,7 +115,13 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                     const SizedBox(height: 20),
 
                     // Quick Action Toolbar
-                    _buildQuickActionToolbar(context, appState, overview, allGuestIfaces, hasWriteAccess),
+                    _buildQuickActionToolbar(
+                      context,
+                      appState,
+                      overview,
+                      allGuestIfaces,
+                      hasWriteAccess,
+                    ),
                     const SizedBox(height: 24),
 
                     // Section Header: Guest Wireless SSIDs
@@ -113,36 +130,67 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.shield_moon_rounded, color: Colors.amber.shade800, size: 22),
+                            Icon(
+                              Icons.shield_moon_rounded,
+                              color: Colors.amber.shade800,
+                              size: 22,
+                            ),
                             const SizedBox(width: 8),
                             Text(
                               'Configured Guest Networks (${allGuestIfaces.length})',
-                              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
                         if (allGuestIfaces.isNotEmpty)
                           Text(
                             '$activeGuestCount active',
-                            style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
                       ],
                     ),
                     const SizedBox(height: 12),
 
                     if (allGuestIfaces.isEmpty)
-                      _buildEmptyGuestCard(context, theme, appState, overview, hasWriteAccess)
+                      _buildEmptyGuestCard(
+                        context,
+                        theme,
+                        appState,
+                        overview,
+                        hasWriteAccess,
+                      )
                     else
                       ...allGuestIfaces.map(
                         (iface) => WirelessInterfaceCard(
-                          radio: iface.radio ?? (overview.radios.isNotEmpty ? overview.radios.first : WirelessRadio(name: 'radio0', isUp: true, channel: 'auto', country: 'US', interfaces: [iface])),
+                          radio:
+                              iface.radio ??
+                              (overview.radios.isNotEmpty
+                                  ? overview.radios.first
+                                  : WirelessRadio(
+                                      name: 'radio0',
+                                      isUp: true,
+                                      channel: 'auto',
+                                      country: 'US',
+                                      interfaces: [iface],
+                                    )),
                           interface: iface,
                           onToggleEnabled: (enable) async {
                             if (!hasWriteAccess) {
-                              context.showToastError('Read-only session: UCI write permission required.');
+                              context.showToastError(
+                                'Read-only session: UCI write permission required.',
+                              );
                               return;
                             }
-                            await appState.setSsidEnabled(iface.sectionName, enable, context: context);
+                            await appState.setSsidEnabled(
+                              iface.sectionName,
+                              enable,
+                              context: context,
+                            );
                           },
                         ),
                       ),
@@ -150,7 +198,13 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                     const SizedBox(height: 28),
 
                     // Connected Guest Clients List with guest-specific controls
-                    _buildConnectedGuestClientsSection(context, theme, appState, guestStationPairs, hasWriteAccess),
+                    _buildConnectedGuestClientsSection(
+                      context,
+                      theme,
+                      appState,
+                      guestStationPairs,
+                      hasWriteAccess,
+                    ),
                     const SizedBox(height: 28),
 
                     // Guest Architecture & Subnet Firewall Status
@@ -182,7 +236,12 @@ class GuestWifiManagementScreen extends ConsumerWidget {
       elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: isDarkMode ? Colors.amber.shade700.withValues(alpha: 0.45) : Colors.amber.shade400.withValues(alpha: 0.7), width: 1.2),
+        side: BorderSide(
+          color: isDarkMode
+              ? Colors.amber.shade700.withValues(alpha: 0.45)
+              : Colors.amber.shade400.withValues(alpha: 0.7),
+          width: 1.2,
+        ),
       ),
       color: isDarkMode ? const Color(0xFF231E16) : const Color(0xFFFFF9EE),
       child: Padding(
@@ -198,7 +257,13 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                     color: Colors.amber.shade800.withValues(alpha: 0.18),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.shield_moon_rounded, color: isDarkMode ? Colors.amber.shade400 : Colors.amber.shade900, size: 28),
+                  child: Icon(
+                    Icons.shield_moon_rounded,
+                    color: isDarkMode
+                        ? Colors.amber.shade400
+                        : Colors.amber.shade900,
+                    size: 28,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -207,14 +272,20 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                     children: [
                       const Text(
                         'Guest Wi-Fi Master Control',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 17,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         guestIfaces.isEmpty
                             ? 'No active guest SSIDs configured'
                             : '$activeCount of ${guestIfaces.length} networks enabled • $totalStations client${totalStations == 1 ? '' : 's'} connected',
-                        style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -232,7 +303,11 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                             int count = 0;
                             for (final iface in guestIfaces) {
                               if (iface.isEnabled != enable) {
-                                final res = await appState.setSsidEnabled(iface.sectionName, enable, context: context);
+                                final res = await appState.setSsidEnabled(
+                                  iface.sectionName,
+                                  enable,
+                                  context: context,
+                                );
                                 if (res) count++;
                               }
                             }
@@ -246,7 +321,9 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                             }
                           }
                         : (val) {
-                            context.showToastError('Read-only session: UCI write permission required.');
+                            context.showToastError(
+                              'Read-only session: UCI write permission required.',
+                            );
                           },
                   ),
               ],
@@ -271,12 +348,15 @@ class GuestWifiManagementScreen extends ConsumerWidget {
         ElevatedButton.icon(
           onPressed: () {
             if (!hasWriteAccess) {
-              context.showToastError('Read-only session: UCI write permission required to create Guest Wi-Fi.');
+              context.showToastError(
+                'Read-only session: UCI write permission required to create Guest Wi-Fi.',
+              );
               return;
             }
             showDialog(
               context: context,
-              builder: (ctx) => ProvisionGuestNetworkDialog(radios: overview.radios),
+              builder: (ctx) =>
+                  ProvisionGuestNetworkDialog(radios: overview.radios),
             );
           },
           icon: const Icon(Icons.add_moderator_rounded, size: 18),
@@ -327,7 +407,11 @@ class GuestWifiManagementScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
-            Icon(Icons.wifi_protected_setup_rounded, size: 48, color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6)),
+            Icon(
+              Icons.wifi_protected_setup_rounded,
+              size: 48,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+            ),
             const SizedBox(height: 12),
             const Text(
               'No Guest Wi-Fi Networks Found',
@@ -337,18 +421,24 @@ class GuestWifiManagementScreen extends ConsumerWidget {
             Text(
               'Easily create an isolated guest network with 1-click presets or mark an existing wireless SSID as Guest.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                fontSize: 13,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: () {
                 if (!hasWriteAccess) {
-                  context.showToastError('Read-only session: UCI write permission required to create Guest Wi-Fi.');
+                  context.showToastError(
+                    'Read-only session: UCI write permission required to create Guest Wi-Fi.',
+                  );
                   return;
                 }
                 showDialog(
                   context: context,
-                  builder: (ctx) => ProvisionGuestNetworkDialog(radios: overview.radios),
+                  builder: (ctx) =>
+                      ProvisionGuestNetworkDialog(radios: overview.radios),
                 );
               },
               icon: const Icon(Icons.add_rounded, size: 18),
@@ -372,11 +462,17 @@ class GuestWifiManagementScreen extends ConsumerWidget {
       children: [
         Row(
           children: [
-            Icon(Icons.devices_other_rounded, size: 20, color: theme.colorScheme.primary),
+            Icon(
+              Icons.devices_other_rounded,
+              size: 20,
+              color: theme.colorScheme.primary,
+            ),
             const SizedBox(width: 8),
             Text(
               'Connected Guest Devices (${guestStationPairs.length})',
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
@@ -392,12 +488,19 @@ class GuestWifiManagementScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(16.0),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle_outline_rounded, color: theme.colorScheme.primary, size: 20),
+                  Icon(
+                    Icons.check_circle_outline_rounded,
+                    color: theme.colorScheme.primary,
+                    size: 20,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'No clients currently associated with guest networks.',
-                      style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ],
@@ -417,7 +520,9 @@ class GuestWifiManagementScreen extends ConsumerWidget {
             final macNorm = ClientNamingHelper.normalizeMac(st.macAddress);
             final ipAddress = client?.ipAddress ?? 'N/A';
             final isPaused = appState.pausedInternetMacs.contains(macNorm);
-            final isStatic = (client != null && client.isStatic) || appState.findStaticLeaseByMac(macNorm) != null;
+            final isStatic =
+                (client != null && client.isStatic) ||
+                appState.findStaticLeaseByMac(macNorm) != null;
 
             return Card(
               margin: const EdgeInsets.only(bottom: 10),
@@ -438,10 +543,16 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         CircleAvatar(
-                          backgroundColor: isPaused ? Colors.red.shade100 : Colors.amber.shade100,
+                          backgroundColor: isPaused
+                              ? Colors.red.shade100
+                              : Colors.amber.shade100,
                           child: Icon(
-                            isPaused ? Icons.block_rounded : ClientNamingHelper.getDeviceIcon(client),
-                            color: isPaused ? Colors.red.shade900 : Colors.amber.shade900,
+                            isPaused
+                                ? Icons.block_rounded
+                                : ClientNamingHelper.getDeviceIcon(client),
+                            color: isPaused
+                                ? Colors.red.shade900
+                                : Colors.amber.shade900,
                             size: 20,
                           ),
                         ),
@@ -464,29 +575,55 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                                   ),
                                   const SizedBox(width: 6),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: Colors.amber.shade700.withValues(alpha: 0.15),
+                                      color: Colors.amber.shade700.withValues(
+                                        alpha: 0.15,
+                                      ),
                                       borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: Colors.amber.shade800.withValues(alpha: 0.4)),
+                                      border: Border.all(
+                                        color: Colors.amber.shade800.withValues(
+                                          alpha: 0.4,
+                                        ),
+                                      ),
                                     ),
                                     child: Text(
                                       'Isolated Guest',
-                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.amber.shade900,
+                                      ),
                                     ),
                                   ),
                                   if (isPaused) ...[
                                     const SizedBox(width: 4),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: Colors.red.shade700.withValues(alpha: 0.15),
+                                        color: Colors.red.shade700.withValues(
+                                          alpha: 0.15,
+                                        ),
                                         borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: Colors.red.shade800.withValues(alpha: 0.4)),
+                                        border: Border.all(
+                                          color: Colors.red.shade800.withValues(
+                                            alpha: 0.4,
+                                          ),
+                                        ),
                                       ),
                                       child: const Text(
                                         'PAUSED',
-                                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.red,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -495,12 +632,18 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                               const SizedBox(height: 3),
                               Text(
                                 'IP: $ipAddress  •  MAC: $macNorm  •  SSID: ${iface.ssid}',
-                                style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 'Signal: ${st.formattedSignal} (${st.signalQualityLabel})  •  Noise: ${st.noiseDbm != null ? "${st.noiseDbm} dBm" : "N/A"}',
-                                style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
                               ),
                             ],
                           ),
@@ -544,26 +687,39 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                                 }
                               : null,
                           icon: Icon(
-                            isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                            isPaused
+                                ? Icons.play_arrow_rounded
+                                : Icons.pause_rounded,
                             size: 16,
-                            color: isPaused ? Colors.green.shade700 : Colors.red.shade700,
+                            color: isPaused
+                                ? Colors.green.shade700
+                                : Colors.red.shade700,
                           ),
                           label: Text(
                             isPaused ? 'Resume Access' : 'Pause Access',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: isPaused ? Colors.green.shade700 : Colors.red.shade700,
+                              color: isPaused
+                                  ? Colors.green.shade700
+                                  : Colors.red.shade700,
                             ),
                           ),
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
                             minimumSize: const Size(0, 36),
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             side: BorderSide(
-                              color: isPaused ? Colors.green.shade400 : Colors.red.shade300,
+                              color: isPaused
+                                  ? Colors.green.shade400
+                                  : Colors.red.shade300,
                             ),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                         ),
 
@@ -579,33 +735,64 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                                       ipAddress: ipAddress,
                                       ssid: iface.ssid,
                                       iface: iface.sectionName,
-                                      isAlreadyBanned: appState.isWirelessBanned(macNorm),
+                                      isAlreadyBanned: appState
+                                          .isWirelessBanned(macNorm),
                                       onBanConfirmed: (int banTimeSeconds) async {
-                                        context.showToastLoading('Banning $displayName...', actionKey: 'ban_$macNorm');
-                                        final res = await appState.banWirelessClient(
-                                          macNorm,
-                                          iface: iface.sectionName,
-                                          banTimeSeconds: banTimeSeconds,
-                                          context: context,
+                                        context.showToastLoading(
+                                          'Banning $displayName...',
+                                          actionKey: 'ban_$macNorm',
                                         );
-                                         if (res) {
-                                           if (context.mounted) LuciToastManager.safeShowSuccess(context, 'Banned $displayName from ${iface.ssid}', actionKey: 'ban_$macNorm');
-                                         } else {
-                                           if (context.mounted) LuciToastManager.safeShowError(context, 'Failed to ban $displayName', actionKey: 'ban_$macNorm');
-                                         }
+                                        final res = await appState
+                                            .banWirelessClient(
+                                              macNorm,
+                                              iface: iface.sectionName,
+                                              banTimeSeconds: banTimeSeconds,
+                                              context: context,
+                                            );
+                                        if (res) {
+                                          if (context.mounted)
+                                            LuciToastManager.safeShowSuccess(
+                                              context,
+                                              'Banned $displayName from ${iface.ssid}',
+                                              actionKey: 'ban_$macNorm',
+                                            );
+                                        } else {
+                                          if (context.mounted)
+                                            LuciToastManager.safeShowError(
+                                              context,
+                                              'Failed to ban $displayName',
+                                              actionKey: 'ban_$macNorm',
+                                            );
+                                        }
                                       },
                                     ),
                                   );
                                 }
                               : null,
-                          icon: const Icon(Icons.block_rounded, size: 16, color: Colors.orange),
-                          label: const Text('Ban Client', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange)),
+                          icon: const Icon(
+                            Icons.block_rounded,
+                            size: 16,
+                            color: Colors.orange,
+                          ),
+                          label: const Text(
+                            'Ban Client',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange,
+                            ),
+                          ),
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
                             minimumSize: const Size(0, 36),
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             side: BorderSide(color: Colors.orange.shade300),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                         ),
 
@@ -618,16 +805,25 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                                       context: context,
                                       builder: (ctx) => AddStaticLeaseDialog(
                                         macAddress: macNorm,
-                                        initialIp: ipAddress != 'N/A' ? ipAddress : null,
-                                        initialHostname: displayName != macNorm ? displayName : null,
+                                        initialIp: ipAddress != 'N/A'
+                                            ? ipAddress
+                                            : null,
+                                        initialHostname: displayName != macNorm
+                                            ? displayName
+                                            : null,
                                         client: client,
                                         allClients: appState.clients,
-                                        onSaved: () => appState.fetchClientsForSelectedRouter(),
+                                        onSaved: () => appState
+                                            .fetchClientsForSelectedRouter(),
                                       ),
                                     );
                                   }
                                 : null,
-                            icon: const Icon(Icons.push_pin_outlined, size: 16, color: Colors.teal),
+                            icon: const Icon(
+                              Icons.push_pin_outlined,
+                              size: 16,
+                              color: Colors.teal,
+                            ),
                             label: Text(
                               'Static Lease',
                               style: TextStyle(
@@ -637,11 +833,16 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                               ),
                             ),
                             style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
                               minimumSize: const Size(0, 36),
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               side: BorderSide(color: Colors.teal.shade400),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
                           )
                         else ...[
@@ -652,16 +853,25 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                                       context: context,
                                       builder: (ctx) => AddStaticLeaseDialog(
                                         macAddress: macNorm,
-                                        initialIp: ipAddress != 'N/A' ? ipAddress : null,
-                                        initialHostname: displayName != macNorm ? displayName : null,
+                                        initialIp: ipAddress != 'N/A'
+                                            ? ipAddress
+                                            : null,
+                                        initialHostname: displayName != macNorm
+                                            ? displayName
+                                            : null,
                                         client: client,
                                         allClients: appState.clients,
-                                        onSaved: () => appState.fetchClientsForSelectedRouter(),
+                                        onSaved: () => appState
+                                            .fetchClientsForSelectedRouter(),
                                       ),
                                     );
                                   }
                                 : null,
-                            icon: const Icon(Icons.edit_outlined, size: 16, color: Colors.teal),
+                            icon: const Icon(
+                              Icons.edit_outlined,
+                              size: 16,
+                              color: Colors.teal,
+                            ),
                             label: Text(
                               'Edit Static Lease',
                               style: TextStyle(
@@ -671,22 +881,31 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                               ),
                             ),
                             style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
                               minimumSize: const Size(0, 36),
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               side: BorderSide(color: Colors.teal.shade400),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
                           ),
                           OutlinedButton.icon(
                             onPressed: hasWriteAccess
                                 ? () => _confirmRemoveStaticLease(
-                                      context,
-                                      macAddress: macNorm,
-                                      displayName: displayName,
-                                    )
+                                    context,
+                                    macAddress: macNorm,
+                                    displayName: displayName,
+                                  )
                                 : null,
-                            icon: const Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              size: 16,
+                              color: Colors.redAccent,
+                            ),
                             label: const Text(
                               'Remove Lease',
                               style: TextStyle(
@@ -696,11 +915,18 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                               ),
                             ),
                             style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              ),
                               minimumSize: const Size(0, 36),
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.5)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              side: BorderSide(
+                                color: Colors.redAccent.withValues(alpha: 0.5),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
                           ),
                         ],
@@ -715,7 +941,10 @@ class GuestWifiManagementScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildGuestSecurityArchitectureCard(BuildContext context, ThemeData theme) {
+  Widget _buildGuestSecurityArchitectureCard(
+    BuildContext context,
+    ThemeData theme,
+  ) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -729,7 +958,11 @@ class GuestWifiManagementScreen extends ConsumerWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.security_rounded, color: theme.colorScheme.primary, size: 20),
+                Icon(
+                  Icons.security_rounded,
+                  color: theme.colorScheme.primary,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 const Text(
                   'Guest Security & Firewall Guardrails',
@@ -741,19 +974,22 @@ class GuestWifiManagementScreen extends ConsumerWidget {
             _buildArchitectureTile(
               icon: Icons.alt_route_rounded,
               title: 'Subnet & Client Isolation',
-              description: 'Guest clients are assigned to isolated subnet with inter-client communication blocked (isolate=1).',
+              description:
+                  'Guest clients are assigned to isolated subnet with inter-client communication blocked (isolate=1).',
             ),
             const Divider(height: 16),
             _buildArchitectureTile(
               icon: Icons.local_fire_department_rounded,
               title: 'Firewall Policy Forwarding',
-              description: 'Outbound WAN traffic is permitted while LAN access (router admin portal & internal network devices) is strictly rejected.',
+              description:
+                  'Outbound WAN traffic is permitted while LAN access (router admin portal & internal network devices) is strictly rejected.',
             ),
             const Divider(height: 16),
             _buildArchitectureTile(
               icon: Icons.verified_user_rounded,
               title: 'Atomic UCI Commit',
-              description: 'All wireless configuration edits are applied directly to the router via atomic UCI commits.',
+              description:
+                  'All wireless configuration edits are applied directly to the router via atomic UCI commits.',
             ),
           ],
         ),
@@ -761,7 +997,11 @@ class GuestWifiManagementScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildArchitectureTile({required IconData icon, required String title, required String description}) {
+  Widget _buildArchitectureTile({
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -771,9 +1011,18 @@ class GuestWifiManagementScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
               const SizedBox(height: 2),
-              Text(description, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              Text(
+                description,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
             ],
           ),
         ),
@@ -786,9 +1035,14 @@ class GuestWifiManagementScreen extends ConsumerWidget {
     required String macAddress,
     required String displayName,
   }) async {
-    if (ActionRateLimiter.isRateLimited('delete_static_lease_$macAddress', cooldown: const Duration(milliseconds: 1200))) {
+    if (ActionRateLimiter.isRateLimited(
+      'delete_static_lease_$macAddress',
+      cooldown: const Duration(milliseconds: 1200),
+    )) {
       if (context.mounted) {
-        context.showToastWarning('Removal in progress. Please wait a moment...');
+        context.showToastWarning(
+          'Removal in progress. Please wait a moment...',
+        );
       }
       return;
     }
@@ -805,7 +1059,11 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                 color: Colors.red.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 24),
+              child: const Icon(
+                Icons.delete_outline,
+                color: Colors.redAccent,
+                size: 24,
+              ),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -829,7 +1087,9 @@ class GuestWifiManagementScreen extends ConsumerWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
             child: const Text('Remove Reservation'),
           ),
@@ -867,7 +1127,10 @@ class GuestWifiManagementScreen extends ConsumerWidget {
     }
   }
 
-  Widget _buildJustifiedGuestActionButtons(BuildContext context, {required List<Widget> buttons}) {
+  Widget _buildJustifiedGuestActionButtons(
+    BuildContext context, {
+    required List<Widget> buttons,
+  }) {
     if (buttons.isEmpty) return const SizedBox.shrink();
 
     return LayoutBuilder(
@@ -888,13 +1151,7 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                 ),
               );
             } else {
-              rows.add(
-                Row(
-                  children: [
-                    Expanded(child: buttons[i]),
-                  ],
-                ),
-              );
+              rows.add(Row(children: [Expanded(child: buttons[i])]));
             }
           }
           return Column(

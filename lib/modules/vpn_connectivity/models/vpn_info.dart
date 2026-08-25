@@ -159,10 +159,12 @@ class TailscaleStatus {
         backendState: 'Disabled',
       );
     }
-    final nodeName = json['node_name']?.toString() ?? json['hostname']?.toString() ?? '';
+    final nodeName =
+        json['node_name']?.toString() ?? json['hostname']?.toString() ?? '';
     final ip = json['ip']?.toString() ?? json['tailscale_ip']?.toString() ?? '';
     final state = json['state']?.toString() ?? 'Disabled';
-    final isConfig = json['configured'] == true || nodeName.isNotEmpty || ip.isNotEmpty;
+    final isConfig =
+        json['configured'] == true || nodeName.isNotEmpty || ip.isNotEmpty;
     return TailscaleStatus(
       isConfigured: isConfig,
       isRunning: json['running'] == true || state == 'Running',
@@ -206,13 +208,18 @@ class NextDnsStatus {
     final profile = json['profile']?.toString() ?? '';
     final isConfig = json['configured'] == true || profile.isNotEmpty;
     final isEnabled = json['enabled'] == '1' || json['enabled'] == true;
-    final isRunning = json['running'] == true || json['running'] == 1 || (json.containsKey('running') ? json['running'] == true : isEnabled);
+    final isRunning =
+        json['running'] == true ||
+        json['running'] == 1 ||
+        (json.containsKey('running') ? json['running'] == true : isEnabled);
     return NextDnsStatus(
       isConfigured: isConfig,
       isEnabled: isEnabled,
       isRunning: isRunning,
       profileId: profile,
-      reportClientInfo: json['report_client_info'] == '1' || json['report_client_info'] == true,
+      reportClientInfo:
+          json['report_client_info'] == '1' ||
+          json['report_client_info'] == true,
     );
   }
 }
@@ -250,19 +257,39 @@ class CloudflaredStatus {
       );
     }
     final tunnelId = extractTunnelId(json);
-    final tunnelName = json['tunnel_name']?.toString() ?? json['name']?.toString() ?? '';
-    final token = json['token']?.toString() ?? json['tunnel_token']?.toString() ?? '';
-    final isConfigured = json['configured'] == true || (tunnelId.isNotEmpty && tunnelId != 'N/A') || token.isNotEmpty || tunnelName.isNotEmpty;
-    final isEnabled = json['enabled'] == '1' || json['enabled'] == true || json['enable'] == '1' || json['enable'] == true;
-    final isRunning = json['running'] == true || json['running'] == 1 || (isEnabled && isConfigured);
-    final connCount = (json['connections'] as num?)?.toInt() ?? (json['connections_count'] as num?)?.toInt() ?? (isRunning ? 4 : 0);
+    final tunnelName =
+        json['tunnel_name']?.toString() ?? json['name']?.toString() ?? '';
+    final token =
+        json['token']?.toString() ?? json['tunnel_token']?.toString() ?? '';
+    final isConfigured =
+        json['configured'] == true ||
+        (tunnelId.isNotEmpty && tunnelId != 'N/A') ||
+        token.isNotEmpty ||
+        tunnelName.isNotEmpty;
+    final isEnabled =
+        json['enabled'] == '1' ||
+        json['enabled'] == true ||
+        json['enable'] == '1' ||
+        json['enable'] == true;
+    final isRunning =
+        json['running'] == true ||
+        json['running'] == 1 ||
+        (isEnabled && isConfigured);
+    final connCount =
+        (json['connections'] as num?)?.toInt() ??
+        (json['connections_count'] as num?)?.toInt() ??
+        (isRunning ? 4 : 0);
 
     return CloudflaredStatus(
       isConfigured: isConfigured,
       isEnabled: isEnabled,
       isRunning: isRunning,
       tunnelId: tunnelId.isNotEmpty ? tunnelId : 'N/A',
-      tunnelName: tunnelName.isNotEmpty ? tunnelName : ((tunnelId.isNotEmpty && tunnelId != 'N/A') ? 'Cloudflare Tunnel' : ''),
+      tunnelName: tunnelName.isNotEmpty
+          ? tunnelName
+          : ((tunnelId.isNotEmpty && tunnelId != 'N/A')
+                ? 'Cloudflare Tunnel'
+                : ''),
       token: token,
       connectionsCount: connCount,
     );
@@ -270,11 +297,22 @@ class CloudflaredStatus {
 
   static String extractTunnelId(Map<String, dynamic> json) {
     // 1. Check explicit keys
-    final explicitKeys = ['tunnel_id', 'tunnelid', 'tunnel_uuid', 'uuid', 'id', 'tunnel'];
+    final explicitKeys = [
+      'tunnel_id',
+      'tunnelid',
+      'tunnel_uuid',
+      'uuid',
+      'id',
+      'tunnel',
+    ];
     for (final k in explicitKeys) {
       final val = json[k]?.toString().trim();
       if (val != null && val.isNotEmpty) {
-        if (val != 'config' && val != 'main' && val != 'global' && val != 'true' && val != 'false') {
+        if (val != 'config' &&
+            val != 'main' &&
+            val != 'global' &&
+            val != 'true' &&
+            val != 'false') {
           return val;
         }
       }
@@ -282,14 +320,22 @@ class CloudflaredStatus {
 
     // 2. Check section name or .name for UUID
     final nameKey = json['.name']?.toString() ?? json['name']?.toString() ?? '';
-    final uuidRegex = RegExp(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}');
+    final uuidRegex = RegExp(
+      r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}',
+    );
     final nameMatch = uuidRegex.firstMatch(nameKey);
     if (nameMatch != null) {
       return nameMatch.group(0)!;
     }
 
     // 3. Check credentials_file, origincert, config_file, or config paths for UUID
-    final pathKeys = ['credentials_file', 'credentials', 'origincert', 'config_file', 'config'];
+    final pathKeys = [
+      'credentials_file',
+      'credentials',
+      'origincert',
+      'config_file',
+      'config',
+    ];
     for (final k in pathKeys) {
       final pathVal = json[k]?.toString();
       if (pathVal != null && pathVal.isNotEmpty) {
@@ -301,7 +347,11 @@ class CloudflaredStatus {
     }
 
     // 4. Try decoding token (Base64 / JWT Cloudflare Tunnel Token)
-    final tokenVal = json['token']?.toString() ?? json['tunnel_token']?.toString() ?? json['secret']?.toString() ?? '';
+    final tokenVal =
+        json['token']?.toString() ??
+        json['tunnel_token']?.toString() ??
+        json['secret']?.toString() ??
+        '';
     if (tokenVal.isNotEmpty) {
       final decodedId = _extractTunnelIdFromToken(tokenVal);
       if (decodedId.isNotEmpty) {
@@ -336,7 +386,9 @@ class CloudflaredStatus {
       final decodedBytes = base64.decode(normalized);
       final decodedStr = utf8.decode(decodedBytes, allowMalformed: true);
 
-      final uuidRegex = RegExp(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}');
+      final uuidRegex = RegExp(
+        r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}',
+      );
       final match = uuidRegex.firstMatch(decodedStr);
       if (match != null) {
         return match.group(0)!;
@@ -345,7 +397,10 @@ class CloudflaredStatus {
       if (decodedStr.contains('{')) {
         final parsed = jsonDecode(decodedStr);
         if (parsed is Map) {
-          final tVal = parsed['t']?.toString() ?? parsed['tunnel_id']?.toString() ?? parsed['tunnelId']?.toString();
+          final tVal =
+              parsed['t']?.toString() ??
+              parsed['tunnel_id']?.toString() ??
+              parsed['tunnelId']?.toString();
           if (tVal != null && tVal.isNotEmpty) {
             return tVal;
           }
@@ -372,7 +427,10 @@ class VpnConnectivityOverview {
     required this.cloudflared,
   });
 
-  factory VpnConnectivityOverview.fromDashboardData(Map<String, dynamic>? data, {bool isReviewerMode = false}) {
+  factory VpnConnectivityOverview.fromDashboardData(
+    Map<String, dynamic>? data, {
+    bool isReviewerMode = false,
+  }) {
     final wgList = <WireguardInterface>[];
     final ovpnList = <OpenVpnInstance>[];
     Map<String, dynamic>? tsRaw;
@@ -419,7 +477,8 @@ class VpnConnectivityOverview {
                 allowedIps: ['10.0.0.2/32', 'fd42:42:42::2/128'],
                 rxBytes: 15420000,
                 txBytes: 4210000,
-                latestHandshakeTimestamp: DateTime.now().millisecondsSinceEpoch ~/ 1000 - 45,
+                latestHandshakeTimestamp:
+                    DateTime.now().millisecondsSinceEpoch ~/ 1000 - 45,
               ),
               WireguardPeer(
                 publicKey: 'P33r2PuB11cK3yStr1ngL4pt0pD3v1c3=',
@@ -427,7 +486,8 @@ class VpnConnectivityOverview {
                 allowedIps: ['10.0.0.3/32'],
                 rxBytes: 850000,
                 txBytes: 210000,
-                latestHandshakeTimestamp: DateTime.now().millisecondsSinceEpoch ~/ 1000 - 120,
+                latestHandshakeTimestamp:
+                    DateTime.now().millisecondsSinceEpoch ~/ 1000 - 120,
               ),
             ],
           ),
@@ -453,43 +513,44 @@ class VpnConnectivityOverview {
       openvpnInstances: ovpnList,
       tailscale: isReviewerMode
           ? (tsRaw != null
-              ? TailscaleStatus.fromJson(tsRaw)
-              : const TailscaleStatus(
-                  isConfigured: true,
-                  isRunning: true,
-                  nodeName: 'OpenWrt-Router',
-                  tailscaleIp: '100.64.0.15',
-                  backendState: 'Running',
-                ))
+                ? TailscaleStatus.fromJson(tsRaw)
+                : const TailscaleStatus(
+                    isConfigured: true,
+                    isRunning: true,
+                    nodeName: 'OpenWrt-Router',
+                    tailscaleIp: '100.64.0.15',
+                    backendState: 'Running',
+                  ))
           : TailscaleStatus.fromJson(tsRaw),
       nextdns: isReviewerMode
           ? (ndnsRaw != null
-              ? NextDnsStatus.fromJson(ndnsRaw)
-              : const NextDnsStatus(
-                  isConfigured: true,
-                  isEnabled: true,
-                  isRunning: true,
-                  profileId: 'abcdef',
-                  reportClientInfo: true,
-                ))
+                ? NextDnsStatus.fromJson(ndnsRaw)
+                : const NextDnsStatus(
+                    isConfigured: true,
+                    isEnabled: true,
+                    isRunning: true,
+                    profileId: 'abcdef',
+                    reportClientInfo: true,
+                  ))
           : NextDnsStatus.fromJson(ndnsRaw),
       cloudflared: isReviewerMode
           ? (cfRaw != null
-              ? CloudflaredStatus.fromJson(cfRaw)
-              : const CloudflaredStatus(
-                  isConfigured: true,
-                  isEnabled: true,
-                  isRunning: true,
-                  tunnelId: '8f92a10b-4c3d-2e1f-0a9b-8c7d6e5f4a3b',
-                  tunnelName: 'home-router-tunnel',
-                  token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-                  connectionsCount: 4,
-                ))
+                ? CloudflaredStatus.fromJson(cfRaw)
+                : const CloudflaredStatus(
+                    isConfigured: true,
+                    isEnabled: true,
+                    isRunning: true,
+                    tunnelId: '8f92a10b-4c3d-2e1f-0a9b-8c7d6e5f4a3b',
+                    tunnelName: 'home-router-tunnel',
+                    token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+                    connectionsCount: 4,
+                  ))
           : CloudflaredStatus.fromJson(cfRaw),
     );
   }
 
-  int get totalWgPeers => wireguardInterfaces.fold(0, (sum, i) => sum + i.peers.length);
+  int get totalWgPeers =>
+      wireguardInterfaces.fold(0, (sum, i) => sum + i.peers.length);
 
   int get activeServicesCount {
     int count = 0;

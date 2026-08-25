@@ -40,7 +40,8 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     final amount = int.tryParse(text);
     if (amount == null || amount < _minAmount) {
       setState(() {
-        _customAmountError = 'Minimum support amount is $_currencySymbol$_minAmount';
+        _customAmountError =
+            'Minimum support amount is $_currencySymbol$_minAmount';
       });
       return;
     }
@@ -50,7 +51,11 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     });
 
     FocusScope.of(context).unfocus();
-    context.showToastSuccess('Support Received!', subtitle: 'Thank you so much for supporting with $_currencySymbol$amount! ❤️');
+    context.showToastSuccess(
+      'Support Received!',
+      subtitle:
+          'Thank you so much for supporting with $_currencySymbol$amount! ❤️',
+    );
   }
 
   @override
@@ -65,12 +70,16 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
     final isPurchased = entitlementState.tier == EntitlementTier.lifetime;
 
     // Check if real Play Store ProductDetails was fetched
-    final productDetails = entitlementState.availableProducts.cast<dynamic>().firstWhere(
+    final productDetails = entitlementState.availableProducts
+        .cast<dynamic>()
+        .firstWhere(
           (p) => p.id == PlayBillingProducts.lifetimeUnlimited,
           orElse: () => null,
         );
 
-    final displayPrice = productDetails != null ? productDetails.price as String : minPriceStr;
+    final displayPrice = productDetails != null
+        ? productDetails.price as String
+        : minPriceStr;
 
     return Scaffold(
       appBar: AppBar(
@@ -85,14 +94,19 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
           children: [
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20.0,
+                  vertical: 16.0,
+                ),
                 children: [
                   // Header Icon
                   Center(
                     child: Container(
                       padding: const EdgeInsets.all(16.0),
                       decoration: BoxDecoration(
-                        color: colorScheme.primaryContainer.withValues(alpha: 0.2),
+                        color: colorScheme.primaryContainer.withValues(
+                          alpha: 0.2,
+                        ),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
@@ -125,7 +139,9 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                   Container(
                     padding: const EdgeInsets.all(14.0),
                     decoration: BoxDecoration(
-                      color: colorScheme.secondaryContainer.withValues(alpha: 0.3),
+                      color: colorScheme.secondaryContainer.withValues(
+                        alpha: 0.3,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: colorScheme.secondary.withValues(alpha: 0.3),
@@ -133,7 +149,11 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.check_circle_outline_rounded, color: colorScheme.secondary, size: 22),
+                        Icon(
+                          Icons.check_circle_outline_rounded,
+                          color: colorScheme.secondary,
+                          size: 22,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
@@ -158,9 +178,15 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                           ? null
                           : () async {
                               if (productDetails != null) {
-                                await ref.read(entitlementProvider.notifier).buyProduct(productDetails);
+                                await ref
+                                    .read(entitlementProvider.notifier)
+                                    .buyProduct(productDetails);
                               } else {
-                                context.showToastSuccess('Support Received!', subtitle: 'Thank you for supporting with $displayPrice! ❤️');
+                                context.showToastSuccess(
+                                  'Support Received!',
+                                  subtitle:
+                                      'Thank you for supporting with $displayPrice! ❤️',
+                                );
                               }
                             },
                       style: ElevatedButton.styleFrom(
@@ -174,8 +200,8 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                         isPurchased
                             ? 'Active Supporter'
                             : entitlementState.isLoading
-                                ? 'Processing...'
-                                : 'Support with $displayPrice',
+                            ? 'Processing...'
+                            : 'Support with $displayPrice',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -191,7 +217,9 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16.0),
                       side: BorderSide(
-                        color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                        color: colorScheme.outlineVariant.withValues(
+                          alpha: 0.5,
+                        ),
                       ),
                     ),
                     child: Padding(
@@ -220,13 +248,18 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                                 child: TextField(
                                   controller: _customAmountController,
                                   keyboardType: TextInputType.number,
-                                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
                                   decoration: InputDecoration(
                                     prefixText: '$_currencySymbol ',
                                     hintText: 'e.g. ${(_minAmount * 2)}',
                                     errorText: _customAmountError,
                                     border: const OutlineInputBorder(),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 12,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -234,9 +267,14 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                               ElevatedButton(
                                 onPressed: _submitCustomSupport,
                                 style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                                  backgroundColor: colorScheme.secondaryContainer,
-                                  foregroundColor: colorScheme.onSecondaryContainer,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 18,
+                                    vertical: 14,
+                                  ),
+                                  backgroundColor:
+                                      colorScheme.secondaryContainer,
+                                  foregroundColor:
+                                      colorScheme.onSecondaryContainer,
                                 ),
                                 child: const Text('Support'),
                               ),
@@ -255,9 +293,14 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                       onPressed: entitlementState.isLoading
                           ? null
                           : () async {
-                              await ref.read(entitlementProvider.notifier).restorePurchases();
+                              await ref
+                                  .read(entitlementProvider.notifier)
+                                  .restorePurchases();
                               if (context.mounted) {
-                                context.showToastSuccess('Purchases Restored', subtitle: 'Purchases restored successfully.');
+                                context.showToastSuccess(
+                                  'Purchases Restored',
+                                  subtitle: 'Purchases restored successfully.',
+                                );
                               }
                             },
                       icon: const Icon(Icons.restore_rounded, size: 18),

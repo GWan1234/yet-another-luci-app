@@ -40,9 +40,12 @@ class _WifiQrDialogState extends ConsumerState<WifiQrDialog> {
     setState(() => _isFetchingPassphrase = true);
     try {
       final appState = ref.read(appStateProvider);
-      final values = await appState.fetchWirelessSectionConfig(widget.interface.sectionName);
+      final values = await appState.fetchWirelessSectionConfig(
+        widget.interface.sectionName,
+      );
       if (mounted && values != null) {
-        final liveKey = values['key']?.toString() ??
+        final liveKey =
+            values['key']?.toString() ??
             values['passphrase']?.toString() ??
             values['sae_password']?.toString() ??
             values['psk']?.toString();
@@ -65,7 +68,8 @@ class _WifiQrDialogState extends ConsumerState<WifiQrDialog> {
       return 'WIFI:S:${widget.interface.ssid};T:nopass;;';
     }
     final keyToUse = _passphrase ?? widget.interface.key ?? '';
-    final secType = widget.interface.securityMode == WifiSecurityMode.saeOnly ||
+    final secType =
+        widget.interface.securityMode == WifiSecurityMode.saeOnly ||
             widget.interface.securityMode == WifiSecurityMode.saeMixed
         ? 'WPA'
         : 'WPA';
@@ -78,7 +82,8 @@ class _WifiQrDialogState extends ConsumerState<WifiQrDialog> {
     final theme = Theme.of(context);
     final iface = widget.interface;
     final payload = _qrPayload;
-    final hasPassword = iface.securityMode != WifiSecurityMode.open &&
+    final hasPassword =
+        iface.securityMode != WifiSecurityMode.open &&
         _passphrase != null &&
         _passphrase!.isNotEmpty;
 
@@ -99,7 +104,9 @@ class _WifiQrDialogState extends ConsumerState<WifiQrDialog> {
                   Expanded(
                     child: Text(
                       'Wi-Fi Quick Connect',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   IconButton(
@@ -119,7 +126,9 @@ class _WifiQrDialogState extends ConsumerState<WifiQrDialog> {
                       GestureDetector(
                         onTap: () {
                           Clipboard.setData(ClipboardData(text: payload));
-                          context.showToastSuccess('WIFI QR Payload copied to clipboard');
+                          context.showToastSuccess(
+                            'WIFI QR Payload copied to clipboard',
+                          );
                         },
                         child: Tooltip(
                           message: 'Tap QR code to copy full WIFI payload',
@@ -156,7 +165,10 @@ class _WifiQrDialogState extends ConsumerState<WifiQrDialog> {
                       const SizedBox(height: 16),
                       Text(
                         iface.ssid,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 6),
@@ -164,9 +176,14 @@ class _WifiQrDialogState extends ConsumerState<WifiQrDialog> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
-                              color: iface.securityMode.badgeColor.withValues(alpha: 0.15),
+                              color: iface.securityMode.badgeColor.withValues(
+                                alpha: 0.15,
+                              ),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
@@ -181,7 +198,10 @@ class _WifiQrDialogState extends ConsumerState<WifiQrDialog> {
                           if (iface.isHidden) ...[
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.purple.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(6),
@@ -203,11 +223,17 @@ class _WifiQrDialogState extends ConsumerState<WifiQrDialog> {
                       // Passphrase card or action button
                       if (hasPassword) ...[
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                            color: theme.colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: theme.colorScheme.outlineVariant),
+                            border: Border.all(
+                              color: theme.colorScheme.outlineVariant,
+                            ),
                           ),
                           child: Row(
                             children: [
@@ -217,7 +243,9 @@ class _WifiQrDialogState extends ConsumerState<WifiQrDialog> {
                                 child: Text(
                                   _showPassword ? _passphrase! : '••••••••••••',
                                   style: TextStyle(
-                                    fontFamily: _showPassword ? 'monospace' : null,
+                                    fontFamily: _showPassword
+                                        ? 'monospace'
+                                        : null,
                                     fontWeight: FontWeight.w600,
                                     fontSize: 13,
                                   ),
@@ -225,36 +253,53 @@ class _WifiQrDialogState extends ConsumerState<WifiQrDialog> {
                               ),
                               IconButton(
                                 icon: Icon(
-                                  _showPassword ? Icons.visibility_off : Icons.visibility,
+                                  _showPassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
                                   size: 18,
                                 ),
-                                onPressed: () => setState(() => _showPassword = !_showPassword),
-                                tooltip: _showPassword ? 'Hide Passphrase' : 'Show Passphrase',
+                                onPressed: () => setState(
+                                  () => _showPassword = !_showPassword,
+                                ),
+                                tooltip: _showPassword
+                                    ? 'Hide Passphrase'
+                                    : 'Show Passphrase',
                               ),
                               IconButton(
                                 icon: const Icon(Icons.copy_rounded, size: 18),
                                 onPressed: () {
-                                  Clipboard.setData(ClipboardData(text: _passphrase!));
-                                  context.showToastSuccess('Passphrase copied to clipboard');
+                                  Clipboard.setData(
+                                    ClipboardData(text: _passphrase!),
+                                  );
+                                  context.showToastSuccess(
+                                    'Passphrase copied to clipboard',
+                                  );
                                 },
                                 tooltip: 'Copy Passphrase Only',
                               ),
                             ],
                           ),
                         ),
-                      ] else if (iface.securityMode == WifiSecurityMode.open) ...[
+                      ] else if (iface.securityMode ==
+                          WifiSecurityMode.open) ...[
                         Text(
                           'Open Wi-Fi Network (No Passphrase Required)',
-                          style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ] else ...[
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                            color: theme.colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.4),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: theme.colorScheme.outlineVariant),
+                            border: Border.all(
+                              color: theme.colorScheme.outlineVariant,
+                            ),
                           ),
                           child: Column(
                             children: [
@@ -262,9 +307,22 @@ class _WifiQrDialogState extends ConsumerState<WifiQrDialog> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                                    const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
                                     const SizedBox(width: 8),
-                                    Text('Fetching passphrase from router…', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
+                                    Text(
+                                      'Fetching passphrase from router…',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ] else ...[
@@ -272,19 +330,36 @@ class _WifiQrDialogState extends ConsumerState<WifiQrDialog> {
                                   onPressed: () async {
                                     final currentContext = context;
                                     await _fetchPassphraseLive();
-                                    if (_passphrase != null && _passphrase!.isNotEmpty) {
-                                      await Clipboard.setData(ClipboardData(text: _passphrase!));
+                                    if (_passphrase != null &&
+                                        _passphrase!.isNotEmpty) {
+                                      await Clipboard.setData(
+                                        ClipboardData(text: _passphrase!),
+                                      );
                                       if (mounted && currentContext.mounted) {
-                                        currentContext.showToastSuccess('Passphrase copied to clipboard');
+                                        currentContext.showToastSuccess(
+                                          'Passphrase copied to clipboard',
+                                        );
                                       }
-                                    } else if (mounted && currentContext.mounted) {
-                                      currentContext.showToastError('Passphrase unavailable in router config');
+                                    } else if (mounted &&
+                                        currentContext.mounted) {
+                                      currentContext.showToastError(
+                                        'Passphrase unavailable in router config',
+                                      );
                                     }
                                   },
-                                  icon: const Icon(Icons.copy_rounded, size: 16),
-                                  label: const Text('Copy Passphrase from Edit SSID', style: TextStyle(fontSize: 12)),
+                                  icon: const Icon(
+                                    Icons.copy_rounded,
+                                    size: 16,
+                                  ),
+                                  label: const Text(
+                                    'Copy Passphrase from Edit SSID',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
                                   style: ElevatedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 10,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -300,13 +375,23 @@ class _WifiQrDialogState extends ConsumerState<WifiQrDialog> {
                             Expanded(
                               child: FilledButton.icon(
                                 onPressed: () {
-                                  Clipboard.setData(ClipboardData(text: _passphrase!));
-                                  context.showToastSuccess('Passphrase copied to clipboard');
+                                  Clipboard.setData(
+                                    ClipboardData(text: _passphrase!),
+                                  );
+                                  context.showToastSuccess(
+                                    'Passphrase copied to clipboard',
+                                  );
                                 },
                                 icon: const Icon(Icons.copy_rounded, size: 16),
-                                label: const Text('Copy Password', style: TextStyle(fontSize: 12)),
+                                label: const Text(
+                                  'Copy Password',
+                                  style: TextStyle(fontSize: 12),
+                                ),
                                 style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 10,
+                                  ),
                                   visualDensity: VisualDensity.compact,
                                 ),
                               ),
@@ -317,12 +402,23 @@ class _WifiQrDialogState extends ConsumerState<WifiQrDialog> {
                             child: OutlinedButton.icon(
                               onPressed: () {
                                 Clipboard.setData(ClipboardData(text: payload));
-                                context.showToastSuccess('WIFI QR Payload copied to clipboard');
+                                context.showToastSuccess(
+                                  'WIFI QR Payload copied to clipboard',
+                                );
                               },
-                              icon: const Icon(Icons.qr_code_2_rounded, size: 16),
-                              label: const Text('Copy QR Payload', style: TextStyle(fontSize: 12)),
+                              icon: const Icon(
+                                Icons.qr_code_2_rounded,
+                                size: 16,
+                              ),
+                              label: const Text(
+                                'Copy QR Payload',
+                                style: TextStyle(fontSize: 12),
+                              ),
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 10,
+                                ),
                                 visualDensity: VisualDensity.compact,
                               ),
                             ),

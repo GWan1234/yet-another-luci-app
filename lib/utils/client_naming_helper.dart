@@ -24,17 +24,24 @@ class ClientNamingHelper {
     final targetClient = client ?? appState?.findClientByMac(normMac);
     if (targetClient != null) {
       final name = targetClient.displayName;
-      if (name.isNotEmpty && name != 'Unknown' && normalizeMac(name) != normMac) {
+      if (name.isNotEmpty &&
+          name != 'Unknown' &&
+          normalizeMac(name) != normMac) {
         return name;
       }
     }
 
     // 2. Direct host hint / static lease lookup from AppState dashboard data
     if (appState != null) {
-      final hostHints = appState.dashboardData?['hostHints'] as Map<String, dynamic>? ?? {};
-      final hint = hostHints[normMac] ?? hostHints[macAddress] ?? hostHints[macAddress.toLowerCase()];
+      final hostHints =
+          appState.dashboardData?['hostHints'] as Map<String, dynamic>? ?? {};
+      final hint =
+          hostHints[normMac] ??
+          hostHints[macAddress] ??
+          hostHints[macAddress.toLowerCase()];
       if (hint is Map) {
-        final staticName = hint['staticLeaseName']?.toString() ?? hint['name']?.toString();
+        final staticName =
+            hint['staticLeaseName']?.toString() ?? hint['name']?.toString();
         if (staticName != null &&
             staticName.trim().isNotEmpty &&
             staticName != 'Unknown' &&
@@ -71,13 +78,16 @@ class ClientNamingHelper {
     if (client == null) {
       final text = (fallbackName ?? '').toLowerCase();
       if (text.contains('tv')) return Icons.tv_rounded;
-      if (text.contains('laptop') || text.contains('macbook')) return Icons.laptop_mac_rounded;
+      if (text.contains('laptop') || text.contains('macbook')) {
+        return Icons.laptop_mac_rounded;
+      }
       return Icons.phone_android_rounded;
     }
     final nameLower = client.displayName.toLowerCase();
     final vendorLower = (client.vendor ?? '').toLowerCase();
     final dnsLower = (client.dnsName ?? '').toLowerCase();
-    final fullSearchText = '$nameLower $vendorLower $dnsLower ${fallbackName ?? ''}';
+    final fullSearchText =
+        '$nameLower $vendorLower $dnsLower ${fallbackName ?? ''}';
 
     // 1. Router / Gateway / AP
     if (fullSearchText.contains('openwrt') ||
@@ -217,16 +227,20 @@ class ClientNamingHelper {
     }
 
     // 7. Smart Appliances & Home Automation
-    if (fullSearchText.contains('vacuum') || fullSearchText.contains('roborock')) {
+    if (fullSearchText.contains('vacuum') ||
+        fullSearchText.contains('roborock')) {
       return Icons.cleaning_services_rounded;
     }
-    if (fullSearchText.contains('thermostat') || fullSearchText.contains('ecobee')) {
+    if (fullSearchText.contains('thermostat') ||
+        fullSearchText.contains('ecobee')) {
       return Icons.thermostat_rounded;
     }
-    if (fullSearchText.contains('fridge') || fullSearchText.contains('refrigerator')) {
+    if (fullSearchText.contains('fridge') ||
+        fullSearchText.contains('refrigerator')) {
       return Icons.kitchen_rounded;
     }
-    if (fullSearchText.contains('aircon') || fullSearchText.contains('purifier')) {
+    if (fullSearchText.contains('aircon') ||
+        fullSearchText.contains('purifier')) {
       return Icons.air_rounded;
     }
 
@@ -333,4 +347,3 @@ class ClientNamingHelper {
         .join(':');
   }
 }
-

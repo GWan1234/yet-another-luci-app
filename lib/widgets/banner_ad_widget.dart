@@ -111,13 +111,19 @@ class _BannerAdWidgetState extends ConsumerState<BannerAdWidget> {
                 Icon(
                   Icons.ad_units_outlined,
                   size: 18,
-                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.6,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  isAndroid ? 'Loading Sponsor Banner...' : 'Ad Space (Free Tier) — Upgrade to remove',
+                  isAndroid
+                      ? 'Loading Sponsor Banner...'
+                      : 'Ad Space (Free Tier) — Upgrade to remove',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                    color: theme.colorScheme.onSurfaceVariant.withValues(
+                      alpha: 0.7,
+                    ),
                     fontSize: 11,
                   ),
                 ),

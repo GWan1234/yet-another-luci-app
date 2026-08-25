@@ -24,7 +24,8 @@ class AddEditProfileDialog extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<AddEditProfileDialog> createState() => _AddEditProfileDialogState();
+  ConsumerState<AddEditProfileDialog> createState() =>
+      _AddEditProfileDialogState();
 }
 
 class _AddEditProfileDialogState extends ConsumerState<AddEditProfileDialog> {
@@ -45,17 +46,38 @@ class _AddEditProfileDialogState extends ConsumerState<AddEditProfileDialog> {
   late bool _isEnabled;
 
   static const List<String> _colorOptions = [
-    '#F97316', '#EF4444', '#A855F7', '#3B82F6',
-    '#10B981', '#F59E0B', '#EC4899', '#6366F1',
+    '#F97316',
+    '#EF4444',
+    '#A855F7',
+    '#3B82F6',
+    '#10B981',
+    '#F59E0B',
+    '#EC4899',
+    '#6366F1',
   ];
 
   bool get _isEditing => widget.existing != null;
+
+  static String generateNextProfileName(List<ParentalProfile> existingProfiles) {
+    int maxIndex = 0;
+    for (final p in existingProfiles) {
+      final match =
+          RegExp(r'^Profile\s+(\d+)$', caseSensitive: false).firstMatch(p.name);
+      if (match != null) {
+        final idx = int.tryParse(match.group(1)!) ?? 0;
+        if (idx > maxIndex) maxIndex = idx;
+      }
+    }
+    return 'Profile ${maxIndex + 1}';
+  }
 
   @override
   void initState() {
     super.initState();
     final e = widget.existing;
-    _nameCtrl = TextEditingController(text: e?.name ?? '');
+    _nameCtrl = TextEditingController(
+      text: e?.name ?? generateNextProfileName(widget.allProfiles),
+    );
     _selectedIcon = e?.icon ?? kProfileIcons.first;
     _selectedColor = e?.color ?? _colorOptions.first;
     _macAddresses = List.from(e?.macAddresses ?? []);
@@ -67,7 +89,9 @@ class _AddEditProfileDialogState extends ConsumerState<AddEditProfileDialog> {
     _isEnabled = e?.isEnabled ?? true;
     _macCtrl = TextEditingController();
     _customDns1Ctrl = TextEditingController(
-      text: (e?.customDnsServers.isNotEmpty ?? false) ? e!.customDnsServers[0] : '',
+      text: (e?.customDnsServers.isNotEmpty ?? false)
+          ? e!.customDnsServers[0]
+          : '',
     );
     _customDns2Ctrl = TextEditingController(
       text: (e?.customDnsServers.length ?? 0) > 1 ? e!.customDnsServers[1] : '',
@@ -150,7 +174,8 @@ class _AddEditProfileDialogState extends ConsumerState<AddEditProfileDialog> {
     // Daily time limit comparison
     final existingHasTimeLimit = e.dailyTimeLimitMinutes != null;
     if (_hasTimeLimit != existingHasTimeLimit) return true;
-    if (_hasTimeLimit && _dailyLimitMinutes != e.dailyTimeLimitMinutes) return true;
+    if (_hasTimeLimit && _dailyLimitMinutes != e.dailyTimeLimitMinutes)
+      return true;
 
     // Content filter comparison
     if (_contentFilter != e.contentFilter) return true;
@@ -176,14 +201,15 @@ class _AddEditProfileDialogState extends ConsumerState<AddEditProfileDialog> {
     return '${minutes}m';
   }
 
-
   void _addMac() {
     final raw = _macCtrl.text.trim().toUpperCase();
     if (raw.isEmpty) return;
     final isValid = RegExp(r'^([0-9A-F]{2}:){5}[0-9A-F]{2}$').hasMatch(raw);
     if (!isValid) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid MAC address format (e.g. AA:BB:CC:DD:EE:FF)')),
+        const SnackBar(
+          content: Text('Invalid MAC address format (e.g. AA:BB:CC:DD:EE:FF)'),
+        ),
       );
       return;
     }
@@ -205,8 +231,10 @@ class _AddEditProfileDialogState extends ConsumerState<AddEditProfileDialog> {
     if (!_isValid) return;
     final customDns = <String>[];
     if (_contentFilter == ContentFilterDns.custom) {
-      if (_customDns1Ctrl.text.trim().isNotEmpty) customDns.add(_customDns1Ctrl.text.trim());
-      if (_customDns2Ctrl.text.trim().isNotEmpty) customDns.add(_customDns2Ctrl.text.trim());
+      if (_customDns1Ctrl.text.trim().isNotEmpty)
+        customDns.add(_customDns1Ctrl.text.trim());
+      if (_customDns2Ctrl.text.trim().isNotEmpty)
+        customDns.add(_customDns2Ctrl.text.trim());
     }
 
     final profile = ParentalProfile(
@@ -241,7 +269,9 @@ class _AddEditProfileDialogState extends ConsumerState<AddEditProfileDialog> {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Discard Unsaved Changes?'),
-            content: const Text('You have unsaved profile changes. Are you sure you want to discard them?'),
+            content: const Text(
+              'You have unsaved profile changes. Are you sure you want to discard them?',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -262,435 +292,505 @@ class _AddEditProfileDialogState extends ConsumerState<AddEditProfileDialog> {
         insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: 520, maxHeight: maxH),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Title bar
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 8, 0),
-              child: Row(
-                children: [
-                  Icon(
-                    _isEditing ? Icons.edit_rounded : Icons.person_add_rounded,
-                    color: theme.colorScheme.primary,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      _isEditing ? 'Edit Profile' : 'New Profile',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Title bar
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 8, 0),
+                child: Row(
+                  children: [
+                    Icon(
+                      _isEditing
+                          ? Icons.edit_rounded
+                          : Icons.person_add_rounded,
+                      color: theme.colorScheme.primary,
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _isEditing ? 'Edit Profile' : 'New Profile',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const Divider(height: 16),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── Profile Mode Toggle (Active / Bypassed) ───────
-                      Material(
-                        color: _isEnabled
-                            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.2)
-                            : theme.colorScheme.errorContainer.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                        clipBehavior: Clip.antiAlias,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _isEnabled
-                                  ? theme.colorScheme.primary.withValues(alpha: 0.3)
-                                  : theme.colorScheme.error.withValues(alpha: 0.3),
-                            ),
-                          ),
-                          child: SwitchListTile(
-                            value: _isEnabled,
-                            onChanged: (val) => setState(() => _isEnabled = val),
-                            activeThumbColor: theme.colorScheme.primary,
-                            title: Text(
-                              _isEnabled ? 'Profile Guardrails Active' : 'Profile Bypassed (Unrestricted)',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
+              const Divider(height: 16),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Profile Mode Toggle (Active / Bypassed) ───────
+                        Material(
+                          color: _isEnabled
+                              ? theme.colorScheme.primaryContainer.withValues(
+                                  alpha: 0.2,
+                                )
+                              : theme.colorScheme.errorContainer.withValues(
+                                  alpha: 0.2,
+                                ),
+                          borderRadius: BorderRadius.circular(12),
+                          clipBehavior: Clip.antiAlias,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
                                 color: _isEnabled
-                                    ? theme.colorScheme.onSurface
+                                    ? theme.colorScheme.primary.withValues(
+                                        alpha: 0.3,
+                                      )
+                                    : theme.colorScheme.error.withValues(
+                                        alpha: 0.3,
+                                      ),
+                              ),
+                            ),
+                            child: SwitchListTile(
+                              value: _isEnabled,
+                              onChanged: (val) =>
+                                  setState(() => _isEnabled = val),
+                              activeThumbColor: theme.colorScheme.primary,
+                              title: Text(
+                                _isEnabled
+                                    ? 'Profile Guardrails Active'
+                                    : 'Profile Bypassed (Unrestricted)',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: _isEnabled
+                                      ? theme.colorScheme.onSurface
+                                      : theme.colorScheme.error,
+                                ),
+                              ),
+                              subtitle: Text(
+                                _isEnabled
+                                    ? 'Schedule, DNS filters, and time limits are enforced.'
+                                    : 'Devices under this profile enjoy unrestricted internet access without restrictions.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontSize: 11,
+                                ),
+                              ),
+                              secondary: Icon(
+                                _isEnabled
+                                    ? Icons.shield_outlined
+                                    : Icons.lock_open_rounded,
+                                color: _isEnabled
+                                    ? theme.colorScheme.primary
                                     : theme.colorScheme.error,
                               ),
                             ),
-                            subtitle: Text(
-                              _isEnabled
-                                  ? 'Schedule, DNS filters, and time limits are enforced.'
-                                  : 'Devices under this profile enjoy unrestricted internet access without restrictions.',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                                fontSize: 11,
-                              ),
-                            ),
-                            secondary: Icon(
-                              _isEnabled ? Icons.shield_outlined : Icons.lock_open_rounded,
-                              color: _isEnabled ? theme.colorScheme.primary : theme.colorScheme.error,
-                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
-                      // ── Name ──────────────────────────────────────────
-                      TextFormField(
-                        controller: _nameCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Profile Name *',
-                          hintText: 'e.g. Kids, Gaming PC, Teenager',
-                          prefixIcon: Icon(Icons.badge_outlined),
-                          border: OutlineInputBorder(),
+                        // ── Name ──────────────────────────────────────────
+                        TextFormField(
+                          controller: _nameCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Profile Name *',
+                            hintText: 'e.g. Kids, Gaming PC, Teenager',
+                            prefixIcon: Icon(Icons.badge_outlined),
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (_) => setState(() {}),
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'Name is required'
+                              : null,
                         ),
-                        onChanged: (_) => setState(() {}),
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? 'Name is required' : null,
-                      ),
-                      const SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
-                      // ── Icon picker ───────────────────────────────────
-                      _SectionLabel('Profile Icon'),
-                      const SizedBox(height: 8),
-                      _IconPicker(
-                        selected: _selectedIcon,
-                        onSelect: (i) => setState(() => _selectedIcon = i),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // ── Color picker ─────────────────────────────────
-                      _SectionLabel('Accent Color'),
-                      const SizedBox(height: 8),
-                      _ColorPicker(
-                        colors: _colorOptions,
-                        selected: _selectedColor,
-                        onSelect: (c) => setState(() => _selectedColor = c),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // ── Device MACs ───────────────────────────────────
-                      _SectionLabel('Assigned Devices'),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Select from connected network devices or enter MAC manually.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                        // ── Icon picker ───────────────────────────────────
+                        _SectionLabel('Profile Icon'),
+                        const SizedBox(height: 8),
+                        _IconPicker(
+                          selected: _selectedIcon,
+                          onSelect: (i) => setState(() => _selectedIcon = i),
                         ),
-                      ),
-                      const SizedBox(height: 10),
+                        const SizedBox(height: 16),
 
-                      if (availableClients.isNotEmpty) ...[
-                        Builder(
-                          builder: (context) {
-                            final uniqueClientsMap = <String, Client>{};
-                            for (final c in availableClients) {
-                              final normMac = c.macAddress.toUpperCase().replaceAll('-', ':');
-                              if (normMac.isNotEmpty && normMac != 'N/A' && normMac != '00:00:00:00:00:00') {
-                                if (!uniqueClientsMap.containsKey(normMac) ||
-                                    (c.isConnected && !uniqueClientsMap[normMac]!.isConnected)) {
-                                  uniqueClientsMap[normMac] = c;
+                        // ── Color picker ─────────────────────────────────
+                        _SectionLabel('Accent Color'),
+                        const SizedBox(height: 8),
+                        _ColorPicker(
+                          colors: _colorOptions,
+                          selected: _selectedColor,
+                          onSelect: (c) => setState(() => _selectedColor = c),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // ── Device MACs ───────────────────────────────────
+                        _SectionLabel('Assigned Devices'),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Select from connected network devices or enter MAC manually.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        if (availableClients.isNotEmpty) ...[
+                          Builder(
+                            builder: (context) {
+                              final uniqueClientsMap = <String, Client>{};
+                              for (final c in availableClients) {
+                                final normMac = c.macAddress
+                                    .toUpperCase()
+                                    .replaceAll('-', ':');
+                                if (normMac.isNotEmpty &&
+                                    normMac != 'N/A' &&
+                                    normMac != '00:00:00:00:00:00') {
+                                  if (!uniqueClientsMap.containsKey(normMac) ||
+                                      (c.isConnected &&
+                                          !uniqueClientsMap[normMac]!
+                                              .isConnected)) {
+                                    uniqueClientsMap[normMac] = c;
+                                  }
                                 }
                               }
-                            }
-                            final uniqueClients = uniqueClientsMap.values.toList();
-                            if (uniqueClients.isEmpty) return const SizedBox.shrink();
+                              final uniqueClients = uniqueClientsMap.values
+                                  .toList();
+                              if (uniqueClients.isEmpty)
+                                return const SizedBox.shrink();
 
-                            return DropdownButtonFormField<String>(
-                              key: ValueKey('client_picker_${_macAddresses.length}'),
-                              initialValue: null,
-                              isExpanded: true,
-                              decoration: const InputDecoration(
-                                labelText: 'Pick from Connected Devices',
-                                hintText: 'Select a connected device to add MAC...',
-                                prefixIcon: Icon(Icons.phonelink_setup_rounded),
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                              items: uniqueClients.map((client) {
-                                final macNorm = client.macAddress.toUpperCase().replaceAll('-', ':');
-                                final isAlreadyAdded = _macAddresses.contains(macNorm);
-                                final nameLabel = client.displayName.isNotEmpty
-                                    ? client.displayName
-                                    : (client.hostname.isNotEmpty ? client.hostname : 'Device');
-                                final typeIcon = client.connectionType == ConnectionType.wireless ? '📶' : '🔌';
-                                return DropdownMenuItem<String>(
-                                  value: macNorm,
-                                  enabled: !isAlreadyAdded,
-                                  child: Text(
-                                    '$typeIcon $nameLabel ($macNorm)${isAlreadyAdded ? ' ✓ Added' : ''}',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: isAlreadyAdded
-                                          ? theme.colorScheme.onSurface.withValues(alpha: 0.38)
-                                          : null,
+                              return DropdownButtonFormField<String>(
+                                key: ValueKey(
+                                  'client_picker_${_macAddresses.length}',
+                                ),
+                                initialValue: null,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'Pick from Connected Devices',
+                                  hintText:
+                                      'Select a connected device to add MAC...',
+                                  prefixIcon: Icon(
+                                    Icons.phonelink_setup_rounded,
+                                  ),
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                                items: uniqueClients.map((client) {
+                                  final macNorm = client.macAddress
+                                      .toUpperCase()
+                                      .replaceAll('-', ':');
+                                  final isAlreadyAdded = _macAddresses.contains(
+                                    macNorm,
+                                  );
+                                  final nameLabel =
+                                      client.displayName.isNotEmpty
+                                      ? client.displayName
+                                      : (client.hostname.isNotEmpty
+                                            ? client.hostname
+                                            : 'Device');
+                                  final typeIcon =
+                                      client.connectionType ==
+                                          ConnectionType.wireless
+                                      ? '📶'
+                                      : '🔌';
+                                  return DropdownMenuItem<String>(
+                                    value: macNorm,
+                                    enabled: !isAlreadyAdded,
+                                    child: Text(
+                                      '$typeIcon $nameLabel ($macNorm)${isAlreadyAdded ? ' ✓ Added' : ''}',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: isAlreadyAdded
+                                            ? theme.colorScheme.onSurface
+                                                  .withValues(alpha: 0.38)
+                                            : null,
+                                      ),
                                     ),
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: (selectedMac) {
-                                if (selectedMac == null) return;
-                                final client = uniqueClientsMap[selectedMac];
-                                if (!_macAddresses.contains(selectedMac)) {
-                                  setState(() {
-                                    _macAddresses.add(selectedMac);
-                                    if (_nameCtrl.text.trim().isEmpty && client != null) {
-                                      final nameToUse = client.hostname.isNotEmpty &&
-                                              client.hostname != '*' &&
-                                              client.hostname != selectedMac
-                                          ? client.hostname
-                                          : client.displayName;
-                                      if (nameToUse.isNotEmpty) {
-                                        _nameCtrl.text = nameToUse;
+                                  );
+                                }).toList(),
+                                onChanged: (selectedMac) {
+                                  if (selectedMac == null) return;
+                                  final client = uniqueClientsMap[selectedMac];
+                                  if (!_macAddresses.contains(selectedMac)) {
+                                    setState(() {
+                                      _macAddresses.add(selectedMac);
+                                      if (_nameCtrl.text.trim().isEmpty &&
+                                          client != null) {
+                                        final nameToUse =
+                                            client.hostname.isNotEmpty &&
+                                                client.hostname != '*' &&
+                                                client.hostname != selectedMac
+                                            ? client.hostname
+                                            : client.displayName;
+                                        if (nameToUse.isNotEmpty) {
+                                          _nameCtrl.text = nameToUse;
+                                        }
                                       }
-                                    }
-                                  });
-                                }
-                              },
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            const Expanded(child: Divider()),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                              child: Text(
-                                'OR MANUAL MAC ENTRY',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ),
-                            const Expanded(child: Divider()),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _macCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'MAC Address',
-                                hintText: 'AA:BB:CC:DD:EE:FF',
-                                prefixIcon: Icon(Icons.devices_outlined),
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                              textCapitalization: TextCapitalization.characters,
-                              onFieldSubmitted: (_) => _addMac(),
-                            ),
+                                    });
+                                  }
+                                },
+                              );
+                            },
                           ),
-                          const SizedBox(width: 8),
-                          IconButton.filled(
-                            onPressed: _addMac,
-                            icon: const Icon(Icons.add),
-                            tooltip: 'Add MAC',
-                          ),
-                        ],
-                      ),
-                      if (_macAddresses.isEmpty) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
+                          const SizedBox(height: 10),
+                          Row(
                             children: [
-                              Icon(Icons.info_outline, size: 16, color: theme.colorScheme.primary),
-                              const SizedBox(width: 8),
-                              Expanded(
+                              const Expanded(child: Divider()),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8.0,
+                                ),
                                 child: Text(
-                                  'No devices assigned yet. Profile is pre-configured and ready for devices to be added later.',
-                                  style: theme.textTheme.bodySmall?.copyWith(
+                                  'OR MANUAL MAC ENTRY',
+                                  style: theme.textTheme.labelSmall?.copyWith(
                                     color: theme.colorScheme.onSurfaceVariant,
-                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10,
                                   ),
                                 ),
                               ),
+                              const Expanded(child: Divider()),
                             ],
                           ),
-                        ),
-                      ] else ...[
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          children: _macAddresses
-                              .map(
-                                (mac) => Chip(
-                                  label: Text(
-                                    mac,
-                                    style: const TextStyle(fontSize: 11),
-                                  ),
-                                  deleteIcon: const Icon(Icons.close, size: 14),
-                                  onDeleted: () => _removeMac(mac),
-                                  visualDensity: VisualDensity.compact,
+                          const SizedBox(height: 10),
+                        ],
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _macCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'MAC Address',
+                                  hintText: 'AA:BB:CC:DD:EE:FF',
+                                  prefixIcon: Icon(Icons.devices_outlined),
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
                                 ),
-                              )
-                              .toList(),
+                                textCapitalization:
+                                    TextCapitalization.characters,
+                                onFieldSubmitted: (_) => _addMac(),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton.filled(
+                              onPressed: _addMac,
+                              icon: const Icon(Icons.add),
+                              tooltip: 'Add MAC',
+                            ),
+                          ],
                         ),
-                      ],
-                      const SizedBox(height: 20),
-
-                      // ── Time Schedule ─────────────────────────────────
-                      SwitchListTile.adaptive(
-                        value: _hasSchedule,
-                        onChanged: (v) => setState(() => _hasSchedule = v),
-                        title: const Text('Block Schedule'),
-                        subtitle: Text(_hasSchedule && _schedule != null
-                            ? 'Block ${_schedule!.blockTimeFormatted} → Resume ${_schedule!.resumeTimeFormatted} · ${_schedule!.activeDaysLabel}'
-                            : 'Set recurring block/resume times'),
-                        secondary: const Icon(Icons.schedule_rounded),
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      if (_hasSchedule && _schedule != null) ...[
-                        _ScheduleEditor(
-                          schedule: _schedule!,
-                          onChanged: (s) => setState(() => _schedule = s),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-
-                      // ── Daily Time Limit ──────────────────────────────
-                      SwitchListTile.adaptive(
-                        value: _hasTimeLimit,
-                        onChanged: (v) {
-                          setState(() {
-                            _hasTimeLimit = v;
-                            if (v && _dailyLimitMinutes == null) _dailyLimitMinutes = 120;
-                          });
-                        },
-                        title: const Text('Daily Time Limit'),
-                        subtitle: Text(_hasTimeLimit && _dailyLimitMinutes != null
-                            ? '$_dailyLimitMinutes minutes per day'
-                            : 'Limit total daily internet time'),
-                        secondary: const Icon(Icons.timer_outlined),
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      if (_hasTimeLimit) ...[
-                        Slider(
-                          min: 15,
-                          max: 480,
-                          divisions: 31,
-                          value: (_dailyLimitMinutes ?? 120).toDouble(),
-                          label: _formatMinutes(_dailyLimitMinutes ?? 120),
-                          onChanged: (v) => setState(() => _dailyLimitMinutes = v.round()),
-                        ),
-                        Center(
-                          child: Text(
-                            _formatMinutes(_dailyLimitMinutes ?? 120),
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
+                        if (_macAddresses.isEmpty) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest
+                                  .withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  size: 16,
+                                  color: theme.colorScheme.primary,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'No devices assigned yet. Profile is pre-configured and ready for devices to be added later.',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-
-                      // ── Content Filtering ─────────────────────────────
-                      _SectionLabel('Content Filtering (DNS)'),
-                      const SizedBox(height: 8),
-                      ...ContentFilterDns.values.map(
-                        (opt) => ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          dense: true,
-                          leading: Icon(
-                            _contentFilter == opt
-                                ? Icons.radio_button_checked_rounded
-                                : Icons.radio_button_unchecked_rounded,
-                            color: _contentFilter == opt
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.onSurfaceVariant,
-                            size: 20,
+                        ] else ...[
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: _macAddresses
+                                .map(
+                                  (mac) => Chip(
+                                    label: Text(
+                                      mac,
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
+                                    deleteIcon: const Icon(
+                                      Icons.close,
+                                      size: 14,
+                                    ),
+                                    onDeleted: () => _removeMac(mac),
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                )
+                                .toList(),
                           ),
-                          title: Text(opt.label, style: const TextStyle(fontSize: 14)),
+                        ],
+                        const SizedBox(height: 20),
+
+                        // ── Time Schedule ─────────────────────────────────
+                        SwitchListTile.adaptive(
+                          value: _hasSchedule,
+                          onChanged: (v) => setState(() => _hasSchedule = v),
+                          title: const Text('Block Schedule'),
                           subtitle: Text(
-                            opt.description,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: theme.colorScheme.onSurfaceVariant,
+                            _hasSchedule && _schedule != null
+                                ? 'Block ${_schedule!.blockTimeFormatted} → Resume ${_schedule!.resumeTimeFormatted} · ${_schedule!.activeDaysLabel}'
+                                : 'Set recurring block/resume times',
+                          ),
+                          secondary: const Icon(Icons.schedule_rounded),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        if (_hasSchedule && _schedule != null) ...[
+                          _ScheduleEditor(
+                            schedule: _schedule!,
+                            onChanged: (s) => setState(() => _schedule = s),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+
+                        // ── Daily Time Limit ──────────────────────────────
+                        SwitchListTile.adaptive(
+                          value: _hasTimeLimit,
+                          onChanged: (v) {
+                            setState(() {
+                              _hasTimeLimit = v;
+                              if (v && _dailyLimitMinutes == null)
+                                _dailyLimitMinutes = 120;
+                            });
+                          },
+                          title: const Text('Daily Time Limit'),
+                          subtitle: Text(
+                            _hasTimeLimit && _dailyLimitMinutes != null
+                                ? '$_dailyLimitMinutes minutes per day'
+                                : 'Limit total daily internet time',
+                          ),
+                          secondary: const Icon(Icons.timer_outlined),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        if (_hasTimeLimit) ...[
+                          Slider(
+                            min: 15,
+                            max: 480,
+                            divisions: 31,
+                            value: (_dailyLimitMinutes ?? 120).toDouble(),
+                            label: _formatMinutes(_dailyLimitMinutes ?? 120),
+                            onChanged: (v) =>
+                                setState(() => _dailyLimitMinutes = v.round()),
+                          ),
+                          Center(
+                            child: Text(
+                              _formatMinutes(_dailyLimitMinutes ?? 120),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                          onTap: () => setState(() => _contentFilter = opt),
-                        ),
-                      ),
-                      if (_contentFilter == ContentFilterDns.custom) ...[
+                          const SizedBox(height: 8),
+                        ],
+
+                        // ── Content Filtering ─────────────────────────────
+                        _SectionLabel('Content Filtering (DNS)'),
                         const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _customDns1Ctrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Primary DNS',
-                            hintText: '1.1.1.1',
-                            border: OutlineInputBorder(),
-                            isDense: true,
+                        ...ContentFilterDns.values.map(
+                          (opt) => ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            dense: true,
+                            leading: Icon(
+                              _contentFilter == opt
+                                  ? Icons.radio_button_checked_rounded
+                                  : Icons.radio_button_unchecked_rounded,
+                              color: _contentFilter == opt
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.onSurfaceVariant,
+                              size: 20,
+                            ),
+                            title: Text(
+                              opt.label,
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                            subtitle: Text(
+                              opt.description,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            onTap: () => setState(() => _contentFilter = opt),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _customDns2Ctrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Secondary DNS',
-                            hintText: '8.8.8.8',
-                            border: OutlineInputBorder(),
-                            isDense: true,
+                        if (_contentFilter == ContentFilterDns.custom) ...[
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _customDns1Ctrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Primary DNS',
+                              hintText: '1.1.1.1',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _customDns2Ctrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Secondary DNS',
+                              hintText: '8.8.8.8',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: FilledButton.icon(
-                      onPressed: _canSave ? _save : null,
-                      icon: const Icon(Icons.check_rounded, size: 18),
-                      label: Text(
-                        _isEditing ? 'Save Changes' : 'Create Profile',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: FilledButton.icon(
+                        onPressed: _canSave ? _save : null,
+                        icon: const Icon(Icons.check_rounded, size: 18),
+                        label: Text(
+                          _isEditing ? 'Save Changes' : 'Create Profile',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
     );
   }
 }
@@ -706,9 +806,9 @@ class _SectionLabel extends StatelessWidget {
     return Text(
       text,
       style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
+        fontWeight: FontWeight.bold,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
     );
   }
 }
@@ -742,7 +842,9 @@ class _IconPicker extends StatelessWidget {
                   ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
                   : Theme.of(context).colorScheme.surfaceContainerHighest,
             ),
-            child: Center(child: Text(icon, style: const TextStyle(fontSize: 20))),
+            child: Center(
+              child: Text(icon, style: const TextStyle(fontSize: 20)),
+            ),
           ),
         );
       }).toList(),
@@ -754,7 +856,11 @@ class _ColorPicker extends StatelessWidget {
   final List<String> colors;
   final String selected;
   final void Function(String) onSelect;
-  const _ColorPicker({required this.colors, required this.selected, required this.onSelect});
+  const _ColorPicker({
+    required this.colors,
+    required this.selected,
+    required this.onSelect,
+  });
 
   Color _toColor(String hex) {
     try {
@@ -781,7 +887,9 @@ class _ColorPicker extends StatelessWidget {
               shape: BoxShape.circle,
               color: color,
               border: Border.all(
-                color: isSelected ? Theme.of(context).colorScheme.onSurface : Colors.transparent,
+                color: isSelected
+                    ? Theme.of(context).colorScheme.onSurface
+                    : Colors.transparent,
                 width: 2.5,
               ),
             ),
@@ -807,9 +915,13 @@ class _ScheduleEditor extends StatelessWidget {
     final picked = await showTimePicker(context: context, initialTime: initial);
     if (picked == null) return;
     if (isBlock) {
-      onChanged(schedule.copyWith(blockHour: picked.hour, blockMinute: picked.minute));
+      onChanged(
+        schedule.copyWith(blockHour: picked.hour, blockMinute: picked.minute),
+      );
     } else {
-      onChanged(schedule.copyWith(resumeHour: picked.hour, resumeMinute: picked.minute));
+      onChanged(
+        schedule.copyWith(resumeHour: picked.hour, resumeMinute: picked.minute),
+      );
     }
   }
 
@@ -863,7 +975,10 @@ class _ScheduleEditor extends StatelessWidget {
             children: ScheduleDay.values.map((day) {
               final isActive = schedule.activeDays.contains(day);
               return FilterChip(
-                label: Text(day.shortLabel, style: const TextStyle(fontSize: 11)),
+                label: Text(
+                  day.shortLabel,
+                  style: const TextStyle(fontSize: 11),
+                ),
                 selected: isActive,
                 onSelected: (v) {
                   final newDays = Set<ScheduleDay>.from(schedule.activeDays);
@@ -889,7 +1004,11 @@ class _TimeButton extends StatelessWidget {
   final String label;
   final String time;
   final VoidCallback onTap;
-  const _TimeButton({required this.label, required this.time, required this.onTap});
+  const _TimeButton({
+    required this.label,
+    required this.time,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -916,9 +1035,9 @@ class _TimeButton extends StatelessWidget {
               child: Text(
                 time,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue,
-                    ),
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+                ),
               ),
             ),
           ],

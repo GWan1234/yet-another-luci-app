@@ -5,12 +5,15 @@ import 'dart:async';
 
 import 'package:yet_another_luci_app/models/client.dart';
 import 'package:yet_another_luci_app/models/router.dart' as model;
-import 'package:yet_another_luci_app/services/api_service.dart';
 import 'package:yet_another_luci_app/services/interfaces/api_service_interface.dart';
 import 'package:yet_another_luci_app/services/interfaces/auth_service_interface.dart';
 import 'package:yet_another_luci_app/services/router_service.dart';
 import 'package:yet_another_luci_app/state/app_state.dart'
-    show kNeighborProbeInterval, kNeighborProbeMaxBatch, normalizeMac, selectNeighborProbeTargets;
+    show
+        kNeighborProbeInterval,
+        kNeighborProbeMaxBatch,
+        normalizeMac,
+        selectNeighborProbeTargets;
 import 'package:yet_another_luci_app/utils/logger.dart';
 
 /// Encapsulates client list aggregation, neighbor table NUD active probing,
@@ -25,16 +28,16 @@ class ClientController {
     required bool Function() reviewerModeRef,
     Map<String, dynamic>? Function()? dashboardDataRef,
     required Future<String?> Function(String command, List<String> args)
-        executeRouterCommandOutput,
+    executeRouterCommandOutput,
     required Map<String, dynamic> Function(Map<String, dynamic> rawDhcpData)
-        processDhcpLeases,
-  })  : _apiServiceRef = apiServiceRef,
-        _authServiceRef = authServiceRef,
-        _routerServiceRef = routerServiceRef,
-        _reviewerModeRef = reviewerModeRef,
-        _dashboardDataRef = dashboardDataRef,
-        _executeRouterCommandOutput = executeRouterCommandOutput,
-        _processDhcpLeases = processDhcpLeases;
+    processDhcpLeases,
+  }) : _apiServiceRef = apiServiceRef,
+       _authServiceRef = authServiceRef,
+       _routerServiceRef = routerServiceRef,
+       _reviewerModeRef = reviewerModeRef,
+       _dashboardDataRef = dashboardDataRef,
+       _executeRouterCommandOutput = executeRouterCommandOutput,
+       _processDhcpLeases = processDhcpLeases;
 
   final IApiService? Function() _apiServiceRef;
   final IAuthService? Function() _authServiceRef;
@@ -42,9 +45,9 @@ class ClientController {
   final bool Function() _reviewerModeRef;
   final Map<String, dynamic>? Function()? _dashboardDataRef;
   final Future<String?> Function(String command, List<String> args)
-      _executeRouterCommandOutput;
+  _executeRouterCommandOutput;
   final Map<String, dynamic> Function(Map<String, dynamic> rawDhcpData)
-      _processDhcpLeases;
+  _processDhcpLeases;
 
   final Set<String> _knownWirelessMacs = {};
   final Map<String, DateTime> _recentWiredActiveTime = {};
@@ -84,9 +87,9 @@ class ClientController {
         if (a.isConnected != b.isConnected) {
           return a.isConnected ? -1 : 1;
         }
-        return a.displayName
-            .toLowerCase()
-            .compareTo(b.displayName.toLowerCase());
+        return a.displayName.toLowerCase().compareTo(
+          b.displayName.toLowerCase(),
+        );
       });
       _lastFetchedClients = list;
       return list;
@@ -166,8 +169,9 @@ class ClientController {
               hostHints[macNorm]?['vendor']?.toString() ?? c.vendor;
 
           clientMap[macNorm] = c.copyWith(
-            connectionType:
-                isWireless ? ConnectionType.wireless : ConnectionType.wired,
+            connectionType: isWireless
+                ? ConnectionType.wireless
+                : ConnectionType.wired,
             ssid: macToSsidMap[macNorm],
             wirelessIface: macToIfaceMap[macNorm],
             staticLeaseName: staticName,
@@ -185,16 +189,17 @@ class ClientController {
                 ? hintV6.map((e) => e.toString()).toList()
                 : null;
             final vendorName = hostHints[mac]?['vendor']?.toString();
-            clientMap[mac] = Client.fromWirelessStation(
-              mac,
-              ssid: macToSsidMap[mac],
-              wirelessIface: macToIfaceMap[mac],
-            ).copyWith(
-              staticLeaseName: staticName,
-              isStaticLease: isStaticEntry,
-              ipv6Addresses: v6List,
-              vendor: vendorName,
-            );
+            clientMap[mac] =
+                Client.fromWirelessStation(
+                  mac,
+                  ssid: macToSsidMap[mac],
+                  wirelessIface: macToIfaceMap[mac],
+                ).copyWith(
+                  staticLeaseName: staticName,
+                  isStaticLease: isStaticEntry,
+                  ipv6Addresses: v6List,
+                  vendor: vendorName,
+                );
           }
         }
         hostHints.forEach((mac, info) {
@@ -207,9 +212,8 @@ class ClientController {
             final ip = (ipaddrs != null && ipaddrs.isNotEmpty)
                 ? ipaddrs.first.toString()
                 : 'N/A';
-            final name = (hintName != null &&
-                    hintName.isNotEmpty &&
-                    hintName != '*')
+            final name =
+                (hintName != null && hintName.isNotEmpty && hintName != '*')
                 ? hintName
                 : macN;
             final isWireless = normalizedMacs.contains(macN);
@@ -223,8 +227,9 @@ class ClientController {
               ipAddress: ip,
               macAddress: macN,
               hostname: name,
-              connectionType:
-                  isWireless ? ConnectionType.wireless : ConnectionType.wired,
+              connectionType: isWireless
+                  ? ConnectionType.wireless
+                  : ConnectionType.wired,
               ssid: macToSsidMap[macN],
               wirelessIface: macToIfaceMap[macN],
               staticLeaseName: staticName,
@@ -247,8 +252,9 @@ class ClientController {
             }
           }
 
-          final cmpType = typeOrder(a.connectionType)
-              .compareTo(typeOrder(b.connectionType));
+          final cmpType = typeOrder(
+            a.connectionType,
+          ).compareTo(typeOrder(b.connectionType));
           if (cmpType != 0) return cmpType;
           return a.hostname.toLowerCase().compareTo(b.hostname.toLowerCase());
         });
@@ -256,10 +262,13 @@ class ClientController {
         return reviewerClients;
       }
 
-      if (_routerService?.selectedRouter == null || _authService?.sysauth == null) {
+      if (_routerService?.selectedRouter == null ||
+          _authService?.sysauth == null) {
         return _lastFetchedClients ?? [];
       }
-      final result = await _fetchClientsForRouter(_routerService!.selectedRouter!);
+      final result = await _fetchClientsForRouter(
+        _routerService!.selectedRouter!,
+      );
       _lastFetchedClients = result;
       return result;
     } catch (e, stack) {
@@ -271,15 +280,25 @@ class ClientController {
   }
 
   Future<List<Client>> _fetchClientsForRouter(model.Router router) async {
+    final currentSysauth = _authService?.sysauth;
+    if ((currentSysauth == null || currentSysauth.isEmpty) &&
+        !_isReviewerMode) {
+      return [];
+    }
+    final activeSysauth = (currentSysauth != null && currentSysauth.isNotEmpty)
+        ? currentSysauth
+        : 'mock';
+
     try {
       String normMac(String mac) => normalizeMac(mac);
 
       // 1. Fetch live associated wireless stations
-      final stationsMap = await _apiService!.fetchAllAssociatedWirelessMacsWithContext(
-        ipAddress: router.ipAddress,
-        sysauth: _authService!.sysauth!,
-        useHttps: router.useHttps,
-      );
+      final stationsMap = await _apiService!
+          .fetchAllAssociatedWirelessMacsWithContext(
+            ipAddress: router.ipAddress,
+            sysauth: activeSysauth,
+            useHttps: router.useHttps,
+          );
       final macToSsidMap = <String, String>{};
       final macToIfaceMap = <String, String>{};
       final wireless = <String>{};
@@ -314,13 +333,24 @@ class ClientController {
           }
         }
         if (ifaces.isEmpty) {
-          ifaces.addAll(
-              ['wlan0', 'wlan1', 'phy0-ap0', 'phy1-ap0', 'phy2-ap0', 'ra0']);
+          ifaces.addAll([
+            'wlan0',
+            'wlan1',
+            'phy0-ap0',
+            'phy1-ap0',
+            'phy2-ap0',
+            'ra0',
+          ]);
         }
         for (final iface in ifaces) {
           final iwDump =
-              await _executeRouterCommandOutput('iw', ['dev', iface, 'station', 'dump']) ??
-                  await _executeRouterCommandOutput('iwinfo', [iface, 'assoclist']);
+              await _executeRouterCommandOutput('iw', [
+                'dev',
+                iface,
+                'station',
+                'dump',
+              ]) ??
+              await _executeRouterCommandOutput('iwinfo', [iface, 'assoclist']);
           if (iwDump != null && iwDump.isNotEmpty) {
             final macRegex = RegExp(r'([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})');
             for (final match in macRegex.allMatches(iwDump)) {
@@ -338,7 +368,7 @@ class ClientController {
       // 2. Fetch getDHCPLeases from luci-rpc
       final callRes = await _apiService!.call(
         router.ipAddress,
-        _authService!.sysauth!,
+        activeSysauth,
         router.useHttps,
         object: 'luci-rpc',
         method: 'getDHCPLeases',
@@ -350,24 +380,27 @@ class ClientController {
         final data = callRes[1] as Map<String, dynamic>;
         if (data['dhcp_leases'] is List) {
           dhcp4Leases.addAll(
-              (data['dhcp_leases'] as List).cast<Map<String, dynamic>>());
+            (data['dhcp_leases'] as List).cast<Map<String, dynamic>>(),
+          );
         }
         if (data['dhcp6_leases'] is List) {
           dhcp6Leases.addAll(
-              (data['dhcp6_leases'] as List).cast<Map<String, dynamic>>());
+            (data['dhcp6_leases'] as List).cast<Map<String, dynamic>>(),
+          );
         }
       }
 
       if (dhcp4Leases.isEmpty) {
         final rawLeaseStr =
             await _executeRouterCommandOutput('cat', ['/tmp/dhcp.leases']) ??
-                await _executeRouterCommandOutput('cat', ['/var/dhcp.leases']) ??
-                await _executeRouterCommandOutput('cat', ['/tmp/dnsmasq.leases']);
+            await _executeRouterCommandOutput('cat', ['/var/dhcp.leases']) ??
+            await _executeRouterCommandOutput('cat', ['/tmp/dnsmasq.leases']);
         if (rawLeaseStr != null && rawLeaseStr.isNotEmpty) {
           final processed = _processDhcpLeases({'data': rawLeaseStr});
           if (processed['dhcp_leases'] is List) {
-            dhcp4Leases.addAll((processed['dhcp_leases'] as List)
-                .cast<Map<String, dynamic>>());
+            dhcp4Leases.addAll(
+              (processed['dhcp_leases'] as List).cast<Map<String, dynamic>>(),
+            );
           }
         }
       }
@@ -404,12 +437,20 @@ class ClientController {
       bool usedIpNeigh = false;
       try {
         final neighV4Str =
-            await _executeRouterCommandOutput('/sbin/ip', ['-4', 'neigh', 'show']) ??
-                await _executeRouterCommandOutput('ip', ['-4', 'neigh', 'show']) ??
-                await _executeRouterCommandOutput('ip', ['neigh', 'show']);
+            await _executeRouterCommandOutput('/sbin/ip', [
+              '-4',
+              'neigh',
+              'show',
+            ]) ??
+            await _executeRouterCommandOutput('ip', ['-4', 'neigh', 'show']) ??
+            await _executeRouterCommandOutput('ip', ['neigh', 'show']);
         final neighV6Str =
-            await _executeRouterCommandOutput('/sbin/ip', ['-6', 'neigh', 'show']) ??
-                await _executeRouterCommandOutput('ip', ['-6', 'neigh', 'show']);
+            await _executeRouterCommandOutput('/sbin/ip', [
+              '-6',
+              'neigh',
+              'show',
+            ]) ??
+            await _executeRouterCommandOutput('ip', ['-6', 'neigh', 'show']);
 
         final combined = [
           if (neighV4Str != null && neighV4Str.trim().isNotEmpty) neighV4Str,
@@ -426,8 +467,11 @@ class ClientController {
       final fdbMacs = <String>{};
       try {
         final fdbStr =
-            await _executeRouterCommandOutput('/sbin/bridge', ['fdb', 'show']) ??
-                await _executeRouterCommandOutput('bridge', ['fdb', 'show']);
+            await _executeRouterCommandOutput('/sbin/bridge', [
+              'fdb',
+              'show',
+            ]) ??
+            await _executeRouterCommandOutput('bridge', ['fdb', 'show']);
         if (fdbStr != null && fdbStr.trim().isNotEmpty) {
           final macRegex = RegExp(r'([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})');
           for (final line in fdbStr.split('\n')) {
@@ -454,14 +498,17 @@ class ClientController {
           );
 
           final now = DateTime.now();
-          final shouldProbe = _lastNeighborProbeTime == null ||
+          final shouldProbe =
+              _lastNeighborProbeTime == null ||
               now.difference(_lastNeighborProbeTime!) >= kNeighborProbeInterval;
 
           if (shouldProbe && probeIps.isNotEmpty) {
             final cmd =
                 'for ip in ${probeIps.join(' ')}; do ping -c 1 -W 1 \$ip >/dev/null 2>&1 & done; wait; ip neigh show';
-            final probedNeighStr =
-                await _executeRouterCommandOutput('sh', ['-c', cmd]);
+            final probedNeighStr = await _executeRouterCommandOutput('sh', [
+              '-c',
+              cmd,
+            ]);
             if (probedNeighStr != null && probedNeighStr.trim().isNotEmpty) {
               neighClients.clear();
               neighClients.addAll(parseIpNeighOutput(probedNeighStr));
@@ -476,8 +523,9 @@ class ClientController {
       // Fallback: /proc/net/arp
       if (!usedIpNeigh || neighClients.isEmpty) {
         try {
-          final arpStr =
-              await _executeRouterCommandOutput('cat', ['/proc/net/arp']);
+          final arpStr = await _executeRouterCommandOutput('cat', [
+            '/proc/net/arp',
+          ]);
           if (arpStr != null && arpStr.isNotEmpty) {
             for (final line in arpStr.split('\n')) {
               final trimmed = line.trim();
@@ -511,7 +559,7 @@ class ClientController {
       // 4. Fetch Host Hints dictionary
       final hostHints = await _apiService!.fetchHostHintsWithContext(
         ipAddress: router.ipAddress,
-        sysauth: _authService!.sysauth!,
+        sysauth: activeSysauth,
         useHttps: router.useHttps,
       );
 
@@ -521,7 +569,7 @@ class ClientController {
       try {
         final devRes = await _apiService!.call(
           router.ipAddress,
-          _authService!.sysauth!,
+          activeSysauth,
           router.useHttps,
           object: 'network.device',
           method: 'status',
@@ -566,8 +614,14 @@ class ClientController {
             values.forEach((_, sec) {
               if (sec is Map && sec['.type'] == 'host') {
                 final rawMac = sec['mac'];
-                final sName = sec['name']?.toString() ?? sec['hostname']?.toString() ?? '';
-                final sTime = sec['leasetime']?.toString() ?? sec['lease_time']?.toString() ?? '';
+                final sName =
+                    sec['name']?.toString() ??
+                    sec['hostname']?.toString() ??
+                    '';
+                final sTime =
+                    sec['leasetime']?.toString() ??
+                    sec['lease_time']?.toString() ??
+                    '';
                 final macList = <String>[];
                 if (rawMac is List) {
                   macList.addAll(rawMac.map((e) => e.toString()));
@@ -607,9 +661,16 @@ class ClientController {
           }
         }
 
-        final staticName = hostHints[macN]?['staticLeaseName']?.toString() ?? staticUciNames[macN];
-        final staticTime = staticUciTimes[macN] ?? hostHints[macN]?['staticLeaseTime']?.toString() ?? hostHints[macN]?['leasetime']?.toString();
-        final isStaticEntry = hostHints[macN]?['isStaticLease'] == true || staticUciMacs.contains(macN);
+        final staticName =
+            hostHints[macN]?['staticLeaseName']?.toString() ??
+            staticUciNames[macN];
+        final staticTime =
+            staticUciTimes[macN] ??
+            hostHints[macN]?['staticLeaseTime']?.toString() ??
+            hostHints[macN]?['leasetime']?.toString();
+        final isStaticEntry =
+            hostHints[macN]?['isStaticLease'] == true ||
+            staticUciMacs.contains(macN);
         final isWireless = normalizedWireless.contains(macN);
         final foundSsid = macToSsidMap[macN];
         final foundIface = macToIfaceMap[macN];
@@ -621,8 +682,9 @@ class ClientController {
 
         clientMap[macN] = c.copyWith(
           hostname: hostname,
-          connectionType:
-              isWireless ? ConnectionType.wireless : ConnectionType.wired,
+          connectionType: isWireless
+              ? ConnectionType.wireless
+              : ConnectionType.wired,
           ssid: foundSsid,
           wirelessIface: foundIface,
           staticLeaseName: staticName,
@@ -647,8 +709,10 @@ class ClientController {
 
         if (macN.isNotEmpty && clientMap.containsKey(macN)) {
           final existing = clientMap[macN]!;
-          final mergedV6 =
-              <String>{...?(existing.ipv6Addresses), ...v6Addrs}.toList();
+          final mergedV6 = <String>{
+            ...?(existing.ipv6Addresses),
+            ...v6Addrs,
+          }.toList();
           clientMap[macN] = existing.copyWith(ipv6Addresses: mergedV6);
         } else {
           String? matchedMac;
@@ -670,14 +734,17 @@ class ClientController {
           if (matchedMac != null && matchedMac!.isNotEmpty) {
             if (clientMap.containsKey(matchedMac)) {
               final existing = clientMap[matchedMac]!;
-              final mergedV6 =
-                  <String>{...?(existing.ipv6Addresses), ...v6Addrs}.toList();
-              clientMap[matchedMac!] =
-                  existing.copyWith(ipv6Addresses: mergedV6);
+              final mergedV6 = <String>{
+                ...?(existing.ipv6Addresses),
+                ...v6Addrs,
+              }.toList();
+              clientMap[matchedMac!] = existing.copyWith(
+                ipv6Addresses: mergedV6,
+              );
             } else {
               final isWireless = normalizedWireless.contains(matchedMac!);
-              final staticName =
-                  hostHints[matchedMac]?['staticLeaseName']?.toString();
+              final staticName = hostHints[matchedMac]?['staticLeaseName']
+                  ?.toString();
               final isStaticEntry =
                   hostHints[matchedMac]?['isStaticLease'] == true;
               clientMap[matchedMac!] = Client(
@@ -686,8 +753,9 @@ class ClientController {
                 hostname: (hostname != null && hostname.isNotEmpty)
                     ? hostname
                     : matchedMac!,
-                connectionType:
-                    isWireless ? ConnectionType.wireless : ConnectionType.wired,
+                connectionType: isWireless
+                    ? ConnectionType.wireless
+                    : ConnectionType.wired,
                 ssid: macToSsidMap[matchedMac],
                 wirelessIface: macToIfaceMap[matchedMac],
                 staticLeaseName: staticName,
@@ -710,9 +778,8 @@ class ClientController {
           final ip = (ipaddrs != null && ipaddrs.isNotEmpty)
               ? ipaddrs.first.toString()
               : 'N/A';
-          final name = (hintName != null &&
-                  hintName.isNotEmpty &&
-                  hintName != '*')
+          final name =
+              (hintName != null && hintName.isNotEmpty && hintName != '*')
               ? hintName
               : macN;
           final isWireless = normalizedWireless.contains(macN);
@@ -725,8 +792,9 @@ class ClientController {
             ipAddress: ip,
             macAddress: macN,
             hostname: name,
-            connectionType:
-                isWireless ? ConnectionType.wireless : ConnectionType.wired,
+            connectionType: isWireless
+                ? ConnectionType.wireless
+                : ConnectionType.wired,
             ssid: macToSsidMap[macN],
             wirelessIface: macToIfaceMap[macN],
             staticLeaseName: staticName,
@@ -738,8 +806,7 @@ class ClientController {
 
       // D. Final pass
       final processedClients = <Client>[];
-      final sysHostname =
-          (router.lastKnownHostname ?? '').trim().toLowerCase();
+      final sysHostname = (router.lastKnownHostname ?? '').trim().toLowerCase();
 
       for (final c in clientMap.values) {
         final macN = normMac(c.macAddress);
@@ -784,7 +851,8 @@ class ClientController {
           final aMac = normMac(a['macaddr'] as String);
           if (aMac != macN) continue;
           final dev = (a['device'] as String? ?? '').toLowerCase();
-          final isWlanDev = dev.startsWith('wlan') ||
+          final isWlanDev =
+              dev.startsWith('wlan') ||
               dev.startsWith('phy') ||
               dev.startsWith('ra') ||
               dev.startsWith('wifi') ||
@@ -818,7 +886,8 @@ class ClientController {
 
         final resolvedSsid = c.ssid ?? macToSsidMap[macN];
         final resolvedIface = c.wirelessIface ?? macToIfaceMap[macN];
-        final isWirelessClient = isWirelessActive ||
+        final isWirelessClient =
+            isWirelessActive ||
             _knownWirelessMacs.contains(macN) ||
             macToSsidMap.containsKey(macN) ||
             macToIfaceMap.containsKey(macN) ||
@@ -839,8 +908,8 @@ class ClientController {
         } else if (isFdbActive) {
           neighState = NeighborReachability.reachable;
         } else if (wiredNeighEntry != null) {
-          final nud =
-              (wiredNeighEntry['nud_state'] as String? ?? '').toUpperCase();
+          final nud = (wiredNeighEntry['nud_state'] as String? ?? '')
+              .toUpperCase();
           switch (nud) {
             case 'REACHABLE':
             case 'DELAY':
@@ -876,7 +945,8 @@ class ClientController {
           isConnected = isWirelessActive;
           finalConnType = ConnectionType.wireless;
         } else {
-          final isL3Active = wiredNeighEntry != null &&
+          final isL3Active =
+              wiredNeighEntry != null &&
               (neighState == NeighborReachability.reachable ||
                   neighState == NeighborReachability.unknown);
 
@@ -902,28 +972,32 @@ class ClientController {
         }
 
         final hasValidIp = resolvedIp != 'N/A' && resolvedIp.isNotEmpty;
-        final hasGlobalV6 = c.ipv6Addresses != null &&
-            c.ipv6Addresses!
-                .any((addr) => !addr.toLowerCase().startsWith('fe80:'));
+        final hasGlobalV6 =
+            c.ipv6Addresses != null &&
+            c.ipv6Addresses!.any(
+              (addr) => !addr.toLowerCase().startsWith('fe80:'),
+            );
         final hasName =
             (c.staticLeaseName != null && c.staticLeaseName!.isNotEmpty) ||
-                (c.hostname != 'Unknown' &&
-                    c.hostname.isNotEmpty &&
-                    c.hostname != macN);
+            (c.hostname != 'Unknown' &&
+                c.hostname.isNotEmpty &&
+                c.hostname != macN);
 
         if (!hasValidIp && !hasGlobalV6 && !hasName && !isConnected) {
           continue;
         }
 
         if (isConnected || hasActiveLease || isStaticLease) {
-          processedClients.add(c.copyWith(
-            ipAddress: resolvedIp,
-            isConnected: isConnected,
-            neighState: neighState,
-            connectionType: finalConnType,
-            ssid: resolvedSsid,
-            wirelessIface: resolvedIface,
-          ));
+          processedClients.add(
+            c.copyWith(
+              ipAddress: resolvedIp,
+              isConnected: isConnected,
+              neighState: neighState,
+              connectionType: finalConnType,
+              ssid: resolvedSsid,
+              wirelessIface: resolvedIface,
+            ),
+          );
         }
       }
 
@@ -931,9 +1005,9 @@ class ClientController {
         if (a.isConnected != b.isConnected) {
           return a.isConnected ? -1 : 1;
         }
-        return a.displayName
-            .toLowerCase()
-            .compareTo(b.displayName.toLowerCase());
+        return a.displayName.toLowerCase().compareTo(
+          b.displayName.toLowerCase(),
+        );
       });
 
       return processedClients;
@@ -960,21 +1034,20 @@ class ClientController {
 
       final tasks = routers.map((r) async {
         try {
-          if (_apiService is RealApiService) {
-            final real = _apiService as RealApiService;
-            final res = await real.loginWithProtocolDetection(
+          if (_apiService != null) {
+            final res = await _apiService!.authenticate(
               r.ipAddress,
               r.username,
               r.password,
               r.useHttps,
             );
-            if (res.token == null) return <String>{};
-            final map =
-                await _apiService!.fetchAllAssociatedWirelessMacsWithContext(
-              ipAddress: r.ipAddress,
-              sysauth: res.token!,
-              useHttps: res.actualUseHttps,
-            );
+            if (!res.isSuccess || res.token == null) return <String>{};
+            final map = await _apiService!
+                .fetchAllAssociatedWirelessMacsWithContext(
+                  ipAddress: r.ipAddress,
+                  sysauth: res.token!,
+                  useHttps: res.actualUseHttps,
+                );
             final set = <String>{};
             map.forEach((_, stations) {
               set.addAll(stations.map((m) => m.toLowerCase()));
@@ -999,8 +1072,11 @@ class ClientController {
   Future<List<Map<String, dynamic>>> fetchAggregatedDhcpLeases() async {
     try {
       if (_isReviewerMode) {
-        final result =
-            await _apiService!.callSimple('luci-rpc', 'getDHCPLeases', {});
+        final result = await _apiService!.callSimple(
+          'luci-rpc',
+          'getDHCPLeases',
+          {},
+        );
         if (result is List && result.length > 1 && result[0] == 0) {
           final data = result[1] as Map<String, dynamic>;
           final leases = (data['dhcp_leases'] as List<dynamic>? ?? [])
@@ -1015,15 +1091,15 @@ class ClientController {
 
       final tasks = routers.map((r) async {
         try {
-          if (_apiService is RealApiService) {
-            final real = _apiService as RealApiService;
-            final res = await real.loginWithProtocolDetection(
+          if (_apiService != null) {
+            final res = await _apiService!.authenticate(
               r.ipAddress,
               r.username,
               r.password,
               r.useHttps,
             );
-            if (res.token == null) return <Map<String, dynamic>>[];
+            if (!res.isSuccess || res.token == null)
+              return <Map<String, dynamic>>[];
             final callRes = await _apiService!.call(
               r.ipAddress,
               res.token!,

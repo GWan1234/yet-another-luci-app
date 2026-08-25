@@ -24,7 +24,9 @@ class WirelessRollbackBanner extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    final hasUciWrite = (appState.capabilities?.hasUciWriteAccess ?? true) && appState.isAdministrativeUser;
+    final hasUciWrite =
+        (appState.capabilities?.hasUciWriteAccess ?? true) &&
+        appState.isAdministrativeUser;
     final pendingSection = appState.pendingSectionName ?? 'Wireless';
 
     return Container(
@@ -51,7 +53,11 @@ class WirelessRollbackBanner extends ConsumerWidget {
                   color: Colors.white.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.pending_actions_rounded, color: Colors.white, size: 22),
+                child: const Icon(
+                  Icons.pending_actions_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -60,7 +66,11 @@ class WirelessRollbackBanner extends ConsumerWidget {
                   children: [
                     Text(
                       'Staged Changes Pending ($pendingSection)',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     const Text(
@@ -80,35 +90,52 @@ class WirelessRollbackBanner extends ConsumerWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
                   side: const BorderSide(color: Colors.white),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   visualDensity: VisualDensity.compact,
                 ),
                 onPressed: () => _handleRevert(context, ref, appState),
                 icon: const Icon(Icons.undo_rounded, size: 16),
-                label: const Text('Revert Changes Now', style: TextStyle(fontSize: 12)),
+                label: const Text(
+                  'Revert Changes Now',
+                  style: TextStyle(fontSize: 12),
+                ),
               ),
               const SizedBox(width: 8),
               FilledButton.icon(
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   visualDensity: VisualDensity.compact,
                 ),
                 onPressed: hasUciWrite
                     ? () async {
-                        final success = await appState.confirmWifiAccessControlChanges();
+                        final success = await appState
+                            .confirmWifiAccessControlChanges();
                         if (context.mounted) {
                           if (success) {
-                            context.showToastSuccess('Wireless changes confirmed & saved permanently.');
+                            context.showToastSuccess(
+                              'Wireless changes confirmed & saved permanently.',
+                            );
                           } else {
-                            context.showToastError('Failed to send confirmation to router.');
+                            context.showToastError(
+                              'Failed to send confirmation to router.',
+                            );
                           }
                         }
                       }
                     : null,
                 icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
-                label: const Text('Confirm & Keep', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                label: const Text(
+                  'Confirm & Keep',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
@@ -117,22 +144,37 @@ class WirelessRollbackBanner extends ConsumerWidget {
     );
   }
 
-  Future<void> _handleRevert(BuildContext context, WidgetRef ref, AppState appState) async {
+  Future<void> _handleRevert(
+    BuildContext context,
+    WidgetRef ref,
+    AppState appState,
+  ) async {
     final pendingSection = appState.pendingSectionName;
     final pendingType = appState.pendingTargetType;
     final targetRadio = appState.pendingTargetRadio;
     final targetInterface = appState.pendingTargetInterface;
 
-    context.showToastLoading('Reverting staged wireless changes...', actionKey: 'revert_wireless');
+    context.showToastLoading(
+      'Reverting staged wireless changes...',
+      actionKey: 'revert_wireless',
+    );
 
-    final reverted = await appState.revertWifiAccessControlChanges(context: context);
+    final reverted = await appState.revertWifiAccessControlChanges(
+      context: context,
+    );
 
     if (!context.mounted) return;
 
     if (reverted) {
-      context.showToastSuccess('Wireless changes reverted & verified on router.', actionKey: 'revert_wireless');
+      context.showToastSuccess(
+        'Wireless changes reverted & verified on router.',
+        actionKey: 'revert_wireless',
+      );
     } else {
-      context.showToastInfo('Revert signal sent. Verifying router UCI status...', actionKey: 'revert_wireless');
+      context.showToastInfo(
+        'Revert signal sent. Verifying router UCI status...',
+        actionKey: 'revert_wireless',
+      );
     }
 
     // Re-open relevant settings dialog if target radio or interface reference exists
@@ -141,23 +183,31 @@ class WirelessRollbackBanner extends ConsumerWidget {
       isReviewerMode: appState.reviewerModeEnabled,
     );
 
-    if (pendingType == 'radio' && (targetRadio != null || pendingSection != null)) {
-      final radioToEdit = targetRadio ?? overview.radios.firstWhere(
-        (r) => r.name == pendingSection,
-        orElse: () => overview.radios.first,
-      );
+    if (pendingType == 'radio' &&
+        (targetRadio != null || pendingSection != null)) {
+      final radioToEdit =
+          targetRadio ??
+          overview.radios.firstWhere(
+            (r) => r.name == pendingSection,
+            orElse: () => overview.radios.first,
+          );
       await showDialog(
         context: context,
         builder: (ctx) => EditRadioDialog(radio: radioToEdit),
       );
     } else if (pendingType == 'ssid' && targetInterface != null) {
-      final parentRadio = targetRadio ?? overview.radios.firstWhere(
-        (r) => r.interfaces.any((i) => i.sectionName == targetInterface.sectionName),
-        orElse: () => overview.radios.first,
-      );
+      final parentRadio =
+          targetRadio ??
+          overview.radios.firstWhere(
+            (r) => r.interfaces.any(
+              (i) => i.sectionName == targetInterface.sectionName,
+            ),
+            orElse: () => overview.radios.first,
+          );
       await showDialog(
         context: context,
-        builder: (ctx) => EditSsidDialog(radio: parentRadio, interface: targetInterface),
+        builder: (ctx) =>
+            EditSsidDialog(radio: parentRadio, interface: targetInterface),
       );
     }
   }

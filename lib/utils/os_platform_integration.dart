@@ -2,27 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'dart:async' show unawaited;
-import 'dart:io' show Platform, File, Directory;
+import 'dart:io' show Platform, File, Directory, Process;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:yet_another_luci_app/modules/storage_monitoring/models/storage_info.dart';
 import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 
 /// Semantic haptic feedback intensity types.
-enum OsHapticType {
-  light,
-  medium,
-  heavy,
-  selection,
-}
+enum OsHapticType { light, medium, heavy, selection }
 
-enum StoragePermissionChoice {
-  preferPublic,
-  preferSandbox,
-  cancelled,
-}
+enum StoragePermissionChoice { preferPublic, preferSandbox, cancelled }
 
 class FileSaveResult {
   final String filePath;
@@ -48,20 +40,18 @@ class OsPlatformIntegration {
       switch (type) {
         case OsHapticType.light:
           await HapticFeedback.lightImpact();
-          break;
+          return;
         case OsHapticType.medium:
           await HapticFeedback.mediumImpact();
-          break;
+          return;
         case OsHapticType.heavy:
           await HapticFeedback.heavyImpact();
-          break;
+          return;
         case OsHapticType.selection:
           await HapticFeedback.selectionClick();
-          break;
+          return;
       }
-    } catch (_) {
-      // Platform unsupported or vibration hardware absent
-    }
+    } catch (_) {}
   }
 
   /// Copies text to OS system clipboard with haptic confirmation and toast notification.
@@ -78,7 +68,10 @@ class OsPlatformIntegration {
       }
     } catch (e) {
       if (context.mounted) {
-        context.showToastError('Clipboard Error', subtitle: 'Failed to copy $label.');
+        context.showToastError(
+          'Clipboard Error',
+          subtitle: 'Failed to copy $label.',
+        );
       }
     }
   }
@@ -103,7 +96,9 @@ class OsPlatformIntegration {
     }
 
     if (!launched && context.mounted) {
-      context.showToastInfo('Please open device Settings > Apps > Yet Another LuCI App to manage permissions.');
+      context.showToastInfo(
+        'Please open device Settings > Apps > Yet Another LuCI App to manage permissions.',
+      );
     }
 
     return launched;
@@ -112,7 +107,9 @@ class OsPlatformIntegration {
   /// Helper to evaluate whether a filesystem path is genuinely public Downloads.
   static bool isPathPublic(String path) {
     final lower = path.toLowerCase();
-    if (lower.contains('/android/data/') || lower.contains('/data/user/') || lower.contains('com.nightcode.luci')) {
+    if (lower.contains('/android/data/') ||
+        lower.contains('/data/user/') ||
+        lower.contains('com.nightcode.luci')) {
       return false;
     }
     return true;
@@ -185,6 +182,17 @@ class OsPlatformIntegration {
       if (targetDir != null && targetDir.existsSync()) {
         final file = File('${targetDir.path}/$fileName');
         await file.writeAsBytes(bytes, flush: true);
+        if (Platform.isAndroid) {
+          try {
+            await Process.run('am', [
+              'broadcast',
+              '-a',
+              'android.intent.action.MEDIA_SCANNER_SCAN_FILE',
+              '-d',
+              'file://${file.path}',
+            ]);
+          } catch (_) {}
+        }
         return FileSaveResult(
           filePath: file.path,
           isPublicDownloads: isPathPublic(file.path),
@@ -244,7 +252,10 @@ class OsPlatformIntegration {
     required Uint8List bytes,
     required String fileName,
   }) async {
-    final res = await saveDownloadedFileWithResult(bytes: bytes, fileName: fileName);
+    final res = await saveDownloadedFileWithResult(
+      bytes: bytes,
+      fileName: fileName,
+    );
     return res?.filePath;
   }
 
@@ -266,10 +277,7 @@ class OsPlatformIntegration {
       }
     } catch (_) {}
 
-    String formattedSize = '${(fileSizeInBytes / 1024).toStringAsFixed(1)} KB';
-    if (fileSizeInBytes >= 1024 * 1024) {
-      formattedSize = '${(fileSizeInBytes / (1024 * 1024)).toStringAsFixed(2)} MB';
-    }
+    final formattedSize = StorageOverview.formatBytes(fileSizeInBytes);
 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -298,21 +306,32 @@ class OsPlatformIntegration {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                color: colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.6,
+                ),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.archive_outlined, size: 20, color: Colors.teal),
+                      const Icon(
+                        Icons.archive_outlined,
+                        size: 20,
+                        color: Colors.teal,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           fileName,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -324,23 +343,38 @@ class OsPlatformIntegration {
                     children: [
                       Text(
                         'Size: $formattedSize',
-                        style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.teal.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.teal.withValues(alpha: 0.3)),
+                          border: Border.all(
+                            color: Colors.teal.withValues(alpha: 0.3),
+                          ),
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.folder_special_outlined, size: 11, color: Colors.teal),
+                            Icon(
+                              Icons.folder_special_outlined,
+                              size: 11,
+                              color: Colors.teal,
+                            ),
                             SizedBox(width: 4),
                             Text(
                               'Public Downloads',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.teal),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.teal,
+                              ),
                             ),
                           ],
                         ),
@@ -353,7 +387,10 @@ class OsPlatformIntegration {
             const SizedBox(height: 12),
             Text(
               'Downloaded File Location:',
-              style: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurfaceVariant),
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 4),
             Container(
@@ -361,11 +398,17 @@ class OsPlatformIntegration {
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
+                border: Border.all(
+                  color: colorScheme.outline.withValues(alpha: 0.2),
+                ),
               ),
               child: SelectableText(
                 saveResult.filePath,
-                style: const TextStyle(fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -379,11 +422,19 @@ class OsPlatformIntegration {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.teal,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             onPressed: () {
               Navigator.of(ctx).pop();
-              unawaited(copyToClipboard(context, text: saveResult.filePath, label: 'Backup Path'));
+              unawaited(
+                copyToClipboard(
+                  context,
+                  text: saveResult.filePath,
+                  label: 'Backup Path',
+                ),
+              );
             },
             icon: const Icon(Icons.copy, size: 16),
             label: const Text('Copy File Path'),
@@ -395,7 +446,10 @@ class OsPlatformIntegration {
 
   /// Attempts to open the host OS file manager directory containing the specified file.
   /// Falls back gracefully to showing an interactive path dialog with clipboard copying and file metrics.
-  static Future<void> openSavedDirectoryOrFile(BuildContext context, String filePath) async {
+  static Future<void> openSavedDirectoryOrFile(
+    BuildContext context,
+    String filePath,
+  ) async {
     final isPublic = isPathPublic(filePath);
     final saveResult = FileSaveResult(
       filePath: filePath,
@@ -432,7 +486,9 @@ class OsPlatformIntegration {
     if (!Platform.isAndroid) return false;
     try {
       final version = Platform.operatingSystemVersion;
-      final match = RegExp(r'(?:API|SDK)\s*(\d+)|Android\s*(\d+)').firstMatch(version);
+      final match = RegExp(
+        r'(?:API|SDK)\s*(\d+)|Android\s*(\d+)',
+      ).firstMatch(version);
       if (match != null) {
         final sdkStr = match.group(1);
         if (sdkStr != null) {
@@ -450,7 +506,10 @@ class OsPlatformIntegration {
   }
 
   /// Evaluates safe top inset padding considering OS status bar cutouts & notch insets.
-  static double getSafeAreaTopPadding(BuildContext context, {double defaultOffset = 12.0}) {
+  static double getSafeAreaTopPadding(
+    BuildContext context, {
+    double defaultOffset = 12.0,
+  }) {
     final mediaQuery = MediaQuery.of(context);
     final topPadding = mediaQuery.padding.top;
     final viewTopPadding = mediaQuery.viewPadding.top;
@@ -459,11 +518,16 @@ class OsPlatformIntegration {
   }
 
   /// Evaluates safe bottom inset padding considering OS navigation bar / gesture bar cutouts.
-  static double getSafeAreaBottomPadding(BuildContext context, {double defaultOffset = 24.0}) {
+  static double getSafeAreaBottomPadding(
+    BuildContext context, {
+    double defaultOffset = 24.0,
+  }) {
     final mediaQuery = MediaQuery.of(context);
     final bottomPadding = mediaQuery.padding.bottom;
     final viewBottomPadding = mediaQuery.viewPadding.bottom;
-    final safeBottom = bottomPadding > viewBottomPadding ? bottomPadding : viewBottomPadding;
+    final safeBottom = bottomPadding > viewBottomPadding
+        ? bottomPadding
+        : viewBottomPadding;
     return safeBottom + defaultOffset;
   }
 

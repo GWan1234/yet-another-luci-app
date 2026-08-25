@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 enum StorageDataSource {
-  rpcJson,   // Natively in Bytes from OpenWrt RPC JSON (luci-rpc.getMountPoints, system.mounts, etc.)
+  rpcJson, // Natively in Bytes from OpenWrt RPC JSON (luci-rpc.getMountPoints, system.mounts, etc.)
   dfKBlocks, // 1K-blocks (KB) from plain df or df -k command output
-  dfHuman,   // Human-readable string from df -h (e.g. 123M, 1.5G, 500K)
+  dfHuman, // Human-readable string from df -h (e.g. 123M, 1.5G, 500K)
 }
 
 /// Representation of an individual mounted filesystem partition or device.
@@ -29,19 +29,22 @@ class MountPointItem {
     Map<String, dynamic> json, {
     StorageDataSource dataSource = StorageDataSource.rpcJson,
   }) {
-    final mount = json['mount']?.toString() ??
+    final mount =
+        json['mount']?.toString() ??
         json['target']?.toString() ??
         json['mountpoint']?.toString() ??
         json['dest']?.toString() ??
         json['path']?.toString() ??
         '/';
-    final dev = json['device']?.toString() ??
+    final dev =
+        json['device']?.toString() ??
         json['dev']?.toString() ??
         json['src']?.toString() ??
         json['source']?.toString() ??
         'unknown';
 
-    String fs = json['fs']?.toString() ??
+    String fs =
+        json['fs']?.toString() ??
         json['fstype']?.toString() ??
         json['type']?.toString() ??
         json['filesystem']?.toString() ??
@@ -72,22 +75,26 @@ class MountPointItem {
         final lower = clean.toLowerCase();
         if (lower.endsWith('g') || lower.endsWith('gb')) {
           hasUnitSuffix = true;
-          final n = double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
+          final n =
+              double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
           return (n * 1024 * 1024 * 1024).toInt();
         }
         if (lower.endsWith('m') || lower.endsWith('mb')) {
           hasUnitSuffix = true;
-          final n = double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
+          final n =
+              double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
           return (n * 1024 * 1024).toInt();
         }
         if (lower.endsWith('k') || lower.endsWith('kb')) {
           hasUnitSuffix = true;
-          final n = double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
+          final n =
+              double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
           return (n * 1024).toInt();
         }
         if (lower.endsWith('b')) {
           hasUnitSuffix = true;
-          final n = double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
+          final n =
+              double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
           return n.toInt();
         }
         return int.tryParse(clean) ?? (double.tryParse(clean)?.toInt() ?? 0);
@@ -95,14 +102,30 @@ class MountPointItem {
       return 0;
     }
 
-    int rawSize = parseNum(json['size'] ?? json['total'] ?? json['blocks'] ?? json['sizeBytes'] ?? json['bytes'] ?? json['capacity']);
-    int rawAvail = parseNum(json['avail'] ?? json['available'] ?? json['free'] ?? json['availableBytes'] ?? json['freeBytes']);
+    int rawSize = parseNum(
+      json['size'] ??
+          json['total'] ??
+          json['blocks'] ??
+          json['sizeBytes'] ??
+          json['bytes'] ??
+          json['capacity'],
+    );
+    int rawAvail = parseNum(
+      json['avail'] ??
+          json['available'] ??
+          json['free'] ??
+          json['availableBytes'] ??
+          json['freeBytes'],
+    );
     int rawUsed = parseNum(json['used'] ?? json['usedBytes']);
 
-    final bsize = parseNum(json['bsize'] ?? json['block_size'] ?? json['blockSize']);
+    final bsize = parseNum(
+      json['bsize'] ?? json['block_size'] ?? json['blockSize'],
+    );
     final unitStr = json['unit']?.toString().toLowerCase() ?? '';
 
-    final isExplicitBytes = hasUnitSuffix ||
+    final isExplicitBytes =
+        hasUnitSuffix ||
         json.containsKey('sizeBytes') ||
         json.containsKey('bytes') ||
         json.containsKey('usedBytes') ||
@@ -168,7 +191,10 @@ class MountPointItem {
       return bsize;
     }
 
-    if (hasExplicitByteKey || hasUnitSuffix || unitStr == 'bytes' || unitStr == 'b') {
+    if (hasExplicitByteKey ||
+        hasUnitSuffix ||
+        unitStr == 'bytes' ||
+        unitStr == 'b') {
       return 1;
     }
 
@@ -194,7 +220,8 @@ class MountPointItem {
       return 1;
     }
 
-    final bool isSystemMount = mountPath == '/' ||
+    final bool isSystemMount =
+        mountPath == '/' ||
         mountPath == '/overlay' ||
         mountPath == '/rom' ||
         mountPath == '/tmp' ||
@@ -205,7 +232,8 @@ class MountPointItem {
         return 1;
       }
       final bool isExactMbMultiple = (rawSize % 1048576 == 0);
-      final double ifKbToGb = (rawSize.toDouble() * 1024.0) / (1024.0 * 1024.0 * 1024.0);
+      final double ifKbToGb =
+          (rawSize.toDouble() * 1024.0) / (1024.0 * 1024.0 * 1024.0);
 
       if (ifKbToGb > 100000.0 || (isExactMbMultiple && rawSize >= 16777216)) {
         return 1;
@@ -281,7 +309,10 @@ class StorageOverview {
     return '${gb.toStringAsFixed(2)} GB';
   }
 
-  factory StorageOverview.fromRpcData(dynamic data, {bool isReviewerMode = false}) {
+  factory StorageOverview.fromRpcData(
+    dynamic data, {
+    bool isReviewerMode = false,
+  }) {
     final list = <MountPointItem>[];
 
     int parseNum(dynamic val) {
@@ -289,16 +320,28 @@ class StorageOverview {
       if (val is num) return val.toInt();
       if (val is String) {
         final clean = val.replaceAll(',', '').trim();
-        if (clean.endsWith('G') || clean.endsWith('GB') || clean.endsWith('g') || clean.endsWith('gb')) {
-          final n = double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
+        if (clean.endsWith('G') ||
+            clean.endsWith('GB') ||
+            clean.endsWith('g') ||
+            clean.endsWith('gb')) {
+          final n =
+              double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
           return (n * 1024 * 1024 * 1024).toInt();
         }
-        if (clean.endsWith('M') || clean.endsWith('MB') || clean.endsWith('m') || clean.endsWith('mb')) {
-          final n = double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
+        if (clean.endsWith('M') ||
+            clean.endsWith('MB') ||
+            clean.endsWith('m') ||
+            clean.endsWith('mb')) {
+          final n =
+              double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
           return (n * 1024 * 1024).toInt();
         }
-        if (clean.endsWith('K') || clean.endsWith('KB') || clean.endsWith('k') || clean.endsWith('kb')) {
-          final n = double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
+        if (clean.endsWith('K') ||
+            clean.endsWith('KB') ||
+            clean.endsWith('k') ||
+            clean.endsWith('kb')) {
+          final n =
+              double.tryParse(clean.replaceAll(RegExp(r'[a-zA-Z]'), '')) ?? 0;
           return (n * 1024).toInt();
         }
         return int.tryParse(clean) ?? (double.tryParse(clean)?.toInt() ?? 0);
@@ -331,7 +374,10 @@ class StorageOverview {
 
         final parts = trimmed.split(RegExp(r'\s+'));
         if (parts.length == 1 &&
-            (parts[0].startsWith('/') || parts[0].contains(':') || parts[0] == 'tmpfs' || parts[0].startsWith('overlay'))) {
+            (parts[0].startsWith('/') ||
+                parts[0].contains(':') ||
+                parts[0] == 'tmpfs' ||
+                parts[0].startsWith('overlay'))) {
           pendingDev = parts[0];
           continue;
         }
@@ -348,7 +394,9 @@ class StorageOverview {
         if (parts.length < 2) continue;
 
         // /proc/mounts fallback line: <device> <target> <type> <options>...
-        if (parts.length >= 3 && int.tryParse(parts[1]) == null && (parts[1].startsWith('/') || parts[1] == 'swap')) {
+        if (parts.length >= 3 &&
+            int.tryParse(parts[1]) == null &&
+            (parts[1].startsWith('/') || parts[1] == 'swap')) {
           final dev = parts[0];
           final target = parts[1];
           final fs = parts[2];
@@ -360,14 +408,16 @@ class StorageOverview {
             continue;
           }
 
-          list.add(MountPointItem(
-            mountPath: target,
-            device: dev,
-            filesystemType: fs,
-            sizeBytes: 0,
-            usedBytes: 0,
-            availableBytes: 0,
-          ));
+          list.add(
+            MountPointItem(
+              mountPath: target,
+              device: dev,
+              filesystemType: fs,
+              sizeBytes: 0,
+              usedBytes: 0,
+              availableBytes: 0,
+            ),
+          );
           continue;
         }
 
@@ -385,20 +435,28 @@ class StorageOverview {
           String fs = '';
           int blockIdx = 1;
 
-          if (percentIdx >= 5 && int.tryParse(parts[1]) == null && !parts[1].contains('%')) {
+          if (percentIdx >= 5 &&
+              int.tryParse(parts[1]) == null &&
+              !parts[1].contains('%')) {
             fs = parts[1];
             blockIdx = 2;
           }
 
           final sizeRawStr = parts[blockIdx];
-          final hasUnitSuffix = RegExp(r'[a-zA-Z]$').hasMatch(sizeRawStr.trim());
+          final hasUnitSuffix = RegExp(
+            r'[a-zA-Z]$',
+          ).hasMatch(sizeRawStr.trim());
           final lineDataSource = (hasUnitSuffix || isHumanFormat)
               ? StorageDataSource.dfHuman
               : StorageDataSource.dfKBlocks;
 
           int rawSize = parseNum(sizeRawStr);
-          int rawUsed = percentIdx - blockIdx >= 2 ? parseNum(parts[blockIdx + 1]) : 0;
-          int rawAvail = percentIdx - blockIdx >= 3 ? parseNum(parts[blockIdx + 2]) : 0;
+          int rawUsed = percentIdx - blockIdx >= 2
+              ? parseNum(parts[blockIdx + 1])
+              : 0;
+          int rawAvail = percentIdx - blockIdx >= 3
+              ? parseNum(parts[blockIdx + 2])
+              : 0;
 
           final target = parts.sublist(percentIdx + 1).join(' ');
           final mountPath = target.isEmpty ? '/' : target;
@@ -422,9 +480,12 @@ class StorageOverview {
           if (fs.isEmpty || fs.toLowerCase() == 'unknown') {
             if (dev.contains('ubi')) {
               fs = 'ubifs';
-            } else if (dev.contains('overlay') || mountPath.contains('overlay')) {
+            } else if (dev.contains('overlay') ||
+                mountPath.contains('overlay')) {
               fs = 'overlayfs';
-            } else if (dev == 'tmpfs' || mountPath == '/tmp' || mountPath == '/dev') {
+            } else if (dev == 'tmpfs' ||
+                mountPath == '/tmp' ||
+                mountPath == '/dev') {
               fs = 'tmpfs';
             } else if (dev.contains('root') || mountPath == '/rom') {
               fs = 'squashfs';
@@ -442,14 +503,16 @@ class StorageOverview {
             }
           }
 
-          list.add(MountPointItem(
-            mountPath: mountPath,
-            device: dev,
-            filesystemType: fs,
-            sizeBytes: sizeBytes,
-            usedBytes: usedBytes,
-            availableBytes: availBytes < 0 ? 0 : availBytes,
-          ));
+          list.add(
+            MountPointItem(
+              mountPath: mountPath,
+              device: dev,
+              filesystemType: fs,
+              sizeBytes: sizeBytes,
+              usedBytes: usedBytes,
+              availableBytes: availBytes < 0 ? 0 : availBytes,
+            ),
+          );
         }
       }
     } else if (data is List) {
@@ -460,7 +523,8 @@ class StorageOverview {
       }
     } else if (data is Map) {
       final mapData = Map<String, dynamic>.from(data);
-      final inner = mapData['mountPoints'] ??
+      final inner =
+          mapData['mountPoints'] ??
           mapData['mounts'] ??
           mapData['result'] ??
           mapData['values'] ??
@@ -478,7 +542,10 @@ class StorageOverview {
         targetMap.forEach((key, val) {
           if (val is Map) {
             final copy = Map<String, dynamic>.from(val);
-            if (copy['mount'] == null && copy['target'] == null && copy['mountpoint'] == null && copy['dest'] == null) {
+            if (copy['mount'] == null &&
+                copy['target'] == null &&
+                copy['mountpoint'] == null &&
+                copy['dest'] == null) {
               copy['mount'] = key;
             }
             list.add(MountPointItem.fromJson(copy));
@@ -492,7 +559,10 @@ class StorageOverview {
             if (typeStr != null && typeStr != 'mount' && typeStr != 'swap') {
               return;
             }
-            if (copy['mount'] == null && copy['target'] == null && copy['mountpoint'] == null && copy['dest'] == null) {
+            if (copy['mount'] == null &&
+                copy['target'] == null &&
+                copy['mountpoint'] == null &&
+                copy['dest'] == null) {
               copy['mount'] = key;
             }
             list.add(MountPointItem.fromJson(copy));
@@ -509,15 +579,15 @@ class StorageOverview {
           device: '/dev/root',
           filesystemType: 'squashfs',
           sizeBytes: 134217728, // 128 MB
-          usedBytes: 47185920,  // 45 MB
+          usedBytes: 47185920, // 45 MB
           availableBytes: 87031808,
         ),
         const MountPointItem(
           mountPath: '/overlay',
           device: '/dev/mtdblock6',
           filesystemType: 'ext4',
-          sizeBytes: 67108864,  // 64 MB
-          usedBytes: 16777216,  // 16 MB
+          sizeBytes: 67108864, // 64 MB
+          usedBytes: 16777216, // 16 MB
           availableBytes: 50331648,
         ),
         const MountPointItem(
@@ -525,7 +595,7 @@ class StorageOverview {
           device: 'tmpfs',
           filesystemType: 'tmpfs',
           sizeBytes: 268435456, // 256 MB
-          usedBytes: 2097152,   // 2 MB
+          usedBytes: 2097152, // 2 MB
           availableBytes: 266338304,
         ),
       ]);
@@ -551,7 +621,9 @@ class StorageOverview {
   MountPointItem? get overlayFs {
     if (mountPoints.isEmpty) return null;
     for (final m in mountPoints) {
-      if (m.mountPath == '/overlay' || m.device.contains('ubi') || m.device.contains('overlay')) {
+      if (m.mountPath == '/overlay' ||
+          m.device.contains('ubi') ||
+          m.device.contains('overlay')) {
         return m;
       }
     }
@@ -601,7 +673,9 @@ class StorageOverview {
       }
     }
     tmpItem ??= tmpFs;
-    if (tmpItem != null && !selected.contains(tmpItem) && mountPoints.contains(tmpItem)) {
+    if (tmpItem != null &&
+        !selected.contains(tmpItem) &&
+        mountPoints.contains(tmpItem)) {
       selected.add(tmpItem);
     }
 
@@ -625,7 +699,11 @@ class StorageOverview {
     final primarySize = primary?.sizeBytes ?? 0;
     int extraSize = 0;
     for (final m in mountPoints) {
-      if (!m.isTmp && m != primary && m.mountPath != '/' && m.mountPath != '/rom' && m.mountPath != '/overlay') {
+      if (!m.isTmp &&
+          m != primary &&
+          m.mountPath != '/' &&
+          m.mountPath != '/rom' &&
+          m.mountPath != '/overlay') {
         extraSize += m.sizeBytes;
       }
     }
@@ -637,7 +715,11 @@ class StorageOverview {
     final primaryUsed = primary?.usedBytes ?? 0;
     int extraUsed = 0;
     for (final m in mountPoints) {
-      if (!m.isTmp && m != primary && m.mountPath != '/' && m.mountPath != '/rom' && m.mountPath != '/overlay') {
+      if (!m.isTmp &&
+          m != primary &&
+          m.mountPath != '/' &&
+          m.mountPath != '/rom' &&
+          m.mountPath != '/overlay') {
         extraUsed += m.usedBytes;
       }
     }

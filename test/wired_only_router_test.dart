@@ -25,7 +25,7 @@ void main() {
         'uptime': 12345,
         'device': 'br-lan',
         'ipv4-address': [
-          {'address': '192.168.1.1', 'mask': 24}
+          {'address': '192.168.1.1', 'mask': 24},
         ],
         'dns-server': ['8.8.8.8'],
         // No 'stats' key at all
@@ -65,8 +65,9 @@ void main() {
         if (result[0] == 0) {
           return result[1];
         } else {
-          final errorMessage =
-              result[1] is String ? result[1] : 'Unknown API Error';
+          final errorMessage = result[1] is String
+              ? result[1]
+              : 'Unknown API Error';
           throw Exception(errorMessage);
         }
       }
@@ -81,15 +82,15 @@ void main() {
       }
     }
 
-    test('getData throws on non-zero status (simulates uci.get wireless failure)', () {
-      // On a wired-only router, uci.get for wireless config returns an error
-      final wirelessResult = [5, 'Entry not found'];
+    test(
+      'getData throws on non-zero status (simulates uci.get wireless failure)',
+      () {
+        // On a wired-only router, uci.get for wireless config returns an error
+        final wirelessResult = [5, 'Entry not found'];
 
-      expect(
-        () => getData(wirelessResult),
-        throwsException,
-      );
-    });
+        expect(() => getData(wirelessResult), throwsException);
+      },
+    );
 
     test('getOptionalData returns null on failure instead of throwing', () {
       final wirelessResult = [5, 'Entry not found'];
@@ -102,7 +103,7 @@ void main() {
     test('getOptionalData returns data on success', () {
       final wirelessResult = [
         0,
-        {'values': {}}
+        {'values': {}},
       ];
 
       final data = getOptionalData(wirelessResult, 'uci.get wireless');
@@ -130,7 +131,7 @@ void main() {
             'uptime': 200,
             'device': 'eth0',
           },
-        ]
+        ],
       };
       // networkDevices could be null or empty on some setups
       final Map<String, dynamic>? networkDevices = null;
@@ -143,27 +144,29 @@ void main() {
       if (detailedData.containsKey('interface') &&
           detailedData['interface'] is List) {
         final List<dynamic> interfaceDataList = detailedData['interface'];
-        final Map<String, dynamic> networkStatsMap =
-            networkDevices != null ? Map<String, dynamic>.from(networkDevices) : {};
+        final Map<String, dynamic> networkStatsMap = networkDevices != null
+            ? Map<String, dynamic>.from(networkDevices)
+            : {};
 
-        interfacesList =
-            interfaceDataList.whereType<Map<String, dynamic>>().map((
-          detailedInterfaceMap,
-        ) {
-          // Enrich with stats if available (but don't require it)
-          final stats = detailedInterfaceMap['stats'];
-          if (stats == null || (stats is Map && stats.isEmpty)) {
-            final String? deviceName =
-                detailedInterfaceMap['l3_device'] ?? detailedInterfaceMap['device'];
-            if (deviceName != null) {
-              final statsContainer = networkStatsMap[deviceName];
-              if (statsContainer is Map && statsContainer['stats'] is Map) {
-                detailedInterfaceMap['stats'] = statsContainer['stats'];
+        interfacesList = interfaceDataList
+            .whereType<Map<String, dynamic>>()
+            .map((detailedInterfaceMap) {
+              // Enrich with stats if available (but don't require it)
+              final stats = detailedInterfaceMap['stats'];
+              if (stats == null || (stats is Map && stats.isEmpty)) {
+                final String? deviceName =
+                    detailedInterfaceMap['l3_device'] ??
+                    detailedInterfaceMap['device'];
+                if (deviceName != null) {
+                  final statsContainer = networkStatsMap[deviceName];
+                  if (statsContainer is Map && statsContainer['stats'] is Map) {
+                    detailedInterfaceMap['stats'] = statsContainer['stats'];
+                  }
+                }
               }
-            }
-          }
-          return NetworkInterface.fromJson(detailedInterfaceMap);
-        }).toList();
+              return NetworkInterface.fromJson(detailedInterfaceMap);
+            })
+            .toList();
       }
 
       // With the fix, we should still get interfaces even without stats
@@ -178,7 +181,7 @@ void main() {
       final sysInfo = {
         'uptime': 3600,
         'load': [2580, 1920, 1024],
-        'memory': {'total': 134217728, 'free': 67108864, 'buffered': 4194304}
+        'memory': {'total': 134217728, 'free': 67108864, 'buffered': 4194304},
       };
 
       final metrics = SystemMetrics.fromSysInfo(sysInfo);
@@ -190,7 +193,7 @@ void main() {
       final sysInfo = {
         'uptime': 3600,
         'load': ['2580', '1920', '1024'],
-        'memory': {'total': 134217728, 'free': 67108864, 'buffered': 4194304}
+        'memory': {'total': 134217728, 'free': 67108864, 'buffered': 4194304},
       };
 
       final metrics = SystemMetrics.fromSysInfo(sysInfo);
@@ -202,7 +205,7 @@ void main() {
       final sysInfo = {
         'uptime': 3600,
         'load': [0.15, 0.10, 0.05],
-        'memory': {'total': 100, 'free': 50, 'buffered': 10}
+        'memory': {'total': 100, 'free': 50, 'buffered': 10},
       };
 
       final metrics = SystemMetrics.fromSysInfo(sysInfo);
@@ -221,30 +224,35 @@ void main() {
     });
 
     test('parses explicit cpu_usage key correctly', () {
-      final sysInfo = {
-        'uptime': 3600,
-        'cpu_usage': 18.5,
-      };
+      final sysInfo = {'uptime': 3600, 'cpu_usage': 18.5};
 
       final metrics = SystemMetrics.fromSysInfo(sysInfo);
       expect(metrics.cpuUsagePercent, equals(18.5));
     });
 
-    test('normalizes 1.0+ load average on multi-core router instead of false 100%', () {
-      final sysInfo = {
-        'uptime': 3600,
-        'load': [68812, 40000, 20000], // 1.05 1m load average in 16-bit integer format
-      };
-      final boardInfo = {
-        'model': 'MediaTek MT7621',
-      };
+    test(
+      'normalizes 1.0+ load average on multi-core router instead of false 100%',
+      () {
+        final sysInfo = {
+          'uptime': 3600,
+          'load': [
+            68812,
+            40000,
+            20000,
+          ], // 1.05 1m load average in 16-bit integer format
+        };
+        final boardInfo = {'model': 'MediaTek MT7621'};
 
-      final metrics = SystemMetrics.fromSysInfo(sysInfo, boardInfo: boardInfo);
-      expect(metrics.load1m, closeTo(1.05, 0.01));
-      // 1.05 load average on 4-thread MT7621 should yield ~28% CPU load, NOT 100%
-      expect(metrics.cpuUsagePercent, lessThan(50.0));
-      expect(metrics.cpuUsagePercent, greaterThan(15.0));
-    });
+        final metrics = SystemMetrics.fromSysInfo(
+          sysInfo,
+          boardInfo: boardInfo,
+        );
+        expect(metrics.load1m, closeTo(1.05, 0.01));
+        // 1.05 load average on 4-thread MT7621 should yield ~28% CPU load, NOT 100%
+        expect(metrics.cpuUsagePercent, lessThan(50.0));
+        expect(metrics.cpuUsagePercent, greaterThan(15.0));
+      },
+    );
 
     test('parses map format for cpu usage correctly', () {
       final sysInfo = {

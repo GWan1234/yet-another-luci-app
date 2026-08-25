@@ -37,20 +37,20 @@ class SessionController {
     required void Function(bool isLoading) setLoadingState,
     required void Function(String? error) setErrorState,
     required VoidCallback notifyListeners,
-  })  : _reviewerModeEnabled = initialReviewerMode,
-        _apiServiceRef = apiServiceRef,
-        _authServiceRef = authServiceRef,
-        _routerServiceRef = routerServiceRef,
-        _secureStorageServiceRef = secureStorageServiceRef,
-        _httpClientManagerRef = httpClientManagerRef,
-        _dashboardControllerRef = dashboardControllerRef,
-        _cancelThroughputTimer = cancelThroughputTimer,
-        _startThroughputTimer = startThroughputTimer,
-        _fetchDashboardData = fetchDashboardData,
-        _initializeServices = initializeServices,
-        _setLoadingState = setLoadingState,
-        _setErrorState = setErrorState,
-        _notifyListeners = notifyListeners;
+  }) : _reviewerModeEnabled = initialReviewerMode,
+       _apiServiceRef = apiServiceRef,
+       _authServiceRef = authServiceRef,
+       _routerServiceRef = routerServiceRef,
+       _secureStorageServiceRef = secureStorageServiceRef,
+       _httpClientManagerRef = httpClientManagerRef,
+       _dashboardControllerRef = dashboardControllerRef,
+       _cancelThroughputTimer = cancelThroughputTimer,
+       _startThroughputTimer = startThroughputTimer,
+       _fetchDashboardData = fetchDashboardData,
+       _initializeServices = initializeServices,
+       _setLoadingState = setLoadingState,
+       _setErrorState = setErrorState,
+       _notifyListeners = notifyListeners;
 
   final IApiService? Function() _apiServiceRef;
   final IAuthService? Function() _authServiceRef;
@@ -113,10 +113,12 @@ class SessionController {
   }
 
   Future<void> loadReviewerMode(SecureStorageService defaultStorage) async {
-    // Initialize secure storage service with default factory first
-    ServiceContainer.configure(reviewerMode: false);
     final stored = await defaultStorage.readValue(AppConfig.reviewerModeKey);
     _reviewerModeEnabled = stored == 'true';
+    if (_reviewerModeEnabled) {
+      ServiceContainer.configure(reviewerMode: true);
+      _initializeServices();
+    }
   }
 
   Future<void> setReviewerMode(bool enabled, {BuildContext? context}) async {
@@ -139,14 +141,18 @@ class SessionController {
 
     if (enabled) {
       setPublicIps('203.0.113.195', '2001:db8:85a3::8a2e:0370:7334');
-      await tryAutoLogin(context: (context != null && context.mounted) ? context : null);
-      await _fetchDashboardData();
+      await tryAutoLogin(
+        context: (context != null && context.mounted) ? context : null,
+      );
     } else {
       _publicIpv4 = null;
       _publicIpv6 = null;
       final current = selectedRouter;
       if (current != null) {
-        await selectRouter(current.id, context: (context != null && context.mounted) ? context : null);
+        await selectRouter(
+          current.id,
+          context: (context != null && context.mounted) ? context : null,
+        );
       }
     }
     _setLoadingState(false);
@@ -198,11 +204,14 @@ class SessionController {
 
       String? jsonStr = await _secureStorageService.readValue(key);
       if ((jsonStr == null || jsonStr.isEmpty) && routerId != null) {
-        jsonStr = await _secureStorageService.readValue('dashboard_preferences');
+        jsonStr = await _secureStorageService.readValue(
+          'dashboard_preferences',
+        );
       }
       if (jsonStr != null && jsonStr.isNotEmpty) {
-        _dashboardPreferences =
-            DashboardPreferences.fromJson(jsonDecode(jsonStr));
+        _dashboardPreferences = DashboardPreferences.fromJson(
+          jsonDecode(jsonStr),
+        );
         _notifyListeners();
       }
     } catch (e, stack) {
@@ -365,7 +374,9 @@ class SessionController {
       // Guardrail: Reset dashboard state if connection fails to avoid displaying stale data under new profile label
       _dashboardController?.resetState();
       final routerLabel = found.lastKnownHostname ?? found.ipAddress;
-      _setErrorState('Failed to establish session with $routerLabel (${found.ipAddress}).');
+      _setErrorState(
+        'Failed to establish session with $routerLabel (${found.ipAddress}).',
+      );
     }
     _setLoadingState(false);
     _notifyListeners();
@@ -423,13 +434,16 @@ class SessionController {
             );
           }
         }
-        await _fetchDashboardData();
         _startThroughputTimer();
         _setLoadingState(false);
         _notifyListeners();
+        // Trigger dashboard data fetching asynchronously so UI transitions immediately to MainScreen
+        unawaited(_fetchDashboardData());
         return true;
       } else {
-        _setErrorState('Login Failed: Invalid credentials or host unreachable.');
+        _setErrorState(
+          'Login Failed: Invalid credentials or host unreachable.',
+        );
         _setLoadingState(false);
         _notifyListeners();
         return false;
@@ -455,16 +469,8 @@ class SessionController {
   }
 
   Future<bool> tryAutoLogin({BuildContext? context}) async {
-    if (_reviewerModeEnabled) {
-      return await _authService!.tryAutoLogin(
-        null,
-        null,
-        null,
-        null,
-        context: context,
-      );
-    }
-    final success = await _authService?.tryAutoLogin(
+    final success =
+        await _authService?.tryAutoLogin(
           null,
           null,
           null,
@@ -475,7 +481,9 @@ class SessionController {
     if (success) {
       await loadRouters();
       await _fetchDashboardData();
-      _startThroughputTimer();
+      if (!_reviewerModeEnabled) {
+        _startThroughputTimer();
+      }
       _notifyListeners();
     }
     return success;

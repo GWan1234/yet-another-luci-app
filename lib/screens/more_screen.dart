@@ -15,6 +15,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:yet_another_luci_app/config/app_config.dart';
 import 'package:yet_another_luci_app/utils/http_client_manager.dart';
+import 'package:yet_another_luci_app/utils/gateway_utils.dart';
+import 'package:yet_another_luci_app/services/secure_storage_service.dart';
 import 'package:yet_another_luci_app/state/app_state.dart';
 import 'package:yet_another_luci_app/modules/core/luci_module_registry.dart';
 import 'package:yet_another_luci_app/screens/paywall_screen.dart';
@@ -105,12 +107,25 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                 // Clear all accepted certificates on logout
                 await HttpClientManager().clearAcceptedCertificates();
                 if (context.mounted) {
-                  await Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
-                    ),
-                    (Route<dynamic> route) => false,
-                  );
+                  final creds = await SecureStorageService().getCredentials();
+                  final detectedGateway = await GatewayUtils.detectGatewayIp();
+                  final effectiveIp = (creds['ipAddress'] != null && creds['ipAddress']!.isNotEmpty)
+                      ? creds['ipAddress']
+                      : detectedGateway;
+                      
+                  if (context.mounted) {
+                    await Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            LoginScreen(
+                              initialIp: effectiveIp,
+                              initialUsername: creds['username'],
+                              initialPassword: creds['password'],
+                            ),
+                      ),
+                      (Route<dynamic> route) => false,
+                    );
+                  }
                 }
               },
             ),
@@ -122,7 +137,10 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
 
   Future<void> _showRebootDialog(BuildContext context) async {
     final appState = ref.read(appStateProvider);
-    final routerName = appState.selectedRouter?.lastKnownHostname ?? appState.selectedRouter?.ipAddress ?? 'the router';
+    final routerName =
+        appState.selectedRouter?.lastKnownHostname ??
+        appState.selectedRouter?.ipAddress ??
+        'the router';
     return showDialog<void>(
       context: context,
       builder: (BuildContext context) {
@@ -147,12 +165,15 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                 if (parentContext.mounted) {
                   parentContext.showToastLoading(
                     'Rebooting Router',
-                    subtitle: 'Router is rebooting... The app will automatically reconnect once online.',
+                    subtitle:
+                        'Router is rebooting... The app will automatically reconnect once online.',
                     actionKey: actionKey,
                     timeout: const Duration(seconds: 45),
                   );
                 }
-                final success = await appState.reboot(context: parentContext.mounted ? parentContext : null);
+                final success = await appState.reboot(
+                  context: parentContext.mounted ? parentContext : null,
+                );
                 if (parentContext.mounted && !success) {
                   parentContext.showToastError(
                     'Reboot Failed',
@@ -178,7 +199,9 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
         context: context,
         builder: (BuildContext context) {
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
             title: Row(
               children: [
                 const ThemeRouterLogo(width: 28, height: 28, showShadow: false),
@@ -196,9 +219,14 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.6),
+                    color: theme.colorScheme.primaryContainer.withValues(
+                      alpha: 0.6,
+                    ),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -232,7 +260,10 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                       icon: const Icon(Icons.code_rounded, size: 16),
                       label: const Text('GitHub'),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
@@ -242,7 +273,9 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                         final Uri mailUri = Uri(
                           scheme: 'mailto',
                           path: AppConfig.supportEmail,
-                          queryParameters: {'subject': 'Yet Another LuCI App Support Request'},
+                          queryParameters: {
+                            'subject': 'Yet Another LuCI App Support Request',
+                          },
                         );
                         await launchUrlString(
                           mailUri.toString(),
@@ -252,7 +285,10 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                       icon: const Icon(Icons.email_outlined, size: 16),
                       label: const Text('Support'),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
@@ -306,27 +342,29 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
             ),
             const LuciSectionHeader('Management Modules'),
             _MoreScreenSection(
-              tiles: LuciModuleRegistry.instance.enabledModules.where((m) => !m.showInBottomNav).map((module) {
-                return _buildMoreTile(
-                  context,
-                  icon: module.icon,
-                  iconColor: Theme.of(context).colorScheme.primary,
-                  title: module.name,
-                  subtitle: module.description,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => module.buildScreen(context),
-                      ),
+              tiles: LuciModuleRegistry.instance.enabledModules
+                  .where((m) => !m.showInBottomNav)
+                  .map((module) {
+                    return _buildMoreTile(
+                      context,
+                      icon: module.icon,
+                      iconColor: Theme.of(context).colorScheme.primary,
+                      title: module.name,
+                      subtitle: module.description,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => module.buildScreen(context),
+                          ),
+                        );
+                      },
                     );
-                  },
-                );
-              }).toList(),
+                  })
+                  .toList(),
             ),
             const LuciSectionHeader('Application'),
             _MoreScreenSection(
               tiles: [
-
                 if (AppConfig.isSupportDevEnabled)
                   _buildMoreTile(
                     context,

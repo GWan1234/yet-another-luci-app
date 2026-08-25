@@ -41,7 +41,10 @@ class LuciCollapsibleCard extends StatefulWidget {
     this.trailingAction,
     this.onExpansionChanged,
     this.padding = const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-  }) : assert(child != null || childBuilder != null, 'Either child or childBuilder must be provided');
+  }) : assert(
+         child != null || childBuilder != null,
+         'Either child or childBuilder must be provided',
+       );
 
   @override
   State<LuciCollapsibleCard> createState() => _LuciCollapsibleCardState();
@@ -60,8 +63,12 @@ class _LuciCollapsibleCardState extends State<LuciCollapsibleCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final effectiveIconColor = widget.iconColor ?? theme.colorScheme.primary;
-    final displayTitle = widget.count != null ? '${widget.title} (${widget.count})' : widget.title;
-    final displaySubtitle = widget.subtitle ?? (widget.count != null ? '${widget.count} items' : null);
+    final displayTitle = widget.count != null
+        ? '${widget.title} (${widget.count})'
+        : widget.title;
+    final displaySubtitle =
+        widget.subtitle ??
+        (widget.count != null ? '${widget.count} items' : null);
 
     return RepaintBoundary(
       child: Card(
