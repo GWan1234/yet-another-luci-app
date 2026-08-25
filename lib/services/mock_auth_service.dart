@@ -46,6 +46,7 @@ class MockAuthService implements IAuthService {
     String? username,
     String? password,
     bool? useHttps, {
+    bool force = false,
     BuildContext? context,
   }) async {
     // Simulate a short delay for realism

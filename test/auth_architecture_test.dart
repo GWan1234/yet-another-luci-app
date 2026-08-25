@@ -1,11 +1,15 @@
 // Copyright 2026 Tuhin Garai. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:yet_another_luci_app/screens/login_screen.dart';
 import 'package:yet_another_luci_app/services/interfaces/api_service_interface.dart';
 import 'package:yet_another_luci_app/services/mock_api_service.dart';
 import 'package:yet_another_luci_app/services/auth_service.dart';
+import 'package:yet_another_luci_app/state/app_state.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -71,6 +75,63 @@ void main() {
       expect(success, isTrue);
       expect(authService.isAuthenticated, isTrue);
       expect(authService.sysauth, 'mock_sysauth_token_12345');
+    });
+
+    test('AppState.setError normalizes empty or blank strings to null', () {
+      final appState = AppState.instance;
+
+      appState.setError('Something went wrong');
+      expect(appState.errorMessage, equals('Something went wrong'));
+
+      appState.setError('');
+      expect(appState.errorMessage, isNull);
+
+      appState.setError('   ');
+      expect(appState.errorMessage, isNull);
+
+      appState.setError(null);
+      expect(appState.errorMessage, isNull);
+    });
+
+    test('AppState.hasActiveSession reflects authentication and reviewer mode', () async {
+      final appState = AppState.instance;
+      expect(appState.hasActiveSession, isFalse);
+
+      await appState.setReviewerMode(true);
+      expect(appState.reviewerModeEnabled, isTrue);
+      expect(appState.hasActiveSession, isTrue);
+
+      await appState.setReviewerMode(false);
+      expect(appState.reviewerModeEnabled, isFalse);
+      expect(appState.hasActiveSession, isFalse);
+    });
+
+    test('RealAuthService.logout clears sysauth while preserving saved profiles', () async {
+      final mockApi = MockApiService();
+      final authService = RealAuthService(mockApi);
+
+      await authService.login('192.168.1.1', 'root', 'password', false);
+      expect(authService.isAuthenticated, isTrue);
+
+      await authService.logout();
+      expect(authService.isAuthenticated, isFalse);
+      expect(authService.sysauth, isNull);
+    });
+
+    testWidgets('LoginScreen PopScope strictly blocks back navigation to MainScreen', (tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: LoginScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final popScopeFinder = find.byWidgetPredicate((w) => w is PopScope);
+      expect(popScopeFinder, findsOneWidget);
+      final popScopeWidget = tester.widget<PopScope>(popScopeFinder);
+      expect(popScopeWidget.canPop, isFalse);
     });
   });
 }

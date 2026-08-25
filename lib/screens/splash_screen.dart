@@ -10,9 +10,6 @@ import 'package:yet_another_luci_app/widgets/theme_router_logo.dart';
 import 'package:yet_another_luci_app/screens/main_screen.dart';
 import 'package:yet_another_luci_app/screens/login_screen.dart';
 
-import 'package:yet_another_luci_app/utils/http_client_manager.dart';
-import 'package:yet_another_luci_app/utils/gateway_utils.dart';
-
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -49,26 +46,19 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _initializeAppSession() async {
-    // Concurrently initialize SSL certs, read secure storage & detect gateway IP during splash logo animation
+    // Concurrently read minimum signals (reviewer mode preference & saved credentials)
     final reviewerStorageFuture = SecureStorageService().readValue(
       AppConfig.reviewerModeKey,
     );
     final credsFuture = SecureStorageService().getCredentials();
-    final certsFuture = HttpClientManager().ensureInitialized();
-    final gatewayFuture = GatewayUtils.detectGatewayIp();
-    final minDelayFuture = Future.delayed(const Duration(milliseconds: 400));
 
     final results = await Future.wait([
       reviewerStorageFuture,
       credsFuture,
-      certsFuture,
-      gatewayFuture,
-      minDelayFuture,
     ]);
 
     final reviewerModeEnabled = results[0] as String?;
     final creds = results[1] as Map<String, String?>;
-    final detectedGateway = results[3] as String?;
 
     if (!mounted) return;
 
@@ -91,19 +81,14 @@ class _SplashScreenState extends State<SplashScreen>
         context: mounted ? context : null,
       );
       if (!mounted) return;
-      if (success) {
+      if (success && appState.hasActiveSession) {
         _navigateToMainScreen();
         return;
       }
     }
 
-    final effectiveIp =
-        (creds['ipAddress'] != null && creds['ipAddress']!.isNotEmpty)
-        ? creds['ipAddress']
-        : detectedGateway;
-
     _navigateToLoginScreen(
-      initialIp: effectiveIp,
+      initialIp: creds['ipAddress'],
       initialUsername: creds['username'],
       initialPassword: creds['password'],
     );

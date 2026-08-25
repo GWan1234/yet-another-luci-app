@@ -115,10 +115,6 @@ class SessionController {
   Future<void> loadReviewerMode(SecureStorageService defaultStorage) async {
     final stored = await defaultStorage.readValue(AppConfig.reviewerModeKey);
     _reviewerModeEnabled = stored == 'true';
-    if (_reviewerModeEnabled) {
-      ServiceContainer.configure(reviewerMode: true);
-      _initializeServices();
-    }
   }
 
   Future<void> setReviewerMode(bool enabled, {BuildContext? context}) async {
@@ -147,13 +143,6 @@ class SessionController {
     } else {
       _publicIpv4 = null;
       _publicIpv6 = null;
-      final current = selectedRouter;
-      if (current != null) {
-        await selectRouter(
-          current.id,
-          context: (context != null && context.mounted) ? context : null,
-        );
-      }
     }
     _setLoadingState(false);
     _notifyListeners();
@@ -468,13 +457,14 @@ class SessionController {
     _notifyListeners();
   }
 
-  Future<bool> tryAutoLogin({BuildContext? context}) async {
+  Future<bool> tryAutoLogin({bool force = false, BuildContext? context}) async {
     final success =
         await _authService?.tryAutoLogin(
           null,
           null,
           null,
           null,
+          force: force,
           context: context,
         ) ??
         false;
@@ -487,5 +477,24 @@ class SessionController {
       _notifyListeners();
     }
     return success;
+  }
+
+  /// Handles app resumption when screen turns on or app returns from background.
+  Future<void> handleAppResume() async {
+    if (!_reviewerModeEnabled) {
+      _startThroughputTimer();
+    }
+
+    if (_reviewerModeEnabled) {
+      return;
+    }
+
+    // Flush stale HTTP client sockets from memory on app resume to ensure immediate fresh TCP connections
+    _httpClientManager.disposeAll();
+
+    // Refresh dashboard data upon resuming from background if authenticated
+    if (selectedRouter != null && _authService?.isAuthenticated == true) {
+      unawaited(_fetchDashboardData());
+    }
   }
 }

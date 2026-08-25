@@ -16,6 +16,7 @@ abstract class IAuthService {
     String? username,
     String? password,
     bool? useHttps, {
+    bool force = false,
     BuildContext? context,
   });
   Future<void> logout();

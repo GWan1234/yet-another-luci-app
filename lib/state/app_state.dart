@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
+import 'package:yet_another_luci_app/config/app_config.dart';
 import 'package:yet_another_luci_app/services/secure_storage_service.dart';
 import 'package:yet_another_luci_app/services/router_service.dart';
 import 'package:yet_another_luci_app/services/throughput_service.dart';
@@ -178,10 +179,13 @@ class AppState extends ChangeNotifier {
     _secureStorageService = ServiceContainer.instance.factory
         .createSecureStorageService();
     _initializeServices();
-    await _sessionController?.loadReviewerMode(_secureStorageService);
-    if (_sessionController?.reviewerModeEnabled == true) {
-      _initializeServices();
+
+    final storedReviewerMode =
+        await _secureStorageService.readValue(AppConfig.reviewerModeKey);
+    if (storedReviewerMode == 'true') {
+      await _sessionController?.setReviewerMode(true);
     }
+
     await _sessionController?.loadThemeMode();
     await loadRouters(); // Load routers on app start (sets selectedRouter)
     await _sessionController
@@ -249,7 +253,7 @@ class AppState extends ChangeNotifier {
       fetchDashboardData: fetchDashboardData,
       initializeServices: _initializeServices,
       setLoadingState: (loading) => _isLoading = loading,
-      setErrorState: (error) => _errorMessage = error,
+      setErrorState: setError,
       notifyListeners: notifyListeners,
     );
     _packageController = PackageController(
@@ -300,9 +304,7 @@ class AppState extends ChangeNotifier {
     if (enabled) {
       _hasShownReviewerNotice = false;
     }
-    await _sessionController!.setReviewerMode(enabled, context: context);
-    _initializeServices();
-    notifyListeners();
+    await _sessionController?.setReviewerMode(enabled, context: context);
   }
 
   /// Generic secure storage read — used by feature modules (e.g. Parental Controls).
@@ -329,11 +331,16 @@ class AppState extends ChangeNotifier {
 
   String? get sysauth => _sessionController?.sysauth;
   bool get isAuthenticated => sysauth != null && sysauth!.isNotEmpty;
+  bool get hasActiveSession => isAuthenticated || reviewerModeEnabled;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  void setError(String error) {
-    _errorMessage = error;
+  void setError(String? error) {
+    if (error == null || error.trim().isEmpty) {
+      _errorMessage = null;
+    } else {
+      _errorMessage = error;
+    }
     notifyListeners();
   }
 
@@ -2324,8 +2331,16 @@ class AppState extends ChangeNotifier {
     {'value': 'tkip', 'label': 'TKIP (Legacy)'},
   ];
 
-  Future<bool> tryAutoLogin({BuildContext? context}) =>
-      _sessionController!.tryAutoLogin(context: context);
+  Future<bool> tryAutoLogin({bool force = false, BuildContext? context}) =>
+      _sessionController!.tryAutoLogin(force: force, context: context);
+
+  /// Handles app resumption when screen turns on or app returns from background
+  Future<void> handleAppResume() async {
+    await _sessionController?.handleAppResume();
+    if (!reviewerModeEnabled && selectedRouter != null) {
+      unawaited(fetchPublicIps());
+    }
+  }
 
   /// Fetch all associated wireless MAC addresses from all wireless interfaces
   Future<Set<String>> fetchAllAssociatedWirelessMacs() async {

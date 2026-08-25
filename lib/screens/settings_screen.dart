@@ -36,7 +36,6 @@ class SettingsScreen extends ConsumerWidget {
             onPressed: () async {
               Navigator.of(context).pop();
               await appState.setReviewerMode(false);
-              await appState.logout();
               if (context.mounted) {
                 await Navigator.of(
                   context,

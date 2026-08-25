@@ -11,7 +11,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:yet_another_luci_app/config/app_config.dart';
 import 'package:yet_another_luci_app/main.dart';
-import 'package:yet_another_luci_app/services/secure_storage_service.dart';
 import 'package:yet_another_luci_app/utils/url_parser.dart';
 import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 import 'package:yet_another_luci_app/widgets/theme_router_logo.dart';
@@ -211,8 +210,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   void _onOtherFieldActivity() {
     final appState = ref.read(appStateProvider);
-    if (appState.errorMessage != null && appState.errorMessage!.isNotEmpty) {
-      appState.setError('');
+    if (appState.errorMessage != null) {
+      appState.setError(null);
     }
     if (_showAutoFillHint && _autoFillHintTimer == null) {
       _startHintTimeout();
@@ -288,14 +287,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   void _onIpChanged() {
     if (mounted) {
       final appState = ref.read(appStateProvider);
-      if (appState.errorMessage != null && appState.errorMessage!.isNotEmpty) {
-        appState.setError('');
+      if (appState.errorMessage != null) {
+        appState.setError(null);
       }
     }
   }
 
   void _navigateToMainScreen(BuildContext context) {
     if (!mounted) return;
+    final appState = ref.read(appStateProvider);
+    if (!appState.hasActiveSession) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const MainScreen()),
       (route) => false,
@@ -681,31 +682,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-
-        final appState = ref.read(appStateProvider);
-
-        if (appState.sysauth != null ||
-            appState.reviewerModeEnabled ||
-            appState.selectedRouter != null) {
-          // Return smoothly to active session main screen
-          _navigateToMainScreen(context);
-        } else {
-          // Check if reviewer mode or saved session is enabled
-          final secureStorage = SecureStorageService();
-          final reviewerModeEnabled = await secureStorage.readValue(
-            AppConfig.reviewerModeKey,
-          );
-
-          if (reviewerModeEnabled == 'true') {
-            await appState.setReviewerMode(true);
-            if (context.mounted) {
-              _navigateToMainScreen(context);
-            }
-          } else {
-            // Exit app gracefully to OS home screen rather than showing a blank route
-            await SystemNavigator.pop();
-          }
-        }
+        // Exit app gracefully to OS home screen rather than allowing back-navigation to main screen
+        await SystemNavigator.pop();
       },
       child: Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
@@ -1315,11 +1293,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                               (s) => s.errorMessage,
                                             ),
                                           );
+                                          final hasError =
+                                              errorMessage != null &&
+                                              errorMessage.trim().isNotEmpty;
                                           return AnimatedSwitcher(
                                             duration: const Duration(
                                               milliseconds: 300,
                                             ),
-                                            child: errorMessage != null
+                                            child: hasError
                                                 ? Padding(
                                                     key: const ValueKey(
                                                       'error',

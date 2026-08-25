@@ -33,7 +33,7 @@ class DashboardController {
     required ThroughputController? Function() throughputControllerRef,
     required DashboardPreferences Function() dashboardPreferencesRef,
     required bool Function() reviewerModeRef,
-    required Future<bool> Function() tryAutoLogin,
+    required Future<bool> Function({bool force}) tryAutoLogin,
     required Future<void> Function() fetchPublicIps,
     required void Function(String v4, String v6) setPublicIps,
     required void Function(DashboardConnectionStatus status)
@@ -66,7 +66,7 @@ class DashboardController {
   final ThroughputController? Function() _throughputControllerRef;
   final DashboardPreferences Function() _dashboardPreferencesRef;
   final bool Function() _reviewerModeRef;
-  final Future<bool> Function() _tryAutoLogin;
+  final Future<bool> Function({bool force}) _tryAutoLogin;
   final Future<void> Function() _fetchPublicIps;
   final void Function(String v4, String v6) _setPublicIps;
   final void Function(DashboardConnectionStatus status) _setConnectionStatus;
@@ -591,7 +591,9 @@ class DashboardController {
         try {
           final currentSysauth = _authService?.sysauth;
           if (currentSysauth == null || currentSysauth.isEmpty) {
-            if (!_isReviewerMode) return null;
+            if (!_isReviewerMode) {
+              throw Exception('Access denied: No active sysauth token');
+            }
           }
           return await _apiService!.call(
             ip,
@@ -602,10 +604,16 @@ class DashboardController {
             params: params,
           );
         } catch (e, stack) {
-          final errStr = e.toString();
-          if (errStr.contains('Access denied') ||
-              errStr.contains('Permission denied')) {
-            Logger.debug('Optional RPC $object.$method denied by ACL: $e');
+          final errStr = e.toString().toLowerCase();
+          if (errStr.contains('access denied') ||
+              errStr.contains('permission denied') ||
+              errStr.contains('unauthenticated') ||
+              errStr.contains('http 401') ||
+              errStr.contains('http 403') ||
+              errStr.contains('invalid sysauth') ||
+              errStr.contains('session expired')) {
+            Logger.warning('RPC $object.$method failed with auth error: $e');
+            rethrow;
           } else {
             Logger.warning('Optional RPC $object.$method failed: $e');
             Logger.debug('Optional RPC $object.$method stack: $stack');
@@ -1715,7 +1723,7 @@ class DashboardController {
         for (int attempt = 1; attempt <= 3; attempt++) {
           await Future.delayed(Duration(milliseconds: 300 * attempt));
           try {
-            final autoLoginSuccess = await _tryAutoLogin();
+            final autoLoginSuccess = await _tryAutoLogin(force: true);
             if (autoLoginSuccess) {
               reconnected = true;
               break;

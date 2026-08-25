@@ -70,10 +70,15 @@ class RealAuthService implements IAuthService {
     String? username,
     String? password,
     bool? useHttps, {
+    bool force = false,
     BuildContext? context,
   }) async {
-    if (isAuthenticated) {
+    if (!force && isAuthenticated) {
       return true;
+    }
+
+    if (force) {
+      _sysauth = null;
     }
 
     if (ipAddress != null &&

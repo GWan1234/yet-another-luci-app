@@ -8,9 +8,9 @@ import 'package:yet_another_luci_app/main.dart';
 import 'package:yet_another_luci_app/state/app_state.dart';
 import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 import 'package:yet_another_luci_app/utils/os_platform_integration.dart';
-import 'package:yet_another_luci_app/utils/self_device_guard.dart';
 import '../models/parental_profile.dart';
 import '../models/parental_controls_store.dart';
+import '../controllers/parental_controls_controller.dart';
 import '../widgets/add_edit_profile_dialog.dart';
 import '../widgets/parental_profile_card.dart';
 
@@ -24,107 +24,44 @@ class ParentalControlsScreen extends ConsumerStatefulWidget {
 
 class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
     with WidgetsBindingObserver {
-  final _store = ParentalControlsStore.instance;
-  Timer? _expiryTimer;
-  bool _storeLoaded = false;
+  final _controller = ParentalControlsController.instance;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _startExpiryTimer();
-    _loadStore();
+    _controller.store.addListener(_onStoreChange);
+    _initController();
+  }
+
+  Future<void> _initController() async {
+    final appState = ref.read(appStateProvider);
+    await _controller.loadStore(appState);
+    _controller.startExpiryTimer(appState);
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _store.removeListener(_onStoreChange);
-    _expiryTimer?.cancel();
+    _controller.store.removeListener(_onStoreChange);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      if (_expiryTimer == null || !_expiryTimer!.isActive) {
-        _startExpiryTimer();
-      }
-      _checkPausesAndSchedules();
-    } else if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.hidden) {
-      _expiryTimer?.cancel();
-    }
+    if (!mounted) return;
+    _controller.handleLifecycleState(state, ref.read(appStateProvider));
   }
 
-  /// Fired only after `_loadStore` completes so we never write back an empty state.
   void _onStoreChange() {
     if (!mounted) return;
     setState(() {});
-    _persistStore();
-  }
-
-  Future<void> _loadStore() async {
-    final appState = ref.read(appStateProvider);
-    final raw = await appState.secureRead('parental_controls_store_v1');
-    if (!mounted) return;
-    _store.loadFromString(raw);
-    _storeLoaded = true;
-
-    final routerProfiles = await appState.fetchParentalProfiles();
-    if (routerProfiles != null) {
-      _store.setProfiles(routerProfiles);
-    }
-
-    _store.addListener(_onStoreChange);
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _persistStore() async {
-    if (!_storeLoaded) return;
-    final appState = ref.read(appStateProvider);
-    await appState.secureWrite(
-      'parental_controls_store_v1',
-      _store.toJsonString(),
-    );
-  }
-
-  void _startExpiryTimer() {
-    _expiryTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-      if (!mounted) return;
-      _checkPausesAndSchedules();
-    });
-  }
-
-  /// Auto-resume expired manual pauses and sync active scheduled time blocks.
-  void _checkPausesAndSchedules() {
-    final appState = ref.read(appStateProvider);
-    for (final profile in _store.profiles) {
-      // 1. Auto-resume any timed manual pauses that have expired
-      if (profile.isPaused &&
-          profile.pauseExpiresAt != null &&
-          profile.pauseExpiresAt!.isBefore(DateTime.now().toUtc())) {
-        _resumeProfile(profile, appState: appState, auto: true);
-      }
-
-      // 2. Sync scheduled access windows for active (non-bypassed) profiles
-      if (profile.isEnabled && profile.hasSchedule) {
-        final inScheduleWindow = profile.schedule!.isTimeInBlockWindow();
-        for (final mac in profile.macAddresses) {
-          final currentlyPaused = appState.isInternetPaused(mac);
-          if (inScheduleWindow && !currentlyPaused) {
-            // Schedule block window active: enforce firewall block
-            appState.pauseClientInternet(mac, pause: true, context: null);
-          } else if (!inScheduleWindow &&
-              !profile.isPaused &&
-              currentlyPaused) {
-            // Schedule block window ended: restore internet access
-            appState.pauseClientInternet(mac, pause: false, context: null);
-          }
-        }
-      }
-    }
   }
 
   Future<void> _pauseProfile(
@@ -132,118 +69,53 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
     PauseDuration duration,
   ) async {
     if (!mounted) return;
-    final appState = ref.read(appStateProvider);
-    final caps = appState.capabilities;
-    final hasFirewall = caps == null || caps.hasUciWriteAccess;
-
-    if (!hasFirewall) {
-      if (mounted) {
-        context.showToastError(
-          'Firewall write access unavailable. Cannot pause internet.',
-        );
-      }
-      return;
-    }
-
-    for (final mac in profile.macAddresses) {
-      final safe = await SelfDeviceGuard.checkSelfActionGuardrail(
-        context,
-        actionName: 'Pause Internet for ${profile.name}',
-        targetMac: mac,
-      );
-      if (!safe) return;
-    }
-
-    DateTime? expiresAt;
-    if (duration == PauseDuration.untilTomorrow) {
-      final now = DateTime.now().toLocal();
-      final tomorrow = DateTime(now.year, now.month, now.day + 1, 7, 0);
-      expiresAt = tomorrow.toUtc();
-    } else if (duration.duration != null) {
-      expiresAt = DateTime.now().toUtc().add(duration.duration!);
-    }
-
     final actionKey = 'pause_profile_${profile.id}';
-    if (mounted) {
-      context.showToastLoading(
-        'Pausing internet for ${profile.name}…',
-        actionKey: actionKey,
-      );
-    }
+    context.showToastLoading(
+      'Pausing internet for ${profile.name}…',
+      actionKey: actionKey,
+    );
 
-    bool allOk = true;
-    for (final mac in profile.macAddresses) {
-      // ignore: use_build_context_synchronously — context checked via mounted guard above
-      final ok = await appState.pauseClientInternet(
-        mac,
-        pause: true,
-        context: null,
-      );
-      if (!ok) allOk = false;
-    }
+    final appState = ref.read(appStateProvider);
+    final result = await _controller.pauseProfile(
+      profile,
+      duration,
+      appState,
+      context: context,
+    );
 
     if (!mounted) return;
 
-    if (allOk || profile.macAddresses.isEmpty) {
-      _store.markProfilePaused(profile.id, expiresAt: expiresAt);
+    if (result.success) {
       unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
-      final msg = expiresAt != null
-          ? 'Internet paused for ${profile.name} (${duration.label}).'
-          : 'Internet paused for ${profile.name}.';
-      if (mounted) context.showToastSuccess(msg, actionKey: actionKey);
+      context.showToastSuccess(result.message, actionKey: actionKey);
     } else {
       unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
-      if (mounted) {
-        context.showToastError(
-          'Some devices could not be paused. Check router connection.',
-          actionKey: actionKey,
-        );
-      }
+      context.showToastError(result.message, actionKey: actionKey);
     }
   }
 
-  Future<void> _resumeProfile(
-    ParentalProfile profile, {
-    required AppState appState,
-    bool auto = false,
-  }) async {
+  Future<void> _resumeProfile(ParentalProfile profile) async {
+    if (!mounted) return;
     final actionKey = 'resume_profile_${profile.id}';
+    context.showToastLoading(
+      'Resuming internet for ${profile.name}…',
+      actionKey: actionKey,
+    );
 
-    if (!auto && mounted) {
-      context.showToastLoading(
-        'Resuming internet for ${profile.name}…',
-        actionKey: actionKey,
-      );
-    }
+    final appState = ref.read(appStateProvider);
+    final result = await _controller.resumeProfile(
+      profile,
+      appState: appState,
+    );
 
-    bool allOk = true;
-    for (final mac in profile.macAddresses) {
-      final ok = await appState.pauseClientInternet(
-        mac,
-        pause: false,
-        context: null,
-      );
-      if (!ok) allOk = false;
-    }
+    if (!mounted) return;
 
-    if (allOk || profile.macAddresses.isEmpty) {
-      _store.markProfileResumed(profile.id);
-      if (!auto)
-        unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
-      if (!auto && mounted) {
-        context.showToastSuccess(
-          'Internet resumed for ${profile.name}.',
-          actionKey: actionKey,
-        );
-      }
+    if (result.success) {
+      unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.medium));
+      context.showToastSuccess(result.message, actionKey: actionKey);
     } else {
-      if (!auto && mounted) {
-        unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
-        context.showToastError(
-          'Failed to resume for some devices.',
-          actionKey: actionKey,
-        );
-      }
+      unawaited(OsPlatformIntegration.triggerHaptic(OsHapticType.heavy));
+      context.showToastError(result.message, actionKey: actionKey);
     }
   }
 
@@ -251,29 +123,12 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
     showDialog(
       context: context,
       builder: (ctx) => AddEditProfileDialog(
-        allProfiles: _store.profiles,
+        allProfiles: _controller.store.profiles,
         onSave: (profile) async {
-          _store.addProfile(profile);
           final appState = ref.read(appStateProvider);
-          await appState.saveParentalProfile(profile: profile);
-          if (profile.isCurrentlyBlocked) {
-            for (final mac in profile.macAddresses) {
-              await appState.pauseClientInternet(
-                mac,
-                pause: true,
-                context: null,
-              );
-            }
-          }
-          if (profile.hasContentFilter) {
-            await appState.applyParentalProfileDns(
-              profileId: profile.id,
-              macAddresses: profile.macAddresses,
-              dnsServers: profile.contentFilter == ContentFilterDns.custom
-                  ? profile.customDnsServers
-                  : profile.contentFilter.primaryServers,
-              context: null,
-            );
+          final res = await _controller.addProfile(profile, appState);
+          if (mounted && res.message.isNotEmpty) {
+            context.showToastSuccess(res.message);
           }
         },
       ),
@@ -285,47 +140,17 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
       context: context,
       builder: (ctx) => AddEditProfileDialog(
         existing: profile,
-        allProfiles: _store.profiles,
+        allProfiles: _controller.store.profiles,
         onSave: (updated) async {
-          final oldMacs = Set<String>.from(profile.macAddresses);
-          final newMacs = Set<String>.from(updated.macAddresses);
-          _store.updateProfile(updated);
-
           final appState = ref.read(appStateProvider);
-          await appState.saveParentalProfile(profile: updated);
-
-          // 1. MACs removed from profile: unblock if no other profile blocks them
-          final removedMacs = oldMacs.difference(newMacs);
-          for (final mac in removedMacs) {
-            if (!_store.isMacPaused(mac)) {
-              await appState.pauseClientInternet(
-                mac,
-                pause: false,
-                context: null,
-              );
-            }
-          }
-          // 2. MACs newly added to profile: block if profile is currently blocked
-          final addedMacs = newMacs.difference(oldMacs);
-          if (updated.isCurrentlyBlocked) {
-            for (final mac in addedMacs) {
-              await appState.pauseClientInternet(
-                mac,
-                pause: true,
-                context: null,
-              );
-            }
-          }
-          
-          // 3. Apply DNS changes
-          await appState.applyParentalProfileDns(
-            profileId: updated.id,
-            macAddresses: updated.macAddresses,
-            dnsServers: updated.contentFilter == ContentFilterDns.custom
-                ? updated.customDnsServers
-                : updated.contentFilter.primaryServers,
-            context: null,
+          final res = await _controller.updateProfile(
+            updated,
+            profile,
+            appState,
           );
+          if (mounted && res.message.isNotEmpty) {
+            context.showToastSuccess(res.message);
+          }
         },
       ),
     );
@@ -347,16 +172,11 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
           FilledButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              _store.deleteProfile(profile.id);
-
               final appState = ref.read(appStateProvider);
-              await appState.deleteParentalProfile(profileId: profile.id);
-              await appState.applyParentalProfileDns(
-                profileId: profile.id,
-                macAddresses: [],
-                dnsServers: null,
-                context: null,
-              );
+              final res = await _controller.deleteProfile(profile.id, appState);
+              if (mounted && res.message.isNotEmpty) {
+                context.showToastInfo(res.message);
+              }
             },
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Delete'),
@@ -374,7 +194,7 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
     final isReviewerMode = appState.reviewerModeEnabled;
     final hasFirewall = caps == null || caps.hasUciWriteAccess;
     final hasFileExec = caps == null || caps.hasFileExec;
-    final profiles = _store.profiles;
+    final profiles = _controller.store.profiles;
 
     return Scaffold(
       appBar: AppBar(
@@ -392,7 +212,7 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
         children: [
           // ── Capability banners ──────────────────────────────────────
           if (!hasFirewall)
-            _CapabilityBanner(
+            const _CapabilityBanner(
               icon: Icons.shield_outlined,
               color: Colors.orange,
               message:
@@ -400,7 +220,7 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
                   'features require root/admin access to the router.',
             ),
           if (!hasFileExec)
-            _CapabilityBanner(
+            const _CapabilityBanner(
               icon: Icons.schedule_rounded,
               color: Colors.blue,
               message:
@@ -417,7 +237,7 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
 
           // ── Body ────────────────────────────────────────────────────
           Expanded(
-            child: !_storeLoaded
+            child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : profiles.isEmpty
                 ? _EmptyState(onAdd: _openAddProfile)
@@ -432,58 +252,17 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
                         hasFirewall: hasFirewall,
                         hasFileExec: hasFileExec,
                         onPause: (duration) => _pauseProfile(profile, duration),
-                        onResume: () => _resumeProfile(
-                          profile,
-                          appState: ref.read(appStateProvider),
-                        ),
+                        onResume: () => _resumeProfile(profile),
                         onEdit: () => _openEditProfile(profile),
                         onDelete: () => _confirmDeleteProfile(profile),
                         onToggleEnabled: () async {
-                          _store.toggleProfileEnabled(profile.id);
-                          final updated = _store.getProfile(profile.id);
-                          if (updated != null && mounted) {
-                            final isNowEnabled = updated.isEnabled;
-                            final appState = ref.read(appStateProvider);
-                            await appState.saveParentalProfile(profile: updated);
-                            if (!isNowEnabled) {
-                              // Profile is now bypassed: remove active firewall block for assigned devices
-                              for (final mac in updated.macAddresses) {
-                                await appState.pauseClientInternet(
-                                  mac,
-                                  pause: false,
-                                  context: null,
-                                );
-                              }
-                            } else if (updated.isCurrentlyBlocked) {
-                              // Profile re-enabled and currently blocked: re-apply firewall block for assigned devices
-                              for (final mac in updated.macAddresses) {
-                                await appState.pauseClientInternet(
-                                  mac,
-                                  pause: true,
-                                  context: null,
-                                );
-                              }
-                            }
-                            
-                            // Apply or remove DNS rules
-                            await appState.applyParentalProfileDns(
-                              profileId: updated.id,
-                              macAddresses: isNowEnabled ? updated.macAddresses : [],
-                              dnsServers: isNowEnabled
-                                  ? (updated.contentFilter == ContentFilterDns.custom
-                                      ? updated.customDnsServers
-                                      : updated.contentFilter.primaryServers)
-                                  : null,
-                              context: null,
-                            );
-                            if (mounted) {
-                              // ignore: use_build_context_synchronously — mounted guard checked above
-                              context.showToastInfo(
-                                isNowEnabled
-                                    ? 'Rules re-enabled for ${profile.name}'
-                                    : 'Restrictions bypassed for ${profile.name}',
-                              );
-                            }
+                          final appState = ref.read(appStateProvider);
+                          final res = await _controller.toggleProfileEnabled(
+                            profile.id,
+                            appState,
+                          );
+                          if (mounted && res.message.isNotEmpty) {
+                            context.showToastInfo(res.message);
                           }
                         },
                       );
@@ -512,7 +291,7 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
         builder: (_, ctrl) => StatefulBuilder(
           builder: (ctx2, setSheetState) {
             final theme = Theme.of(ctx2);
-            final log = _store.activityLog;
+            final log = _controller.store.activityLog;
             return Column(
               children: [
                 // Drag handle
@@ -544,8 +323,9 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
                       const Spacer(),
                       if (log.isNotEmpty)
                         TextButton(
-                          onPressed: () {
-                            _store.clearActivityLog();
+                          onPressed: () async {
+                            final appState = ref.read(appStateProvider);
+                            await _controller.clearActivityLog(appState);
                             setSheetState(() {});
                           },
                           child: const Text('Clear'),

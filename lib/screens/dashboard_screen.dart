@@ -1963,7 +1963,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               Navigator.of(ctx).pop();
               final appState = ref.read(appStateProvider);
               await appState.setReviewerMode(false);
-              await appState.logout();
               if (context.mounted) {
                 await Navigator.of(
                   context,

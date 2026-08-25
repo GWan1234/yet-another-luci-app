@@ -31,6 +31,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
   int _selectedIndex = 0;
   String? _currentInterfaceToScroll;
   final Set<int> _activatedTabs = {0};
+  bool _isRedirectingToLogin = false;
 
   @override
   void initState() {
@@ -58,7 +59,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
         state == AppLifecycleState.hidden) {
       appState.cancelThroughputTimer();
     } else if (state == AppLifecycleState.resumed) {
-      appState.startThroughputTimer();
+      appState.handleAppResume();
     }
   }
 
@@ -105,23 +106,30 @@ class _MainScreenState extends ConsumerState<MainScreen>
 
     // Guardrail: If session is completely unauthenticated and not in reviewer mode,
     // redirect smoothly to LoginScreen instead of leaving the app on a blank main screen.
-    if (appState.sysauth == null &&
-        !appState.reviewerModeEnabled &&
-        !appState.isLoading) {
+    if (appState.hasActiveSession) {
+      _isRedirectingToLogin = false;
+    } else if (!appState.isLoading && !_isRedirectingToLogin) {
+      _isRedirectingToLogin = true;
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (mounted &&
-            appState.sysauth == null &&
-            !appState.reviewerModeEnabled &&
-            !appState.isLoading) {
+            !ref.read(appStateProvider).hasActiveSession &&
+            !ref.read(appStateProvider).isLoading) {
           final creds = await SecureStorageService().getCredentials();
           final detectedGateway = await GatewayUtils.detectGatewayIp();
+
+          if (!mounted) return;
+          final currentState = ref.read(appStateProvider);
+          if (currentState.hasActiveSession || currentState.isLoading) {
+            _isRedirectingToLogin = false;
+            return;
+          }
+
           final effectiveIp =
               (creds['ipAddress'] != null && creds['ipAddress']!.isNotEmpty)
                   ? creds['ipAddress']
                   : detectedGateway;
 
-          if (!mounted) return;
-          Navigator.of(context).pushReplacement(
+          Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(
               builder: (context) => LoginScreen(
                 initialIp: effectiveIp,
@@ -129,7 +137,10 @@ class _MainScreenState extends ConsumerState<MainScreen>
                 initialPassword: creds['password'],
               ),
             ),
+            (route) => false,
           );
+        } else {
+          _isRedirectingToLogin = false;
         }
       });
     }
