@@ -16,7 +16,11 @@ AGENTS.md
 .agents
 .github/agents
 .claude
+.gemini
 AUDIT_TRACKER.md
+PLAY_STORE_PRE_RELEASE_CHECKLIST.md
+*_CHECKLIST.md
+.private/
 
 # IntelliJ related
 *.iml
