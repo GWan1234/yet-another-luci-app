@@ -92,7 +92,7 @@
 
 ---
 
-## Screenshots Showcase
+## Screenshots
 
 <div align="center">
   <p><b>Explore full resolution screenshots of Yet Another LuCI App features:</b></p>
@@ -203,6 +203,14 @@ To enable full communication between **Yet Another LuCI App** and your OpenWrt r
 ```bash
 opkg update
 opkg install luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status
+/etc/init.d/rpcd restart
+```
+
+for OpenWrt 25.12 and newer use the `apk` package manager:
+
+```bash
+apk update
+apk add rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status
 /etc/init.d/rpcd restart
 ```
 
