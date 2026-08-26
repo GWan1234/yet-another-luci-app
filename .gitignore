@@ -155,6 +155,9 @@ scripts/*.md
 android/build/
 lib/config/ad_config.dart
 android/app/src/playstore/
+assets/fingerprints/advanced.json
+assets/fingerprints/private_*.json
+
 
 # Exceptions to above rules
 !**/ios/**/default.mode1v3

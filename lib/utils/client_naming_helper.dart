@@ -4,6 +4,8 @@
 import 'package:flutter/material.dart';
 import '../models/client.dart';
 import '../state/app_state.dart';
+import '../services/client_fingerprint_service.dart';
+
 
 /// Global helper for resolving client display names consistently across the application.
 /// Enforces strict OpenWrt naming hierarchy:
@@ -75,6 +77,7 @@ class ClientNamingHelper {
 
   /// Resolves an accurate Material Icon based on client metadata (hostname, vendor, device type).
   static IconData getDeviceIcon(Client? client, {String? fallbackName}) {
+
     if (client == null) {
       final text = (fallbackName ?? '').toLowerCase();
       if (text.contains('tv')) return Icons.tv_rounded;
@@ -83,11 +86,25 @@ class ClientNamingHelper {
       }
       return Icons.phone_android_rounded;
     }
+
+    // 0. Check local fingerprint registry (base or private advanced)
+    final fpService = ClientFingerprintService.instance;
+    if (fpService.isInitialized) {
+      final macMatch = fpService.lookupByMac(client.macAddress);
+      final hostMatch = fpService.lookupByHostname(client.hostname ?? client.dnsName);
+      final match = macMatch ?? hostMatch;
+      if (match != null) {
+        final fpIcon = _mapIconHintToMaterial(match.iconHint);
+        if (fpIcon != null) return fpIcon;
+      }
+    }
+
     final nameLower = client.displayName.toLowerCase();
     final vendorLower = (client.vendor ?? '').toLowerCase();
     final dnsLower = (client.dnsName ?? '').toLowerCase();
     final fullSearchText =
         '$nameLower $vendorLower $dnsLower ${fallbackName ?? ''}';
+
 
     // 1. Router / Gateway / AP
     if (fullSearchText.contains('openwrt') ||
@@ -336,6 +353,56 @@ class ClientNamingHelper {
     }
   }
 
+  /// Maps string icon hints from fingerprint database to Material IconData.
+  static IconData? _mapIconHintToMaterial(String hint) {
+    switch (hint.toLowerCase()) {
+      case 'speaker':
+        return Icons.speaker_rounded;
+      case 'storage':
+        return Icons.storage_rounded;
+      case 'lightbulb':
+        return Icons.lightbulb_rounded;
+      case 'developer_board':
+        return Icons.developer_board_rounded;
+      case 'doorbell':
+        return Icons.doorbell_rounded;
+      case 'videocam':
+        return Icons.videocam_rounded;
+      case 'lock':
+        return Icons.lock_rounded;
+      case 'power':
+        return Icons.power_rounded;
+      case 'thermostat':
+        return Icons.thermostat_rounded;
+      case 'tv':
+        return Icons.tv_rounded;
+      case 'bluetooth':
+        return Icons.bluetooth_rounded;
+      case 'print':
+        return Icons.print_rounded;
+      case 'hub':
+        return Icons.hub_rounded;
+      case 'sensors':
+        return Icons.sensors_rounded;
+      case 'cast':
+        return Icons.cast_rounded;
+      case 'kitchen':
+        return Icons.kitchen_rounded;
+      case 'monitor_weight':
+        return Icons.monitor_weight_rounded;
+      case 'bolt':
+        return Icons.bolt_rounded;
+      case 'memory':
+        return Icons.memory_rounded;
+      case 'router':
+        return Icons.router_rounded;
+      case 'computer':
+        return Icons.computer_rounded;
+      default:
+        return null;
+    }
+  }
+
   /// Normalizes MAC address string (e.g. AA:BB:CC:DD:EE:FF).
   static String normalizeMac(String mac) {
     if (mac.isEmpty) return mac;
@@ -347,3 +414,4 @@ class ClientNamingHelper {
         .join(':');
   }
 }
+

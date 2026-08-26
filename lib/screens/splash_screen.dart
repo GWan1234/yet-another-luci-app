@@ -5,10 +5,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:yet_another_luci_app/state/app_state.dart';
 import 'package:yet_another_luci_app/services/secure_storage_service.dart';
+import 'package:yet_another_luci_app/services/local_network_permission_service.dart';
 import 'package:yet_another_luci_app/config/app_config.dart';
 import 'package:yet_another_luci_app/widgets/theme_router_logo.dart';
 import 'package:yet_another_luci_app/screens/main_screen.dart';
 import 'package:yet_another_luci_app/screens/login_screen.dart';
+
+import 'package:yet_another_luci_app/services/client_fingerprint_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -46,16 +49,20 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _initializeAppSession() async {
-    // Concurrently read minimum signals (reviewer mode preference & saved credentials)
+    // Concurrently read minimum signals (reviewer mode preference & saved credentials & local fingerprints)
     final reviewerStorageFuture = SecureStorageService().readValue(
       AppConfig.reviewerModeKey,
     );
     final credsFuture = SecureStorageService().getCredentials();
+    final fingerprintsFuture = ClientFingerprintService.instance.initialize();
 
     final results = await Future.wait([
       reviewerStorageFuture,
       credsFuture,
+      fingerprintsFuture,
     ]);
+
+
 
     final reviewerModeEnabled = results[0] as String?;
     final creds = results[1] as Map<String, String?>;
@@ -77,6 +84,17 @@ class _SplashScreenState extends State<SplashScreen>
         creds['password'] != null;
 
     if (hasSavedCreds) {
+      final hasPermission =
+          await LocalNetworkPermissionService.ensurePermissionGranted();
+      if (!mounted) return;
+      if (!hasPermission) {
+        _navigateToLoginScreen(
+          initialIp: creds['ipAddress'],
+          initialUsername: creds['username'],
+          initialPassword: creds['password'],
+        );
+        return;
+      }
       final success = await appState.tryAutoLogin(
         context: mounted ? context : null,
       );
