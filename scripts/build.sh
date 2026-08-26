@@ -45,6 +45,25 @@ VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr -d '\r\n')
 RAW_VER=$(echo "${VERSION}" | cut -d'+' -f1)
 BUILD_NUM=$(echo "${VERSION}" | cut -d'+' -f2)
 
+# Auto-sync untracked private monetization & fingerprint configs if .private exists
+if [ -d "${PROJECT_ROOT}/.private" ]; then
+    MONETIZATION_DIR="${PROJECT_ROOT}/.private/monetization"
+    if [ -f "${MONETIZATION_DIR}/ad_config.dart" ] && [ ! -f "${PROJECT_ROOT}/lib/config/ad_config.dart" ]; then
+        mkdir -p "${PROJECT_ROOT}/lib/config"
+        cp "${MONETIZATION_DIR}/ad_config.dart" "${PROJECT_ROOT}/lib/config/ad_config.dart"
+    fi
+    if [ -f "${MONETIZATION_DIR}/AndroidManifest.xml" ] && [ ! -f "${PROJECT_ROOT}/android/app/src/playstore/AndroidManifest.xml" ]; then
+        mkdir -p "${PROJECT_ROOT}/android/app/src/playstore"
+        cp "${MONETIZATION_DIR}/android/app/src/playstore/AndroidManifest.xml" "${PROJECT_ROOT}/android/app/src/playstore/AndroidManifest.xml" 2>/dev/null || cp "${MONETIZATION_DIR}/AndroidManifest.xml" "${PROJECT_ROOT}/android/app/src/playstore/AndroidManifest.xml"
+    fi
+    FINGERPRINTS_DIR="${PROJECT_ROOT}/.private/fingerprints"
+    if [ -f "${FINGERPRINTS_DIR}/advanced_heuristics.json" ]; then
+        mkdir -p "${PROJECT_ROOT}/assets/fingerprints"
+        cp "${FINGERPRINTS_DIR}/advanced_heuristics.json" "${PROJECT_ROOT}/assets/fingerprints/advanced.json"
+    fi
+fi
+
+
 FLAVOR="community"
 OFFICIAL="false"
 TARGET="apk"
