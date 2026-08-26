@@ -126,17 +126,17 @@ android {
     }
 }
 
-// Exclude monetization/ad dependencies entirely from the community flavor builds
-configurations.matching { it.name.startsWith("community") }.configureEach {
+// Exclude monetization/ad dependencies entirely across all builds
+configurations.all {
     exclude(group = "io.flutter.plugins.googlemobileads")
     exclude(group = "io.flutter.plugins.inapppurchase")
     exclude(module = "google_mobile_ads")
     exclude(module = "in_app_purchase_android")
 }
 
-// Ensure GeneratedPluginRegistrant does not reference excluded ad/purchase plugins when compiling community flavor
+// Ensure GeneratedPluginRegistrant does not reference excluded ad/purchase plugins when compiling
 tasks.configureEach {
-    if (name.contains("Community", ignoreCase = true) && name.contains("JavaWithJavac")) {
+    if (name.contains("JavaWithJavac")) {
         doFirst {
             val registrantFile = file("src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java")
             if (registrantFile.exists()) {

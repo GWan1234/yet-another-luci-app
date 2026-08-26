@@ -5,7 +5,7 @@
   <h2>Modern OpenWrt & LuCI Router Manager for Mobile</h2>
   <p>Maintained by <b>Tuhin Garai (@nightcodex7)</b></p>
 
-  [![Version](https://img.shields.io/badge/Version-v0.1.6-blue.svg?style=for-the-badge&logo=github)](https://github.com/nightcodex7/yet-another-luci-app/releases)
+  [![Version](https://img.shields.io/badge/Version-v1.0.0-blue.svg?style=for-the-badge&logo=github)](https://github.com/nightcodex7/yet-another-luci-app/releases)
   [![Downloads](https://img.shields.io/github/downloads/nightcodex7/yet-another-luci-app/total.svg?style=for-the-badge&logo=github&color=blue)](https://github.com/nightcodex7/yet-another-luci-app/releases)
   [![Page Views](https://komarev.com/ghpvc/?username=nightcodex7-yet-another-luci-app&label=Page%20Views&color=0175C2&style=for-the-badge)](https://github.com/nightcodex7/yet-another-luci-app)
   [![Flutter](https://img.shields.io/badge/Flutter-3.32.5+-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)

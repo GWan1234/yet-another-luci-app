@@ -265,18 +265,6 @@ class _WifiQrDialogState extends ConsumerState<WifiQrDialog> {
                                     ? 'Hide Passphrase'
                                     : 'Show Passphrase',
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.copy_rounded, size: 18),
-                                onPressed: () {
-                                  Clipboard.setData(
-                                    ClipboardData(text: _passphrase!),
-                                  );
-                                  context.showToastSuccess(
-                                    'Passphrase copied to clipboard',
-                                  );
-                                },
-                                tooltip: 'Copy Passphrase Only',
-                              ),
                             ],
                           ),
                         ),
@@ -352,7 +340,7 @@ class _WifiQrDialogState extends ConsumerState<WifiQrDialog> {
                                     size: 16,
                                   ),
                                   label: const Text(
-                                    'Copy Passphrase from Edit SSID',
+                                    'Fetch & Copy Passphrase',
                                     style: TextStyle(fontSize: 12),
                                   ),
                                   style: ElevatedButton.styleFrom(

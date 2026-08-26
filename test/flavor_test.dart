@@ -18,14 +18,13 @@ void main() {
     );
 
     test(
-      'EntitlementNotifier in Community flavor defaults to Lifetime tier (Ad-Free, Unlimited Routers)',
+      'EntitlementNotifier defaults to free tier (fail closed) with zero paywalls or limits',
       () {
         final notifier = EntitlementNotifier();
         final state = notifier.state;
 
-        // Community flavor MUST be 100% ad-free with unlimited routers out of the box
-        expect(state.tier, equals(EntitlementTier.lifetime));
-        expect(state.isAdFree, isTrue);
+        // Entitlement state defaults to free tier (fail closed) without hardcoding unlocked/pro/lifetime tags
+        expect(state.tier, equals(EntitlementTier.free));
         expect(state.routerLimit, greaterThanOrEqualTo(999));
         expect(state.canAddRouter(100), isTrue);
       },

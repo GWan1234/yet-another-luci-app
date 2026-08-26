@@ -1426,7 +1426,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
 
     if (overview.radios.isEmpty) {
-      return const SizedBox.shrink();
+      return Card(
+        elevation: 1,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 14.0),
+          child: Row(
+            children: [
+              Icon(
+                Icons.wifi_off_rounded,
+                size: 20,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'No wireless interfaces configured',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     final cardWidgets = <Widget>[];
@@ -1642,8 +1664,34 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final interfaces = rawDump is List
         ? rawDump
         : (rawDump is Map ? rawDump.values.toList() : null);
+    Widget buildEmptyInterfaceCard() {
+      return Card(
+        elevation: 1,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 14.0),
+          child: Row(
+            children: [
+              Icon(
+                Icons.lan_outlined,
+                size: 20,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'No network interfaces active',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (interfaces == null || interfaces.isEmpty) {
-      return const SizedBox.shrink();
+      return buildEmptyInterfaceCard();
     }
 
     final wanVpnInterfaces = interfaces.where((item) {
@@ -1662,7 +1710,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }).toList();
 
     if (wanVpnInterfaces.isEmpty) {
-      return const SizedBox.shrink();
+      return buildEmptyInterfaceCard();
     }
 
     List<Widget> interfaceCardWidgets = [];
@@ -2005,6 +2053,230 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
+  Widget _buildSkeletonPill(
+    BuildContext context, {
+    required double width,
+    required double height,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(height / 2),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonCard(
+    BuildContext context, {
+    required double height,
+    Widget? child,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      margin: const EdgeInsets.symmetric(vertical: 4.0),
+      child: SizedBox(
+        height: height,
+        child: child ??
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    _buildSkeletonPill(context, width: 36, height: 36),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildSkeletonPill(context, width: 120, height: 12),
+                          const SizedBox(height: 6),
+                          _buildSkeletonPill(context, width: 80, height: 10),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonVitalsCard(BuildContext context) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      margin: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 8.0),
+        child: Row(
+          children: List.generate(4, (index) {
+            return Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildSkeletonPill(context, width: 48, height: 10),
+                  const SizedBox(height: 6),
+                  _buildSkeletonPill(context, width: 36, height: 14),
+                ],
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonClientsCard(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      margin: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Padding(
+        padding: const EdgeInsets.all(4.0),
+        child: Row(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12.0,
+                  horizontal: 12.0,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.08,
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildSkeletonPill(context, width: 70, height: 10),
+                          const SizedBox(height: 6),
+                          _buildSkeletonPill(context, width: 50, height: 12),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Container(
+              width: 1,
+              height: 36,
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12.0,
+                  horizontal: 12.0,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.08,
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildSkeletonPill(context, width: 70, height: 10),
+                          const SizedBox(height: 6),
+                          _buildSkeletonPill(context, width: 50, height: 12),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonDashboard(BuildContext context, AppState appState) {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 12),
+          _buildDeviceInfoCard(appState),
+          if (appState.isMissingRpcPackages && !_dismissedRpcWarning)
+            _buildRpcWarningCard(context, appState),
+          _buildSectionHeader(
+            context,
+            'Real-time Network Traffic',
+            Icons.swap_vert,
+          ),
+          SizedBox(
+            height: 220,
+            child: _buildRealtimeThroughputCard(appState),
+          ),
+          _buildSectionHeader(
+            context,
+            'System Vitals',
+            Icons.monitor_heart,
+          ),
+          _buildSkeletonVitalsCard(context),
+          _buildSectionHeader(
+            context,
+            'Connected Clients Overview',
+            Icons.devices,
+          ),
+          _buildSkeletonClientsCard(context),
+          _buildSectionHeader(
+            context,
+            'Wireless Radios & SSIDs',
+            Icons.wifi,
+          ),
+          _buildSkeletonCard(context, height: 72),
+          _buildSectionHeader(
+            context,
+            'Network Interfaces',
+            Icons.lan,
+          ),
+          _buildSkeletonCard(context, height: 64),
+          _buildSectionHeader(
+            context,
+            'System Modules & Storage',
+            Icons.storage,
+          ),
+          ..._buildModuleDashboardWidgets(context),
+          const SizedBox(height: 100),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBody(AppState appState) {
     if (appState.dashboardError != null && appState.dashboardData == null) {
       return LuciErrorDisplay(
@@ -2017,11 +2289,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       );
     }
 
-    if (appState.isDashboardLoading && appState.dashboardData == null) {
-      return const LuciLoadingWidget();
-    }
-
     if (appState.dashboardData == null) {
+      if (appState.isDashboardLoading) {
+        return RefreshIndicator(
+          onRefresh: () => appState.fetchDashboardData(),
+          child: _buildSkeletonDashboard(context, appState),
+        );
+      }
       return LuciEmptyState(
         title: 'No Data Available',
         message:

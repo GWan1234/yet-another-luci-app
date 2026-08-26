@@ -6,7 +6,6 @@ import 'core/luci_module.dart';
 import 'core/luci_module_registry.dart';
 import 'system_monitoring/system_monitoring_module.dart';
 import 'storage_monitoring/storage_monitoring_module.dart';
-import 'network_monitoring/network_monitoring_module.dart';
 import 'charting/charting_module.dart';
 import 'wireless_management/wireless_module.dart';
 import 'firewall_security/firewall_module.dart';
@@ -157,7 +156,6 @@ void registerBuiltInModules() {
     DashboardModule(),
     SystemMonitoringModule(),
     StorageMonitoringModule(),
-    NetworkMonitoringModule(),
     ChartingModule(),
     WirelessManagementModule(),
     FirewallSecurityModule(),

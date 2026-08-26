@@ -2,12 +2,20 @@ package com.nightcode.luci
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Bundle
 
 class MainActivity : FlutterActivity() {
-    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+    private val PERMISSION_CHANNEL = "com.nightcode.luci/local_network_permission"
+    private val LOCAL_NETWORK_PERMISSION_CODE = 1001
+    private var pendingPermissionResult: MethodChannel.Result? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
         // Unlock high refresh rate (90Hz/120Hz/144Hz) for ultra-smooth 120fps scrolling
@@ -15,6 +23,51 @@ class MainActivity : FlutterActivity() {
 
         // Enable edge-to-edge display without using deprecated APIs
         setupEdgeToEdge()
+    }
+
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PERMISSION_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "checkLocalNetworkPermission" -> {
+                    val status = checkLocalNetworkPermissionStatus()
+                    result.success(status)
+                }
+                "requestLocalNetworkPermission" -> {
+                    if (Build.VERSION.SDK_INT >= 37) { // Android 17+ / API 37+
+                        val permission = "android.permission.ACCESS_LOCAL_NETWORK"
+                        if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
+                            result.success(true)
+                        } else {
+                            pendingPermissionResult = result
+                            ActivityCompat.requestPermissions(this, arrayOf(permission), LOCAL_NETWORK_PERMISSION_CODE)
+                        }
+                    } else {
+                        // Automatically granted on Android 16 and lower
+                        result.success(true)
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    private fun checkLocalNetworkPermissionStatus(): Boolean {
+        return if (Build.VERSION.SDK_INT >= 37) {
+            ContextCompat.checkSelfPermission(this, "android.permission.ACCESS_LOCAL_NETWORK") == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == LOCAL_NETWORK_PERMISSION_CODE) {
+            val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            pendingPermissionResult?.success(granted)
+            pendingPermissionResult = null
+        }
     }
 
     override fun onResume() {
@@ -84,15 +137,9 @@ class MainActivity : FlutterActivity() {
             val edgeToEdgeClass = Class.forName("androidx.activity.EdgeToEdge")
             val enableMethod = edgeToEdgeClass.getMethod("enable", androidx.activity.ComponentActivity::class.java)
             enableMethod.invoke(null, this)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Fallback is already handled by setupEdgeToEdge()
         }
-    }
-    
-    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
-        super.configureFlutterEngine(flutterEngine)
-        // Edge-to-edge is now handled natively without intercepting Flutter calls
-        // This prevents deprecated API usage while maintaining compatibility
     }
 
     override fun onTrimMemory(level: Int) {

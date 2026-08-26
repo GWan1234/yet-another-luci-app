@@ -9,6 +9,7 @@ import '../models/dhcp_dns_info.dart';
 
 import 'package:yet_another_luci_app/widgets/luci_collapsible_card.dart';
 import 'package:yet_another_luci_app/widgets/luci_toast.dart';
+import 'package:yet_another_luci_app/utils/client_naming_helper.dart';
 
 class DhcpDnsScreen extends ConsumerWidget {
   const DhcpDnsScreen({super.key});
@@ -61,6 +62,7 @@ class DhcpDnsScreen extends ConsumerWidget {
               child: _buildLeasesList(
                 context,
                 ref,
+                appState,
                 overview.activeLeases,
                 overview.staticMappings,
               ),
@@ -81,6 +83,7 @@ class DhcpDnsScreen extends ConsumerWidget {
               child: _buildStaticMappingsList(
                 context,
                 ref,
+                appState,
                 overview.staticMappings,
               ),
             ),
@@ -158,6 +161,7 @@ class DhcpDnsScreen extends ConsumerWidget {
   Widget _buildLeasesList(
     BuildContext context,
     WidgetRef ref,
+    dynamic appState,
     List<DhcpLease> leases,
     List<DhcpStaticMapping> staticMappings,
   ) {
@@ -207,6 +211,11 @@ class DhcpDnsScreen extends ConsumerWidget {
           }
         }
         final isStatic = matchingStatic != null;
+        final leaseIcon = _resolveLeaseIcon(
+          appState,
+          lease.macAddress,
+          lease.hostname,
+        );
 
         return Card(
           key: ValueKey<String>(lease.macAddress),
@@ -221,7 +230,7 @@ class DhcpDnsScreen extends ConsumerWidget {
                   ? Colors.teal.withValues(alpha: 0.15)
                   : Colors.blue.withValues(alpha: 0.15),
               child: Icon(
-                isStatic ? Icons.push_pin : Icons.devices,
+                leaseIcon,
                 color: isStatic ? Colors.teal : Colors.blue,
               ),
             ),
@@ -279,6 +288,7 @@ class DhcpDnsScreen extends ConsumerWidget {
   Widget _buildStaticMappingsList(
     BuildContext context,
     WidgetRef ref,
+    dynamic appState,
     List<DhcpStaticMapping> mappings,
   ) {
     if (mappings.isEmpty) {
@@ -306,6 +316,11 @@ class DhcpDnsScreen extends ConsumerWidget {
       },
       itemBuilder: (context, index) {
         final mapping = mappings[index];
+        final mappingIcon = _resolveLeaseIcon(
+          appState,
+          mapping.macAddress,
+          mapping.hostname,
+        );
         return Card(
           key: ValueKey<String>(mapping.macAddress),
           margin: const EdgeInsets.only(bottom: 8),
@@ -316,7 +331,7 @@ class DhcpDnsScreen extends ConsumerWidget {
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: Colors.teal.withValues(alpha: 0.15),
-              child: const Icon(Icons.push_pin, color: Colors.teal),
+              child: Icon(mappingIcon, color: Colors.teal),
             ),
             title: Text(
               mapping.hostname,
@@ -501,6 +516,19 @@ class DhcpDnsScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  IconData _resolveLeaseIcon(
+    dynamic appState,
+    String macAddress,
+    String hostname,
+  ) {
+    final normMac = ClientNamingHelper.normalizeMac(macAddress);
+    final client = appState.findClientByMac(normMac);
+    if (client != null && client.isConnected) {
+      return ClientNamingHelper.getDeviceIcon(client, fallbackName: hostname);
+    }
+    return Icons.push_pin;
   }
 
   Widget _buildDetailRow(BuildContext context, String label, String value) {

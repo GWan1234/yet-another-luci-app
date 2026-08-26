@@ -8,11 +8,15 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" android:maxSdkVersion="29"/>
 
-    <!-- Support the Dev / In-App Purchases & Licensing Permission -->
-    <uses-permission android:name="com.android.vending.BILLING"/>
-    <uses-permission android:name="com.android.vending.CHECK_LICENSE"/>
+    <!-- Local Network Access Permission for Android 15+ / Target API 37 -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="32"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="32"/>
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" tools:targetApi="33"/>
 
-    <!-- Explicitly Remove Unnecessary & Ad-Related Transitive Permissions -->
+    <!-- Explicitly Strip All In-App Purchase, Billing & Ad-Related Transitive Permissions -->
+    <uses-permission android:name="com.android.vending.BILLING" tools:node="remove"/>
+    <uses-permission android:name="com.android.vending.CHECK_LICENSE" tools:node="remove"/>
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove"/>
     <uses-permission android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION" tools:node="remove"/>
     <uses-permission android:name="android.permission.ACCESS_ADSERVICES_TOPICS" tools:node="remove"/>

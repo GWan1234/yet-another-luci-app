@@ -10,7 +10,7 @@ class ChartingModule extends LuciModule {
   String get id => 'charting';
 
   @override
-  String get name => 'Real-Time Charts';
+  String get name => 'Real-Time Metrics';
 
   @override
   String get description =>

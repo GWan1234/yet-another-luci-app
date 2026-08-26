@@ -102,10 +102,8 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
               ? InAppPurchase.instance
               : _DisabledInAppPurchase()),
       super(
-        EntitlementState(
-          tier: AppConfig.isMonetizationEnabled
-              ? EntitlementTier.free
-              : EntitlementTier.lifetime,
+        const EntitlementState(
+          tier: EntitlementTier.free,
         ),
       ) {
     if (AppConfig.isMonetizationEnabled) {
@@ -126,6 +124,7 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
 
   /// Loads cached entitlement tier from local secure storage.
   Future<void> loadCachedEntitlement() async {
+    if (!AppConfig.isMonetizationEnabled) return;
     try {
       final cachedStr = await _secureStorage.read(key: _storageKey);
       if (cachedStr != null) {
@@ -142,6 +141,7 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
 
   /// Updates active entitlement tier and immediately persists it locally.
   Future<void> updateEntitlement(EntitlementTier newTier) async {
+    if (!AppConfig.isMonetizationEnabled) return;
     state = state.copyWith(tier: newTier, errorMessage: null);
     try {
       await _secureStorage.write(key: _storageKey, value: newTier.name);
@@ -152,6 +152,7 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
 
   /// Loads products configured in Google Play Console.
   Future<void> fetchBillingProducts() async {
+    if (!AppConfig.isMonetizationEnabled) return;
     try {
       final bool isAvailable = await _iap.isAvailable();
       if (!isAvailable) {
@@ -172,6 +173,7 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
 
   /// Listens to Play Store purchase stream to handle real-time purchase completions and restores.
   void _listenToPurchaseUpdates() {
+    if (!AppConfig.isMonetizationEnabled) return;
     _purchaseSubscription?.cancel();
     _purchaseSubscription = _iap.purchaseStream.listen(
       (purchaseList) {
@@ -187,6 +189,7 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
   Future<void> _handlePurchaseUpdates(
     List<PurchaseDetails> purchaseDetailsList,
   ) async {
+    if (!AppConfig.isMonetizationEnabled) return;
     for (final purchaseDetails in purchaseDetailsList) {
       if (purchaseDetails.status == PurchaseStatus.pending) {
         state = state.copyWith(isLoading: true);
@@ -230,6 +233,7 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
 
   /// Initiates purchase flow for a product.
   Future<void> buyProduct(ProductDetails productDetails) async {
+    if (!AppConfig.isMonetizationEnabled) return;
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final PurchaseParam purchaseParam = PurchaseParam(
@@ -250,6 +254,7 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
 
   /// Triggers Play Store restore purchases flow required by Play Store policy.
   Future<void> restorePurchases() async {
+    if (!AppConfig.isMonetizationEnabled) return;
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       await _iap.restorePurchases();

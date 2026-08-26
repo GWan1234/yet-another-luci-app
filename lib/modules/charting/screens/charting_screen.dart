@@ -66,7 +66,7 @@ class ChartingScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Real-Time Metrics Charts')),
+      appBar: AppBar(title: const Text('Real-Time Metrics')),
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
@@ -137,6 +137,8 @@ class ChartingScreen extends ConsumerWidget {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          _buildThroughputTableCard(context, appState),
           const SizedBox(height: 32),
         ],
       ),
@@ -272,5 +274,159 @@ class ChartingScreen extends ConsumerWidget {
     if (bits < 1000) return '${bits.toStringAsFixed(0)} bps';
     if (bits < 1000000) return '${(bits / 1000).toStringAsFixed(1)} Kbps';
     return '${(bits / 1000000).toStringAsFixed(2)} Mbps';
+  }
+
+  Widget _buildThroughputTableCard(
+    BuildContext context,
+    dynamic appState,
+  ) {
+    final devices =
+        appState.dashboardData?['networkDevices'] as Map<String, dynamic>?;
+    final statsMap = <String, Map<String, num>>{};
+
+    if (devices != null) {
+      devices.forEach((devName, devData) {
+        if (devData is Map<String, dynamic> && devData['stats'] is Map) {
+          final rawStats = devData['stats'] as Map;
+          statsMap[devName] = {
+            'rx_bytes': (rawStats['rx_bytes'] as num?) ?? 0,
+            'tx_bytes': (rawStats['tx_bytes'] as num?) ?? 0,
+            'rx_packets': (rawStats['rx_packets'] as num?) ?? 0,
+            'tx_packets': (rawStats['tx_packets'] as num?) ?? 0,
+            'rx_errors': (rawStats['rx_errors'] as num?) ?? 0,
+            'tx_errors': (rawStats['tx_errors'] as num?) ?? 0,
+          };
+        }
+      });
+    }
+
+    if (statsMap.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final theme = Theme.of(context);
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.table_chart_outlined,
+                  size: 20,
+                  color: Colors.teal,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'RX/TX Throughput Metrics (Tabular)',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                headingRowHeight: 40,
+                dataRowMinHeight: 44,
+                dataRowMaxHeight: 44,
+                columns: const [
+                  DataColumn(
+                    label: Text(
+                      'Device',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  DataColumn(
+                    label: Text(
+                      'RX Bytes',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  DataColumn(
+                    label: Text(
+                      'TX Bytes',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  DataColumn(
+                    label: Text(
+                      'RX Packets',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  DataColumn(
+                    label: Text(
+                      'TX Packets',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  DataColumn(
+                    label: Text(
+                      'Errors',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+                rows: statsMap.entries.map((entry) {
+                  final stats = entry.value;
+                  final rxBytes = _formatBytes(stats['rx_bytes'] ?? 0);
+                  final txBytes = _formatBytes(stats['tx_bytes'] ?? 0);
+                  final rxPackets = stats['rx_packets']?.toString() ?? '0';
+                  final txPackets = stats['tx_packets']?.toString() ?? '0';
+                  final errors =
+                      (stats['rx_errors'] ?? 0) + (stats['tx_errors'] ?? 0);
+
+                  return DataRow(
+                    cells: [
+                      DataCell(
+                        Text(
+                          entry.key,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      DataCell(Text(rxBytes)),
+                      DataCell(Text(txBytes)),
+                      DataCell(Text(rxPackets)),
+                      DataCell(Text(txPackets)),
+                      DataCell(
+                        Text(
+                          '$errors',
+                          style: TextStyle(
+                            color: errors > 0 ? Colors.red : Colors.grey,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatBytes(num bytes) {
+    if (bytes <= 0) return '0 B';
+    final double b = bytes.toDouble();
+    if (b >= 1024 * 1024 * 1024) {
+      return '${(b / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+    }
+    if (b >= 1024 * 1024) {
+      return '${(b / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    if (b >= 1024) {
+      return '${(b / 1024).toStringAsFixed(0)} KB';
+    }
+    return '${b.toStringAsFixed(0)} B';
   }
 }

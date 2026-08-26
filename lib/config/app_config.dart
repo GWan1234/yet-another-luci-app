@@ -44,12 +44,11 @@ class AppConfig {
       const bool.fromEnvironment('ENABLE_ADS', defaultValue: false);
 
   /// Whether voluntary Support the Developer feature is enabled in UI.
-  /// Controlled via compile-time flag --dart-define=ENABLE_SUPPORT_DEV=true. Defaults to false.
-  static bool get isSupportDevEnabled =>
-      const bool.fromEnvironment('ENABLE_SUPPORT_DEV', defaultValue: false);
+  /// Explicitly disabled across all public builds per security and release policy.
+  static bool get isSupportDevEnabled => false;
 
   /// Whether monetization features (Play Billing, Paywalls, Router Gating) are enabled.
-  /// Explicitly disabled across all builds.
+  /// Explicitly disabled across all public builds per security and release policy.
   static bool get isMonetizationEnabled => false;
 
   /// Google Play Billing Licensing RSA public key (Base64-encoded).

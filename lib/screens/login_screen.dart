@@ -10,6 +10,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:yet_another_luci_app/config/app_config.dart';
+import 'package:yet_another_luci_app/services/local_network_permission_service.dart';
 import 'package:yet_another_luci_app/main.dart';
 import 'package:yet_another_luci_app/utils/url_parser.dart';
 import 'package:yet_another_luci_app/widgets/luci_toast.dart';
@@ -437,6 +438,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   Future<void> _connect() async {
     if (_formKey.currentState!.validate()) {
+      final hasPermission =
+          await LocalNetworkPermissionService.ensurePermissionGranted();
+      if (!hasPermission) {
+        ref.read(appStateProvider).setError(
+          'Local Network Access permission is required to connect to your router.',
+        );
+        return;
+      }
+
       if (mounted) {
         setState(() {
           _isConnecting = true;
