@@ -21,6 +21,10 @@ AUDIT_TRACKER.md
 PLAY_STORE_PRE_RELEASE_CHECKLIST.md
 *_CHECKLIST.md
 .private/
+releases/
+*.apk
+*.aab
+diff.txt
 
 # IntelliJ related
 *.iml
