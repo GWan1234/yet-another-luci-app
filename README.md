@@ -96,27 +96,27 @@
   <p><b>Explore full resolution screenshots of Yet Another LuCI App features:</b></p>
 </div>
 
-| Login Screen | Dashboard (Light) | Dashboard (Dark) | Dashboard Vitals |
+| Login Screen | Dashboard (Light) | Dashboard (Dark) | Dashboard-1 |
 |:---:|:---:|:---:|:---:|
 | <img src="assets/screenshots/3_login_page.jpeg" width="180"/> | <img src="assets/screenshots/1_dashboard-light.jpeg" width="180"/> | <img src="assets/screenshots/2_dashboard-dark.jpeg" width="180"/> | <img src="assets/screenshots/4_dashboard-2.jpeg" width="180"/> |
 
-| System Telemetry | Connected Clients | Network Interfaces | Interface Details |
+| Dashboard-2 | Clients | Interfaces | Interface-1 |
 |:---:|:---:|:---:|:---:|
 | <img src="assets/screenshots/5_dashboard-3.jpeg" width="180"/> | <img src="assets/screenshots/6_clients.jpeg" width="180"/> | <img src="assets/screenshots/7_interfaces.jpeg" width="180"/> | <img src="assets/screenshots/8_interfaces-1.jpeg" width="180"/> |
 
-| Wireless Management | System Diagnostics | Storage & Mounts | Real-Time Metrics |
+| Wireless Management | System Monitoring | Storage Monitoring | Real-Time Metrics |
 |:---:|:---:|:---:|:---:|
 | <img src="assets/screenshots/9_wireless.jpeg" width="180"/> | <img src="assets/screenshots/10_system.jpeg" width="180"/> | <img src="assets/screenshots/11_storage.jpeg" width="180"/> | <img src="assets/screenshots/12_realtime_charts.jpeg" width="180"/> |
 
-| DHCP & DNS | Firewall Rules | Firewall Zones | Services & Init |
+| DHCP & DNS | Firewall | Firewall-1 | Services & System |
 |:---:|:---:|:---:|:---:|
 | <img src="assets/screenshots/13_dhcp_dns.jpeg" width="180"/> | <img src="assets/screenshots/14_firewall.jpeg" width="180"/> | <img src="assets/screenshots/15_firewall-1.jpeg" width="180"/> | <img src="assets/screenshots/16_services_system.jpeg" width="180"/> |
 
-| Parental Controls | Parental Schedules | OPKG & APK Packages | Play Store Settings |
+| Parental Controls | Parental Controls-1 | OPKG & APK Packages | Settings (PlayStore) |
 |:---:|:---:|:---:|:---:|
 | <img src="assets/screenshots/17_parental_controls.jpeg" width="180"/> | <img src="assets/screenshots/18_parental_controls-1.jpeg" width="180"/> | <img src="assets/screenshots/19_packagemanager.jpeg" width="180"/> | <img src="assets/screenshots/20-settings-playstore.jpeg" width="180"/> |
 
-| Community Settings | More Management Tools | About & App Info | |
+| Settings (Community) | More menu | About & App Info | |
 |:---:|:---:|:---:|:---:|
 | <img src="assets/screenshots/20-settings-community.jpeg" width="180"/> | <img src="assets/screenshots/21-more.jpeg" width="180"/> | <img src="assets/screenshots/22-about.jpeg" width="180"/> | |
 
