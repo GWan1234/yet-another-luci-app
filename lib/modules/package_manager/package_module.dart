@@ -14,7 +14,7 @@ class PackageManagerModule extends LuciModule {
 
   @override
   String get description =>
-      'OPKG package manager, repository updates, and dynamic LuCI application discovery';
+      'OPKG & APK package managers, software updates, repository configuration & LuCI app management';
 
   @override
   IconData get icon => Icons.inventory_2_outlined;

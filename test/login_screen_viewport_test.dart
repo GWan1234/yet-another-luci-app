@@ -46,4 +46,41 @@ void main() {
       expect(connectButtonFinder, findsOneWidget);
     },
   );
+
+  testWidgets(
+    'LoginScreen renders responsive dual-pane layout on tablet landscape (1280x800) without overflow',
+    (WidgetTester tester) async {
+      // Set tablet landscape screen dimensions (1280x800)
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(home: LoginScreen()),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Verify form fields are rendered
+      expect(find.byKey(const ValueKey('login_ip_field')), findsOneWidget);
+      expect(find.byKey(const ValueKey('login_pass_field')), findsOneWidget);
+
+      // Verify no render overflow exception occurred
+      expect(tester.takeException(), isNull);
+
+      // Verify "CONNECT TO ROUTER" button is visible
+      final connectButtonFinder = find.widgetWithText(
+        FilledButton,
+        'CONNECT TO ROUTER',
+      );
+      expect(connectButtonFinder, findsOneWidget);
+
+      // Verify Direct LAN Connection badge and brand identity are rendered
+      expect(find.text('DIRECT LAN CONNECTION'), findsOneWidget);
+      expect(find.text('Yet Another LuCI App'), findsOneWidget);
+    },
+  );
 }

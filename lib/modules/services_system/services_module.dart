@@ -15,7 +15,7 @@ class ServicesSystemModule extends LuciModule {
 
   @override
   String get description =>
-      'Procd system services running status, service controls, startup init scripts, and system cron jobs';
+      'Procd system services, startup init scripts, cron scheduled tasks, Dynamic DNS (DDNS) providers, and system logs';
 
   @override
   IconData get icon => Icons.settings_applications_outlined;

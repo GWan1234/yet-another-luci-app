@@ -91,7 +91,10 @@ class ThroughputController {
 
   /// Extracts the specific-interface device name from dashboard preferences,
   /// handling the "SSID (deviceName)" and bare-deviceName formats.
-  static String? resolveSpecificInterface(DashboardPreferences prefs) {
+  static String? resolveSpecificInterface(
+    DashboardPreferences prefs, {
+    String? Function(String)? deviceNameResolver,
+  }) {
     if (prefs.showAllThroughput || prefs.primaryThroughputInterface == null) {
       return null;
     }
@@ -99,6 +102,12 @@ class ThroughputController {
     if (interfaceId.contains('(')) {
       final match = RegExp(r'\(([^)]+)\)').firstMatch(interfaceId);
       return match?.group(1);
+    }
+    if (deviceNameResolver != null) {
+      final resolved = deviceNameResolver(interfaceId);
+      if (resolved != null && resolved.isNotEmpty) {
+        return resolved;
+      }
     }
     return interfaceId;
   }

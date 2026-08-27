@@ -32,19 +32,55 @@ class ThroughputService {
 
   // Interface-specific getters
   List<double> getRxHistoryForInterface(String interface) {
-    return _rxHistoryPerInterface[interface]?.toList() ?? [];
+    if (_rxHistoryPerInterface.containsKey(interface)) {
+      return _rxHistoryPerInterface[interface]!.toList();
+    }
+    if (interface == 'lan' && _rxHistoryPerInterface.containsKey('br-lan')) {
+      return _rxHistoryPerInterface['br-lan']!.toList();
+    }
+    if (interface == 'wan' && _rxHistoryPerInterface.containsKey('eth0')) {
+      return _rxHistoryPerInterface['eth0']!.toList();
+    }
+    return [];
   }
 
   List<double> getTxHistoryForInterface(String interface) {
-    return _txHistoryPerInterface[interface]?.toList() ?? [];
+    if (_txHistoryPerInterface.containsKey(interface)) {
+      return _txHistoryPerInterface[interface]!.toList();
+    }
+    if (interface == 'lan' && _txHistoryPerInterface.containsKey('br-lan')) {
+      return _txHistoryPerInterface['br-lan']!.toList();
+    }
+    if (interface == 'wan' && _txHistoryPerInterface.containsKey('eth0')) {
+      return _txHistoryPerInterface['eth0']!.toList();
+    }
+    return [];
   }
 
   double getCurrentRxRateForInterface(String interface) {
-    return _currentRxRatePerInterface[interface] ?? 0.0;
+    if (_currentRxRatePerInterface.containsKey(interface)) {
+      return _currentRxRatePerInterface[interface]!;
+    }
+    if (interface == 'lan' && _currentRxRatePerInterface.containsKey('br-lan')) {
+      return _currentRxRatePerInterface['br-lan']!;
+    }
+    if (interface == 'wan' && _currentRxRatePerInterface.containsKey('eth0')) {
+      return _currentRxRatePerInterface['eth0']!;
+    }
+    return 0.0;
   }
 
   double getCurrentTxRateForInterface(String interface) {
-    return _currentTxRatePerInterface[interface] ?? 0.0;
+    if (_currentTxRatePerInterface.containsKey(interface)) {
+      return _currentTxRatePerInterface[interface]!;
+    }
+    if (interface == 'lan' && _currentTxRatePerInterface.containsKey('br-lan')) {
+      return _currentTxRatePerInterface['br-lan']!;
+    }
+    if (interface == 'wan' && _currentTxRatePerInterface.containsKey('eth0')) {
+      return _currentTxRatePerInterface['eth0']!;
+    }
+    return 0.0;
   }
 
   void updateThroughput(
@@ -63,11 +99,36 @@ class ThroughputService {
 
     // Update overall throughput
     if (specificInterface != null && specificInterface.isNotEmpty) {
-      // If specific interface requested, use only that interface's data
-      if (networkData != null && networkData.containsKey(specificInterface)) {
+      String? matchedKey;
+      if (networkData != null) {
+        if (networkData.containsKey(specificInterface)) {
+          matchedKey = specificInterface;
+        } else {
+          // Fallback matching: map logical interface names (e.g. lan -> br-lan, wan -> eth0)
+          for (final entry in networkData.entries) {
+            final devName = entry.key;
+            if (devName == specificInterface ||
+                (specificInterface == 'lan' && devName == 'br-lan') ||
+                (specificInterface == 'wan' && devName == 'eth0')) {
+              matchedKey = devName;
+              break;
+            }
+            final devData = entry.value;
+            if (devData is Map<String, dynamic>) {
+              if (devData['device'] == specificInterface ||
+                  devData['l3_device'] == specificInterface) {
+                matchedKey = devName;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      if (matchedKey != null) {
         _updateSpecificInterfaceThroughput(
-          specificInterface,
-          networkData[specificInterface],
+          matchedKey,
+          networkData![matchedKey],
           now,
         );
       } else {

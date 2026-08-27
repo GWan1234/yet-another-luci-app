@@ -14,7 +14,7 @@ class ParentalControlsModule extends LuciModule {
 
   @override
   String get description =>
-      'Per-device internet scheduling, daily time limits, and content filtering';
+      'Per-device internet scheduling, daily time limits, content filtering, and active device access rules';
 
   @override
   IconData get icon => Icons.family_restroom_outlined;

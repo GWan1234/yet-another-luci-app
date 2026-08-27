@@ -16,6 +16,8 @@ import 'package:yet_another_luci_app/design/luci_design_system.dart';
 import 'package:yet_another_luci_app/models/client.dart';
 import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 import 'package:yet_another_luci_app/modules/system_monitoring/models/system_metrics.dart';
+import 'package:yet_another_luci_app/modules/wireless_management/screens/guest_wifi_management_screen.dart';
+import 'package:yet_another_luci_app/modules/vpn_connectivity/screens/vpn_connectivity_screen.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -328,9 +330,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     if (!prefs.showAllThroughput && prefs.primaryThroughputInterface != null) {
       final interface = prefs.primaryThroughputInterface!;
       rxHistory = appState.getRxHistoryForInterface(interface);
+      if (rxHistory.isEmpty) {
+        rxHistory = appState.rxHistory;
+      }
       txHistory = appState.getTxHistoryForInterface(interface);
+      if (txHistory.isEmpty) {
+        txHistory = appState.txHistory;
+      }
       currentRxRate = appState.getCurrentRxRateForInterface(interface);
+      if (currentRxRate == 0 && appState.currentRxRate > 0) {
+        currentRxRate = appState.currentRxRate;
+      }
       currentTxRate = appState.getCurrentTxRateForInterface(interface);
+      if (currentTxRate == 0 && appState.currentTxRate > 0) {
+        currentTxRate = appState.currentTxRate;
+      }
       throughputLabel = ' - $interface';
     } else {
       rxHistory = appState.rxHistory;
@@ -697,12 +711,26 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       return '0 bps';
     }
 
-    final bitsPerSecond = bytesPerSecond * 8;
-    if (bitsPerSecond < 1_000) return '${bitsPerSecond.toStringAsFixed(0)} bps';
-    if (bitsPerSecond < 1_000_000) {
-      return '${(bitsPerSecond / 1_000).toStringAsFixed(1)} Kbps';
+    final speedUnit =
+        ref.read(appStateProvider).dashboardPreferences.speedUnit;
+    if (speedUnit == 'bytes') {
+      if (bytesPerSecond < 1024) {
+        return '${bytesPerSecond.toStringAsFixed(0)} B/s';
+      }
+      if (bytesPerSecond < 1024 * 1024) {
+        return '${(bytesPerSecond / 1024).toStringAsFixed(1)} KB/s';
+      }
+      return '${(bytesPerSecond / (1024 * 1024)).toStringAsFixed(2)} MB/s';
+    } else {
+      final bitsPerSecond = bytesPerSecond * 8;
+      if (bitsPerSecond < 1_000) {
+        return '${bitsPerSecond.toStringAsFixed(0)} bps';
+      }
+      if (bitsPerSecond < 1_000_000) {
+        return '${(bitsPerSecond / 1_000).toStringAsFixed(1)} Kbps';
+      }
+      return '${(bitsPerSecond / 1_000_000).toStringAsFixed(2)} Mbps';
     }
-    return '${(bitsPerSecond / 1_000_000).toStringAsFixed(2)} Mbps';
   }
 
   String _formatSpeedCompact(double bytesPerSecond) {
@@ -770,95 +798,55 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ? '${metrics.memoryUsagePercent.toStringAsFixed(0)}%'
         : 'N/A';
 
+    final prefs = appState.dashboardPreferences;
+    final vitals = <Widget>[];
+    if (prefs.showCpuLoad) {
+      vitals.add(
+        _buildVitalsColumn(
+          context,
+          label: 'CPU Load',
+          value: cpuLoadValue,
+        ),
+      );
+    }
+    if (prefs.showRamUsage) {
+      vitals.add(
+        _buildVitalsColumn(
+          context,
+          label: 'RAM Usage',
+          value: memoryValue,
+        ),
+      );
+    }
+    if (prefs.showLoadAverage) {
+      vitals.add(
+        _buildVitalsColumn(
+          context,
+          label: 'Load Avg',
+          value: loadAvgValue,
+        ),
+      );
+    }
+    if (prefs.showUptime) {
+      vitals.add(
+        _buildVitalsColumn(
+          context,
+          label: 'Uptime',
+          value: uptimeValue,
+        ),
+      );
+    }
+
+    if (vitals.isEmpty) return const SizedBox.shrink();
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 0),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isNarrow =
-                constraints.maxWidth < 360 ||
-                MediaQuery.textScalerOf(context).scale(14) > 18;
-            if (isNarrow) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildVitalsColumn(
-                          context,
-                          label: 'CPU Load',
-                          value: cpuLoadValue,
-                        ),
-                      ),
-                      Expanded(
-                        child: _buildVitalsColumn(
-                          context,
-                          label: 'RAM Usage',
-                          value: memoryValue,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildVitalsColumn(
-                          context,
-                          label: 'Load Avg',
-                          value: loadAvgValue,
-                        ),
-                      ),
-                      Expanded(
-                        child: _buildVitalsColumn(
-                          context,
-                          label: 'Uptime',
-                          value: uptimeValue,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              );
-            }
-
-            return Row(
-              children: [
-                Expanded(
-                  child: _buildVitalsColumn(
-                    context,
-                    label: 'CPU Load',
-                    value: cpuLoadValue,
-                  ),
-                ),
-                Expanded(
-                  child: _buildVitalsColumn(
-                    context,
-                    label: 'RAM Usage',
-                    value: memoryValue,
-                  ),
-                ),
-                Expanded(
-                  child: _buildVitalsColumn(
-                    context,
-                    label: 'Load Avg',
-                    value: loadAvgValue,
-                  ),
-                ),
-                Expanded(
-                  child: _buildVitalsColumn(
-                    context,
-                    label: 'Uptime',
-                    value: uptimeValue,
-                  ),
-                ),
-              ],
-            );
-          },
+        child: Row(
+          children: vitals.map((v) => Expanded(child: v)).toList(),
         ),
       ),
     );
@@ -1697,9 +1685,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final wanVpnInterfaces = interfaces.where((item) {
       final interface = item as Map<String, dynamic>;
       final name = interface['interface'] as String? ?? '';
+      final isUp = interface['up'] as bool? ?? false;
 
       // Skip loopback interface
       if (name == 'loopback' || name == 'lo') return false;
+
+      // Hide inactive interfaces if preference disabled
+      if (!prefs.showInactiveInterfaces && !isUp) return false;
 
       // If preferences are empty, show all interfaces by default
       if (prefs.enabledWiredInterfaces.isEmpty) {
@@ -2313,124 +2305,378 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           final isLandscape =
               MediaQuery.of(context).orientation == Orientation.landscape;
 
-          // Split layout handling to avoid Expanded widget conflicts with staggered animations
-          if (isLandscape) {
-            final landscapeContent = [
-              const SizedBox(height: 16),
-              _buildDeviceInfoCard(appState),
-              if (appState.isMissingRpcPackages && !_dismissedRpcWarning)
-                _buildRpcWarningCard(context, appState),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 240,
-                child: _buildRealtimeThroughputCard(appState),
-              ),
-              const SizedBox(height: 12),
-              _buildSystemVitalsCard(appState),
-              const SizedBox(height: 12),
-              _buildClientsSummaryCard(appState),
-              const SizedBox(height: 12),
-              _buildWirelessNetworksCard(appState),
-              const SizedBox(height: 12),
-              _buildInterfaceStatusCards(appState),
-              const SizedBox(height: 12),
-              ..._buildModuleDashboardWidgets(context),
-              const SizedBox(height: 100),
-            ];
+          final orderedContent = _buildOrderedDashboardCards(
+            context,
+            appState,
+            isLandscape,
+          );
 
-            return Padding(
+          return RefreshIndicator(
+            onRefresh: () => appState.fetchDashboardData(),
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: landscapeContent,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: orderedContent,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  List<Widget> _buildOrderedDashboardCards(
+    BuildContext context,
+    AppState appState,
+    bool isLandscape,
+  ) {
+    final prefs = appState.dashboardPreferences;
+    final order = prefs.cardOrder;
+    final widgets = <Widget>[];
+
+    widgets.add(const SizedBox(height: 12));
+
+    if (appState.isMissingRpcPackages && !_dismissedRpcWarning) {
+      widgets.add(_buildRpcWarningCard(context, appState));
+      widgets.add(const SizedBox(height: 12));
+    }
+
+    for (final cardId in order) {
+      if (!prefs.isSectionVisible(cardId)) continue;
+
+      switch (cardId) {
+        case 'quick_actions':
+          final qaCard = _buildQuickActionsCard(context, appState);
+          if (qaCard != null) {
+            widgets.add(qaCard);
+            widgets.add(const SizedBox(height: 12));
+          }
+          break;
+        case 'device_info':
+          widgets.add(_buildDeviceInfoCard(appState));
+          widgets.add(const SizedBox(height: 12));
+          break;
+        case 'realtime_traffic':
+          if (!isLandscape) {
+            widgets.add(
+              _buildSectionHeader(
+                context,
+                'Real-time Network Traffic',
+                Icons.swap_vert,
               ),
             );
-          } else {
-            // Portrait mode: SingleChildScrollView with all dynamic module widgets
-            return RefreshIndicator(
-              onRefresh: () => appState.fetchDashboardData(),
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 12),
-                    _buildDeviceInfoCard(appState),
-                    if (appState.isMissingRpcPackages && !_dismissedRpcWarning)
-                      _buildRpcWarningCard(context, appState),
-                    _buildSectionHeader(
-                      context,
-                      'Real-time Network Traffic',
-                      Icons.swap_vert,
-                    ),
-                    SizedBox(
-                      height: 220,
-                      child: _buildRealtimeThroughputCard(appState),
-                    ),
-                    _buildSectionHeader(
-                      context,
-                      'System Vitals',
-                      Icons.monitor_heart,
-                    ),
-                    _buildSystemVitalsCard(appState),
-                    _buildSectionHeader(
-                      context,
-                      'Connected Clients Overview',
-                      Icons.devices,
-                    ),
-                    _buildClientsSummaryCard(appState),
-                    _buildSectionHeader(
-                      context,
-                      'Wireless Radios & SSIDs',
-                      Icons.wifi,
-                    ),
-                    _buildWirelessNetworksCard(appState),
-                    _buildSectionHeader(
-                      context,
-                      'Network Interfaces',
-                      Icons.lan,
-                      action: IconButton(
-                        icon: Icon(
-                          appState.dashboardPreferences.maskPublicIp
-                              ? Icons.visibility_off_outlined
-                              : Icons.visibility_outlined,
-                          size: 18,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        tooltip: appState.dashboardPreferences.maskPublicIp
-                            ? 'Show public WAN IP address'
-                            : 'Mask public WAN IP address for privacy',
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        onPressed: () {
-                          final current = appState.dashboardPreferences;
-                          appState.saveDashboardPreferences(
-                            current.copyWith(
-                              maskPublicIp: !current.maskPublicIp,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    _buildInterfaceStatusCards(appState),
-                    _buildSectionHeader(
-                      context,
-                      'System Modules & Storage',
-                      Icons.storage,
-                    ),
-                    ..._buildModuleDashboardWidgets(context),
-                    const SizedBox(height: 100),
-                  ],
+          }
+          widgets.add(
+            SizedBox(
+              height: isLandscape ? 240 : 220,
+              child: _buildRealtimeThroughputCard(appState),
+            ),
+          );
+          widgets.add(const SizedBox(height: 12));
+          break;
+        case 'system_vitals':
+          if (!isLandscape) {
+            widgets.add(
+              _buildSectionHeader(
+                context,
+                'System Vitals',
+                Icons.monitor_heart,
+              ),
+            );
+          }
+          widgets.add(_buildSystemVitalsCard(appState));
+          widgets.add(const SizedBox(height: 12));
+          break;
+        case 'connected_clients':
+          if (!isLandscape) {
+            widgets.add(
+              _buildSectionHeader(
+                context,
+                'Connected Clients Overview',
+                Icons.devices,
+              ),
+            );
+          }
+          widgets.add(_buildClientsSummaryCard(appState));
+          widgets.add(const SizedBox(height: 12));
+          break;
+        case 'wireless_networks':
+          if (!isLandscape) {
+            widgets.add(
+              _buildSectionHeader(
+                context,
+                'Wireless Radios & SSIDs',
+                Icons.wifi,
+              ),
+            );
+          }
+          widgets.add(_buildWirelessNetworksCard(appState));
+          widgets.add(const SizedBox(height: 12));
+          break;
+        case 'network_interfaces':
+          if (!isLandscape) {
+            widgets.add(
+              _buildSectionHeader(
+                context,
+                'Network Interfaces',
+                Icons.lan,
+                action: IconButton(
+                  icon: Icon(
+                    prefs.maskPublicIp
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  tooltip: prefs.maskPublicIp
+                      ? 'Show public WAN IP address'
+                      : 'Mask public WAN IP address for privacy',
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () {
+                    appState.saveDashboardPreferences(
+                      prefs.copyWith(maskPublicIp: !prefs.maskPublicIp),
+                    );
+                  },
                 ),
               ),
             );
           }
-        },
+          widgets.add(_buildInterfaceStatusCards(appState));
+          widgets.add(const SizedBox(height: 12));
+          break;
+        case 'system_modules':
+          if (!isLandscape) {
+            widgets.add(
+              _buildSectionHeader(
+                context,
+                'System Modules & Storage',
+                Icons.storage,
+              ),
+            );
+          }
+          widgets.addAll(_buildModuleDashboardWidgets(context));
+          break;
+      }
+    }
+
+    widgets.add(const SizedBox(height: 100));
+    return widgets;
+  }
+
+  Widget? _buildQuickActionsCard(BuildContext context, AppState appState) {
+    final enabledActions = appState.dashboardPreferences.enabledQuickActions;
+    if (enabledActions.isEmpty) return null;
+
+    final buttons = <Widget>[];
+
+    if (enabledActions.contains('reboot')) {
+      buttons.add(
+        _buildQuickActionButton(
+          context,
+          icon: Icons.restart_alt,
+          color: Colors.amber.shade700,
+          label: 'Reboot Router',
+          onTap: () => _showQuickRebootDialog(context, appState),
+        ),
+      );
+    }
+
+    if (enabledActions.contains('flush_dns')) {
+      buttons.add(
+        _buildQuickActionButton(
+          context,
+          icon: Icons.cleaning_services,
+          color: Colors.teal,
+          label: 'Flush DNS',
+          onTap: () async {
+            const actionKey = 'flush_dns_action';
+            context.showToastLoading('Flushing DNS cache...', actionKey: actionKey);
+            final success = await appState
+                .executeRouterCommand('/etc/init.d/dnsmasq', ['restart']);
+            if (context.mounted) {
+              if (success) {
+                context.showToastSuccess(
+                  'DNS Cache Flushed',
+                  subtitle: 'dnsmasq restarted successfully',
+                  actionKey: actionKey,
+                );
+              } else {
+                context.showToastError(
+                  'Flush DNS Failed',
+                  subtitle: 'Could not send command to router',
+                  actionKey: actionKey,
+                );
+              }
+            }
+          },
+        ),
+      );
+    }
+
+    if (enabledActions.contains('guest_wifi')) {
+      buttons.add(
+        _buildQuickActionButton(
+          context,
+          icon: Icons.wifi_tethering,
+          color: Colors.indigo,
+          label: 'Guest Wi-Fi',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const GuestWifiManagementScreen(),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    if (enabledActions.contains('vpn')) {
+      buttons.add(
+        _buildQuickActionButton(
+          context,
+          icon: Icons.vpn_key,
+          color: Colors.deepOrange,
+          label: 'VPN Status',
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const VpnConnectivityScreen(),
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    if (enabledActions.contains('refresh')) {
+      buttons.add(
+        _buildQuickActionButton(
+          context,
+          icon: Icons.refresh,
+          color: Theme.of(context).colorScheme.primary,
+          label: 'Refresh Data',
+          onTap: () async {
+            const actionKey = 'refresh_dashboard_action';
+            context.showToastLoading(
+              'Refreshing Dashboard...',
+              actionKey: actionKey,
+            );
+            await appState.fetchDashboardData();
+            if (context.mounted) {
+              context.showToastSuccess(
+                'Dashboard Updated',
+                actionKey: actionKey,
+              );
+            }
+          },
+        ),
+      );
+    }
+
+    if (buttons.isEmpty) return null;
+
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(top: 4),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.flash_on,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Quick Actions',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: buttons
+                    .map((btn) => Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: btn,
+                        ))
+                    .toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActionButton(
+    BuildContext context, {
+    required IconData icon,
+    required Color color,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return ActionChip(
+      avatar: Icon(icon, size: 16, color: color),
+      label: Text(
+        label,
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+      ),
+      onPressed: onTap,
+      backgroundColor: color.withValues(alpha: 0.1),
+      side: BorderSide(color: color.withValues(alpha: 0.3)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    );
+  }
+
+  void _showQuickRebootDialog(BuildContext context, AppState appState) {
+    final routerName = appState.selectedRouter?.lastKnownHostname ??
+        appState.selectedRouter?.ipAddress ??
+        'the router';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reboot Router?'),
+        content: Text('Are you sure you want to reboot $routerName now?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              const actionKey = 'router_reboot';
+              context.showToastLoading(
+                'Rebooting Router...',
+                actionKey: actionKey,
+              );
+              final success = await appState.reboot(context: context);
+              if (context.mounted && !success) {
+                context.showToastError(
+                  'Reboot Failed',
+                  subtitle: 'Could not send command to router',
+                  actionKey: actionKey,
+                );
+              }
+            },
+            child: const Text('Reboot'),
+          ),
+        ],
       ),
     );
   }

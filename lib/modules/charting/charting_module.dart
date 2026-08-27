@@ -14,7 +14,7 @@ class ChartingModule extends LuciModule {
 
   @override
   String get description =>
-      'Dynamic real-time charting system for CPU, RAM, and Network RX/TX throughput';
+      'Interactive real-time charts for CPU, RAM memory usage, and live Network RX/TX throughput';
 
   @override
   IconData get icon => Icons.show_chart_outlined;

@@ -15,7 +15,7 @@ class FirewallSecurityModule extends LuciModule {
 
   @override
   String get description =>
-      'Firewall Zones (LAN/WAN), forwarding rules, default policies, port redirects, and custom security rules';
+      'Firewall zones (LAN/WAN), traffic forwarding, port forwarding, NAT rules, custom iptables/nftables & security policies';
 
   @override
   IconData get icon => Icons.shield_outlined;

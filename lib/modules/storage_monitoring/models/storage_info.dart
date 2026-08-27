@@ -191,6 +191,22 @@ class MountPointItem {
       return bsize;
     }
 
+    if (dataSource == StorageDataSource.rpcJson) {
+      if (hasExplicitByteKey ||
+          hasUnitSuffix ||
+          unitStr == 'bytes' ||
+          unitStr == 'b') {
+        return 1;
+      }
+      if (rawSize > 0 && rawSize <= 8192) {
+        return 1024 * 1024;
+      }
+      if (rawSize > 8192 && rawSize <= 1048576) {
+        return 1024;
+      }
+      return 1;
+    }
+
     if (hasExplicitByteKey ||
         hasUnitSuffix ||
         unitStr == 'bytes' ||
@@ -518,11 +534,51 @@ class StorageOverview {
     } else if (data is List) {
       for (final item in data) {
         if (item is Map) {
-          list.add(MountPointItem.fromJson(Map<String, dynamic>.from(item)));
+          list.add(
+            MountPointItem.fromJson(
+              Map<String, dynamic>.from(item),
+              dataSource: StorageDataSource.rpcJson,
+            ),
+          );
         }
       }
     } else if (data is Map) {
       final mapData = Map<String, dynamic>.from(data);
+
+      // Check for system.info root & tmp maps if present
+      if (mapData['root'] is Map) {
+        final rootMap = Map<String, dynamic>.from(mapData['root']);
+        final totalKb = parseNum(rootMap['total']);
+        final usedKb = parseNum(rootMap['used']);
+        final availKb = parseNum(rootMap['avail'] ?? rootMap['free']);
+        list.add(
+          MountPointItem(
+            mountPath: '/',
+            device: '/dev/root',
+            filesystemType: 'overlayfs',
+            sizeBytes: totalKb * 1024,
+            usedBytes: usedKb * 1024,
+            availableBytes: availKb * 1024,
+          ),
+        );
+      }
+      if (mapData['tmp'] is Map) {
+        final tmpMap = Map<String, dynamic>.from(mapData['tmp']);
+        final totalKb = parseNum(tmpMap['total']);
+        final usedKb = parseNum(tmpMap['used']);
+        final availKb = parseNum(tmpMap['avail'] ?? tmpMap['free']);
+        list.add(
+          MountPointItem(
+            mountPath: '/tmp',
+            device: 'tmpfs',
+            filesystemType: 'tmpfs',
+            sizeBytes: totalKb * 1024,
+            usedBytes: usedKb * 1024,
+            availableBytes: availKb * 1024,
+          ),
+        );
+      }
+
       final inner =
           mapData['mountPoints'] ??
           mapData['mounts'] ??
@@ -534,7 +590,12 @@ class StorageOverview {
       if (inner is List) {
         for (final item in inner) {
           if (item is Map) {
-            list.add(MountPointItem.fromJson(Map<String, dynamic>.from(item)));
+            list.add(
+              MountPointItem.fromJson(
+                Map<String, dynamic>.from(item),
+                dataSource: StorageDataSource.rpcJson,
+              ),
+            );
           }
         }
       } else if (inner is Map) {
@@ -548,11 +609,17 @@ class StorageOverview {
                 copy['dest'] == null) {
               copy['mount'] = key;
             }
-            list.add(MountPointItem.fromJson(copy));
+            list.add(
+              MountPointItem.fromJson(
+                copy,
+                dataSource: StorageDataSource.rpcJson,
+              ),
+            );
           }
         });
       } else {
         mapData.forEach((key, val) {
+          if (key == 'root' || key == 'tmp') return;
           if (val is Map) {
             final copy = Map<String, dynamic>.from(val);
             final typeStr = copy['.type']?.toString();
@@ -565,7 +632,12 @@ class StorageOverview {
                 copy['dest'] == null) {
               copy['mount'] = key;
             }
-            list.add(MountPointItem.fromJson(copy));
+            list.add(
+              MountPointItem.fromJson(
+                copy,
+                dataSource: StorageDataSource.rpcJson,
+              ),
+            );
           }
         });
       }

@@ -15,7 +15,7 @@ class DhcpDnsModule extends LuciModule {
 
   @override
   String get description =>
-      'Active DHCP leases, static IP reservations, Dnsmasq configuration, and upstream DNS forwarders';
+      'Active DHCP v4/v6 leases, static IP reservations, Dnsmasq DNS server, upstream forwarders & domain rules';
 
   @override
   IconData get icon => Icons.dns_outlined;

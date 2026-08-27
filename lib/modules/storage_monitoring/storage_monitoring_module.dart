@@ -15,7 +15,7 @@ class StorageMonitoringModule extends LuciModule {
 
   @override
   String get description =>
-      'Filesystem usage overview, mounted devices, overlay FS, and flash memory status';
+      'Storage filesystems, mounted USB drives & partitions, overlay FS allocation, and flash memory health';
 
   @override
   IconData get icon => Icons.sd_storage_outlined;

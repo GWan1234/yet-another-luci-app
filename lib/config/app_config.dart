@@ -13,6 +13,15 @@ class AppConfig {
   // GitHub issues URL
   static const String githubIssuesUrl = '$githubRepositoryUrl/issues';
 
+  // Legal & Privacy Policy URLs
+  static const String privacyPolicyUrl =
+      'https://nightcode.co.in/privacy-policy.html';
+  static const String termsAndConditionsUrl =
+      'https://nightcode.co.in/terms.html';
+  static const String contactUrl =
+      'https://nightcode.co.in/contact.html';
+
+
   // Maintainer & Contact Configuration
   static const String appAuthor = 'Tuhin Garai';
   static const String appAuthorGithub = '@nightcodex7';

@@ -28,7 +28,8 @@ class DashboardModule extends LuciModule {
   String get name => 'Dashboard';
 
   @override
-  String get description => 'System overview, status & charts';
+  String get description =>
+      'Router status overview, real-time traffic graph & customizable widgets';
 
   @override
   IconData get icon => Icons.dashboard_outlined;
@@ -59,7 +60,8 @@ class ClientsModule extends LuciModule {
   String get name => 'Clients';
 
   @override
-  String get description => 'Connected devices, DHCP leases & MAC info';
+  String get description =>
+      'Connected devices, DHCP lease table, MAC vendor details & access controls';
 
   @override
   IconData get icon => Icons.people_outline;
@@ -90,7 +92,8 @@ class InterfacesModule extends LuciModule {
   String get name => 'Interfaces';
 
   @override
-  String get description => 'Wired & wireless network interfaces';
+  String get description =>
+      'Wired & wireless network interfaces (WAN/LAN/WWAN), subnets & bridge devices';
 
   @override
   IconData get icon => Icons.lan_outlined;
@@ -126,7 +129,8 @@ class MoreModule extends LuciModule {
   String get name => 'More';
 
   @override
-  String get description => 'App settings, router selection & modules';
+  String get description =>
+      'Router management, application settings & full module directory';
 
   @override
   IconData get icon => Icons.more_horiz_outlined;

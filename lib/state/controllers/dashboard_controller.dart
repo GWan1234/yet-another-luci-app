@@ -531,13 +531,10 @@ class DashboardController {
           final wanDeviceNames = {'eth0', 'wlan0', 'br-lan'};
 
           final prefs = _dashboardPreferences;
-          String? specificInterface;
-          if (!prefs.showAllThroughput &&
-              prefs.primaryThroughputInterface != null) {
-            specificInterface = getDeviceNameForInterface(
-              prefs.primaryThroughputInterface!,
-            );
-          }
+          final specificInterface = ThroughputController.resolveSpecificInterface(
+            prefs,
+            deviceNameResolver: (iface) => getDeviceNameForInterface(iface),
+          );
 
           _throughputController!.updateThroughput(
             networkData,
@@ -878,7 +875,24 @@ class DashboardController {
             return overview.mountPoints.isNotEmpty;
           }
 
-          final res1 = await callOptionalRpc(
+          Future<dynamic> safeCandidateCall({
+            required String object,
+            required String method,
+            Map<String, dynamic>? params,
+          }) async {
+            try {
+              return await callOptionalRpc(
+                object: object,
+                method: method,
+                params: params,
+              );
+            } catch (e) {
+              Logger.warning('Candidate RPC $object.$method failed: $e');
+              return null;
+            }
+          }
+
+          final res1 = await safeCandidateCall(
             object: 'luci-rpc',
             method: 'getMountPoints',
             params: {},
@@ -886,7 +900,7 @@ class DashboardController {
           final data1 = getOptionalData(res1, 'luci-rpc.getMountPoints');
           if (hasValidMounts(data1)) return data1;
 
-          final res2 = await callOptionalRpc(
+          final res2 = await safeCandidateCall(
             object: 'system',
             method: 'mounts',
             params: {},
@@ -894,7 +908,7 @@ class DashboardController {
           final data2 = getOptionalData(res2, 'system.mounts');
           if (hasValidMounts(data2)) return data2;
 
-          final res3 = await callOptionalRpc(
+          final res3 = await safeCandidateCall(
             object: 'luci',
             method: 'getMountPoints',
             params: {},
@@ -1560,13 +1574,10 @@ class DashboardController {
       }
 
       final prefs = _dashboardPreferences;
-      String? specificInterface;
-      if (!prefs.showAllThroughput &&
-          prefs.primaryThroughputInterface != null) {
-        specificInterface = getDeviceNameForInterface(
-          prefs.primaryThroughputInterface!,
-        );
-      }
+      final specificInterface = ThroughputController.resolveSpecificInterface(
+        prefs,
+        deviceNameResolver: (iface) => getDeviceNameForInterface(iface),
+      );
 
       _throughputController?.updateThroughput(
         networkData,
@@ -1689,7 +1700,7 @@ class DashboardController {
         'cronJobs': cronRaw,
         'services': servicesData,
         'initScripts': initScriptsData,
-        'mountPoints': mountPointsData,
+        'mountPoints': mountPointsData ?? sysInfoData,
         'wireguard': wireguardData,
         'openvpn': openvpnData,
         'tailscale': tailscaleData,
@@ -1769,11 +1780,26 @@ class DashboardController {
         if (interface is Map<String, dynamic>) {
           final ifname = interface['interface'] as String?;
           if (ifname == interfaceName) {
-            return (interface['device'] ?? interface['l3_device']) as String?;
+            final l3Dev = interface['l3_device'] as String?;
+            final dev = interface['device'] as String?;
+            if (l3Dev != null && l3Dev.isNotEmpty && !l3Dev.startsWith('@')) {
+              return l3Dev;
+            }
+            if (dev != null && dev.isNotEmpty && !dev.startsWith('@')) {
+              return dev;
+            }
+            final fallback = l3Dev ?? dev;
+            if (fallback != null && fallback.isNotEmpty) {
+              return fallback;
+            }
           }
         }
       }
     }
+
+    // Smart fallbacks for common OpenWrt logical interface names
+    if (interfaceName == 'lan') return 'br-lan';
+    if (interfaceName == 'wan') return 'eth0';
 
     return interfaceName;
   }

@@ -14,7 +14,7 @@ class WirelessManagementModule extends LuciModule {
 
   @override
   String get description =>
-      'Radios (radio0, radio1), associated SSIDs, operating mode, channels, TX power, security and connected stations';
+      'Wi-Fi radios (2.4GHz/5GHz/6GHz), SSIDs, guest network isolation, channels, security encryption & connected stations';
 
   @override
   IconData get icon => Icons.wifi_outlined;

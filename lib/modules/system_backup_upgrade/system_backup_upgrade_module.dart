@@ -14,7 +14,7 @@ class SystemBackupUpgradeModule extends LuciModule {
 
   @override
   String get description =>
-      'Configuration backup/restore, factory reset & sysupgrade firmware flash';
+      'Router configuration backup & restore, factory reset, and sysupgrade firmware flashing';
 
   @override
   IconData get icon => Icons.system_update_alt_outlined;

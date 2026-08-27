@@ -680,13 +680,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final primaryColor = colorScheme.primary;
     final isDark = theme.brightness == Brightness.dark;
 
     final meshColor = isDark
         ? Colors.white.withValues(alpha: 0.05)
         : Colors.black.withValues(alpha: 0.04);
-
 
     return PopScope(
       canPop: false,
@@ -711,6 +709,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             SafeArea(
               child: LayoutBuilder(
                 builder: (context, constraints) {
+                  final isWide =
+                      constraints.maxWidth >= 768 && constraints.maxHeight >= 480;
+
                   return SingleChildScrollView(
                     controller: _scrollController,
                     physics: const AlwaysScrollableScrollPhysics(
@@ -718,857 +719,75 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     ),
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isWide ? 32 : 20,
                       vertical: 18,
                     ),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: (constraints.maxHeight - 36).clamp(
-                          0.0,
-                          double.infinity,
+                    child: Align(
+                      alignment: isWide ? Alignment.center : Alignment.topCenter,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: (constraints.maxHeight - 36).clamp(
+                            0.0,
+                            double.infinity,
+                          ),
+                          maxWidth: isWide ? 920 : 460,
                         ),
-                        maxWidth: 420,
-                      ),
-                      child: IntrinsicHeight(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            const SizedBox(height: 8),
-
-                            // Header Lockup: Console Identity
-                            GestureDetector(
-                              onLongPress: _startReviewerModeActivation,
-                              onLongPressUp: _cancelReviewerModeActivation,
-                              child: Column(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: colorScheme.surfaceContainer,
-                                      borderRadius: BorderRadius.circular(20),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(
-                                            alpha: 0.04,
-                                          ),
-                                          blurRadius: 14,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ],
-                                    ),
-                                    child: const ThemeRouterLogo(
-                                      width: 68,
-                                      height: 68,
-                                      showShadow: false,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 14),
-                                  Text(
-                                    'Yet Another LuCI App',
-                                    style: theme.textTheme.headlineMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w800,
-                                          color: colorScheme.onSurface,
-                                          letterSpacing: 0.3,
-                                        ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'OpenWrt Router Console',
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      color: colorScheme.onSurfaceVariant
-                                          .withValues(alpha: 0.85),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 10),
-
-                                  // Console Technical Tag
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: colorScheme.surfaceContainerHighest
-                                          .withValues(alpha: 0.5),
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                        color: colorScheme.outlineVariant
-                                            .withValues(alpha: 0.5),
-                                        width: 1,
-                                      ),
-                                    ),
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
+                        child: isWide
+                            ? IntrinsicHeight(
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    // Left Pane: Hero Brand, LAN Security & Footers
+                                    Expanded(
+                                      flex: 5,
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
                                         children: [
-                                          Container(
-                                            width: 6,
-                                            height: 6,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: primaryColor,
-                                            ),
+                                          _buildHeaderLockup(
+                                            context,
+                                            isWide: true,
                                           ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            'DIRECT LAN CONNECTION',
-                                            style: theme.textTheme.labelSmall
-                                                ?.copyWith(
-                                                  color: primaryColor,
-                                                  fontWeight: FontWeight.w700,
-                                                  letterSpacing: 0.6,
-                                                ),
-                                          ),
+                                          const SizedBox(height: 24),
+                                          _buildSecurityAssurance(context),
+                                          const SizedBox(height: 20),
+                                          _buildFooterLinks(context),
                                         ],
                                       ),
                                     ),
-                                  ),
-
-                                  AnimatedSwitcher(
-                                    duration: const Duration(milliseconds: 200),
-                                    child: _isActivatingReviewerMode
-                                        ? Padding(
-                                            key: const ValueKey('progress'),
-                                            padding: const EdgeInsets.only(
-                                              top: 14,
-                                            ),
-                                            child: AnimatedBuilder(
-                                              animation:
-                                                  _progressAnimController,
-                                              builder: (context, child) {
-                                                return Column(
-                                                  children: [
-                                                    Text(
-                                                      'Hold to activate reviewer mode...',
-                                                      style: theme
-                                                          .textTheme
-                                                          .bodySmall
-                                                          ?.copyWith(
-                                                            color: primaryColor,
-                                                            fontWeight:
-                                                                FontWeight.w700,
-                                                            fontSize: 12,
-                                                          ),
-                                                    ),
-                                                    const SizedBox(height: 8),
-                                                    Container(
-                                                      width: 240,
-                                                      height: 5,
-                                                      decoration: BoxDecoration(
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              10,
-                                                            ),
-                                                        color: colorScheme
-                                                            .surfaceContainerHighest,
-                                                        border: Border.all(
-                                                          color: colorScheme
-                                                              .outlineVariant
-                                                              .withValues(
-                                                                alpha: 0.4,
-                                                              ),
-                                                          width: 0.5,
-                                                        ),
-                                                      ),
-                                                      child: ClipRRect(
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              10,
-                                                            ),
-                                                        child: LinearProgressIndicator(
-                                                          value:
-                                                              _progressAnimController
-                                                                  .value,
-                                                          backgroundColor:
-                                                              Colors
-                                                                  .transparent,
-                                                          valueColor:
-                                                              AlwaysStoppedAnimation<
-                                                                Color
-                                                              >(primaryColor),
-                                                          minHeight: 5,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                );
-                                              },
-                                            ),
-                                          )
-                                        : const SizedBox(
-                                            key: ValueKey('empty'),
-                                            height: 0,
-                                          ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 18),
-
-                            // Matte Form Card (Network Endpoint Console)
-                            Container(
-                              decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainer,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: colorScheme.outlineVariant.withValues(
-                                    alpha: 0.6,
-                                  ),
-                                  width: 1,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.04),
-                                    blurRadius: 14,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              padding: const EdgeInsets.all(18.0),
-                              child: AutofillGroup(
-                                child: Form(
-                                  key: _formKey,
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: <Widget>[
-                                      // Network Target Endpoint Banner
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.lan_outlined,
-                                            size: 15,
-                                            color: primaryColor,
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            'TARGET ROUTER ENDPOINT',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w700,
-                                              letterSpacing: 0.6,
-                                              color: colorScheme
-                                                  .onSurfaceVariant
-                                                  .withValues(alpha: 0.8),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 10),
-
-                                      // Router Address Field
-                                      Tooltip(
-                                        message:
-                                            'Enter the IP address, hostname, or full URL of your router',
-                                        child: TextFormField(
-                                          key: const ValueKey('login_ip_field'),
-                                          controller: _ipController,
-                                          focusNode: _ipFocusNode,
-                                          keyboardType: TextInputType.url,
-                                          scrollPadding: const EdgeInsets.only(
-                                            bottom: 100.0,
-                                            top: 20.0,
-                                          ),
-                                          autofillHints: const [
-                                            AutofillHints.url,
-                                          ],
-                                          decoration: InputDecoration(
-                                            labelText: 'Router Address',
-                                            filled: true,
-                                            fillColor: colorScheme
-                                                .surfaceContainerHighest
-                                                .withValues(alpha: 0.35),
-                                            border: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                              borderSide: BorderSide(
-                                                color: colorScheme
-                                                    .outlineVariant
-                                                    .withValues(alpha: 0.6),
-                                              ),
-                                            ),
-                                            enabledBorder: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                              borderSide: BorderSide(
-                                                color: colorScheme
-                                                    .outlineVariant
-                                                    .withValues(alpha: 0.5),
-                                              ),
-                                            ),
-                                            focusedBorder: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                              borderSide: BorderSide(
-                                                color: primaryColor,
-                                                width: 1.5,
-                                              ),
-                                            ),
-                                            prefixIcon: Icon(
-                                              Icons.router_outlined,
-                                              color: primaryColor,
-                                            ),
-                                            suffixIcon: IconButton(
-                                              icon: _detectingGatewayIp
-                                                  ? LuciSmoothSpinner(
-                                                      size: 18,
-                                                      strokeWidth: 2,
-                                                      color: primaryColor,
-                                                    )
-                                                  : Icon(
-                                                      Icons.my_location_rounded,
-                                                      color: primaryColor,
-                                                    ),
-                                              tooltip:
-                                                  'Auto-detect Wi-Fi Gateway IP',
-                                              onPressed: () =>
-                                                  _detectGatewayIp(),
-                                            ),
-                                            helperText:
-                                                'e.g. 192.168.1.1, router.local:8080',
-                                          ),
-                                          textInputAction: TextInputAction.next,
-                                          validator: (value) {
-                                            if (value == null ||
-                                                value.isEmpty) {
-                                              return 'Please enter the router address';
-                                            }
-                                            final parsed = UrlParser.parse(
-                                              value,
-                                            );
-                                            if (!parsed.isValid) {
-                                              return parsed.error ??
-                                                  'Invalid address format';
-                                            }
-                                            return null;
-                                          },
+                                    const SizedBox(width: 32),
+                                    // Right Pane: Router Endpoint Console Form
+                                    Expanded(
+                                      flex: 6,
+                                      child: Center(
+                                        child: _buildFormCard(
+                                          context,
+                                          showSecurityInCard: false,
                                         ),
                                       ),
-
-                                      // Auto-fill hint banner
-                                      AnimatedSwitcher(
-                                        duration: const Duration(
-                                          milliseconds: 250,
-                                        ),
-                                        transitionBuilder: (child, animation) =>
-                                            SizeTransition(
-                                              sizeFactor: animation,
-                                              child: FadeTransition(
-                                                opacity: animation,
-                                                child: child,
-                                              ),
-                                            ),
-                                        child:
-                                            (_showAutoFillHint &&
-                                                _autoFilledIp != null)
-                                            ? Container(
-                                                key: const ValueKey(
-                                                  'autofill_floating_hint',
-                                                ),
-                                                margin: const EdgeInsets.only(
-                                                  top: 8,
-                                                  bottom: 4,
-                                                ),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 12,
-                                                      vertical: 8,
-                                                    ),
-                                                decoration: BoxDecoration(
-                                                  color: colorScheme
-                                                      .surfaceContainerHighest
-                                                      .withValues(alpha: 0.6),
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                  border: Border.all(
-                                                    color: primaryColor
-                                                        .withValues(alpha: 0.4),
-                                                    width: 1.0,
-                                                  ),
-                                                ),
-                                                child: Row(
-                                                  children: [
-                                                    Icon(
-                                                      Icons
-                                                          .auto_awesome_rounded,
-                                                      size: 14,
-                                                      color: primaryColor,
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Expanded(
-                                                      child: Text(
-                                                        'Auto-filled $_autoFilledIp from active network',
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          color: colorScheme
-                                                              .onSurface,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    InkWell(
-                                                      onTap:
-                                                          _dismissAutoFillHint,
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            12,
-                                                          ),
-                                                      child: Padding(
-                                                        padding:
-                                                            const EdgeInsets.all(
-                                                              3.0,
-                                                            ),
-                                                        child: Icon(
-                                                          Icons.close_rounded,
-                                                          size: 15,
-                                                          color: colorScheme
-                                                              .onSurfaceVariant,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              )
-                                            : const SizedBox(
-                                                key: ValueKey(
-                                                  'no_autofill_hint',
-                                                ),
-                                                height: 8,
-                                              ),
-                                      ),
-
-                                      const SizedBox(height: 10),
-
-                                      // Username Field
-                                      Tooltip(
-                                        message: 'Enter your router username',
-                                        child: TextFormField(
-                                          key: const ValueKey(
-                                            'login_user_field',
-                                          ),
-                                          controller: _usernameController,
-                                          focusNode: _usernameFocusNode,
-                                          keyboardType: TextInputType.text,
-                                          scrollPadding: const EdgeInsets.only(
-                                            bottom: 100.0,
-                                            top: 20.0,
-                                          ),
-                                          autofillHints: const [
-                                            AutofillHints.username,
-                                            AutofillHints.email,
-                                          ],
-                                          decoration: InputDecoration(
-                                            labelText: 'Username',
-                                            filled: true,
-                                            fillColor: colorScheme
-                                                .surfaceContainerHighest
-                                                .withValues(alpha: 0.35),
-                                            border: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                              borderSide: BorderSide(
-                                                color: colorScheme
-                                                    .outlineVariant
-                                                    .withValues(alpha: 0.6),
-                                              ),
-                                            ),
-                                            enabledBorder: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                              borderSide: BorderSide(
-                                                color: colorScheme
-                                                    .outlineVariant
-                                                    .withValues(alpha: 0.5),
-                                              ),
-                                            ),
-                                            focusedBorder: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                              borderSide: BorderSide(
-                                                color: primaryColor,
-                                                width: 1.5,
-                                              ),
-                                            ),
-                                            prefixIcon: Icon(
-                                              Icons.person_outlined,
-                                              color: primaryColor,
-                                            ),
-                                            helperText:
-                                                'Default is usually root',
-                                          ),
-                                          textInputAction: TextInputAction.next,
-                                          validator: (value) {
-                                            if (value == null ||
-                                                value.isEmpty) {
-                                              return 'Please enter the username';
-                                            }
-                                            return null;
-                                          },
-                                        ),
-                                      ),
-
-                                      const SizedBox(height: 10),
-
-                                      // Password Field
-                                      Tooltip(
-                                        message: 'Enter your router password',
-                                        child: TextFormField(
-                                          key: const ValueKey(
-                                            'login_pass_field',
-                                          ),
-                                          controller: _passwordController,
-                                          focusNode: _passwordFocusNode,
-                                          obscureText: !_passwordVisible,
-                                          keyboardType:
-                                              TextInputType.visiblePassword,
-                                          scrollPadding: const EdgeInsets.only(
-                                            bottom: 100.0,
-                                            top: 20.0,
-                                          ),
-                                          autofillHints: const [
-                                            AutofillHints.password,
-                                          ],
-                                          decoration: InputDecoration(
-                                            labelText: 'Password',
-                                            filled: true,
-                                            fillColor: colorScheme
-                                                .surfaceContainerHighest
-                                                .withValues(alpha: 0.35),
-                                            border: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                              borderSide: BorderSide(
-                                                color: colorScheme
-                                                    .outlineVariant
-                                                    .withValues(alpha: 0.6),
-                                              ),
-                                            ),
-                                            enabledBorder: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                              borderSide: BorderSide(
-                                                color: colorScheme
-                                                    .outlineVariant
-                                                    .withValues(alpha: 0.5),
-                                              ),
-                                            ),
-                                            focusedBorder: OutlineInputBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                              borderSide: BorderSide(
-                                                color: primaryColor,
-                                                width: 1.5,
-                                              ),
-                                            ),
-                                            prefixIcon: Icon(
-                                              Icons.lock_outlined,
-                                              color: primaryColor,
-                                            ),
-                                            helperText: 'Your router password',
-                                            suffixIcon: IconButton(
-                                              icon: Icon(
-                                                _passwordVisible
-                                                    ? Icons.visibility_outlined
-                                                    : Icons
-                                                          .visibility_off_outlined,
-                                                color: colorScheme
-                                                    .onSurfaceVariant,
-                                              ),
-                                              onPressed: () => setState(
-                                                () => _passwordVisible =
-                                                    !_passwordVisible,
-                                              ),
-                                              tooltip: _passwordVisible
-                                                  ? 'Hide password'
-                                                  : 'Show password',
-                                            ),
-                                          ),
-                                          textInputAction: TextInputAction.done,
-                                        ),
-                                      ),
-
-                                      // Error Message Banner
-                                      Consumer(
-                                        builder: (context, ref, child) {
-                                          final errorMessage = ref.watch(
-                                            appStateProvider.select(
-                                              (s) => s.errorMessage,
-                                            ),
-                                          );
-                                          final hasError =
-                                              errorMessage != null &&
-                                              errorMessage.trim().isNotEmpty;
-                                          return AnimatedSwitcher(
-                                            duration: const Duration(
-                                              milliseconds: 300,
-                                            ),
-                                            child: hasError
-                                                ? Padding(
-                                                    key: const ValueKey(
-                                                      'error',
-                                                    ),
-                                                    padding:
-                                                        const EdgeInsets.only(
-                                                          top: 14.0,
-                                                        ),
-                                                    child: Container(
-                                                      padding:
-                                                          const EdgeInsets.all(
-                                                            12,
-                                                          ),
-                                                      decoration: BoxDecoration(
-                                                        color: colorScheme
-                                                            .errorContainer,
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              12,
-                                                            ),
-                                                        border: Border.all(
-                                                          color: colorScheme
-                                                              .error
-                                                              .withValues(
-                                                                alpha: 0.3,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                      child: Row(
-                                                        children: [
-                                                          Icon(
-                                                            Icons
-                                                                .error_outline_rounded,
-                                                            color: colorScheme
-                                                                .onErrorContainer,
-                                                          ),
-                                                          const SizedBox(
-                                                            width: 10,
-                                                          ),
-                                                          Expanded(
-                                                            child: Text(
-                                                              errorMessage,
-                                                              style: theme
-                                                                  .textTheme
-                                                                  .bodyMedium
-                                                                  ?.copyWith(
-                                                                    color: colorScheme
-                                                                        .onErrorContainer,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w600,
-                                                                  ),
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  )
-                                                : const SizedBox.shrink(),
-                                          );
-                                        },
-                                      ),
-
-                                      const SizedBox(height: 18),
-
-                                      // Matte Tactile Connect Action Button
-                                      Consumer(
-                                        builder: (context, ref, child) {
-                                          final isLoading = ref.watch(
-                                            appStateProvider.select(
-                                              (s) => s.isLoading,
-                                            ),
-                                          );
-                                          return TweenAnimationBuilder<double>(
-                                            duration: const Duration(
-                                              milliseconds: 100,
-                                            ),
-                                            tween: Tween<double>(
-                                              begin: 1,
-                                              end: isLoading ? 0.98 : 1,
-                                            ),
-                                            builder: (context, scale, child) {
-                                              return Transform.scale(
-                                                scale: scale,
-                                                child: child,
-                                              );
-                                            },
-                                            child: FilledButton(
-                                              onPressed:
-                                                  (isLoading || _isConnecting)
-                                                      ? null
-                                                      : _connect,
-                                              style: FilledButton.styleFrom(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      vertical: 16,
-                                                    ),
-                                                backgroundColor: primaryColor,
-                                                foregroundColor:
-                                                    colorScheme.onPrimary,
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(14),
-                                                ),
-                                                elevation: 0,
-                                              ),
-                                              child: isLoading
-                                                  ? LuciSmoothSpinner(
-                                                      size: 22,
-                                                      strokeWidth: 2.5,
-                                                      color:
-                                                          colorScheme.onPrimary,
-                                                    )
-                                                  : FittedBox(
-                                                      fit: BoxFit.scaleDown,
-                                                      child: Row(
-                                                        mainAxisAlignment:
-                                                            MainAxisAlignment
-                                                                .center,
-                                                        children: const [
-                                                          Icon(
-                                                            Icons
-                                                                .arrow_forward_rounded,
-                                                            size: 18,
-                                                          ),
-                                                          SizedBox(width: 8),
-                                                          Text(
-                                                            'CONNECT TO ROUTER',
-                                                            style: TextStyle(
-                                                              fontSize: 15,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                              letterSpacing:
-                                                                  0.6,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-
-                                      const SizedBox(height: 14),
-
-                                      // Direct Local Connection Security Assurance Panel
-                                      Container(
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: colorScheme
-                                              .surfaceContainerHighest
-                                              .withValues(alpha: 0.4),
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          border: Border.all(
-                                            color: colorScheme.outlineVariant
-                                                .withValues(alpha: 0.4),
-                                          ),
-                                        ),
-                                        child: Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Icon(
-                                              Icons.shield_outlined,
-                                              size: 18,
-                                              color: primaryColor,
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Text.rich(
-                                                TextSpan(
-                                                  children: [
-                                                    TextSpan(
-                                                      text:
-                                                          'Direct Local Connection: ',
-                                                      style: TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 11,
-                                                        color: colorScheme
-                                                            .onSurface,
-                                                      ),
-                                                    ),
-                                                    TextSpan(
-                                                      text:
-                                                          'Communicates exclusively with your local OpenWrt router over LAN/Wi-Fi. Zero analytics or cloud servers.',
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        color: colorScheme
-                                                            .onSurfaceVariant,
-                                                        height: 1.3,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height: 20),
-                            const SizedBox(height: 14),
-
-                            // Need Help Link
-                            Tooltip(
-                              message: 'Open troubleshooting guide',
-                              child: TextButton(
-                                onPressed: () => _showHelpBottomSheet(context),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: primaryColor,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 8,
-                                  ),
-                                ),
-                                child: const Text(
-                                  'Need help?',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ),
-
-                            // Version Display
-                            FutureBuilder<PackageInfo>(
-                              future: PackageInfo.fromPlatform(),
-                              builder: (context, snapshot) {
-                                if (!snapshot.hasData) {
-                                  return const SizedBox.shrink();
-                                }
-                                final info = snapshot.data!;
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 4.0),
-                                  child: Text(
-                                    'Version ${info.version}',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: colorScheme.onSurfaceVariant
-                                          .withValues(alpha: 0.6),
-                                      fontWeight: FontWeight.w500,
                                     ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
+                                  ],
+                                ),
+                              )
+                            : IntrinsicHeight(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    const SizedBox(height: 8),
+                                    _buildHeaderLockup(context),
+                                    const SizedBox(height: 18),
+                                    _buildFormCard(
+                                      context,
+                                      showSecurityInCard: true,
+                                    ),
+                                    const SizedBox(height: 20),
+                                    _buildFooterLinks(context),
+                                  ],
+                                ),
+                              ),
                       ),
                     ),
                   );
@@ -1578,6 +797,755 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildHeaderLockup(BuildContext context, {bool isWide = false}) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final primaryColor = colorScheme.primary;
+
+    return GestureDetector(
+      onLongPress: _startReviewerModeActivation,
+      onLongPressUp: _cancelReviewerModeActivation,
+      child: Column(
+        children: [
+          Container(
+            padding: EdgeInsets.all(isWide ? 20 : 16),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainer,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ThemeRouterLogo(
+              width: isWide ? 80 : 68,
+              height: isWide ? 80 : 68,
+              showShadow: false,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Yet Another LuCI App',
+            style: (isWide
+                    ? theme.textTheme.headlineLarge
+                    : theme.textTheme.headlineMedium)
+                ?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: colorScheme.onSurface,
+              letterSpacing: 0.3,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'OpenWrt Router Console',
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.85),
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          // Console Technical Tag
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                width: 1,
+              ),
+            ),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: primaryColor,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'DIRECT LAN CONNECTION',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: primaryColor,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: _isActivatingReviewerMode
+                ? Padding(
+                    key: const ValueKey('progress'),
+                    padding: const EdgeInsets.only(top: 14),
+                    child: AnimatedBuilder(
+                      animation: _progressAnimController,
+                      builder: (context, child) {
+                        return Column(
+                          children: [
+                            Text(
+                              'Hold to activate reviewer mode...',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: primaryColor,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              width: 240,
+                              height: 5,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(10),
+                                color: colorScheme.surfaceContainerHighest,
+                                border: Border.all(
+                                  color: colorScheme.outlineVariant.withValues(
+                                    alpha: 0.4,
+                                  ),
+                                  width: 0.5,
+                                ),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: LinearProgressIndicator(
+                                  value: _progressAnimController.value,
+                                  backgroundColor: Colors.transparent,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    primaryColor,
+                                  ),
+                                  minHeight: 5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  )
+                : const SizedBox(key: ValueKey('empty'), height: 0),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormCard(
+    BuildContext context, {
+    required bool showSecurityInCard,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final primaryColor = colorScheme.primary;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(18.0),
+      child: AutofillGroup(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              // Network Target Endpoint Banner
+              Row(
+                children: [
+                  Icon(Icons.lan_outlined, size: 15, color: primaryColor),
+                  const SizedBox(width: 6),
+                  Text(
+                    'TARGET ROUTER ENDPOINT',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.6,
+                      color: colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.8,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Router Address Field
+              Tooltip(
+                message:
+                    'Enter the IP address, hostname, or full URL of your router',
+                child: TextFormField(
+                  key: const ValueKey('login_ip_field'),
+                  controller: _ipController,
+                  focusNode: _ipFocusNode,
+                  keyboardType: TextInputType.url,
+                  scrollPadding: const EdgeInsets.only(
+                    bottom: 100.0,
+                    top: 20.0,
+                  ),
+                  autofillHints: const [AutofillHints.url],
+                  decoration: InputDecoration(
+                    labelText: 'Router Address',
+                    filled: true,
+                    fillColor: colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.35,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: colorScheme.outlineVariant.withValues(
+                          alpha: 0.6,
+                        ),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: colorScheme.outlineVariant.withValues(
+                          alpha: 0.5,
+                        ),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: primaryColor, width: 1.5),
+                    ),
+                    prefixIcon: Icon(
+                      Icons.router_outlined,
+                      color: primaryColor,
+                    ),
+                    suffixIcon: IconButton(
+                      icon: _detectingGatewayIp
+                          ? LuciSmoothSpinner(
+                              size: 18,
+                              strokeWidth: 2,
+                              color: primaryColor,
+                            )
+                          : Icon(
+                              Icons.my_location_rounded,
+                              color: primaryColor,
+                            ),
+                      tooltip: 'Auto-detect Wi-Fi Gateway IP',
+                      onPressed: () => _detectGatewayIp(),
+                    ),
+                    helperText: 'e.g. 192.168.1.1, router.local:8080',
+                  ),
+                  textInputAction: TextInputAction.next,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter the router address';
+                    }
+                    final parsed = UrlParser.parse(value);
+                    if (!parsed.isValid) {
+                      return parsed.error ?? 'Invalid address format';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+
+              // Auto-fill hint banner
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                transitionBuilder: (child, animation) => SizeTransition(
+                  sizeFactor: animation,
+                  child: FadeTransition(opacity: animation, child: child),
+                ),
+                child: (_showAutoFillHint && _autoFilledIp != null)
+                    ? Container(
+                        key: const ValueKey('autofill_floating_hint'),
+                        margin: const EdgeInsets.only(top: 8, bottom: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest.withValues(
+                            alpha: 0.6,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: primaryColor.withValues(alpha: 0.4),
+                            width: 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.auto_awesome_rounded,
+                              size: 14,
+                              color: primaryColor,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Auto-filled $_autoFilledIp from active network',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: colorScheme.onSurface,
+                                ),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: _dismissAutoFillHint,
+                              borderRadius: BorderRadius.circular(12),
+                              child: Padding(
+                                padding: const EdgeInsets.all(3.0),
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  size: 15,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : const SizedBox(
+                        key: ValueKey('no_autofill_hint'),
+                        height: 8,
+                      ),
+              ),
+
+              const SizedBox(height: 10),
+
+              // Username Field
+              Tooltip(
+                message: 'Enter your router username',
+                child: TextFormField(
+                  key: const ValueKey('login_user_field'),
+                  controller: _usernameController,
+                  focusNode: _usernameFocusNode,
+                  keyboardType: TextInputType.text,
+                  scrollPadding: const EdgeInsets.only(
+                    bottom: 100.0,
+                    top: 20.0,
+                  ),
+                  autofillHints: const [
+                    AutofillHints.username,
+                    AutofillHints.email,
+                  ],
+                  decoration: InputDecoration(
+                    labelText: 'Username',
+                    filled: true,
+                    fillColor: colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.35,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: colorScheme.outlineVariant.withValues(
+                          alpha: 0.6,
+                        ),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: colorScheme.outlineVariant.withValues(
+                          alpha: 0.5,
+                        ),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: primaryColor, width: 1.5),
+                    ),
+                    prefixIcon: Icon(
+                      Icons.person_outlined,
+                      color: primaryColor,
+                    ),
+                    helperText: 'Default is usually root',
+                  ),
+                  textInputAction: TextInputAction.next,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter the username';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              // Password Field
+              Tooltip(
+                message: 'Enter your router password',
+                child: TextFormField(
+                  key: const ValueKey('login_pass_field'),
+                  controller: _passwordController,
+                  focusNode: _passwordFocusNode,
+                  obscureText: !_passwordVisible,
+                  keyboardType: TextInputType.visiblePassword,
+                  scrollPadding: const EdgeInsets.only(
+                    bottom: 100.0,
+                    top: 20.0,
+                  ),
+                  autofillHints: const [AutofillHints.password],
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    filled: true,
+                    fillColor: colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.35,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: colorScheme.outlineVariant.withValues(
+                          alpha: 0.6,
+                        ),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(
+                        color: colorScheme.outlineVariant.withValues(
+                          alpha: 0.5,
+                        ),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: primaryColor, width: 1.5),
+                    ),
+                    prefixIcon: Icon(Icons.lock_outlined, color: primaryColor),
+                    helperText: 'Your router password',
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _passwordVisible
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      onPressed: () => setState(
+                        () => _passwordVisible = !_passwordVisible,
+                      ),
+                      tooltip: _passwordVisible
+                          ? 'Hide password'
+                          : 'Show password',
+                    ),
+                  ),
+                  textInputAction: TextInputAction.done,
+                ),
+              ),
+
+              // Error Message Banner
+              Consumer(
+                builder: (context, ref, child) {
+                  final errorMessage = ref.watch(
+                    appStateProvider.select((s) => s.errorMessage),
+                  );
+                  final hasError =
+                      errorMessage != null && errorMessage.trim().isNotEmpty;
+                  return AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: hasError
+                        ? Padding(
+                            key: const ValueKey('error'),
+                            padding: const EdgeInsets.only(top: 14.0),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: colorScheme.errorContainer,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: colorScheme.error.withValues(
+                                    alpha: 0.3,
+                                  ),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.error_outline_rounded,
+                                    color: colorScheme.onErrorContainer,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      errorMessage,
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        color: colorScheme.onErrorContainer,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 18),
+
+              // Matte Tactile Connect Action Button
+              Consumer(
+                builder: (context, ref, child) {
+                  final isLoading = ref.watch(
+                    appStateProvider.select((s) => s.isLoading),
+                  );
+                  return TweenAnimationBuilder<double>(
+                    duration: const Duration(milliseconds: 100),
+                    tween: Tween<double>(
+                      begin: 1,
+                      end: isLoading ? 0.98 : 1,
+                    ),
+                    builder: (context, scale, child) {
+                      return Transform.scale(scale: scale, child: child);
+                    },
+                    child: FilledButton(
+                      onPressed: (isLoading || _isConnecting) ? null : _connect,
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        backgroundColor: primaryColor,
+                        foregroundColor: colorScheme.onPrimary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: isLoading
+                          ? LuciSmoothSpinner(
+                              size: 22,
+                              strokeWidth: 2.5,
+                              color: colorScheme.onPrimary,
+                            )
+                          : FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  Icon(Icons.arrow_forward_rounded, size: 18),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'CONNECT TO ROUTER',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.6,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                    ),
+                  );
+                },
+              ),
+
+              if (showSecurityInCard) ...[
+                const SizedBox(height: 14),
+                _buildSecurityAssurance(context),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSecurityAssurance(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final primaryColor = colorScheme.primary;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.shield_outlined, size: 18, color: primaryColor),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: 'Direct Local Connection: ',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  TextSpan(
+                    text:
+                        'Communicates exclusively with your local OpenWrt router over LAN/Wi-Fi. Zero analytics or cloud servers.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colorScheme.onSurfaceVariant,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFooterLinks(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final primaryColor = colorScheme.primary;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Need Help Link
+        Tooltip(
+          message: 'Open troubleshooting guide',
+          child: TextButton(
+            onPressed: () => _showHelpBottomSheet(context),
+            style: TextButton.styleFrom(
+              foregroundColor: primaryColor,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 8,
+              ),
+            ),
+            child: const Text(
+              'Need help?',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+        // Version & Legal Footer Links
+        FutureBuilder<PackageInfo>(
+          future: PackageInfo.fromPlatform(),
+          builder: (context, snapshot) {
+            final versionText = snapshot.hasData
+                ? 'Version ${snapshot.data!.version}'
+                : 'Version 1.0.0';
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    versionText,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.6,
+                      ),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: [
+                      InkWell(
+                        onTap: () => launchUrlString(
+                          AppConfig.privacyPolicyUrl,
+                          mode: LaunchMode.externalApplication,
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          child: Text(
+                            'Privacy Policy',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary.withValues(
+                                alpha: 0.85,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '•',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.5,
+                          ),
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () => launchUrlString(
+                          AppConfig.termsAndConditionsUrl,
+                          mode: LaunchMode.externalApplication,
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          child: Text(
+                            'Terms & Conditions',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary.withValues(
+                                alpha: 0.85,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }

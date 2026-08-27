@@ -1,3 +1,4 @@
 {
-    "java.configuration.updateBuildConfiguration": "automatic"
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "codescene.authToken": "pat_eyJpZCI6OTEyOTgsInJhbmQiOiJHSElNb1RxRGZmNVJLUlZFSkMzQVA3dnlhbzlTWHN1RSJ9"
 }

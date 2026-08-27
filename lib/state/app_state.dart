@@ -364,7 +364,7 @@ class AppState extends ChangeNotifier {
 
   // Interface-specific throughput getters
   List<double> getRxHistoryForInterface(String interface) {
-    final deviceName = _getDeviceNameForInterface(interface);
+    final deviceName = getDeviceNameForInterface(interface);
     return _throughputController?.getRxHistoryForInterface(
           deviceName ?? interface,
         ) ??
@@ -372,7 +372,7 @@ class AppState extends ChangeNotifier {
   }
 
   List<double> getTxHistoryForInterface(String interface) {
-    final deviceName = _getDeviceNameForInterface(interface);
+    final deviceName = getDeviceNameForInterface(interface);
     return _throughputController?.getTxHistoryForInterface(
           deviceName ?? interface,
         ) ??
@@ -380,7 +380,7 @@ class AppState extends ChangeNotifier {
   }
 
   double getCurrentRxRateForInterface(String interface) {
-    final deviceName = _getDeviceNameForInterface(interface);
+    final deviceName = getDeviceNameForInterface(interface);
     return _throughputController?.getCurrentRxRateForInterface(
           deviceName ?? interface,
         ) ??
@@ -388,7 +388,7 @@ class AppState extends ChangeNotifier {
   }
 
   double getCurrentTxRateForInterface(String interface) {
-    final deviceName = _getDeviceNameForInterface(interface);
+    final deviceName = getDeviceNameForInterface(interface);
     return _throughputController?.getCurrentTxRateForInterface(
           deviceName ?? interface,
         ) ??
@@ -927,7 +927,7 @@ class AppState extends ChangeNotifier {
     return {'dhcp_leases': leases, 'leases': leases};
   }
 
-  String? _getDeviceNameForInterface(String interfaceName) =>
+  String? getDeviceNameForInterface(String interfaceName) =>
       _dashboardController?.getDeviceNameForInterface(interfaceName) ??
       interfaceName;
 
@@ -1011,6 +1011,7 @@ class AppState extends ChangeNotifier {
         // Resolve specific interface from preferences
         final specificInterface = ThroughputController.resolveSpecificInterface(
           dashboardPreferences,
+          deviceNameResolver: (iface) => getDeviceNameForInterface(iface),
         );
 
         _throughputController?.updateThroughput(
@@ -1091,6 +1092,7 @@ class AppState extends ChangeNotifier {
         // Resolve specific interface from preferences
         final specificInterface = ThroughputController.resolveSpecificInterface(
           dashboardPreferences,
+          deviceNameResolver: (iface) => getDeviceNameForInterface(iface),
         );
 
         _throughputController?.updateThroughput(
