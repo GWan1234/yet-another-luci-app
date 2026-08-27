@@ -70,12 +70,16 @@ class MockApiService implements IApiService {
     Map<String, dynamic>? params,
     BuildContext? context,
   }) async {
-    // Simulate a short delay for realism
-    await Future.delayed(const Duration(milliseconds: 200));
-
     final endpointKey = '$object.$method';
-
     try {
+      if (object == 'file' && method == 'read') {
+        return _handleFileRead(params);
+      }
+      if (object == 'file' && method == 'exec') {
+        final execRes = _handleFileExec(params);
+        if (execRes != null) return execRes;
+      }
+
       if (object == 'uci' && method == 'get') {
         final cfg = params?['config']?.toString();
         String? targetFile;
@@ -149,6 +153,14 @@ class MockApiService implements IApiService {
     final endpointKey = '$object.$method';
 
     try {
+      if (object == 'file' && method == 'read') {
+        return _handleFileRead(params);
+      }
+      if (object == 'file' && method == 'exec') {
+        final execRes = _handleFileExec(params);
+        if (execRes != null) return execRes;
+      }
+
       if (object == 'file' && method == 'stat') {
         final path = params['path']?.toString() ?? '';
         if (path == '/etc/apk') {
@@ -825,10 +837,7 @@ class MockApiService implements IApiService {
       case 'file.read':
         return [
           0,
-          {
-            'data':
-                '0 4 * * * /sbin/reboot\n*/15 * * * * /usr/bin/ping-check.sh\n',
-          },
+          {'data': ''},
         ];
 
       case 'uci.get':
@@ -1837,5 +1846,168 @@ class MockApiService implements IApiService {
   }) async {
     await Future.delayed(const Duration(milliseconds: 200));
     return true;
+  }
+
+  dynamic _handleFileRead(Map<String, dynamic>? params) {
+    final path = params?['path']?.toString() ?? '';
+    if (path.contains('sysinfo/model')) {
+      return [
+        0,
+        {'data': 'OpenWrt Wi-Fi 6 Gateway (GL-AXT1800)\n'},
+      ];
+    }
+    if (path.contains('sysinfo/board_name')) {
+      return [
+        0,
+        {'data': 'mediatek,mt7981-rf-v1\n'},
+      ];
+    }
+    if (path.contains('openwrt_release')) {
+      return [
+        0,
+        {
+          'data':
+              'DISTRIB_ID=\'OpenWrt\'\nDISTRIB_RELEASE=\'23.05.3\'\nDISTRIB_REVISION=\'r23809-234f0e6\'\nDISTRIB_TARGET=\'mediatek/mt7981\'\nDISTRIB_ARCH=\'aarch64_cortex-a53\'\nDISTRIB_DESCRIPTION=\'OpenWrt 23.05.3 r23809-234f0e6\'\n',
+        },
+      ];
+    }
+    if (path.contains('os-release')) {
+      return [
+        0,
+        {
+          'data':
+              'NAME="OpenWrt"\nVERSION="23.05.3"\nID="openwrt"\nPRETTY_NAME="OpenWrt 23.05.3"\n',
+        },
+      ];
+    }
+    if (path.contains('proc/mtd')) {
+      return [
+        0,
+        {
+          'data':
+              'dev:    size   erasesize  name\nmtd0: 00080000 00020000 "u-boot"\nmtd1: 00080000 00020000 "u-boot-env"\nmtd2: 00040000 00020000 "factory"\nmtd3: 02000000 00020000 "firmware"\nmtd4: 00180000 00020000 "kernel"\nmtd5: 01e80000 00020000 "rootfs"\n',
+        },
+      ];
+    }
+    if (path.contains('crontabs/root') || path.contains('crontab') || path == '/etc/crontab') {
+      return [
+        0,
+        {
+          'data':
+              '0 4 * * * /sbin/reboot\n*/15 * * * * /usr/bin/ping-check.sh\n',
+        },
+      ];
+    }
+    if (path.contains('sysupgrade.conf')) {
+      return [
+        0,
+        {'data': '#/etc/sysupgrade.conf\n/etc/config/\n/etc/dropbear/\n'},
+      ];
+    }
+    return [
+      0,
+      {'data': ''},
+    ];
+  }
+
+  dynamic _handleFileExec(Map<String, dynamic>? params) {
+    final cmd = params?['command']?.toString() ?? '';
+    final rawArgs = params?['params'] ?? params?['args'];
+    final argsList = (rawArgs is List) ? rawArgs.map((e) => e.toString()).toList() : <String>[];
+    final fullCmd = '$cmd ${argsList.join(" ")}';
+
+    if (fullCmd.contains('df -k /tmp') || fullCmd.contains('df ')) {
+      return [
+        0,
+        {
+          'code': 0,
+          'stdout':
+              'Filesystem           1K-blocks      Used Available Use% Mounted on\ntmpfs                   124856      1240    123616   1% /tmp\n',
+          'stderr': '',
+        },
+      ];
+    }
+    if (fullCmd.contains('sysupgrade -l') || fullCmd.contains('--list-backup')) {
+      return [
+        0,
+        {
+          'code': 0,
+          'stdout':
+              '/etc/config/dhcp\n/etc/config/dropbear\n/etc/config/firewall\n/etc/config/network\n/etc/config/system\n/etc/config/wireless\n/etc/dropbear/dropbear_rsa_host_key\n/etc/shadow\n',
+          'stderr': '',
+        },
+      ];
+    }
+    if (fullCmd.contains('cat /proc/mtd')) {
+      return [
+        0,
+        {
+          'code': 0,
+          'stdout':
+              'dev:    size   erasesize  name\nmtd0: 00080000 00020000 "u-boot"\nmtd1: 00080000 00020000 "u-boot-env"\nmtd2: 00040000 00020000 "factory"\nmtd3: 02000000 00020000 "firmware"\nmtd4: 00180000 00020000 "kernel"\nmtd5: 01e80000 00020000 "rootfs"\n',
+          'stderr': '',
+        },
+      ];
+    }
+    if (fullCmd.contains('/tmp/sysinfo/model')) {
+      return [
+        0,
+        {'code': 0, 'stdout': 'OpenWrt Wi-Fi 6 Gateway (GL-AXT1800)\n', 'stderr': ''},
+      ];
+    }
+    if (fullCmd.contains('/tmp/sysinfo/board_name')) {
+      return [
+        0,
+        {'code': 0, 'stdout': 'mediatek,mt7981-rf-v1\n', 'stderr': ''},
+      ];
+    }
+    if (fullCmd.contains('/etc/openwrt_release')) {
+      return [
+        0,
+        {
+          'code': 0,
+          'stdout':
+              'DISTRIB_ID=\'OpenWrt\'\nDISTRIB_RELEASE=\'23.05.3\'\nDISTRIB_REVISION=\'r23809-234f0e6\'\nDISTRIB_TARGET=\'mediatek/mt7981\'\nDISTRIB_ARCH=\'aarch64_cortex-a53\'\nDISTRIB_DESCRIPTION=\'OpenWrt 23.05.3 r23809-234f0e6\'\n',
+          'stderr': '',
+        },
+      ];
+    }
+    if (cmd == 'opkg') {
+      if (mockPackageEngine == PackageManagerEngine.opkg) {
+        return [
+          0,
+          {
+            'code': 0,
+            'stdout':
+                'luci-base - git-23.330\nwireguard-tools - 1.0.20210914-1\n',
+            'stderr': '',
+          },
+        ];
+      } else {
+        return [
+          0,
+          {'code': 127, 'stdout': '', 'stderr': 'opkg: not found'},
+        ];
+      }
+    }
+    if (cmd == 'apk') {
+      if (mockPackageEngine == PackageManagerEngine.apk) {
+        return [
+          0,
+          {
+            'code': 0,
+            'stdout':
+                'luci-base-git-23.330\nwireguard-tools-1.0.20210914-1\n',
+            'stderr': '',
+          },
+        ];
+      } else {
+        return [
+          0,
+          {'code': 127, 'stdout': '', 'stderr': 'apk: not found'},
+        ];
+      }
+    }
+    return null;
   }
 }
