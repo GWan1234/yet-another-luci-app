@@ -98,29 +98,114 @@
   <p><b>Explore full resolution screenshots of Yet Another LuCI App features:</b></p>
 </div>
 
-| Login Screen | Dashboard (Light) | Dashboard (Dark) | Dashboard-1 |
-|:---:|:---:|:---:|:---:|
-| <img src="assets/screenshots/3_login_page.jpeg" width="180"/> | <img src="assets/screenshots/1_dashboard-light.jpeg" width="180"/> | <img src="assets/screenshots/2_dashboard-dark.jpeg" width="180"/> | <img src="assets/screenshots/4_dashboard-2.jpeg" width="180"/> |
-
-| Dashboard-2 | Clients | Interfaces | Interface-1 |
-|:---:|:---:|:---:|:---:|
-| <img src="assets/screenshots/5_dashboard-3.jpeg" width="180"/> | <img src="assets/screenshots/6_clients.jpeg" width="180"/> | <img src="assets/screenshots/7_interfaces.jpeg" width="180"/> | <img src="assets/screenshots/8_interfaces-1.jpeg" width="180"/> |
-
-| Wireless Management | System Monitoring | Storage Monitoring | Real-Time Metrics |
-|:---:|:---:|:---:|:---:|
-| <img src="assets/screenshots/9_wireless.jpeg" width="180"/> | <img src="assets/screenshots/10_system.jpeg" width="180"/> | <img src="assets/screenshots/11_storage.jpeg" width="180"/> | <img src="assets/screenshots/12_realtime_charts.jpeg" width="180"/> |
-
-| DHCP & DNS | Firewall | Firewall-1 | Services & System |
-|:---:|:---:|:---:|:---:|
-| <img src="assets/screenshots/13_dhcp_dns.jpeg" width="180"/> | <img src="assets/screenshots/14_firewall.jpeg" width="180"/> | <img src="assets/screenshots/15_firewall-1.jpeg" width="180"/> | <img src="assets/screenshots/16_services_system.jpeg" width="180"/> |
-
-| Parental Controls | Parental Controls-1 | OPKG & APK Packages | Settings (PlayStore) |
-|:---:|:---:|:---:|:---:|
-| <img src="assets/screenshots/17_parental_controls.jpeg" width="180"/> | <img src="assets/screenshots/18_parental_controls-1.jpeg" width="180"/> | <img src="assets/screenshots/19_packagemanager.jpeg" width="180"/> | <img src="assets/screenshots/20-settings-playstore.jpeg" width="180"/> |
-
-| Settings (Community) | More menu | About & App Info | |
-|:---:|:---:|:---:|:---:|
-| <img src="assets/screenshots/20-settings-community.jpeg" width="180"/> | <img src="assets/screenshots/21-more.jpeg" width="180"/> | <img src="assets/screenshots/22-about.jpeg" width="180"/> | |
+<table>
+  <tr>
+    <td width="25%" align="center" valign="top">
+      <b>Login Screen</b><br/><br/>
+      <img src="assets/screenshots/3_login_page.jpeg" width="165" height="350" alt="Login Screen"/>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <b>Dashboard (Light)</b><br/><br/>
+      <img src="assets/screenshots/1_dashboard-light.jpeg" width="165" height="350" alt="Dashboard Light Mode"/>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <b>Dashboard (Dark)</b><br/><br/>
+      <img src="assets/screenshots/2_dashboard-dark.jpeg" width="165" height="350" alt="Dashboard Dark Mode"/>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <b>System Vitals</b><br/><br/>
+      <img src="assets/screenshots/4_dashboard-2.jpeg" width="165" height="350" alt="System Vitals"/>
+    </td>
+  </tr>
+  <tr>
+    <td width="25%" align="center" valign="top">
+      <b>Network Cards</b><br/><br/>
+      <img src="assets/screenshots/5_dashboard-3.jpeg" width="165" height="350" alt="Network Cards"/>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <b>Connected Clients</b><br/><br/>
+      <img src="assets/screenshots/6_clients.jpeg" width="165" height="350" alt="Connected Clients"/>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <b>Interfaces</b><br/><br/>
+      <img src="assets/screenshots/7_interfaces.jpeg" width="165" height="350" alt="Interfaces"/>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <b>Interface Details</b><br/><br/>
+      <img src="assets/screenshots/8_interfaces-1.jpeg" width="165" height="350" alt="Interface Details"/>
+    </td>
+  </tr>
+  <tr>
+    <td width="25%" align="center" valign="top">
+      <b>Wireless Radios</b><br/><br/>
+      <img src="assets/screenshots/9_wireless.jpeg" width="165" height="350" alt="Wireless Radios"/>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <b>System Info</b><br/><br/>
+      <img src="assets/screenshots/10_system.jpeg" width="165" height="350" alt="System Info"/>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <b>Storage Monitor</b><br/><br/>
+      <img src="assets/screenshots/11_storage.jpeg" width="165" height="350" alt="Storage Monitor"/>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <b>Real-Time Charts</b><br/><br/>
+      <img src="assets/screenshots/12_realtime_charts.jpeg" width="165" height="350" alt="Real-Time Charts"/>
+    </td>
+  </tr>
+  <tr>
+    <td width="25%" align="center" valign="top">
+      <b>DHCP & DNS</b><br/><br/>
+      <img src="assets/screenshots/13_dhcp_dns.jpeg" width="165" height="350" alt="DHCP & DNS"/>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <b>Firewall Rules</b><br/><br/>
+      <img src="assets/screenshots/14_firewall.jpeg" width="165" height="350" alt="Firewall Rules"/>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <b>Port Forwarding</b><br/><br/>
+      <img src="assets/screenshots/15_firewall-1.jpeg" width="165" height="350" alt="Port Forwarding"/>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <b>Services & System</b><br/><br/>
+      <img src="assets/screenshots/16_services_system.jpeg" width="165" height="350" alt="Services & System"/>
+    </td>
+  </tr>
+  <tr>
+    <td width="25%" align="center" valign="top">
+      <b>Parental Controls</b><br/><br/>
+      <img src="assets/screenshots/17_parental_controls.jpeg" width="165" height="350" alt="Parental Controls"/>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <b>Parental Rules</b><br/><br/>
+      <img src="assets/screenshots/18_parental_controls-1.jpeg" width="165" height="350" alt="Parental Rules"/>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <b>Package Manager</b><br/><br/>
+      <img src="assets/screenshots/19_packagemanager.jpeg" width="165" height="350" alt="Package Manager"/>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <b>Settings (PlayStore)</b><br/><br/>
+      <img src="assets/screenshots/20-settings-playstore.jpeg" width="165" height="350" alt="Settings PlayStore"/>
+    </td>
+  </tr>
+  <tr>
+    <td width="25%" align="center" valign="top">
+      <b>Settings (Community)</b><br/><br/>
+      <img src="assets/screenshots/20-settings-community.jpeg" width="165" height="350" alt="Settings Community"/>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <b>More Menu</b><br/><br/>
+      <img src="assets/screenshots/21-more.jpeg" width="165" height="350" alt="More Menu"/>
+    </td>
+    <td width="25%" align="center" valign="top">
+      <b>About & App Info</b><br/><br/>
+      <img src="assets/screenshots/22-about.jpeg" width="165" height="350" alt="About & App Info"/>
+    </td>
+    <td width="25%" align="center" valign="top">
+    </td>
+  </tr>
+</table>
 
 <br>
 
