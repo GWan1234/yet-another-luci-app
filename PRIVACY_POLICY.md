@@ -1,7 +1,7 @@
 # Privacy Policy
 
 **Yet Another LuCI App** (by Tuhin Garai / nightcode)  
-Last updated: August 26, 2026
+Last updated: August 27, 2026
 
 Yet Another LuCI App ("we", "our", or "us") is committed to protecting your privacy. This Privacy Policy explains how our mobile application ("App") handles your information when you use the App to manage your OpenWrt/LuCI routers.
 
@@ -33,17 +33,16 @@ Yet Another LuCI App ("we", "our", or "us") is committed to protecting your priv
   - The App may feature optional "Support the Developer" voluntary contributions, tip jars, or feature tier upgrades.
   - All financial transactions are processed securely directly by the **Google Play Store**.
   - The App never collects, receives, or stores credit card details, bank account numbers, or billing addresses.
-- **Optional Ad Services & Consent (Google AdMob & UMP SDK)**:
-  - If optional ad-supported tiers or banner features are enabled in Play Store builds, advertisements are powered by **Google AdMob**.
-  - **Data Collection**: Google AdMob may collect non-sensitive device identifiers (such as Advertising ID), IP address, coarse location, and interaction metrics for ad delivery and fraud prevention.
-  - **GDPR / Regional Consent**: In regions subject to privacy laws (e.g. EU/EEA, UK), the **Google User Messaging Platform (UMP) SDK** prompts users for explicit consent before serving personalized ads. Users may review or revoke consent at any time in App settings.
+- **100% Ad-Free Application**:
+  - The App is completely **Ad-Free** across all builds and channels.
+  - **Zero Ad Identifiers**: The App does not collect, process, or transmit Advertising IDs (`AD_ID`), device identifiers for advertising, or user tracking metrics.
 
 ---
 
 ## 3. Data Sharing and Disclosure
 
 - **Zero Router Data Sharing**: Router passwords, IP addresses, UCI configurations, and connected device logs are **never shared** with any third party.
-- **Google Play & AdMob Services**: Where enabled in Play Store builds, billing receipts and non-sensitive advertising IDs are handled directly by Google Services in compliance with [Google's Privacy Policy](https://policies.google.com/privacy).
+- **Google Play Services**: Optional voluntary purchase receipts are handled directly by Google Play Services in compliance with [Google's Privacy Policy](https://policies.google.com/privacy). No advertising IDs or user tracking data are shared.
 
 ---
 
@@ -54,17 +53,20 @@ Yet Another LuCI App ("we", "our", or "us") is committed to protecting your priv
 
 ---
 
-## 5. Children's Privacy
+## 5. Children's Privacy (Age 3+ Compliance)
 
-- The App is not directed to children under the age of 13. We do not knowingly collect personal information from children.
+- **Rated Age 3+ (Suitable for All Ages)**: Yet Another LuCI App is listed and rated **Age 3+** on the Google Play Store, making it suitable for users of all ages, including children under 13.
+- **Zero Personal Data Collection**: The App operates with a local-first architecture and does not collect, store, or transmit any personal information, personal identifiers, device IDs, location data, or network details from children or any other users.
+- **Ad-Free & Family Safe**: The App displays zero advertisements and includes no analytics or user tracking, providing a safe, privacy-focused experience for all family members.
 
 ---
 
 ## 6. Play Console Data Safety Compliance
 
 This Privacy Policy matches the declarations in the Google Play Console Data Safety form:
-- **Local Data Only**: Router credentials and network data remain on the user's local device.
-- **Optional Ad & Purchase Data**: Device IDs (AdMob) and Purchase History (Google Play Billing) are processed only where billing/ad features are active in Play Store distribution builds.
+- **Local Data Only**: Router credentials and network data remain strictly on the user's local device.
+- **100% Ad-Free**: No Advertising IDs (`AD_ID`) or ad tracking metrics are collected or processed.
+- **Optional Purchase Data**: Purchase History (Google Play Billing) is processed only where voluntary developer support features are accessed in Play Store builds.
 
 ---
 
