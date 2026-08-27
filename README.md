@@ -180,27 +180,33 @@
       <b>Parental Rules</b><br/><br/>
       <img src="assets/screenshots/18_parental_controls-1.jpeg" width="165" height="350" alt="Parental Rules"/>
     </td>
-    <td width="25%" align="center" valign="top">
-      <b>Package Manager</b><br/><br/>
-      <img src="assets/screenshots/19_packagemanager.jpeg" width="165" height="350" alt="Package Manager"/>
-    </td>
-    <td width="25%" align="center" valign="top">
-      <b>Settings (PlayStore)</b><br/><br/>
-      <img src="assets/screenshots/20-settings-playstore.jpeg" width="165" height="350" alt="Settings PlayStore"/>
+    <td width="50%" colspan="2" align="center" valign="top">
+      <b>Package Manager (Tablet)</b><br/><br/>
+      <img src="assets/screenshots/19_packagemanager.png" width="340" style="max-width: 100%; height: auto;" alt="Package Manager Tablet"/>
     </td>
   </tr>
   <tr>
     <td width="25%" align="center" valign="top">
+      <b>Settings (PlayStore)</b><br/><br/>
+      <img src="assets/screenshots/20-settings-playstore.jpeg" width="165" height="350" alt="Settings PlayStore"/>
+    </td>
+    <td width="25%" align="center" valign="top">
       <b>Settings (Community)</b><br/><br/>
       <img src="assets/screenshots/20-settings-community.jpeg" width="165" height="350" alt="Settings Community"/>
     </td>
+    <td width="50%" colspan="2" align="center" valign="top">
+      <b>About & App Info (Tablet)</b><br/><br/>
+      <img src="assets/screenshots/22-about.png" width="340" style="max-width: 100%; height: auto;" alt="About & App Info Tablet"/>
+    </td>
+  </tr>
+  <tr>
     <td width="25%" align="center" valign="top">
       <b>More Menu</b><br/><br/>
       <img src="assets/screenshots/21-more.jpeg" width="165" height="350" alt="More Menu"/>
     </td>
     <td width="25%" align="center" valign="top">
-      <b>About & App Info</b><br/><br/>
-      <img src="assets/screenshots/22-about.jpeg" width="165" height="350" alt="About & App Info"/>
+    </td>
+    <td width="25%" align="center" valign="top">
     </td>
     <td width="25%" align="center" valign="top">
     </td>
