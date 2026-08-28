@@ -384,11 +384,13 @@ class _ProvisionGuestNetworkDialogState
                   ),
                   onChanged: (_) => setState(() {}),
                   validator: (val) {
-                    if (val == null || val.trim().isEmpty)
+                    if (val == null || val.trim().isEmpty) {
                       return 'Guest SSID name cannot be empty';
+                    }
                     final bytes = utf8.encode(val.trim()).length;
-                    if (bytes > 32)
+                    if (bytes > 32) {
                       return 'SSID length exceeds 32 UTF-8 bytes ($bytes bytes)';
+                    }
                     return null;
                   },
                 ),
@@ -431,15 +433,18 @@ class _ProvisionGuestNetworkDialogState
                     ),
                     validator: (val) {
                       if (_selectedNetwork != 'guest') return null;
-                      if (val == null || val.trim().isEmpty)
+                      if (val == null || val.trim().isEmpty) {
                         return 'Guest IP address is required';
+                      }
                       final parts = val.trim().split('.');
-                      if (parts.length != 4)
+                      if (parts.length != 4) {
                         return 'Enter a valid IPv4 address (e.g. 192.168.2.1)';
+                      }
                       for (final part in parts) {
                         final n = int.tryParse(part);
-                        if (n == null || n < 0 || n > 255)
+                        if (n == null || n < 0 || n > 255) {
                           return 'Invalid octet: $part';
+                        }
                       }
                       return null;
                     },
@@ -517,12 +522,15 @@ class _ProvisionGuestNetworkDialogState
                     onChanged: (_) => setState(() {}),
                     validator: (val) {
                       if (!needsPass) return null;
-                      if (val == null || val.trim().isEmpty)
+                      if (val == null || val.trim().isEmpty) {
                         return 'Passphrase is required for encrypted networks';
-                      if (val.trim().length < 8)
+                      }
+                      if (val.trim().length < 8) {
                         return 'Passphrase must be at least 8 characters';
-                      if (val.trim().length > 63)
+                      }
+                      if (val.trim().length > 63) {
                         return 'Passphrase cannot exceed 63 characters';
+                      }
                       return null;
                     },
                   ),
@@ -606,8 +614,9 @@ class _ProvisionGuestNetworkDialogState
                                   _selectedEncryption == 'owe')
                               ? null
                               : (val) {
-                                  if (val != null)
+                                  if (val != null) {
                                     setState(() => _selectedPmf = val);
+                                  }
                                 },
                         ),
                         const SizedBox(height: 12),

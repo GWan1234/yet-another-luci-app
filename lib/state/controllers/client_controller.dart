@@ -1098,8 +1098,9 @@ class ClientController {
               r.password,
               r.useHttps,
             );
-            if (!res.isSuccess || res.token == null)
+            if (!res.isSuccess || res.token == null) {
               return <Map<String, dynamic>>[];
+            }
             final callRes = await _apiService!.call(
               r.ipAddress,
               res.token!,

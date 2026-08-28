@@ -1237,8 +1237,9 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
   static String _classifyIPv6(String ipv6) {
     final lower = ipv6.toLowerCase().split('/').first.split('%').first;
     if (lower.startsWith('fe80')) return 'Link-Local IPv6';
-    if (lower.startsWith('fd') || lower.startsWith('fc'))
+    if (lower.startsWith('fd') || lower.startsWith('fc')) {
       return 'Private IPv6 (ULA)';
+    }
     return 'Public IPv6';
   }
 
@@ -1978,11 +1979,12 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
               actionKey,
               cooldown: const Duration(seconds: 2),
             );
-            if (context.mounted)
+            if (context.mounted) {
               context.showToastRateLimited(
                 'Ban Client (${client.displayName})',
                 remaining,
               );
+            }
             return;
           }
 
@@ -2038,11 +2040,12 @@ class _UnifiedClientCardState extends State<_UnifiedClientCard>
         actionKey,
         cooldown: const Duration(seconds: 2),
       );
-      if (context.mounted)
+      if (context.mounted) {
         context.showToastRateLimited(
           'Unban Client (${client.displayName})',
           remaining,
         );
+      }
       return;
     }
 

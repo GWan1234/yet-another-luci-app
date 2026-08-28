@@ -486,8 +486,9 @@ class WirelessInterface {
     if (sName.contains('guest') ||
         sName.contains('gst') ||
         ifcName.contains('guest') ||
-        ifcName.contains('gst'))
+        ifcName.contains('gst')) {
       return true;
+    }
     // 5. SSID contains 'guest', 'gst', 'visitor', or 'visit' (e.g. TitanicGst, Home_Guest, Visitor-WiFi)
     if (sSsid.contains('guest') ||
         sSsid.contains('gst') ||
@@ -540,10 +541,12 @@ class WirelessInterface {
 
     // WPA3-SAE requires 802.11w/PMF support - typically 5/6GHz or newer 2.4GHz
     if (encryptionValue == 'sae') return is5GHzOr6GHz;
-    if (encryptionValue == 'sae-mixed')
+    if (encryptionValue == 'sae-mixed') {
       return true; // Transitional mode widely supported
-    if (encryptionValue == 'owe')
+    }
+    if (encryptionValue == 'owe') {
       return is5GHzOr6GHz; // Enhanced Open typically 5/6GHz
+    }
     return true; // psk2, psk, none are widely supported
   }
 

@@ -174,8 +174,9 @@ class _AddEditProfileDialogState extends ConsumerState<AddEditProfileDialog> {
     // Daily time limit comparison
     final existingHasTimeLimit = e.dailyTimeLimitMinutes != null;
     if (_hasTimeLimit != existingHasTimeLimit) return true;
-    if (_hasTimeLimit && _dailyLimitMinutes != e.dailyTimeLimitMinutes)
+    if (_hasTimeLimit && _dailyLimitMinutes != e.dailyTimeLimitMinutes) {
       return true;
+    }
 
     // Content filter comparison
     if (_contentFilter != e.contentFilter) return true;
@@ -231,10 +232,12 @@ class _AddEditProfileDialogState extends ConsumerState<AddEditProfileDialog> {
     if (!_isValid) return;
     final customDns = <String>[];
     if (_contentFilter == ContentFilterDns.custom) {
-      if (_customDns1Ctrl.text.trim().isNotEmpty)
+      if (_customDns1Ctrl.text.trim().isNotEmpty) {
         customDns.add(_customDns1Ctrl.text.trim());
-      if (_customDns2Ctrl.text.trim().isNotEmpty)
+      }
+      if (_customDns2Ctrl.text.trim().isNotEmpty) {
         customDns.add(_customDns2Ctrl.text.trim());
+      }
     }
 
     final profile = ParentalProfile(
@@ -463,8 +466,9 @@ class _AddEditProfileDialogState extends ConsumerState<AddEditProfileDialog> {
                               }
                               final uniqueClients = uniqueClientsMap.values
                                   .toList();
-                              if (uniqueClients.isEmpty)
+                              if (uniqueClients.isEmpty) {
                                 return const SizedBox.shrink();
+                              }
 
                               return DropdownButtonFormField<String>(
                                 key: ValueKey(
@@ -671,8 +675,9 @@ class _AddEditProfileDialogState extends ConsumerState<AddEditProfileDialog> {
                           onChanged: (v) {
                             setState(() {
                               _hasTimeLimit = v;
-                              if (v && _dailyLimitMinutes == null)
+                              if (v && _dailyLimitMinutes == null) {
                                 _dailyLimitMinutes = 120;
+                              }
                             });
                           },
                           title: const Text('Daily Time Limit'),

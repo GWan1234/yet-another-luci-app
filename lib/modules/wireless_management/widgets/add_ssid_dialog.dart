@@ -372,10 +372,12 @@ class _AddSsidDialogState extends ConsumerState<AddSsidDialog> {
                     ),
                     onChanged: (_) => setState(() {}),
                     validator: (val) {
-                      if (val == null || val.trim().isEmpty)
+                      if (val == null || val.trim().isEmpty) {
                         return 'SSID name cannot be empty';
-                      if (utf8.encode(val.trim()).length > 32)
+                      }
+                      if (utf8.encode(val.trim()).length > 32) {
                         return 'SSID exceeds 32 UTF-8 bytes';
+                      }
                       final dup = _selectedRadio.interfaces
                           .where((i) => i.mode.toLowerCase() == 'ap')
                           .any(
@@ -383,8 +385,9 @@ class _AddSsidDialogState extends ConsumerState<AddSsidDialog> {
                                 i.ssid.trim().toLowerCase() ==
                                 val.trim().toLowerCase(),
                           );
-                      if (dup)
+                      if (dup) {
                         return 'An SSID with this name already exists on ${_selectedRadio.name}';
+                      }
                       return null;
                     },
                   ),
@@ -600,8 +603,9 @@ class _AddSsidDialogState extends ConsumerState<AddSsidDialog> {
                                     _selectedEncryption == 'owe')
                                 ? null
                                 : (val) {
-                                    if (val != null)
+                                    if (val != null) {
                                       setState(() => _selectedPmf = val);
+                                    }
                                   },
                           ),
                           const SizedBox(height: 14),

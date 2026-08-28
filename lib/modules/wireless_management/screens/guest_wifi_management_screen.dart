@@ -750,19 +750,21 @@ class GuestWifiManagementScreen extends ConsumerWidget {
                                               context: context,
                                             );
                                         if (res) {
-                                          if (context.mounted)
+                                          if (context.mounted) {
                                             LuciToastManager.safeShowSuccess(
                                               context,
                                               'Banned $displayName from ${iface.ssid}',
                                               actionKey: 'ban_$macNorm',
                                             );
+                                          }
                                         } else {
-                                          if (context.mounted)
+                                          if (context.mounted) {
                                             LuciToastManager.safeShowError(
                                               context,
                                               'Failed to ban $displayName',
                                               actionKey: 'ban_$macNorm',
                                             );
+                                          }
                                         }
                                       },
                                     ),

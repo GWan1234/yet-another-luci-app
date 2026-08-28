@@ -259,7 +259,7 @@ class _ParentalControlsScreenState extends ConsumerState<ParentalControlsScreen>
                             profile.id,
                             appState,
                           );
-                          if (mounted && res.message.isNotEmpty) {
+                          if (mounted && context.mounted && res.message.isNotEmpty) {
                             context.showToastInfo(res.message);
                           }
                         },

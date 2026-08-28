@@ -780,8 +780,9 @@ class RealApiService implements IApiService {
           final macRegex = RegExp(r'([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})');
           for (final m in macRegex.allMatches(stdout)) {
             final macStr = m.group(0);
-            if (macStr != null)
+            if (macStr != null) {
               stations.add(macStr.toUpperCase().replaceAll('-', ':'));
+            }
           }
         }
 
@@ -801,8 +802,9 @@ class RealApiService implements IApiService {
             final macRegex = RegExp(r'([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})');
             for (final m in macRegex.allMatches(stdout)) {
               final macStr = m.group(0);
-              if (macStr != null)
+              if (macStr != null) {
                 stations.add(macStr.toUpperCase().replaceAll('-', ':'));
+              }
             }
           }
         }

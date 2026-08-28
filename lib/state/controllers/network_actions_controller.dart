@@ -188,8 +188,9 @@ class NetworkActionsController {
         _useHttps,
         config: 'openvpn',
       );
-      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0)
+      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0) {
         return false;
+      }
 
       await _apiService!.manageServiceAction(
         ip,
@@ -495,8 +496,9 @@ heal_dns() {
         _useHttps,
         config: 'cloudflared',
       );
-      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0)
+      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0) {
         return false;
+      }
 
       await _apiService!.manageServiceAction(
         ip,
@@ -621,8 +623,9 @@ heal_dns() {
         config: 'firewall',
         context: (context != null && context.mounted) ? context : null,
       );
-      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0)
+      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0) {
         return false;
+      }
 
       await _apiService!.manageServiceAction(
         ip,
@@ -675,8 +678,9 @@ heal_dns() {
         config: 'network',
         context: (context != null && context.mounted) ? context : null,
       );
-      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0)
+      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0) {
         return false;
+      }
 
       await _apiService!.manageServiceAction(
         ip,
@@ -729,8 +733,9 @@ heal_dns() {
         config: 'wireless',
         context: (context != null && context.mounted) ? context : null,
       );
-      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0)
+      if (commitRes is List && commitRes.isNotEmpty && commitRes[0] != 0) {
         return false;
+      }
 
       await _apiService!.systemExec(
         ip,
@@ -971,8 +976,9 @@ heal_dns() {
     if (!_isReviewerMode) {
       final ip = _ip;
       final sysauth = _sysauth;
-      if (ip == null || sysauth == null || _apiService == null)
+      if (ip == null || sysauth == null || _apiService == null) {
         return ['lan', 'wan', 'guest'];
+      }
 
       return await _apiService!.fetchNetworkInterfaces(
         ipAddress: ip,

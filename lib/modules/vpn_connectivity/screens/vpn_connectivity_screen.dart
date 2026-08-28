@@ -1012,8 +1012,9 @@ class VpnConnectivityScreen extends ConsumerWidget {
   String _formatBytes(num bytes) {
     if (bytes <= 0) return '0 B';
     final double b = bytes.toDouble();
-    if (b >= 1024 * 1024 * 1024)
+    if (b >= 1024 * 1024 * 1024) {
       return '${(b / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+    }
     if (b >= 1024 * 1024) return '${(b / (1024 * 1024)).toStringAsFixed(1)} MB';
     if (b >= 1024) return '${(b / 1024).toStringAsFixed(0)} KB';
     return '${b.toStringAsFixed(0)} B';

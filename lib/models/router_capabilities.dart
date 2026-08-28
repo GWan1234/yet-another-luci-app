@@ -128,8 +128,9 @@ class RouterCapabilities {
 
   /// Helper to check if ubus session has write authorization for uci configs
   bool get hasUciWriteAccess {
-    if (probeFailed || ubusObjects.isEmpty)
+    if (probeFailed || ubusObjects.isEmpty) {
       return true; // conservative optimistic default
+    }
     if (!ubusObjects.contains('uci')) return false;
     final methods = ubusMethods['uci'];
     if (methods == null) return ubusObjects.contains('uci');

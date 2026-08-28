@@ -420,8 +420,9 @@ class _InterfacesScreenState extends ConsumerState<InterfacesScreen> {
 
   Future<void> _saveChanges() async {
     if (_stagedWiredInterfaceStates.isEmpty &&
-        _stagedWirelessInterfaceStates.isEmpty)
+        _stagedWirelessInterfaceStates.isEmpty) {
       return;
+    }
 
     setState(() {
       _isSaving = true;

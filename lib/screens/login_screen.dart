@@ -1597,8 +1597,9 @@ class _NetworkTopologyMeshPainter extends CustomPainter {
             if (c - 1 >= 0) canvas.drawLine(pt, grid[r + 1][c - 1], linePaint);
           } else {
             if (c < cols) canvas.drawLine(pt, grid[r + 1][c], linePaint);
-            if (c + 1 < cols)
+            if (c + 1 < cols) {
               canvas.drawLine(pt, grid[r + 1][c + 1], linePaint);
+            }
           }
         }
 

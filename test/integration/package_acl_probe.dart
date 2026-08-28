@@ -19,8 +19,9 @@ Future<String?> login() async {
   final resp = await req.close();
   await resp.drain<void>();
   for (final cookie in resp.cookies) {
-    if (cookie.name == 'sysauth' && cookie.value.isNotEmpty)
+    if (cookie.name == 'sysauth' && cookie.value.isNotEmpty) {
       return cookie.value;
+    }
   }
 
   // ubus session.login fallback (OpenWrt 24.10+)
@@ -94,8 +95,9 @@ Future<void> ubusCall(
         final m = result[1] as Map;
         final stdout = m['stdout']?.toString() ?? m['data']?.toString() ?? '';
         detail += ' stdout_len=${stdout.length} code=${m['code']}';
-        if (stdout.length > 40)
+        if (stdout.length > 40) {
           detail += ' head=${stdout.substring(0, 40).replaceAll('\n', ' ')}';
+        }
       }
       stdout.writeln('$label: $detail');
     } else {

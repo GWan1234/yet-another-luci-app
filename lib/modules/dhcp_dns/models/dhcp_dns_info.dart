@@ -269,8 +269,9 @@ class SubnetInfo {
 
   static int? _ipToInt(String ip) {
     final parts = ip.trim().split('.').map(int.tryParse).toList();
-    if (parts.length != 4 || parts.any((p) => p == null || p < 0 || p > 255))
+    if (parts.length != 4 || parts.any((p) => p == null || p < 0 || p > 255)) {
       return null;
+    }
     return ((parts[0]! << 24) |
             (parts[1]! << 16) |
             (parts[2]! << 8) |

@@ -252,21 +252,27 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
             if (liveFt != null) _ieee80211r = liveFt == '1';
             if (liveFtDs != null) _ftOverDs = liveFtDs == '1';
             if (liveFtLocal != null) _ftPskGenerateLocal = liveFtLocal == '1';
-            if (liveMobility != null && liveMobility.isNotEmpty)
+            if (liveMobility != null && liveMobility.isNotEmpty) {
               _mobilityDomainController.text = liveMobility;
+            }
             if (liveWmm != null) _wmmEnabled = liveWmm == '1';
             if (liveLowAck != null) _disassocLowAck = liveLowAck == '1';
-            if (liveMcast2Ucast != null)
+            if (liveMcast2Ucast != null) {
               _multicastToUnicast = liveMcast2Ucast == '1';
+            }
             if (liveWds != null) _wds = liveWds == '1';
-            if (liveDtim != null && liveDtim.isNotEmpty)
+            if (liveDtim != null && liveDtim.isNotEmpty) {
               _dtimPeriodController.text = liveDtim;
-            if (liveRekey != null && liveRekey.isNotEmpty)
+            }
+            if (liveRekey != null && liveRekey.isNotEmpty) {
               _gtkRekeyController.text = liveRekey;
-            if (liveInactivity != null && liveInactivity.isNotEmpty)
+            }
+            if (liveInactivity != null && liveInactivity.isNotEmpty) {
               _inactivityLimitController.text = liveInactivity;
-            if (liveMaxListen != null && liveMaxListen.isNotEmpty)
+            }
+            if (liveMaxListen != null && liveMaxListen.isNotEmpty) {
               _maxListenIntervalController.text = liveMaxListen;
+            }
             if (liveMacFilter != null &&
                 liveMacFilter.isNotEmpty &&
                 liveMacFilter != 'none') {
@@ -502,8 +508,9 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
   bool _hasChanges() {
     if (_initialBaseline.isEmpty) return false;
     if (_ssidController.text.trim() != _initialBaseline['ssid']) return true;
-    if (_passphraseController.text != _initialBaseline['passphrase'])
+    if (_passphraseController.text != _initialBaseline['passphrase']) {
       return true;
+    }
     if (_selectedEncryption != _initialBaseline['encryption']) return true;
     if (_selectedCipher != _initialBaseline['cipher']) return true;
     if (_selectedPmf != _initialBaseline['pmf']) return true;
@@ -512,29 +519,37 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
     if (_selectedNetwork != _initialBaseline['network']) return true;
     if (_ieee80211r != _initialBaseline['ieee80211r']) return true;
     if (_ftOverDs != _initialBaseline['ftOverDs']) return true;
-    if (_ftPskGenerateLocal != _initialBaseline['ftPskGenerateLocal'])
+    if (_ftPskGenerateLocal != _initialBaseline['ftPskGenerateLocal']) {
       return true;
+    }
     if (_mobilityDomainController.text.trim() !=
-        _initialBaseline['mobilityDomain'])
+        _initialBaseline['mobilityDomain']) {
       return true;
+    }
     if (_wmmEnabled != _initialBaseline['wmm']) return true;
     if (_disassocLowAck != _initialBaseline['disassocLowAck']) return true;
-    if (_multicastToUnicast != _initialBaseline['multicastToUnicast'])
+    if (_multicastToUnicast != _initialBaseline['multicastToUnicast']) {
       return true;
+    }
     if (_wds != _initialBaseline['wds']) return true;
-    if (_dtimPeriodController.text.trim() != _initialBaseline['dtimPeriod'])
+    if (_dtimPeriodController.text.trim() != _initialBaseline['dtimPeriod']) {
       return true;
-    if (_gtkRekeyController.text.trim() != _initialBaseline['gtkRekey'])
+    }
+    if (_gtkRekeyController.text.trim() != _initialBaseline['gtkRekey']) {
       return true;
+    }
     if (_inactivityLimitController.text.trim() !=
-        _initialBaseline['inactivityLimit'])
+        _initialBaseline['inactivityLimit']) {
       return true;
+    }
     if (_maxListenIntervalController.text.trim() !=
-        _initialBaseline['maxListenInterval'])
+        _initialBaseline['maxListenInterval']) {
       return true;
+    }
     if (_macfilter != _initialBaseline['macfilter']) return true;
-    if (_maclistController.text.trim() != _initialBaseline['maclist'])
+    if (_maclistController.text.trim() != _initialBaseline['maclist']) {
       return true;
+    }
     return false;
   }
 
@@ -848,8 +863,9 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                                 border: const OutlineInputBorder(),
                               ),
                               validator: (val) {
-                                if (val == null || val.isEmpty)
+                                if (val == null || val.isEmpty) {
                                   return null; // allow empty to retain existing
+                                }
                                 if (val.length < 8 || val.length > 64) {
                                   return 'Passphrase must be between 8 and 64 characters';
                                 }
@@ -900,8 +916,9 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                                     _selectedEncryption == 'none')
                                 ? null
                                 : (val) {
-                                    if (val != null)
+                                    if (val != null) {
                                       setState(() => _selectedPmf = val);
+                                    }
                                   },
                           ),
                           const SizedBox(height: 16),
@@ -917,8 +934,9 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                             ),
                             items: _buildCipherDropdownItems(),
                             onChanged: (val) {
-                              if (val != null)
+                              if (val != null) {
                                 setState(() => _selectedCipher = val);
+                              }
                             },
                           ),
                           const SizedBox(height: 12),
@@ -1023,8 +1041,9 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                                     );
                                   }).toList(),
                                   onChanged: (val) {
-                                    if (val != null)
+                                    if (val != null) {
                                       setState(() => _selectedNetwork = val);
+                                    }
                                   },
                                 ),
                                 const SizedBox(height: 16),
@@ -1276,8 +1295,9 @@ class _EditSsidDialogState extends ConsumerState<EditSsidDialog> {
                                     ),
                                   ],
                                   onChanged: (val) {
-                                    if (val != null)
+                                    if (val != null) {
                                       setState(() => _macfilter = val);
+                                    }
                                   },
                                 ),
                                 const SizedBox(height: 12),

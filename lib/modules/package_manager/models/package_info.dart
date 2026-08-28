@@ -202,8 +202,9 @@ class PackageManagerOverview {
             final trimmed = line.trim();
             if (trimmed.isEmpty ||
                 trimmed.startsWith('#') ||
-                trimmed.startsWith('WARNING'))
+                trimmed.startsWith('WARNING')) {
               continue;
+            }
 
             String pkgName;
             String pkgVer = 'installed';

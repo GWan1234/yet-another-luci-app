@@ -1207,8 +1207,9 @@ class _SystemBackupUpgradeScreenState
           }
         },
       );
-      if (bytes == null || bytes.isEmpty)
+      if (bytes == null || bytes.isEmpty) {
         throw Exception('Failed to dump and read $dev partition from router.');
+      }
 
       final fileName = '$filename.bin';
 

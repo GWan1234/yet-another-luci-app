@@ -50,12 +50,14 @@ void main() {
   setUpAll(() async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-          if (methodCall.method == 'readAll')
+          if (methodCall.method == 'readAll') {
             return <String, String>{'reviewer_mode_enabled': 'true'};
-          if (methodCall.method == 'read')
+          }
+          if (methodCall.method == 'read') {
             return methodCall.arguments['key'] == 'reviewer_mode_enabled'
                 ? 'true'
                 : null;
+          }
           return null;
         });
   });
