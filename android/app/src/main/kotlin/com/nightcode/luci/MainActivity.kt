@@ -1,21 +1,23 @@
 package com.nightcode.luci
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import androidx.core.view.WindowCompat
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.activity.enableEdgeToEdge
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private val PERMISSION_CHANNEL = "com.nightcode.luci/local_network_permission"
     private val LOCAL_NETWORK_PERMISSION_CODE = 1001
     private var pendingPermissionResult: MethodChannel.Result? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         
         // Unlock high refresh rate (90Hz/120Hz/144Hz) for ultra-smooth 120fps scrolling
@@ -114,31 +116,13 @@ class MainActivity : FlutterActivity() {
     }
     
     private fun setupEdgeToEdge() {
-        // Enable edge-to-edge layout
         WindowCompat.setDecorFitsSystemWindows(window, false)
         
-        // Use WindowInsetsController instead of deprecated window flags
+        // Use WindowInsetsController for light/dark status and navigation bar styling
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller?.let {
-            // Make status bar and navigation bar transparent without deprecated APIs
             it.isAppearanceLightStatusBars = false
             it.isAppearanceLightNavigationBars = false
-        }
-        
-        // For Android 15+ (API 35+), use the modern EdgeToEdge API
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-            enableModernEdgeToEdge()
-        }
-    }
-    
-    private fun enableModernEdgeToEdge() {
-        try {
-            // Use reflection to call EdgeToEdge.enable() for Android 15+
-            val edgeToEdgeClass = Class.forName("androidx.activity.EdgeToEdge")
-            val enableMethod = edgeToEdgeClass.getMethod("enable", androidx.activity.ComponentActivity::class.java)
-            enableMethod.invoke(null, this)
-        } catch (_: Exception) {
-            // Fallback is already handled by setupEdgeToEdge()
         }
     }
 

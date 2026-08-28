@@ -91,7 +91,11 @@ class ClientNamingHelper {
     final fpService = ClientFingerprintService.instance;
     if (fpService.isInitialized) {
       final macMatch = fpService.lookupByMac(client.macAddress);
-      final hostMatch = fpService.lookupByHostname(client.hostname ?? client.dnsName);
+      final hostCandidate =
+          (client.hostname.isNotEmpty && client.hostname != 'Unknown')
+              ? client.hostname
+              : client.dnsName;
+      final hostMatch = fpService.lookupByHostname(hostCandidate);
       final match = macMatch ?? hostMatch;
       if (match != null) {
         final fpIcon = _mapIconHintToMaterial(match.iconHint);

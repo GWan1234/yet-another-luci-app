@@ -12,7 +12,6 @@ import 'package:yet_another_luci_app/screens/splash_screen.dart';
 import 'package:yet_another_luci_app/screens/onboarding_screen.dart';
 
 import 'package:yet_another_luci_app/models/router_capabilities.dart';
-import 'package:yet_another_luci_app/modules/built_in_modules.dart';
 
 import 'package:flutter/foundation.dart';
 

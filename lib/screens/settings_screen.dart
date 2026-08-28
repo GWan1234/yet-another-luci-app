@@ -444,7 +444,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         : () async {
                             setState(() => _isRedetecting = true);
                             await appState.redetectCapabilities();
-                            if (mounted) {
+                            if (mounted && context.mounted) {
                               setState(() => _isRedetecting = false);
                               context.showToastSuccess(
                                 'Capabilities Detected',

@@ -470,16 +470,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         return;
       }
 
+      if (!mounted) return;
       FocusScope.of(context).unfocus();
 
       const actionKey = 'login_connecting';
-      if (mounted) {
-        context.showToastLoading(
-          'Connecting',
-          subtitle: 'Attempting connection to ${parsedUrl.displayUrl}...',
-          actionKey: actionKey,
-        );
-      }
+      context.showToastLoading(
+        'Connecting',
+        subtitle: 'Attempting connection to ${parsedUrl.displayUrl}...',
+        actionKey: actionKey,
+      );
 
       try {
         final success = await appState.login(
@@ -488,7 +487,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           pass,
           parsedUrl.useHttps,
           fromRouter: false,
-          context: context,
+          context: mounted ? context : null,
         );
 
         if (success && mounted) {
@@ -679,7 +678,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
     final meshColor = isDark

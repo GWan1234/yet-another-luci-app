@@ -255,9 +255,8 @@ class _RouterDashboardSettingsScreenState
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: cardOrder.length,
-          onReorder: (oldIndex, newIndex) {
+          onReorderItem: (oldIndex, newIndex) {
             setState(() {
-              if (newIndex > oldIndex) newIndex -= 1;
               final item = cardOrder.removeAt(oldIndex);
               cardOrder.insert(newIndex, item);
               _preferences = _preferences.copyWith(cardOrder: cardOrder);
@@ -496,10 +495,7 @@ class _RouterDashboardSettingsScreenState
             style: LuciTextStyles.detailValue(context).copyWith(fontWeight: FontWeight.bold),
           ),
         ),
-        RadioListTile<String>(
-          title: const Text('Bits per second (Mbps / Kbps)'),
-          subtitle: const Text('Standard network bandwidth measurement unit'),
-          value: 'bits',
+        RadioGroup<String>(
           groupValue: _preferences.speedUnit,
           onChanged: (val) {
             if (val == null) return;
@@ -508,23 +504,24 @@ class _RouterDashboardSettingsScreenState
             });
             _onPreferenceChanged();
           },
-          activeColor: Theme.of(context).colorScheme.primary,
-          dense: true,
-        ),
-        RadioListTile<String>(
-          title: const Text('Bytes per second (MB/s / KB/s)'),
-          subtitle: const Text('File transfer rate measurement unit'),
-          value: 'bytes',
-          groupValue: _preferences.speedUnit,
-          onChanged: (val) {
-            if (val == null) return;
-            setState(() {
-              _preferences = _preferences.copyWith(speedUnit: val);
-            });
-            _onPreferenceChanged();
-          },
-          activeColor: Theme.of(context).colorScheme.primary,
-          dense: true,
+          child: Column(
+            children: [
+              RadioListTile<String>(
+                title: const Text('Bits per second (Mbps / Kbps)'),
+                subtitle: const Text('Standard network bandwidth measurement unit'),
+                value: 'bits',
+                activeColor: Theme.of(context).colorScheme.primary,
+                dense: true,
+              ),
+              RadioListTile<String>(
+                title: const Text('Bytes per second (MB/s / KB/s)'),
+                subtitle: const Text('File transfer rate measurement unit'),
+                value: 'bytes',
+                activeColor: Theme.of(context).colorScheme.primary,
+                dense: true,
+              ),
+            ],
+          ),
         ),
         const Divider(height: 20),
         Container(
@@ -566,33 +563,38 @@ class _RouterDashboardSettingsScreenState
         ),
         if (!_preferences.showAllThroughput && interfaces.isNotEmpty) ...[
           SizedBox(height: LuciSpacing.sm),
-          ...interfaces.map((iface) {
-            return Padding(
-              padding: EdgeInsets.symmetric(vertical: LuciSpacing.xs),
-              child: RadioListTile<String>(
-                title: Text(iface, style: LuciTextStyles.detailValue(context)),
-                secondary: Icon(
-                  Icons.lan,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-                value: iface,
-                groupValue: _preferences.primaryThroughputInterface,
-                onChanged: (value) {
-                  setState(() {
-                    _preferences = _preferences.copyWith(
-                      showAllThroughput: false,
-                      primaryThroughputInterface: value,
-                    );
-                  });
-                  _onPreferenceChanged();
-                },
-                activeColor: Theme.of(context).colorScheme.primary,
-                controlAffinity: ListTileControlAffinity.leading,
-                dense: true,
-              ),
-            );
-          }),
+          RadioGroup<String>(
+            groupValue: _preferences.primaryThroughputInterface,
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() {
+                _preferences = _preferences.copyWith(
+                  showAllThroughput: false,
+                  primaryThroughputInterface: value,
+                );
+              });
+              _onPreferenceChanged();
+            },
+            child: Column(
+              children: interfaces.map((iface) {
+                return Padding(
+                  padding: EdgeInsets.symmetric(vertical: LuciSpacing.xs),
+                  child: RadioListTile<String>(
+                    title: Text(iface, style: LuciTextStyles.detailValue(context)),
+                    secondary: Icon(
+                      Icons.lan,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    value: iface,
+                    activeColor: Theme.of(context).colorScheme.primary,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    dense: true,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
         ],
       ],
     );

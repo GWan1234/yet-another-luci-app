@@ -129,6 +129,7 @@ class _MainScreenState extends ConsumerState<MainScreen>
                   ? creds['ipAddress']
                   : detectedGateway;
 
+          if (!mounted || !context.mounted) return;
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(
               builder: (context) => LoginScreen(

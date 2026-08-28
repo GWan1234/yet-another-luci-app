@@ -5,6 +5,20 @@ All notable changes to **Yet Another LuCI App** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-08-28
+
+### Highlights & First Production Release
+- **Official Production Release Track 1.0.0**:
+  - Production-ready suite for OpenWrt router management across phone and tablet form factors.
+  - Zero telemetry, privacy-first offline architecture, and complete removal of ad tracking services.
+- **Core OpenWrt Feature Suite**:
+  - Real-Time Network Throughput & Interface Monitoring with autoscale charts.
+  - Dedicated Parental Controls Engine with schedule profiles, internet pausing, and device guardrails.
+  - Comprehensive Wireless Management (2.4GHz / 5GHz) with MAC access controls and background auto-revert safety guard.
+  - OPKG and APK package manager backends (supporting OpenWrt 19.x through 25.x+).
+  - Multi-VPN & Secure Tunnel status inspection (WireGuard, OpenVPN, IPsec, Cloudflare Tunnels).
+  - Android 15 (`ACCESS_LOCAL_NETWORK`) permission compliance and targeted low-latency ubus RPC backend.
+
 ---
 
 ## [0.1.0] - 2026-08-15
