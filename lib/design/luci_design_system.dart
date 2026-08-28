@@ -254,3 +254,48 @@ class LuciStatusIndicators {
     );
   }
 }
+
+/// Material 3 Window Size Class breakpoints for adaptive layouts.
+///
+/// Compact  < 600dp  — phones in portrait, narrow foldables
+/// Medium   < 840dp  — tablets in portrait, large phones landscape, Chromebooks in app window
+/// Expanded >= 840dp — tablets in landscape, Chromebooks fullscreen, DeX
+///
+/// Usage:
+/// ```dart
+/// final isTablet = LuciBreakpoints.isTablet(context);
+/// final isExpanded = LuciBreakpoints.isExpanded(context);
+/// ```
+class LuciBreakpoints {
+  /// Compact: phone-sized screen (< 600dp). Use single-column layouts.
+  static const double compact = 600.0;
+
+  /// Medium: tablet portrait / large phone landscape (600dp–839dp).
+  /// Use NavigationRail, optional 2-column layouts.
+  static const double medium = 840.0;
+
+  /// Expanded: tablet landscape / Chromebook (>= 840dp).
+  /// Use NavigationDrawer or persistent NavigationRail, 2+ column grids.
+  static const double expanded = 840.0;
+
+  /// Returns true when the layout width is in the Medium or Expanded window class
+  /// (i.e., a tablet-like or Chromebook screen ≥ 600dp).
+  static bool isTablet(BuildContext context) =>
+      MediaQuery.sizeOf(context).width >= compact;
+
+  /// Returns true only for the Expanded window class (>= 840dp).
+  /// Use for full two-pane or wide-grid layouts.
+  static bool isExpanded(BuildContext context) =>
+      MediaQuery.sizeOf(context).width >= expanded;
+
+  /// Content max-width for centered layouts on very wide screens (e.g. landscape tablet).
+  static const double contentMaxWidth = 960.0;
+
+  /// Horizontal padding: scales up on wider screens.
+  static double horizontalPadding(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    if (width >= expanded) return 24.0;
+    if (width >= compact) return 20.0;
+    return 16.0;
+  }
+}

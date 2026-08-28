@@ -2307,24 +2307,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       onRefresh: () => appState.fetchDashboardData(),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final isLandscape =
+          // Width-based breakpoint: treats both landscape phones AND tablets
+          // as "wide" so sections drop section headers and use compact layout.
+          final isWide = constraints.maxWidth >= LuciBreakpoints.compact ||
               MediaQuery.of(context).orientation == Orientation.landscape;
+          final hPad = LuciBreakpoints.horizontalPadding(context);
 
           final orderedContent = _buildOrderedDashboardCards(
             context,
             appState,
-            isLandscape,
+            isWide,
           );
 
-          return RefreshIndicator(
-            onRefresh: () => appState.fetchDashboardData(),
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: orderedContent,
-              ),
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(horizontal: hPad),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: orderedContent,
             ),
           );
         },
@@ -2335,7 +2335,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   List<Widget> _buildOrderedDashboardCards(
     BuildContext context,
     AppState appState,
-    bool isLandscape,
+    bool isWide,
   ) {
     final prefs = appState.dashboardPreferences;
     final order = prefs.cardOrder;
@@ -2364,7 +2364,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           widgets.add(const SizedBox(height: 12));
           break;
         case 'realtime_traffic':
-          if (!isLandscape) {
+          if (!isWide) {
             widgets.add(
               _buildSectionHeader(
                 context,
@@ -2375,14 +2375,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           }
           widgets.add(
             SizedBox(
-              height: isLandscape ? 240 : 220,
+              height: isWide ? 240 : 220,
               child: _buildRealtimeThroughputCard(appState),
             ),
           );
           widgets.add(const SizedBox(height: 12));
           break;
         case 'system_vitals':
-          if (!isLandscape) {
+          if (!isWide) {
             widgets.add(
               _buildSectionHeader(
                 context,
@@ -2395,7 +2395,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           widgets.add(const SizedBox(height: 12));
           break;
         case 'connected_clients':
-          if (!isLandscape) {
+          if (!isWide) {
             widgets.add(
               _buildSectionHeader(
                 context,
@@ -2408,7 +2408,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           widgets.add(const SizedBox(height: 12));
           break;
         case 'wireless_networks':
-          if (!isLandscape) {
+          if (!isWide) {
             widgets.add(
               _buildSectionHeader(
                 context,
@@ -2421,7 +2421,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           widgets.add(const SizedBox(height: 12));
           break;
         case 'network_interfaces':
-          if (!isLandscape) {
+          if (!isWide) {
             widgets.add(
               _buildSectionHeader(
                 context,
@@ -2454,7 +2454,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           widgets.add(const SizedBox(height: 12));
           break;
         case 'system_modules':
-          if (!isLandscape) {
+          if (!isWide) {
             widgets.add(
               _buildSectionHeader(
                 context,

@@ -10,6 +10,7 @@ import 'package:yet_another_luci_app/modules/wireless_management/screens/wireles
 import 'package:yet_another_luci_app/main.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yet_another_luci_app/widgets/scroll_jitter_guard.dart';
+import 'package:yet_another_luci_app/design/luci_design_system.dart';
 
 import 'package:flutter/services.dart';
 import 'package:yet_another_luci_app/utils/gateway_utils.dart';
@@ -176,6 +177,34 @@ class _MainScreenState extends ConsumerState<MainScreen>
 
     final isRebooting = appState.isRebooting;
     final colorScheme = Theme.of(context).colorScheme;
+    final isTablet = LuciBreakpoints.isTablet(context);
+
+    // Build the shared IndexedStack content used in both phone and tablet layouts
+    final body = ScrollJitterGuard(
+      child: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          _activatedTabs.contains(0)
+              ? const DashboardScreen()
+              : const SizedBox.shrink(),
+          _activatedTabs.contains(1)
+              ? InterfacesScreen(
+                  scrollToInterface: _currentInterfaceToScroll,
+                  onScrollComplete: _clearInterfaceToScroll,
+                )
+              : const SizedBox.shrink(),
+          _activatedTabs.contains(2)
+              ? const ClientsScreen()
+              : const SizedBox.shrink(),
+          _activatedTabs.contains(3)
+              ? const WirelessManagementScreen()
+              : const SizedBox.shrink(),
+          _activatedTabs.contains(4)
+              ? const MoreScreen()
+              : const SizedBox.shrink(),
+        ],
+      ),
+    );
 
     return PopScope(
       canPop: false,
@@ -183,168 +212,216 @@ class _MainScreenState extends ConsumerState<MainScreen>
         if (didPop) return;
         SystemNavigator.pop();
       },
-      child: Scaffold(
-        body: ScrollJitterGuard(
-          child: IndexedStack(
-            index: _selectedIndex,
-            children: [
-              _activatedTabs.contains(0)
-                  ? const DashboardScreen()
-                  : const SizedBox.shrink(),
-              _activatedTabs.contains(1)
-                  ? InterfacesScreen(
-                      scrollToInterface: _currentInterfaceToScroll,
-                      onScrollComplete: _clearInterfaceToScroll,
-                    )
-                  : const SizedBox.shrink(),
-              _activatedTabs.contains(2)
-                  ? const ClientsScreen()
-                  : const SizedBox.shrink(),
-              _activatedTabs.contains(3)
-                  ? const WirelessManagementScreen()
-                  : const SizedBox.shrink(),
-              _activatedTabs.contains(4)
-                  ? const MoreScreen()
-                  : const SizedBox.shrink(),
-            ],
-          ),
-        ),
-        bottomNavigationBar: SafeArea(
-          child: SizedBox(
-            height: 72,
-            child: Stack(
-              clipBehavior: Clip.none,
-              alignment: Alignment.bottomCenter,
-              children: [
-                // Flat Matt Bottom Bar Container
-                Container(
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainer,
-                    border: Border(
-                      top: BorderSide(
-                        color: colorScheme.outlineVariant.withValues(
-                          alpha: 0.2,
-                        ),
-                        width: 1,
-                      ),
+      // ── Tablet / Chromebook / DeX layout: NavigationRail on the left ─────────
+      child: isTablet
+          ? Scaffold(
+              body: Row(
+                children: [
+                  NavigationRail(
+                    selectedIndex: _selectedIndex,
+                    onDestinationSelected:
+                        isRebooting ? null : _onItemTapped,
+                    labelType: NavigationRailLabelType.all,
+                    useIndicator: true,
+                    indicatorColor: colorScheme.primaryContainer,
+                    selectedIconTheme: IconThemeData(
+                      color: colorScheme.onPrimaryContainer,
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      // Left Wing (Interfaces & Clients)
-                      Expanded(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            _buildNavItem(
-                              index: 1,
-                              label: 'Interfaces',
-                              icon: Icons.lan_outlined,
-                              selectedIcon: Icons.lan,
-                              isRebooting: isRebooting,
+                    unselectedIconTheme: IconThemeData(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    selectedLabelTextStyle: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.primary,
+                    ),
+                    unselectedLabelTextStyle: TextStyle(
+                      fontSize: 11,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    backgroundColor: colorScheme.surfaceContainer,
+                    destinations: [
+                      NavigationRailDestination(
+                        icon: const Icon(Icons.dashboard_outlined),
+                        selectedIcon: const Icon(Icons.dashboard_rounded),
+                        label: const Text('Dashboard'),
+                      ),
+                      NavigationRailDestination(
+                        icon: const Icon(Icons.lan_outlined),
+                        selectedIcon: const Icon(Icons.lan),
+                        label: const Text('Interfaces'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Builder(builder: (context) {
+                          final connectedCount =
+                              appState.clients.where((c) => c.isConnected).length;
+                          return Badge(
+                            isLabelVisible: connectedCount > 0,
+                            label: Text(
+                              connectedCount > 99 ? '99+' : '$connectedCount',
                             ),
-                            _buildNavItem(
-                              index: 2,
-                              label: 'Clients',
-                              icon: Icons.people_outline,
-                              selectedIcon: Icons.people,
-                              isRebooting: isRebooting,
-                              badgeCount: appState.clients
-                                  .where((c) => c.isConnected)
-                                  .length,
+                            child: const Icon(Icons.people_outline),
+                          );
+                        }),
+                        selectedIcon: const Icon(Icons.people),
+                        label: const Text('Clients'),
+                      ),
+                      NavigationRailDestination(
+                        icon: const Icon(Icons.wifi_outlined),
+                        selectedIcon: const Icon(Icons.wifi),
+                        label: const Text('Wireless'),
+                      ),
+                      NavigationRailDestination(
+                        icon: const Icon(Icons.more_horiz_outlined),
+                        selectedIcon: const Icon(Icons.more_horiz),
+                        label: const Text('More'),
+                      ),
+                    ],
+                  ),
+                  const VerticalDivider(thickness: 1, width: 1),
+                  Expanded(child: body),
+                ],
+              ),
+            )
+          // ── Phone layout: Custom bottom navigation bar ─────────────────────
+          : Scaffold(
+              body: body,
+              bottomNavigationBar: SafeArea(
+                child: SizedBox(
+                  height: 72,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.bottomCenter,
+                    children: [
+                      // Flat Matt Bottom Bar Container
+                      Container(
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainer,
+                          border: Border(
+                            top: BorderSide(
+                              color: colorScheme.outlineVariant.withValues(
+                                alpha: 0.2,
+                              ),
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            // Left Wing (Interfaces & Clients)
+                            Expanded(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  _buildNavItem(
+                                    index: 1,
+                                    label: 'Interfaces',
+                                    icon: Icons.lan_outlined,
+                                    selectedIcon: Icons.lan,
+                                    isRebooting: isRebooting,
+                                  ),
+                                  _buildNavItem(
+                                    index: 2,
+                                    label: 'Clients',
+                                    icon: Icons.people_outline,
+                                    selectedIcon: Icons.people,
+                                    isRebooting: isRebooting,
+                                    badgeCount: appState.clients
+                                        .where((c) => c.isConnected)
+                                        .length,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Center Clearance Spacer for Elevated Dashboard Badge
+                            const SizedBox(width: 64),
+                            // Right Wing (Wireless & More)
+                            Expanded(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  _buildNavItem(
+                                    index: 3,
+                                    label: 'Wireless',
+                                    icon: Icons.wifi_outlined,
+                                    selectedIcon: Icons.wifi,
+                                    isRebooting: isRebooting,
+                                  ),
+                                  _buildNavItem(
+                                    index: 4,
+                                    label: 'More',
+                                    icon: Icons.more_horiz_outlined,
+                                    selectedIcon: Icons.more_horiz,
+                                    isRebooting: false,
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      // Center Clearance Spacer for Elevated Dashboard Badge
-                      const SizedBox(width: 64),
-                      // Right Wing (Wireless & More)
-                      Expanded(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            _buildNavItem(
-                              index: 3,
-                              label: 'Wireless',
-                              icon: Icons.wifi_outlined,
-                              selectedIcon: Icons.wifi,
-                              isRebooting: isRebooting,
+
+                      // Solid Flat Matt Circular Center Dashboard Badge Button (Index 0)
+                      Align(
+                        alignment: Alignment.topCenter,
+                        child: Transform.translate(
+                          offset: const Offset(0, -12),
+                          child: GestureDetector(
+                            onTap: () {
+                              if (isRebooting) return;
+                              _onItemTapped(0);
+                            },
+                            behavior: HitTestBehavior.opaque,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 52,
+                                  height: 52,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _selectedIndex == 0
+                                        ? colorScheme.primary
+                                        : colorScheme.surfaceContainerHigh,
+                                    border: Border.all(
+                                      color: colorScheme.surface,
+                                      width: 3,
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    _selectedIndex == 0
+                                        ? Icons.dashboard_rounded
+                                        : Icons.dashboard_outlined,
+                                    color: _selectedIndex == 0
+                                        ? colorScheme.onPrimary
+                                        : colorScheme.onSurfaceVariant,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Dashboard',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: _selectedIndex == 0
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                    color: _selectedIndex == 0
+                                        ? colorScheme.primary
+                                        : colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
                             ),
-                            _buildNavItem(
-                              index: 4,
-                              label: 'More',
-                              icon: Icons.more_horiz_outlined,
-                              selectedIcon: Icons.more_horiz,
-                              isRebooting: false,
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-
-                // Solid Flat Matt Circular Center Dashboard Badge Button (Index 0)
-                Align(
-                  alignment: Alignment.topCenter,
-                  child: Transform.translate(
-                    offset: const Offset(0, -12),
-                    child: GestureDetector(
-                      onTap: () {
-                        if (isRebooting) return;
-                        _onItemTapped(0);
-                      },
-                      behavior: HitTestBehavior.opaque,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 52,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _selectedIndex == 0
-                                  ? colorScheme.primary
-                                  : colorScheme.surfaceContainerHigh,
-                              border: Border.all(
-                                color: colorScheme.surface,
-                                width: 3,
-                              ),
-                            ),
-                            child: Icon(
-                              _selectedIndex == 0
-                                  ? Icons.dashboard_rounded
-                                  : Icons.dashboard_outlined,
-                              color: _selectedIndex == 0
-                                  ? colorScheme.onPrimary
-                                  : colorScheme.onSurfaceVariant,
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Dashboard',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: _selectedIndex == 0
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                              color: _selectedIndex == 0
-                                  ? colorScheme.primary
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
-      ),
     );
   }
 
