@@ -1,0 +1,33 @@
+Categories:
+  - System
+  - Network
+License: Apache-2.0
+SourceCode: https://github.com/nightcodex7/yet-another-luci-app
+IssueTracker: https://github.com/nightcodex7/yet-another-luci-app/issues
+Changelog: https://github.com/nightcodex7/yet-another-luci-app/releases
+
+AutoName: Yet Another LuCI App
+Summary: Modern OpenWrt router management client for LuCI
+Description: |-
+  Yet Another LuCI App is a free and open-source Android application designed to manage OpenWrt routers running the standard LuCI web interface.
+
+  Features:
+  * Comprehensive router dashboard (CPU, RAM, Bandwidth, Uptime)
+  * Network Interface management & WAN/LAN configuration
+  * Wireless SSID management & Wi-Fi security controls
+  * Connected client tracking & DHCP static lease configuration
+  * Router reboot & system management utilities
+  * 100% Ad-Free with zero telemetry or background tracking
+
+RepoType: git
+Repo: https://github.com/nightcodex7/yet-another-luci-app.git
+
+Builds:
+  - versionName: 1.0.1
+    versionCode: 110
+    commit: v1.0.1+110
+    subdir: .
+    sudo:
+      - apt-get update
+      - apt-get install -y openjdk-17-jdk
+    build:

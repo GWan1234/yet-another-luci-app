@@ -5,6 +5,23 @@ All notable changes to **Yet Another LuCI App** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-09-04
+
+### Highlights & FOSS Architecture Transition
+- **100% FOSS & F-Droid Readiness**:
+  - Transitioned application architecture to 100% Free & Open Source Software (FOSS) licensed under Apache License 2.0.
+  - Complete removal of AdMob SDKs, monetization code, and ad-gating logic from UI and startup services.
+  - Purged `AD_ID` and ad-services permissions from Android manifests to satisfy F-Droid and Google Play Store "No Ads" policies.
+  - Removed `in_app_purchase` dependencies and `com.android.vending.BILLING` permission from standard builds for 100% F-Droid compliance with zero anti-features.
+- **Build System & Flavor Hardening**:
+  - Isolated Play Store billing permissions (`src/playstore/AndroidManifest.xml`) to build overlays, ensuring community and F-Droid builds compile clean from source.
+  - Voluntary developer support features direct community web payment channels (Razorpay, UPI, GitHub Sponsors, PayPal).
+- **Code Quality & Stability**:
+  - Verified 0 static analysis issues (`flutter analyze`).
+  - Maintained 100% test passing rate across all 207 unit, widget, and state tests.
+
+---
+
 ## [1.0.0] - 2026-08-28
 
 ### Highlights & First Production Release
