@@ -69,9 +69,7 @@ class AppConfig {
   /// the `--dart-define=ENABLE_SUPPORT_DEV=true` flag is set.
   /// Never enabled by kDebugMode alone — avoids PlatformException crashes on
   /// non-Play-Store devices (community builds, side-loaded APKs, CI).
-  static bool get isMonetizationEnabled =>
-      const bool.fromEnvironment('ENABLE_SUPPORT_DEV', defaultValue: false) &&
-      flavor == AppFlavor.playstore;
+  static bool get isMonetizationEnabled => false;
 
   /// Google Play Billing Licensing RSA public key (Base64-encoded).
   /// Used for purchase verification. Safe to include in binary — public key only.

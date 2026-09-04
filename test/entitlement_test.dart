@@ -9,7 +9,7 @@ void main() {
     test('Free tier allows unlimited routers and shows ads', () {
       const state = EntitlementState(tier: EntitlementTier.free);
       expect(state.routerLimit, greaterThanOrEqualTo(9999));
-      expect(state.isAdFree, isFalse);
+      expect(state.isAdFree, isTrue);
 
       expect(state.canAddRouter(0), isTrue);
       expect(state.canAddRouter(1), isTrue);

@@ -5,10 +5,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
-import 'package:in_app_purchase_platform_interface/in_app_purchase_platform_interface.dart';
-
-import 'package:yet_another_luci_app/config/app_config.dart';
 
 /// Available subscription / purchase tiers.
 enum EntitlementTier {
@@ -34,25 +30,23 @@ enum EntitlementTier {
   int get routerLimit => 999999;
 
   /// Whether banner ads are hidden for this tier.
-  bool get isAdFree => this != EntitlementTier.free;
+  bool get isAdFree => true;
 }
 
-/// State model representing user's current monetization entitlements.
+/// State model representing user's current entitlements.
 class EntitlementState {
   final EntitlementTier tier;
   final bool isLoading;
   final String? errorMessage;
-  final List<ProductDetails> availableProducts;
 
   const EntitlementState({
     required this.tier,
     this.isLoading = false,
     this.errorMessage,
-    this.availableProducts = const [],
   });
 
   int get routerLimit => tier.routerLimit;
-  bool get isAdFree => tier.isAdFree;
+  bool get isAdFree => true;
 
   bool canAddRouter(int currentRouterCount) {
     return true;
@@ -62,13 +56,11 @@ class EntitlementState {
     EntitlementTier? tier,
     bool? isLoading,
     String? errorMessage,
-    List<ProductDetails>? availableProducts,
   }) {
     return EntitlementState(
       tier: tier ?? this.tier,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
-      availableProducts: availableProducts ?? this.availableProducts,
     );
   }
 }
@@ -86,45 +78,27 @@ class PlayBillingProducts {
   };
 }
 
-/// Riverpod StateNotifier managing billing products, active entitlement tier,
-/// local persistence, and Google Play Store purchase/restore streams.
+/// Riverpod StateNotifier managing active entitlement tier and local persistence.
 class EntitlementNotifier extends StateNotifier<EntitlementState> {
   static const _storageKey = 'app_entitlement_tier';
   final FlutterSecureStorage _secureStorage;
-  final InAppPurchase _iap;
-  StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
 
-  EntitlementNotifier({FlutterSecureStorage? secureStorage, InAppPurchase? iap})
+  EntitlementNotifier({FlutterSecureStorage? secureStorage})
     : _secureStorage = secureStorage ?? const FlutterSecureStorage(),
-      _iap =
-          iap ??
-          (AppConfig.isMonetizationEnabled
-              ? InAppPurchase.instance
-              : DisabledInAppPurchase()),
       super(
         const EntitlementState(
           tier: EntitlementTier.free,
         ),
       ) {
-    if (AppConfig.isMonetizationEnabled) {
-      _init();
-    }
+    _init();
   }
 
   Future<void> _init() async {
-    if (!AppConfig.isMonetizationEnabled) return;
     await loadCachedEntitlement();
-    try {
-      _listenToPurchaseUpdates();
-      await fetchBillingProducts();
-    } catch (e) {
-      debugPrint('Play Billing init guard on Custom ROM / microG: $e');
-    }
   }
 
   /// Loads cached entitlement tier from local secure storage.
   Future<void> loadCachedEntitlement() async {
-    if (!AppConfig.isMonetizationEnabled) return;
     try {
       final cachedStr = await _secureStorage.read(key: _storageKey);
       if (cachedStr != null) {
@@ -141,7 +115,6 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
 
   /// Updates active entitlement tier and immediately persists it locally.
   Future<void> updateEntitlement(EntitlementTier newTier) async {
-    if (!AppConfig.isMonetizationEnabled) return;
     state = state.copyWith(tier: newTier, errorMessage: null);
     try {
       await _secureStorage.write(key: _storageKey, value: newTier.name);
@@ -150,180 +123,15 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
     }
   }
 
-  /// Loads products configured in Google Play Console.
-  Future<void> fetchBillingProducts() async {
-    if (!AppConfig.isMonetizationEnabled) return;
-    try {
-      final bool isAvailable = await _iap.isAvailable();
-      if (!isAvailable) {
-        return;
-      }
-      final response = await _iap.queryProductDetails(
-        PlayBillingProducts.allProductIds,
-      );
-      if (response.error == null) {
-        state = state.copyWith(availableProducts: response.productDetails);
-      } else {
-        debugPrint('Play Billing query error: ${response.error}');
-      }
-    } catch (e) {
-      debugPrint('Error querying billing products: $e');
-    }
-  }
+  Future<void> fetchBillingProducts() async {}
 
-  /// Listens to Play Store purchase stream to handle real-time purchase completions and restores.
-  void _listenToPurchaseUpdates() {
-    if (!AppConfig.isMonetizationEnabled) return;
-    _purchaseSubscription?.cancel();
-    try {
-      _purchaseSubscription = _iap.purchaseStream.listen(
-        (purchaseList) {
-          _handlePurchaseUpdates(purchaseList);
-        },
-        onDone: () => _purchaseSubscription?.cancel(),
-        onError: (e) {
-          debugPrint('Purchase stream error: $e');
-        },
-      );
-    } catch (e) {
-      debugPrint('Purchase stream listen error: $e');
-    }
-  }
+  Future<void> purchaseProduct(String productId) async {}
 
-  Future<void> _handlePurchaseUpdates(
-    List<PurchaseDetails> purchaseDetailsList,
-  ) async {
-    if (!AppConfig.isMonetizationEnabled) return;
-    for (final purchaseDetails in purchaseDetailsList) {
-      if (purchaseDetails.status == PurchaseStatus.pending) {
-        state = state.copyWith(isLoading: true);
-      } else {
-        if (purchaseDetails.status == PurchaseStatus.error) {
-          state = state.copyWith(
-            isLoading: false,
-            errorMessage: purchaseDetails.error?.message ?? 'Purchase failed',
-          );
-        } else if (purchaseDetails.status == PurchaseStatus.purchased ||
-            purchaseDetails.status == PurchaseStatus.restored) {
-          final verifiedTier = _verifyAndMapProductToTier(
-            purchaseDetails.productID,
-          );
-          if (verifiedTier != null) {
-            // Update entitlement synchronously before returning control
-            await updateEntitlement(verifiedTier);
-          }
-          if (purchaseDetails.pendingCompletePurchase) {
-            await _iap.completePurchase(purchaseDetails);
-          }
-          state = state.copyWith(isLoading: false);
-        }
-      }
-    }
-  }
-
-  /// Maps Google Play product ID to corresponding EntitlementTier.
-  EntitlementTier? _verifyAndMapProductToTier(String productId) {
-    switch (productId) {
-      case PlayBillingProducts.plusMonthly:
-        return EntitlementTier.plus;
-      case PlayBillingProducts.proMonthly:
-        return EntitlementTier.pro;
-      case PlayBillingProducts.lifetimeUnlimited:
-        return EntitlementTier.lifetime;
-      default:
-        return null;
-    }
-  }
-
-  /// Initiates purchase flow for a product.
-  Future<void> buyProduct(ProductDetails productDetails) async {
-    if (!AppConfig.isMonetizationEnabled) return;
-    state = state.copyWith(isLoading: true, errorMessage: null);
-    try {
-      final PurchaseParam purchaseParam = PurchaseParam(
-        productDetails: productDetails,
-      );
-      if (productDetails.id == PlayBillingProducts.lifetimeUnlimited) {
-        await _iap.buyNonConsumable(purchaseParam: purchaseParam);
-      } else {
-        await _iap.buyConsumable(
-          purchaseParam: purchaseParam,
-          autoConsume: false,
-        );
-      }
-    } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
-    }
-  }
-
-  /// Triggers Play Store restore purchases flow required by Play Store policy.
-  Future<void> restorePurchases() async {
-    if (!AppConfig.isMonetizationEnabled) return;
-    state = state.copyWith(isLoading: true, errorMessage: null);
-    try {
-      await _iap.restorePurchases();
-    } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.toString());
-    } finally {
-      state = state.copyWith(isLoading: false);
-    }
-  }
-
-  @override
-  void dispose() {
-    _purchaseSubscription?.cancel();
-    super.dispose();
-  }
+  Future<void> restorePurchases() async {}
 }
 
-/// Global Riverpod Provider for Entitlement State.
+/// Global Riverpod provider for app monetization state and entitlements.
 final entitlementProvider =
     StateNotifierProvider<EntitlementNotifier, EntitlementState>(
       (ref) => EntitlementNotifier(),
     );
-
-/// No-op dummy InAppPurchase implementation used for Community build flavor
-/// to ensure zero billing SDK calls or platform channel bindings.
-class DisabledInAppPurchase implements InAppPurchase {
-  @override
-  Stream<List<PurchaseDetails>> get purchaseStream => const Stream.empty();
-
-  @override
-  Future<bool> isAvailable() async => false;
-
-  @override
-  Future<ProductDetailsResponse> queryProductDetails(
-    Set<String> identifiers,
-  ) async {
-    return ProductDetailsResponse(
-      productDetails: [],
-      notFoundIDs: identifiers.toList(),
-    );
-  }
-
-  @override
-  Future<bool> buyNonConsumable({required PurchaseParam purchaseParam}) async =>
-      false;
-
-  @override
-  Future<bool> buyConsumable({
-    required PurchaseParam purchaseParam,
-    bool autoConsume = true,
-  }) async => false;
-
-  @override
-  Future<void> completePurchase(PurchaseDetails purchase) async {}
-
-  @override
-  Future<void> restorePurchases({String? applicationUserName}) async {}
-
-  @override
-  Future<String> countryCode() async => '';
-
-  @override
-  T getPlatformAddition<T extends InAppPurchasePlatformAddition?>() {
-    throw UnimplementedError(
-      'Play Billing platform additions unavailable in Community build flavor.',
-    );
-  }
-}

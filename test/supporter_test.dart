@@ -32,7 +32,7 @@ void main() {
     });
 
     test('Initial state has default values', () {
-      final notifier = SupporterNotifier(iap: NoOpInAppPurchase());
+      final notifier = SupporterNotifier();
       expect(notifier.state.hasSupportedAtLeastOnce, isFalse);
       expect(notifier.state.supportCount, equals(0));
       expect(notifier.state.isLoading, isFalse);
@@ -40,7 +40,7 @@ void main() {
     });
 
     test('markAsSupported updates state and increments support count', () async {
-      final notifier = SupporterNotifier(iap: NoOpInAppPurchase());
+      final notifier = SupporterNotifier();
       await notifier.markAsSupported();
 
       expect(notifier.state.hasSupportedAtLeastOnce, isTrue);
@@ -59,7 +59,7 @@ void main() {
       });
       FlutterSecureStorage.setMockInitialValues({});
 
-      final notifier = SupporterNotifier(iap: NoOpInAppPurchase());
+      final notifier = SupporterNotifier();
       // Allow async load to complete
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
@@ -69,7 +69,7 @@ void main() {
     });
 
     test('clearError clears errorMessage', () {
-      final notifier = SupporterNotifier(iap: NoOpInAppPurchase());
+      final notifier = SupporterNotifier();
       notifier.state = notifier.state.copyWith(errorMessage: 'Test Error');
       expect(notifier.state.errorMessage, equals('Test Error'));
 
@@ -86,7 +86,7 @@ void main() {
         ProviderScope(
           overrides: [
             supporterProvider.overrideWith(
-              (ref) => SupporterNotifier(iap: NoOpInAppPurchase()),
+              (ref) => SupporterNotifier(),
             ),
           ],
           child: const MaterialApp(
@@ -108,7 +108,7 @@ void main() {
         ProviderScope(
           overrides: [
             supporterProvider.overrideWith(
-              (ref) => SupporterNotifier(iap: NoOpInAppPurchase()),
+              (ref) => SupporterNotifier(),
             ),
           ],
           child: const MaterialApp(

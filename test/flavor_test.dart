@@ -23,7 +23,7 @@ void main() {
     test(
       'EntitlementNotifier defaults to free tier (fail closed) with zero paywalls or limits',
       () {
-        final notifier = EntitlementNotifier(iap: DisabledInAppPurchase());
+        final notifier = EntitlementNotifier();
         final state = notifier.state;
 
         // Entitlement state defaults to free tier (fail closed) without hardcoding unlocked/pro/lifetime tags
