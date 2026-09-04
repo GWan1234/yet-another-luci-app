@@ -16,7 +16,7 @@ plugins {
 
 android {
     namespace = "com.nightcode.luci"
-    compileSdk = 37
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -36,7 +36,7 @@ android {
         // You can update the following values to match your application needs.
         // Explicitly set minSdk = 21 (Android 5.0 Lollipop & up) so Google Play Store reflects Android 5.0+ compatibility
         minSdk = flutter.minSdkVersion
-        targetSdk = 37
+        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
