@@ -57,11 +57,6 @@ class AppConfig {
   static bool get isOfficialBuild =>
       const bool.fromEnvironment('OFFICIAL_BUILD', defaultValue: false);
 
-  /// Whether the ads SDK should be compiled, initialized, and rendered.
-  /// Controlled via compile-time flag --dart-define=ENABLE_ADS=true. Defaults to false.
-  static bool get isAdsEnabled =>
-      const bool.fromEnvironment('ENABLE_ADS', defaultValue: false);
-
   /// Whether voluntary Support the Developer feature is enabled in UI.
   /// Enabled via compile-time flag `--dart-define=ENABLE_SUPPORT_DEV=true` or in debug mode (`kDebugMode`).
   /// Disabled by default in release builds.

@@ -14,15 +14,10 @@ import 'package:yet_another_luci_app/screens/onboarding_screen.dart';
 
 import 'package:yet_another_luci_app/models/router_capabilities.dart';
 
-import 'package:flutter/foundation.dart';
-
 import 'package:flutter/rendering.dart';
 import 'package:flutter/gestures.dart';
 
-import 'package:yet_another_luci_app/services/ad_consent_service.dart';
-import 'package:yet_another_luci_app/config/app_config.dart';
 import 'package:yet_another_luci_app/widgets/luci_toast.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart' hide AppState;
 
 void main() {
   final binding = WidgetsFlutterBinding.ensureInitialized();
@@ -36,9 +31,6 @@ void main() {
   // Defer secondary bindings & SDK initializations post-first-frame to eliminate startup latency
   binding.addPostFrameCallback((_) {
     SemanticsBinding.instance.ensureSemantics();
-    if (AppConfig.isAdsEnabled) {
-      _initDeferredAds();
-    }
   });
 }
 
@@ -60,20 +52,6 @@ class LuciScrollBehavior extends MaterialScrollBehavior {
   @override
   ScrollPhysics getScrollPhysics(BuildContext context) {
     return const ClampingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
-  }
-}
-
-Future<void> _initDeferredAds() async {
-  try {
-    await MobileAds.instance.initialize();
-    if (kDebugMode) {
-      await MobileAds.instance.updateRequestConfiguration(
-        RequestConfiguration(testDeviceIds: const []),
-      );
-    }
-    await AdConsentService.initializeConsentAndAds();
-  } catch (e) {
-    debugPrint('MobileAds deferred initialization skipped or failed: $e');
   }
 }
 

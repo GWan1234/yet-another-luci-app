@@ -10,7 +10,6 @@ import 'package:yet_another_luci_app/config/app_config.dart';
 import 'package:yet_another_luci_app/design/luci_design_system.dart';
 import 'package:yet_another_luci_app/providers/entitlement_provider.dart';
 import 'package:yet_another_luci_app/screens/support_the_dev_screen.dart';
-import 'package:yet_another_luci_app/widgets/banner_ad_widget.dart';
 import 'package:yet_another_luci_app/widgets/luci_app_bar.dart';
 import 'package:yet_another_luci_app/widgets/luci_toast.dart';
 import 'package:yet_another_luci_app/screens/dashboard_settings_list_screen.dart';
@@ -127,10 +126,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             _buildReviewerModeCard(context, ref),
             const SizedBox(height: 24),
           ],
-
-          const SizedBox(height: 8),
-          const BannerAdWidget(),
-          const SizedBox(height: 24),
         ],
       ),
     );
