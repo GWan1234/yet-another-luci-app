@@ -13,7 +13,9 @@
   [![Dart](https://img.shields.io/badge/Dart-3.8+-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
   [![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg?style=for-the-badge)](LICENSE)
   [![Build Status](https://img.shields.io/badge/Build-Passing-teal.svg?style=for-the-badge)]()
+  [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Donate-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/nightcode)
   [![OpenWrt](https://img.shields.io/badge/OpenWrt-19.07--24.10+-1589F0?style=for-the-badge&logo=openwrt&logoColor=white)](https://openwrt.org)
+
 
   <br>
 
@@ -314,9 +316,18 @@ apk add rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status
 - **Atomic Rollbacks:** Staged UCI changes revert automatically if RPC failures occur, preventing broken router state.
 - **SSL Support:** Supports HTTPS RPC endpoints and self-signed SSL certificate bypass options for local subnets.
 
+## Support the Project ☕
+
+Yet Another LuCI App is 100% free, open-source, and privacy-first with zero tracking or ads. If this project makes managing your network easier, consider supporting its ongoing development:
+
+<a href="https://buymeacoffee.com/nightcode" target="_blank">
+  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50" />
+</a>
+
 ---
 
 ## Contributing
+
 
 Contributions, bug reports, and feature suggestions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting pull requests.
 
