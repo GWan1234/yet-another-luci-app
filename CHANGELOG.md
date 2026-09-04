@@ -8,14 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.1] - 2026-09-04
 
 ### Highlights & FOSS Architecture Transition
+
 - **100% FOSS & F-Droid Readiness**:
   - Transitioned application architecture to 100% Free & Open Source Software (FOSS) licensed under Apache License 2.0.
-  - Complete removal of AdMob SDKs, monetization code, and ad-gating logic from UI and startup services.
-  - Purged `AD_ID` and ad-services permissions from Android manifests to satisfy F-Droid and Google Play Store "No Ads" policies.
-  - Removed `in_app_purchase` dependencies and `com.android.vending.BILLING` permission from standard builds for 100% F-Droid compliance with zero anti-features.
 - **Build System & Flavor Hardening**:
   - Isolated Play Store billing permissions (`src/playstore/AndroidManifest.xml`) to build overlays, ensuring community and F-Droid builds compile clean from source.
-  - Voluntary developer support features direct community web payment channels (Razorpay, UPI, GitHub Sponsors, PayPal).
+  - Voluntary developer support features direct community web payment channels (UPI, GitHub Sponsors, PayPal).
 - **Code Quality & Stability**:
   - Verified 0 static analysis issues (`flutter analyze`).
   - Maintained 100% test passing rate across all 207 unit, widget, and state tests.
@@ -25,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2026-08-28
 
 ### Highlights & First Production Release
+
 - **Official Production Release Track 1.0.0**:
   - Production-ready suite for OpenWrt router management across phone and tablet form factors.
   - Zero telemetry, privacy-first offline architecture, and complete removal of ad tracking services.
@@ -41,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2026-08-15
 
 ### Added
+
 - **Clean Dual-Stream Real-Time Throughput Graph**:
   - Upgraded dashboard and real-time metric charts to a merged continuous line chart for clear network traffic monitoring.
   - Replaced gradient area fills with clean, high-contrast stroke lines and step-responsive curve rendering (`curveSmoothness: 0.25`).
@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Improved Cloudflare Tunnel ID extraction in the VPN & Connectivity module by parsing tunnel attributes directly from router UCI configurations and encoded token sources.
 
 ### Fixed
+
 - **Client Lease Time Formatting & Stale Device Pruning**:
   - Corrected `leaseTime == null` formatting to return `"No active lease"` instead of conflating absent lease data with infinite static leases (`leaseTime == 0`, `"Unlimited"`).
   - Updated offline client retention logic to exclude disconnected, non-static devices with no active DHCP lease (`leaseTime <= 0`), removing stale ghost host hints from the client list while maintaining active devices, dynamic leases, and UCI static IP reservations.
@@ -58,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.0.9] - 2026-08-14
 
 ### Added
+
 - **Expanded VPN & Secure Tunnels Management**:
   - Full configuration overview and state controls for OpenVPN, WireGuard, IPsec, and Cloudflare Tunnels (`cloudflared`).
   - Added real-time tunnel status tracking, public key display, configuration detail parsing, and diagnostic connection tests.
@@ -65,6 +67,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Integrated automatic extraction of Cloudflare Tunnel attributes and credentials from router `/etc/config/cloudflared` UCI configs and encoded tokens.
 
 ### Fixed
+
 - **Storage Metrics Precision**:
   - Normalized statvfs block-size unit calculations to strictly match OpenWrt RPC specs across all storage mount points.
 
@@ -73,11 +76,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.0.8] - 2026-08-13
 
 ### Added
+
 - **Dynamic Real-Time Throughput Graph Scaling**:
   - Improved real-time metrics chart autoscale and polling timer integration to eliminate rate spikes and visual rendering artifacts.
   - Enhanced CPU/RAM load calculation and dynamic Y-axis bounds scaling for live bandwidth graphs.
 
 ### Fixed
+
 - **Storage Unit Auto-Conversion**:
   - Resolved 1K-blocks vs 512-byte block sizing discrepancies in system storage parsing.
   - Enhanced wired-only router interface discovery and CPU load array normalization.
@@ -87,6 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.0.7] - 2026-08-13
 
 ### Added
+
 - **Static Lease Management & UI Sync**:
   - Added interactive dialog to add dynamic clients directly to static DHCP leases (`/etc/config/dhcp`) with custom hostname, IP, and lease duration settings.
   - Added one-tap static lease removal with instant UI state synchronization and client list refresh.
@@ -100,6 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.0.6] - 2026-08-12
 
 ### Added
+
 - **Dynamic Package Manager Engine**:
   - Support for package search, installation, upgrade, and removal across both modern OPKG and APK (OpenWrt 25.x+) package management systems.
 - **Internet Access Pause/Resume (Parental Control)**:
@@ -108,6 +115,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Introduced standalone Restricted Clients management screen for blocked or access-controlled devices.
 
 ### Fixed & Removed
+
 - **Permission & Privacy Optimization**:
   - Removed `AD_ID` permission from Android Manifest for privacy compliance.
   - Enforced single active router session state to prevent multi-router state race conditions.
@@ -120,6 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Release Note**: Version `0.0.4-beta` was intentionally skipped due to internal release and stability issues to ensure full reliability for this release.
 
 ### Added
+
 - **Wi-Fi Access Control & Auto-Revert Safety Guard**:
   - Added per-radio/per-SSID MAC allow-list control with interactive device selection (from connected clients or manual MAC input).
   - Implemented background shell script auto-revert timer (25 seconds) on the router to protect users from accidental lockout if Wi-Fi connectivity is severed during access rule updates.
@@ -130,6 +139,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated RPCD ACL remediation instructions to provide platform-specific commands for both modern APK (OpenWrt 25.x+) and legacy OPKG (OpenWrt 24.10 and earlier) package managers.
 
 ### Fixed
+
 - **Storage Monitoring Unit-Conversion Engine**:
   - Eliminated magnitude-based unit guessing heuristics (`rawSize < 100GB`), replacing it with explicit `StorageDataSource` format typing (`rpcJson`, `dfKBlocks`, `dfHuman`).
   - Fixed double-conversion bug that caused `/tmp` (tmpfs) to report as `120.17 GB` and total system storage as `53.09 GB`.
@@ -140,6 +150,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.0.4] - 2026-08-10
 
 ### Added
+
 - **Client IPv6 Address Expand/Collapse & Deduplication**:
   - Automatically deduplicated client IPv6 address lists and added an interactive `Show X more IPv6 address(es)` / `Collapse IPv6 addresses` toggle for device cards with multiple ULA or link-local IPv6 addresses.
 - **Adaptive Wireless Throughput Rate Formatting**:
@@ -148,6 +159,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Expanded interface cards on the Interfaces tab now explicitly identify WAN/ISP interfaces and label public IP addresses (`Public IP Address`, `Public IPv6 Address`).
 
 ### Fixed
+
 - **Storage & Overlay Root Metric Calculation**:
   - Fixed storage calculation on Dashboard and Storage Monitoring cards to accurately fetch and report root `/` filesystem capacity rather than locking onto the read-only `/rom` SquashFS image (`0 MB / 16 MB`).
 - **Dashboard Interface Card Navigation**:
@@ -163,6 +175,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Release Note**: Versions `0.0.1` and `0.0.2` were internal testing iterations and were intentionally skipped from public release to ensure maximum stability and reliability for this initial public release.
 
 ### Added
+
 - **5th Standalone Bottom Navigation Tab — Wireless Management**:
   - Promoted Wireless Management (radio configuration, associated SSIDs, operating mode, channels, TX power, and connected stations) to a dedicated, top-level bottom navigation tab.
   - Redesigned the navigation bar into a symmetrical **2-and-2 split** around the elevated central Dashboard badge button (`Interfaces`, `Clients` | `Dashboard` | `Wireless`, `More`).
@@ -178,6 +191,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - DSA (`bridge-vlan`) and `swconfig` network switch topology visualization.
 
 ### Changed
+
 - **App-Wide Color Scheme Rebrand**:
   - Transitioned the entire UI theme palette to **nightcode Orange (`#F97316`)** and **Amber (`#FB923C`)** for a bold, distinctive visual identity across both Light and Dark modes.
   - Migrated hardcoded chart line gradients and speed indicators in `DashboardScreen` and `InterfacesScreen` to design system color tokens.
@@ -191,6 +205,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Expanded interface cards on the Interfaces tab now explicitly identify and label WAN/ISP interfaces and public IP addresses (`Public IP Address`, `Public IPv6 Address`).
 
 ### Fixed
+
 - **Storage & Overlay Root Metric Parsing**:
   - Corrected storage calculation on Dashboard and Storage Monitoring cards to fetch root `/` filesystem usage rather than defaulting to the read-only `/rom` SquashFS image (`0 MB / 16 MB`).
 - **Dashboard Interface Card Navigation**:

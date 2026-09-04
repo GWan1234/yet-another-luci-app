@@ -7,7 +7,6 @@ IssueTracker: https://github.com/nightcodex7/yet-another-luci-app/issues
 Changelog: https://github.com/nightcodex7/yet-another-luci-app/releases
 
 AutoName: Yet Another LuCI App
-Summary: Modern OpenWrt router management client for LuCI
 Description: |-
   Yet Another LuCI App is a free and open-source Android application designed to manage OpenWrt routers running the standard LuCI web interface.
 
@@ -25,12 +24,13 @@ Repo: https://github.com/nightcodex7/yet-another-luci-app.git
 Builds:
   - versionName: 1.0.1
     versionCode: 110
-    commit: v1.0.1+110
+    commit: v1.0.1
     output: build/app/outputs/flutter-apk/app-community-release.apk
     srclibs:
       - flutter@stable
     prebuild:
-      - git -C $$flutter$$ checkout -f $(sed -n -E "s/.*revision:\ \"(.*)\"/ /p" .metadata)
+      - FLUTTER_REV=$(sed -n -E 's/.*revision:\ "(.*)"$/\1/p' .metadata)
+      - git -C $$flutter$$ checkout -f $FLUTTER_REV
       - export PUB_CACHE=$(pwd)/.pub-cache
       - $$flutter$$/bin/flutter config --no-analytics
       - $$flutter$$/bin/flutter pub get
@@ -41,7 +41,7 @@ Builds:
       - $$flutter$$/bin/flutter build apk --release --flavor community --dart-define=FLAVOR=community
         --dart-define=OFFICIAL_BUILD=true --dart-define=ENABLE_SUPPORT_DEV=false
 
-AutoUpdateMode: Version
-UpdateCheckMode: Tags
+AutoUpdateMode: None
+UpdateCheckMode: None
 CurrentVersion: 1.0.1
 CurrentVersionCode: 110
