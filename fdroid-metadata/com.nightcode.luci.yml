@@ -1,6 +1,6 @@
 Categories:
-  - System
   - Connectivity
+  - System
 License: Apache-2.0
 SourceCode: https://github.com/nightcodex7/yet-another-luci-app
 IssueTracker: https://github.com/nightcodex7/yet-another-luci-app/issues
@@ -30,8 +30,7 @@ Builds:
     srclibs:
       - flutter@stable
     prebuild:
-      - git -C $$flutter$$ checkout -f $(sed -n -E "s/.*revision:\ \"(.*)\"/ /p"
-        .metadata)
+      - git -C $$flutter$$ checkout -f $(sed -n -E "s/.*revision:\ \"(.*)\"/ /p" .metadata)
       - export PUB_CACHE=$(pwd)/.pub-cache
       - $$flutter$$/bin/flutter config --no-analytics
       - $$flutter$$/bin/flutter pub get
