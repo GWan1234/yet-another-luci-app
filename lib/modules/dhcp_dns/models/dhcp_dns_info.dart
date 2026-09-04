@@ -901,13 +901,13 @@ class DhcpDnsOverview {
         final forcePurged =
             data?['forcePurged'] == true ||
             (data?['forcePurgedAt'] != null && data!['forcePurgedAt'] > 0);
-        if (forcePurged ||
-            (offlineMacSet.contains(normMac) &&
-                !onlineMacSet.contains(normMac))) {
-          if (offlineMacSet.contains(normMac) &&
-              !onlineMacSet.contains(normMac)) {
-            continue;
-          }
+        final isOffline =
+            offlineMacSet.contains(normMac) && !onlineMacSet.contains(normMac);
+        final isDisconnectedGhostLease =
+            !onlineMacSet.contains(normMac) && lease.expirySeconds <= 0;
+
+        if (forcePurged || isOffline || isDisconnectedGhostLease) {
+          continue;
         }
         finalLeaseList.add(lease);
       }

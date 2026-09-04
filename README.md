@@ -5,6 +5,7 @@
   <h2>Modern OpenWrt & LuCI Router Manager for Mobile</h2>
   <p>Maintained by <b>Tuhin Garai (@nightcodex7)</b></p>
 
+  [![Google Play](https://img.shields.io/badge/Google%20Play-Get%20it%20on%20Play%20Store-414141?style=for-the-badge&logo=google-play&logoColor=white)](https://play.google.com/store/apps/details?id=com.nightcode.luci&referrer=utm_source%3Dgithub%26utm_medium%3Dreadme%26utm_campaign%3Drepo_header)
   [![Version](https://img.shields.io/badge/Version-v1.0.0-blue.svg?style=for-the-badge&logo=github)](https://github.com/nightcodex7/yet-another-luci-app/releases)
   [![Downloads](https://img.shields.io/github/downloads/nightcodex7/yet-another-luci-app/total.svg?style=for-the-badge&logo=github&color=blue)](https://github.com/nightcodex7/yet-another-luci-app/releases)
   [![Page Views](https://komarev.com/ghpvc/?username=nightcodex7-yet-another-luci-app&label=Page%20Views&color=0175C2&style=for-the-badge)](https://github.com/nightcodex7/yet-another-luci-app)
@@ -13,6 +14,12 @@
   [![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg?style=for-the-badge)](LICENSE)
   [![Build Status](https://img.shields.io/badge/Build-Passing-teal.svg?style=for-the-badge)]()
   [![OpenWrt](https://img.shields.io/badge/OpenWrt-19.07--24.10+-1589F0?style=for-the-badge&logo=openwrt&logoColor=white)](https://openwrt.org)
+
+  <br>
+
+  <a href="https://play.google.com/store/apps/details?id=com.nightcode.luci&referrer=utm_source%3Dgithub%26utm_medium%3Dreadme%26utm_campaign%3Dplay_badge">
+    <img src="store-badges/google.webp" alt="Get it on Google Play" height="60" />
+  </a>
 
   <br><br>
 

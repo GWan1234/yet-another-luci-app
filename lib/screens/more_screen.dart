@@ -19,7 +19,8 @@ import 'package:yet_another_luci_app/utils/gateway_utils.dart';
 import 'package:yet_another_luci_app/services/secure_storage_service.dart';
 import 'package:yet_another_luci_app/state/app_state.dart';
 import 'package:yet_another_luci_app/modules/core/luci_module_registry.dart';
-import 'package:yet_another_luci_app/screens/paywall_screen.dart';
+import 'package:yet_another_luci_app/providers/supporter_provider.dart';
+import 'package:yet_another_luci_app/screens/support_the_dev_screen.dart';
 import 'package:yet_another_luci_app/widgets/theme_router_logo.dart';
 
 class _MoreScreenSection extends StatelessWidget {
@@ -363,58 +364,68 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                   .toList(),
             ),
             const LuciSectionHeader('Application'),
-            _MoreScreenSection(
-              tiles: [
-                if (AppConfig.isSupportDevEnabled)
-                  _buildMoreTile(
-                    context,
-                    icon: Icons.favorite,
-                    iconColor: Colors.pink.shade400,
-                    title: 'Support the Developer',
-                    subtitle: 'Help keep this project alive',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const PaywallScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                _buildMoreTile(
-                  context,
-                  icon: Icons.settings_outlined,
-                  iconColor: Theme.of(context).colorScheme.primary,
-                  title: 'Settings',
-                  subtitle: 'Configure app preferences',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const SettingsScreen(),
+            Builder(
+              builder: (context) {
+                final supporterState = ref.watch(supporterProvider);
+                final hasSupported = supporterState.hasSupportedAtLeastOnce;
+
+                return _MoreScreenSection(
+                  tiles: [
+                    if (AppConfig.isSupportDevEnabled)
+                      _buildMoreTile(
+                        context,
+                        icon: Icons.favorite,
+                        iconColor: Colors.pink.shade400,
+                        title: 'Support the Developer',
+                        subtitle: hasSupported
+                            ? 'Thank you for your support! Tap to support again ❤️'
+                            : 'Help keep this project alive',
+                        showBadge: hasSupported,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const SupportTheDevScreen(),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
-                _buildMoreTile(
-                  context,
-                  icon: Icons.info_outline,
-                  iconColor: Theme.of(context).colorScheme.secondary,
-                  title: 'About',
-                  subtitle: 'App version and information',
-                  onTap: () => _showAboutDialog(context),
-                ),
-                _buildMoreTile(
-                  context,
-                  icon: Icons.logout,
-                  iconColor: Theme.of(context).colorScheme.error,
-                  title: 'Logout',
-                  subtitle: 'End your session and sign out',
-                  titleColor: Theme.of(context).colorScheme.error,
-                  subtitleColor: Theme.of(
-                    context,
-                  ).colorScheme.error.withValues(alpha: 0.7),
-                  onTap: () => _showLogoutDialog(context),
-                ),
-              ],
+                    _buildMoreTile(
+                      context,
+                      icon: Icons.settings_outlined,
+                      iconColor: Theme.of(context).colorScheme.primary,
+                      title: 'Settings',
+                      subtitle: 'Configure app preferences',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const SettingsScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildMoreTile(
+                      context,
+                      icon: Icons.info_outline,
+                      iconColor: Theme.of(context).colorScheme.secondary,
+                      title: 'About',
+                      subtitle: 'App version and information',
+                      onTap: () => _showAboutDialog(context),
+                    ),
+                    _buildMoreTile(
+                      context,
+                      icon: Icons.logout,
+                      iconColor: Theme.of(context).colorScheme.error,
+                      title: 'Logout',
+                      subtitle: 'End your session and sign out',
+                      titleColor: Theme.of(context).colorScheme.error,
+                      subtitleColor: Theme.of(
+                        context,
+                      ).colorScheme.error.withValues(alpha: 0.7),
+                      onTap: () => _showLogoutDialog(context),
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 100),
           ],
@@ -434,6 +445,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
     Color? titleColor,
     Color? subtitleColor,
     bool showSpinner = false,
+    bool showBadge = false,
   }) {
     final theme = Theme.of(context);
     // Persistent spinning icon using AnimationController
@@ -453,13 +465,40 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
     return Opacity(
       opacity: enabled ? 1.0 : 0.5,
       child: ListTile(
-        leading: Container(
-          decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.12),
-            shape: BoxShape.circle,
-          ),
-          padding: const EdgeInsets.all(10),
-          child: spinningIconWidget,
+        leading: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              padding: const EdgeInsets.all(10),
+              child: spinningIconWidget,
+            ),
+            if (showBadge)
+              Positioned(
+                right: -2,
+                top: -2,
+                child: Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: Colors.pink.shade400,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: theme.colorScheme.surface,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.favorite,
+                    size: 8,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+          ],
         ),
         title: Text(
           title,

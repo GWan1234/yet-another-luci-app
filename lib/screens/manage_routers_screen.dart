@@ -7,7 +7,7 @@ import 'package:yet_another_luci_app/main.dart';
 import 'package:yet_another_luci_app/models/router.dart' as model;
 import 'package:yet_another_luci_app/services/router_service.dart';
 import 'package:yet_another_luci_app/providers/entitlement_provider.dart';
-import 'package:yet_another_luci_app/screens/paywall_screen.dart';
+import 'package:yet_another_luci_app/screens/support_the_dev_screen.dart';
 import 'package:yet_another_luci_app/widgets/luci_app_bar.dart';
 import 'package:yet_another_luci_app/utils/url_parser.dart';
 
@@ -208,7 +208,7 @@ class _ManageRoutersScreenState extends ConsumerState<ManageRoutersScreen> {
                                   await Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (context) =>
-                                          const PaywallScreen(),
+                                          const SupportTheDevScreen(),
                                     ),
                                   );
                                   return;

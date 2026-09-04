@@ -3,6 +3,7 @@
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:yet_another_luci_app/state/app_state.dart';
@@ -1862,10 +1863,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       Expanded(
                         child: Text(
                           displayIp,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
+                          style: GoogleFonts.geistMono(
                                 fontWeight: FontWeight.w600,
-                                fontFamily: 'monospace',
                               ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -2816,8 +2815,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text(
+          children: [
+            const Text(
               'Connect to your router via SSH and run the following command to enable full RPC functionality:\n',
             ),
             SelectableText(
@@ -2825,7 +2824,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               'opkg update && opkg install luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status && /etc/init.d/rpcd restart\n\n'
               '# OpenWrt 25.12+ (apk):\n'
               'apk update && apk add luci-mod-rpc rpcd-mod-luci rpcd-mod-iwinfo luci-mod-status && /etc/init.d/rpcd restart',
-              style: TextStyle(fontFamily: 'monospace', fontSize: 12),
+              style: GoogleFonts.geistMono(fontSize: 12),
             ),
           ],
         ),

@@ -11,6 +11,9 @@ void main() {
       'AppConfig defaults to Community flavor when FLAVOR environment variable is omitted',
       () {
         expect(AppConfig.flavor, equals(AppFlavor.community));
+        expect(AppConfig.isSupportDevEnabled, isTrue); // true in kDebugMode (test env)
+        // isMonetizationEnabled requires BOTH playstore flavor AND ENABLE_SUPPORT_DEV=true.
+        // In test environment (community flavor, no dart-define), it must be false.
         expect(AppConfig.isMonetizationEnabled, isFalse);
         expect(AppConfig.flavorName, equals('Community'));
         expect(AppConfig.isOfficialBuild, isFalse);
@@ -20,7 +23,7 @@ void main() {
     test(
       'EntitlementNotifier defaults to free tier (fail closed) with zero paywalls or limits',
       () {
-        final notifier = EntitlementNotifier();
+        final notifier = EntitlementNotifier(iap: DisabledInAppPurchase());
         final state = notifier.state;
 
         // Entitlement state defaults to free tier (fail closed) without hardcoding unlocked/pro/lifetime tags

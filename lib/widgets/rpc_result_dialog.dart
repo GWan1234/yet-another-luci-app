@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'luci_toast.dart';
 import '../models/rpc_result.dart';
 import '../state/app_state.dart';
@@ -57,7 +58,7 @@ class RpcResultUiHelper {
           child: Text(
             result.errorMessage ??
                 'An unknown error occurred on the router during operation.',
-            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            style: GoogleFonts.geistMono(fontSize: 12),
           ),
         ),
         actions: [
@@ -167,11 +168,11 @@ class _PermissionDeniedDialogState extends State<_PermissionDeniedDialog> {
               ),
             ],
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'To grant access, log in to your router via SSH and install/configure the RPCD ACL modules:\n\n'
               '${RpcResultUiHelper.kRpcdAclRemediationCommand}\n\n'
               'Then restart rpcd or re-log into this app.',
-              style: TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              style: GoogleFonts.geistMono(fontSize: 12),
             ),
           ],
         ),

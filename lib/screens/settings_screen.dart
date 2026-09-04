@@ -9,7 +9,7 @@ import 'package:yet_another_luci_app/main.dart';
 import 'package:yet_another_luci_app/config/app_config.dart';
 import 'package:yet_another_luci_app/design/luci_design_system.dart';
 import 'package:yet_another_luci_app/providers/entitlement_provider.dart';
-import 'package:yet_another_luci_app/screens/paywall_screen.dart';
+import 'package:yet_another_luci_app/screens/support_the_dev_screen.dart';
 import 'package:yet_another_luci_app/widgets/banner_ad_widget.dart';
 import 'package:yet_another_luci_app/widgets/luci_app_bar.dart';
 import 'package:yet_another_luci_app/widgets/luci_toast.dart';
@@ -582,7 +582,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) => const PaywallScreen(),
+                builder: (context) => const SupportTheDevScreen(),
               ),
             );
           },

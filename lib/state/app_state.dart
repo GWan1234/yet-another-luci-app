@@ -1403,8 +1403,10 @@ class AppState extends ChangeNotifier {
       context: context,
     );
     if (res) {
-      await fetchDashboardData();
-      await fetchClientsForSelectedRouter();
+      // Refresh in background — do NOT await so the loading toast transitions
+      // to success immediately rather than waiting for a full network round-trip.
+      unawaited(fetchDashboardData());
+      unawaited(fetchClientsForSelectedRouter());
     }
     return res;
   }
@@ -1417,9 +1419,11 @@ class AppState extends ChangeNotifier {
       macAddress: macAddress,
       context: context,
     );
+    // Refresh data in background — do NOT await so the loading toast can be
+    // replaced immediately by the success/error toast in the caller.
     if (res) {
-      await fetchDashboardData();
-      await fetchClientsForSelectedRouter();
+      unawaited(fetchDashboardData());
+      unawaited(fetchClientsForSelectedRouter());
     }
     return res;
   }

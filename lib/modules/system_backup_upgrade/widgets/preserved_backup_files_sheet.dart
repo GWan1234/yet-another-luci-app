@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:yet_another_luci_app/state/app_state.dart';
 import 'package:yet_another_luci_app/utils/os_platform_integration.dart';
 import 'package:yet_another_luci_app/widgets/luci_toast.dart';
@@ -639,8 +640,7 @@ class _PreservedBackupFilesSheetState extends State<PreservedBackupFilesSheet>
                           Expanded(
                             child: SelectableText(
                               path,
-                              style: const TextStyle(
-                                fontFamily: 'monospace',
+                              style: GoogleFonts.geistMono(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -827,10 +827,7 @@ class _PreservedBackupFilesSheetState extends State<PreservedBackupFilesSheet>
                     controller: _confTextController,
                     maxLines: null,
                     expands: true,
-                    style: const TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 12,
-                    ),
+                    style: GoogleFonts.geistMono(fontSize: 12),
                     decoration: const InputDecoration(
                       hintText:
                           '# Add files or directories to preserve across sysupgrade\n/etc/config/custom_app\n/etc/ssl/certs',
@@ -900,8 +897,7 @@ class _PreservedBackupFilesSheetState extends State<PreservedBackupFilesSheet>
                           Expanded(
                             child: SelectableText(
                               path,
-                              style: const TextStyle(
-                                fontFamily: 'monospace',
+                              style: GoogleFonts.geistMono(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
                               ),

@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
 import 'package:yet_another_luci_app/models/client.dart';
 import 'package:yet_another_luci_app/modules/dhcp_dns/models/dhcp_dns_info.dart';
@@ -55,6 +56,8 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
   bool _ip6Touched = false;
   bool _duidTouched = false;
   bool _customLeaseTouched = false;
+  // Whether the optional IPv6/DUID section is expanded by the user
+  bool _showIp6Section = false;
 
   String? _rawMacError;
   String? _rawNameError;
@@ -212,28 +215,27 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
                     : ''));
     _ipController = TextEditingController(text: initialIpVal);
 
+    // IPv6: only pre-fill when explicitly provided via existingMapping or initialIp6 param.
+    // Do NOT auto-populate from client's active IPv6 — user must opt-in via the checkbox.
     final initialIp6Val =
-        (widget.initialIp6 != null && widget.initialIp6!.trim().isNotEmpty)
-        ? widget.initialIp6!.trim()
-        : ((mapping != null && mapping.ip6Address.isNotEmpty)
-              ? mapping.ip6Address.trim()
-              : ((client != null &&
-                        client.ipv6Addresses != null &&
-                        client.ipv6Addresses!.isNotEmpty)
-                    ? client.ipv6Addresses!.first.trim()
-                    : ''));
+        (mapping != null && mapping.ip6Address.isNotEmpty)
+        ? mapping.ip6Address.trim()
+        : ((widget.initialIp6 != null && widget.initialIp6!.trim().isNotEmpty)
+              ? widget.initialIp6!.trim()
+              : '');
     _ip6Controller = TextEditingController(text: initialIp6Val);
 
+    // DUID: only pre-fill when explicitly provided via existingMapping or initialDuid param.
     final initialDuidVal =
-        (widget.initialDuid != null && widget.initialDuid!.trim().isNotEmpty)
-        ? widget.initialDuid!.trim()
-        : ((mapping != null && mapping.duid.isNotEmpty)
-              ? mapping.duid.trim()
-              : ((client != null &&
-                        (client.clientId != null || client.hostId != null))
-                    ? (client.clientId ?? client.hostId!).trim()
-                    : ''));
+        (mapping != null && mapping.duid.isNotEmpty)
+        ? mapping.duid.trim()
+        : ((widget.initialDuid != null && widget.initialDuid!.trim().isNotEmpty)
+              ? widget.initialDuid!.trim()
+              : '');
     _duidController = TextEditingController(text: initialDuidVal.toUpperCase());
+
+    // Expand IPv6 section if there is already data (editing existing mapping)
+    _showIp6Section = initialIp6Val.isNotEmpty || initialDuidVal.isNotEmpty;
 
     String initCustomText = '12h';
     if (mapping != null && mapping.leaseTime.trim().isNotEmpty) {
@@ -764,7 +766,9 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
       if (context.mounted) {
         if (res) {
           context.showToastSuccess(
-            'Connection refresh signal sent for $hostname ($macAddress).',
+            'Connection refresh signal sent for $hostname.',
+            subtitle:
+                'Client deauthenticated. Toggle Wi-Fi on the device if it does not acquire its new IP in 10s.',
           );
         } else {
           context.showToastWarning(
@@ -1074,9 +1078,8 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
                         const SizedBox(height: 2),
                         SelectableText(
                           _effectiveMac,
-                          style: const TextStyle(
+                          style: GoogleFonts.geistMono(
                             fontWeight: FontWeight.bold,
-                            fontFamily: 'monospace',
                             fontSize: 13,
                           ),
                         ),
@@ -1338,66 +1341,164 @@ class _AddStaticLeaseDialogState extends State<AddStaticLeaseDialog> {
                 ],
                 const SizedBox(height: 16),
 
-                // IPv6 Address / Host ID (Optional) Field
-                Text(
-                  'Reserved IPv6 Address / Host ID (Optional)',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: _ip6Controller,
-                  keyboardType: TextInputType.text,
-                  textInputAction: TextInputAction.next,
-                  decoration: InputDecoration(
-                    hintText: 'e.g. 2405:201::100 or ::100 (Host ID)',
-                    prefixIcon: const Icon(Icons.language_outlined, size: 20),
-                    errorText: _ip6Error,
-                    errorMaxLines: 3,
-                    filled: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
+                // IPv6 / DUID section — collapsed by default, opt-in only
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () {
+                    setState(() {
+                      _showIp6Section = !_showIp6Section;
+                      // Clear fields when collapsing so they are not submitted
+                      if (!_showIp6Section) {
+                        _ip6Controller.clear();
+                        _duidController.clear();
+                        _ip6Touched = false;
+                        _duidTouched = false;
+                      }
+                    });
+                    _validateInputs();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
                     ),
-                    border: OutlineInputBorder(
+                    decoration: BoxDecoration(
+                      color: _showIp6Section
+                          ? colorScheme.secondaryContainer.withValues(alpha: 0.35)
+                          : colorScheme.surfaceContainerHighest.withValues(
+                              alpha: 0.4,
+                            ),
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _showIp6Section
+                            ? colorScheme.secondary.withValues(alpha: 0.4)
+                            : colorScheme.outlineVariant.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _showIp6Section
+                              ? Icons.expand_less_rounded
+                              : Icons.expand_more_rounded,
+                          size: 18,
+                          color: _showIp6Section
+                              ? colorScheme.secondary
+                              : colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Configure IPv6 Reservation & DUID',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: _showIp6Section
+                                      ? colorScheme.secondary
+                                      : colorScheme.onSurface,
+                                ),
+                              ),
+                              Text(
+                                _showIp6Section
+                                    ? 'Optional — tap to collapse and clear'
+                                    : 'Optional — tap to add an IPv6 address or DUID',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 10,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                          value: _showIp6Section,
+                          onChanged: (v) {
+                            setState(() {
+                              _showIp6Section = v;
+                              if (!v) {
+                                _ip6Controller.clear();
+                                _duidController.clear();
+                                _ip6Touched = false;
+                                _duidTouched = false;
+                              }
+                            });
+                            _validateInputs();
+                          },
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
 
-                // DUID Field (Optional)
-                Text(
-                  'DUID (DHCPv6 Unique Identifier - Optional)',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                TextField(
-                  controller: _duidController,
-                  keyboardType: TextInputType.text,
-                  textCapitalization: TextCapitalization.characters,
-                  textInputAction: TextInputAction.next,
-                  decoration: InputDecoration(
-                    hintText: 'e.g. 0001000129A1B2C3D4E5F67890AB',
-                    prefixIcon: const Icon(
-                      Icons.fingerprint_outlined,
-                      size: 20,
-                    ),
-                    errorText: _duidError,
-                    errorMaxLines: 3,
-                    filled: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                if (_showIp6Section) ...[
+                  const SizedBox(height: 12),
+                  // IPv6 Address / Host ID Field
+                  Text(
+                    'Reserved IPv6 Address / Host ID',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _ip6Controller,
+                    keyboardType: TextInputType.text,
+                    textInputAction: TextInputAction.next,
+                    decoration: InputDecoration(
+                      hintText: 'e.g. 2405:201::100 or ::100 (Host ID)',
+                      prefixIcon: const Icon(
+                        Icons.language_outlined,
+                        size: 20,
+                      ),
+                      errorText: _ip6Error,
+                      errorMaxLines: 3,
+                      filled: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // DUID Field
+                  Text(
+                    'DUID (DHCPv6 Unique Identifier)',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _duidController,
+                    keyboardType: TextInputType.text,
+                    textCapitalization: TextCapitalization.characters,
+                    textInputAction: TextInputAction.next,
+                    decoration: InputDecoration(
+                      hintText: 'e.g. 0001000129A1B2C3D4E5F67890AB',
+                      prefixIcon: const Icon(
+                        Icons.fingerprint_outlined,
+                        size: 20,
+                      ),
+                      errorText: _duidError,
+                      errorMaxLines: 3,
+                      filled: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
 
                 // Lease Time Preset Dropdown

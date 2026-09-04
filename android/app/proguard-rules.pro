@@ -18,10 +18,13 @@
 -keep class io.flutter.plugins.** { *; }
 
 # Anti-Decompilation, Obfuscation & APK Parser Protection
--repackageclasses ''
+-keepnames class io.flutter.embedding.** { *; }
+-repackageclasses 'a'
 -allowaccessmodification
+-optimizationpasses 5
+-overloadaggressively
 -renamesourcefileattribute SourceFile
--keepattributes !SourceFile,!LineNumberTable,!LocalVariableTable,!LocalVariableTypeTable
+-keepattributes SourceFile,LineNumberTable
 -useuniqueclassmembernames
 
 # Strip Debug Logging in Release Bytecode

@@ -1,6 +1,7 @@
 // Copyright 2026 Tuhin Garai. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yet_another_luci_app/main.dart';
@@ -27,6 +28,7 @@ class DhcpDnsScreen extends ConsumerWidget {
             'ipAddress': c.ipAddress,
             'name': c.displayName,
             'isStaticLease': c.isStaticLease,
+            'isConnected': c.isConnected,
           },
         )
         .toList();
@@ -473,12 +475,6 @@ class DhcpDnsScreen extends ConsumerWidget {
         context: context,
       );
 
-      if (success) {
-        final appState = ref.read(appStateProvider);
-        await appState.fetchDashboardData();
-        await appState.fetchClientsForSelectedRouter();
-      }
-
       if (!context.mounted) return;
 
       if (success) {
@@ -486,6 +482,9 @@ class DhcpDnsScreen extends ConsumerWidget {
           'Static lease removed for ${mapping.hostname}.',
           actionKey: actionKey,
         );
+        final appState = ref.read(appStateProvider);
+        unawaited(appState.fetchDashboardData());
+        unawaited(appState.fetchClientsForSelectedRouter());
       } else {
         context.showToastError(
           'Failed to remove static lease for ${mapping.hostname}.',

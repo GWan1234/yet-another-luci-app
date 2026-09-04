@@ -126,15 +126,16 @@ android {
     }
 }
 
-// Exclude monetization/ad dependencies entirely across all builds
+// Exclude unused ad SDK entirely from all builds.
+// in_app_purchase_android MUST be present in the AAB so Google Play's SDK scanner
+// sees BillingClient 8.0.0 and clears the policy violation.
+// The Dart-side isMonetizationEnabled flag gates all IAP calls at runtime.
 configurations.all {
     exclude(group = "io.flutter.plugins.googlemobileads")
-    exclude(group = "io.flutter.plugins.inapppurchase")
     exclude(module = "google_mobile_ads")
-    exclude(module = "in_app_purchase_android")
 }
 
-// Ensure GeneratedPluginRegistrant does not reference excluded ad/purchase plugins when compiling
+// Ensure GeneratedPluginRegistrant does not reference excluded ad plugin when compiling
 tasks.configureEach {
     if (name.contains("JavaWithJavac")) {
         doFirst {
@@ -143,7 +144,7 @@ tasks.configureEach {
                 val cleanedContent = registrantFile.readText()
                     .lines()
                     .filter { line ->
-                        !line.contains("GoogleMobileAdsPlugin") && !line.contains("InAppPurchasePlugin")
+                        !line.contains("GoogleMobileAdsPlugin")
                     }
                     .joinToString("\n")
                 registrantFile.writeText(cleanedContent)

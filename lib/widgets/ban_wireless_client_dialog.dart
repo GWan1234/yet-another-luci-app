@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:yet_another_luci_app/utils/self_device_guard.dart';
 
 /// Context-aware dialog for Banning a wireless client with flexible time customization,
@@ -325,9 +326,8 @@ class _BanWirelessClientDialogState extends State<BanWirelessClientDialog> {
                   const SizedBox(height: 6),
                   Text(
                     'MAC: ${widget.macAddress.toUpperCase()}${widget.ipAddress != null ? " • IP: ${widget.ipAddress}" : ""}',
-                    style: TextStyle(
+                    style: GoogleFonts.geistMono(
                       fontSize: 11,
-                      fontFamily: 'monospace',
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),

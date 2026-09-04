@@ -1,6 +1,8 @@
 // Copyright 2026 Tuhin Garai. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import 'package:flutter/foundation.dart';
+
 /// Flavor types supported by the build pipeline
 enum AppFlavor { community, playstore }
 
@@ -20,6 +22,14 @@ class AppConfig {
       'https://nightcode.co.in/terms.html';
   static const String contactUrl =
       'https://nightcode.co.in/contact.html';
+
+  // Community Direct Support Payment URLs
+  static const String razorpayUrl = 'https://razorpay.me/@nightcode';
+  static const String stripeUrl = '';
+  static const String paypalUrl = '';
+  static const String wiseUrl = '';
+  /// UPI payment link — shown only for India-locale community builds.
+  static const String upiUrl = '';
 
 
   // Maintainer & Contact Configuration
@@ -53,12 +63,20 @@ class AppConfig {
       const bool.fromEnvironment('ENABLE_ADS', defaultValue: false);
 
   /// Whether voluntary Support the Developer feature is enabled in UI.
-  /// Explicitly disabled across all public builds per security and release policy.
-  static bool get isSupportDevEnabled => false;
+  /// Enabled via compile-time flag `--dart-define=ENABLE_SUPPORT_DEV=true` or in debug mode (`kDebugMode`).
+  /// Disabled by default in release builds.
+  static bool get isSupportDevEnabled =>
+      const bool.fromEnvironment('ENABLE_SUPPORT_DEV', defaultValue: false) ||
+      kDebugMode;
 
-  /// Whether monetization features (Play Billing, Paywalls, Router Gating) are enabled.
-  /// Explicitly disabled across all public builds per security and release policy.
-  static bool get isMonetizationEnabled => false;
+  /// Whether Google Play In-App Billing (IAP) is enabled.
+  /// ONLY true when explicitly built for the Play Store flavor AND
+  /// the `--dart-define=ENABLE_SUPPORT_DEV=true` flag is set.
+  /// Never enabled by kDebugMode alone — avoids PlatformException crashes on
+  /// non-Play-Store devices (community builds, side-loaded APKs, CI).
+  static bool get isMonetizationEnabled =>
+      const bool.fromEnvironment('ENABLE_SUPPORT_DEV', defaultValue: false) &&
+      flavor == AppFlavor.playstore;
 
   /// Google Play Billing Licensing RSA public key (Base64-encoded).
   /// Used for purchase verification. Safe to include in binary — public key only.

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:yet_another_luci_app/state/app_state.dart';
@@ -113,16 +114,19 @@ class LuCIApp extends ConsumerWidget {
           surfaceContainerHighest: const Color(0xFFE2E8F0),
           brightness: Brightness.light,
         ),
+        textTheme: GoogleFonts.geistTextTheme(
+          ThemeData(brightness: Brightness.light).textTheme,
+        ),
         scaffoldBackgroundColor: const Color(0xFFF1F5F9),
-        appBarTheme: const AppBarTheme(
+        appBarTheme: AppBarTheme(
           backgroundColor: Colors.transparent,
           elevation: 0,
           scrolledUnderElevation: 0,
           centerTitle: false,
-          titleTextStyle: TextStyle(
+          titleTextStyle: GoogleFonts.geist(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF0F172A),
+            color: const Color(0xFF0F172A),
           ),
         ),
         cardTheme: CardThemeData(
@@ -174,6 +178,9 @@ class LuCIApp extends ConsumerWidget {
           surfaceContainerHighest: const Color(0xFF243356),
           brightness: Brightness.dark,
         ),
+        textTheme: GoogleFonts.geistTextTheme(
+          ThemeData(brightness: Brightness.dark).textTheme,
+        ),
         scaffoldBackgroundColor: const Color(0xFF0F1523),
         focusColor: Colors.transparent,
         highlightColor: Colors.transparent,
@@ -182,15 +189,15 @@ class LuCIApp extends ConsumerWidget {
           shape: Border(),
           collapsedShape: Border(),
         ),
-        appBarTheme: const AppBarTheme(
+        appBarTheme: AppBarTheme(
           backgroundColor: Colors.transparent,
           elevation: 0,
           scrolledUnderElevation: 0,
           centerTitle: false,
-          titleTextStyle: TextStyle(
+          titleTextStyle: GoogleFonts.geist(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: Color(0xFFF8FAFC),
+            color: const Color(0xFFF8FAFC),
           ),
         ),
         cardTheme: CardThemeData(

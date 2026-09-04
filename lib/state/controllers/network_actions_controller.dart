@@ -1583,8 +1583,27 @@ heal_dns() {
             });
           }
         }
+        void purgeFromLeases(dynamic leases) {
+          if (leases is List) {
+            leases.removeWhere((item) {
+              if (item is Map) {
+                final m = (item['macaddr'] ?? item['mac'] ?? item['macAddress'] ?? '')
+                    .toString()
+                    .toUpperCase()
+                    .replaceAll('-', ':');
+                return m == macUpper;
+              }
+              return false;
+            });
+          }
+        }
+
+        purgeFromLeases(dashboardData['dhcpLeases']);
+        purgeFromLeases(dashboardData['dhcp_leases']);
       }
-      await _refreshDashboard();
+      // Fire refresh in background — do NOT await; the caller (app_state)
+      // already fires its own unawaited fetches after this returns.
+      unawaited(_refreshDashboard());
       _notifyListeners();
     }
     return res;

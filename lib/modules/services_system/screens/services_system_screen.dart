@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yet_another_luci_app/main.dart';
 import 'package:yet_another_luci_app/design/luci_design_system.dart';
@@ -386,9 +387,8 @@ class _ServicesSystemScreenState extends ConsumerState<ServicesSystemScreen> {
               ),
               TextSpan(
                 text: targetJob.command,
-                style: const TextStyle(
+                style: GoogleFonts.geistMono(
                   fontWeight: FontWeight.bold,
-                  fontFamily: 'monospace',
                 ),
               ),
               TextSpan(text: '\nSchedule: ${targetJob.expression}'),
@@ -509,9 +509,8 @@ class _ServicesSystemScreenState extends ConsumerState<ServicesSystemScreen> {
                               Expanded(
                                 child: Text(
                                   cron.command,
-                                  style: TextStyle(
+                                  style: GoogleFonts.geistMono(
                                     fontWeight: FontWeight.bold,
-                                    fontFamily: 'monospace',
                                     fontSize: 13,
                                     color: isEnabled
                                         ? null
@@ -1635,8 +1634,7 @@ class _ServicesSystemScreenState extends ConsumerState<ServicesSystemScreen> {
                     ),
                     child: Text(
                       res.testOutput!,
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
+                      style: GoogleFonts.geistMono(
                         fontSize: 11,
                         color: Colors.greenAccent,
                       ),
@@ -1996,7 +1994,7 @@ class _CronJobEditDialogState extends State<_CronJobEditDialog> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.timelapse),
                 ),
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                style: GoogleFonts.geistMono(fontSize: 13),
                 validator: (value) =>
                     CronValidator.validateExpression(value ?? ''),
                 onChanged: (val) {
@@ -2064,7 +2062,7 @@ class _CronJobEditDialogState extends State<_CronJobEditDialog> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.terminal),
                 ),
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                style: GoogleFonts.geistMono(fontSize: 13),
                 validator: (value) =>
                     CronValidator.validateCommand(value ?? ''),
                 onChanged: (_) => setState(() {}),
@@ -2788,8 +2786,7 @@ class _DdnsEditDialogState extends State<_DdnsEditDialog> {
                             ),
                             child: Text(
                               _testResult!.testOutput!,
-                              style: const TextStyle(
-                                fontFamily: 'monospace',
+                              style: GoogleFonts.geistMono(
                                 fontSize: 10,
                                 color: Colors.greenAccent,
                               ),

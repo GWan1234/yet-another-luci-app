@@ -7,6 +7,8 @@ import androidx.core.view.WindowCompat
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.SystemBarStyle
+import android.graphics.Color
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -17,13 +19,21 @@ class MainActivity : FlutterFragmentActivity() {
     private var pendingPermissionResult: MethodChannel.Result? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
+        // Modern Jetpack Edge-to-Edge initialization for Android 15+ (API 35+) compliance
+        try {
+            enableEdgeToEdge(
+                statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+                navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
+            )
+        } catch (_: Exception) {
+            // Fallback for custom legacy framework environments
+        }
         super.onCreate(savedInstanceState)
         
         // Unlock high refresh rate (90Hz/120Hz/144Hz) for ultra-smooth 120fps scrolling
         unlockHighRefreshRate()
 
-        // Enable edge-to-edge display without using deprecated APIs
+        // Enable edge-to-edge layout & display cutout handling without using deprecated APIs
         setupEdgeToEdge()
     }
 
@@ -116,13 +126,29 @@ class MainActivity : FlutterFragmentActivity() {
     }
     
     private fun setupEdgeToEdge() {
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        
-        // Use WindowInsetsController for light/dark status and navigation bar styling
-        val controller = WindowCompat.getInsetsController(window, window.decorView)
-        controller?.let {
-            it.isAppearanceLightStatusBars = false
-            it.isAppearanceLightNavigationBars = false
+        try {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+
+            // Configure modern display cutout mode (LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS for API 35+)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val lp = window.attributes
+                if (Build.VERSION.SDK_INT >= 35) { // Android 15+
+                    lp.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                } else {
+                    @Suppress("DEPRECATION")
+                    lp.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
+                window.attributes = lp
+            }
+            
+            // Use WindowInsetsController with null-safety for light/dark status and navigation bar styling
+            val controller = WindowCompat.getInsetsController(window, window.decorView)
+            controller?.let {
+                it.isAppearanceLightStatusBars = false
+                it.isAppearanceLightNavigationBars = false
+            }
+        } catch (_: Exception) {
+            // Defensive fallback ensuring zero startup crashes on non-standard device hardware/ROMs
         }
     }
 

@@ -100,7 +100,7 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
           iap ??
           (AppConfig.isMonetizationEnabled
               ? InAppPurchase.instance
-              : _DisabledInAppPurchase()),
+              : DisabledInAppPurchase()),
       super(
         const EntitlementState(
           tier: EntitlementTier.free,
@@ -175,15 +175,19 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
   void _listenToPurchaseUpdates() {
     if (!AppConfig.isMonetizationEnabled) return;
     _purchaseSubscription?.cancel();
-    _purchaseSubscription = _iap.purchaseStream.listen(
-      (purchaseList) {
-        _handlePurchaseUpdates(purchaseList);
-      },
-      onDone: () => _purchaseSubscription?.cancel(),
-      onError: (e) {
-        debugPrint('Purchase stream error: $e');
-      },
-    );
+    try {
+      _purchaseSubscription = _iap.purchaseStream.listen(
+        (purchaseList) {
+          _handlePurchaseUpdates(purchaseList);
+        },
+        onDone: () => _purchaseSubscription?.cancel(),
+        onError: (e) {
+          debugPrint('Purchase stream error: $e');
+        },
+      );
+    } catch (e) {
+      debugPrint('Purchase stream listen error: $e');
+    }
   }
 
   Future<void> _handlePurchaseUpdates(
@@ -280,7 +284,7 @@ final entitlementProvider =
 
 /// No-op dummy InAppPurchase implementation used for Community build flavor
 /// to ensure zero billing SDK calls or platform channel bindings.
-class _DisabledInAppPurchase implements InAppPurchase {
+class DisabledInAppPurchase implements InAppPurchase {
   @override
   Stream<List<PurchaseDetails>> get purchaseStream => const Stream.empty();
 

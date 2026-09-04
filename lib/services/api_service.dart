@@ -4214,10 +4214,12 @@ echo "\$DENY_MACS \$WIFI_UCI" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^F
     BuildContext? context,
   }) async {
     try {
-      final cleanMac = macAddress.trim().toLowerCase();
+      final macUpper = macAddress.trim().toUpperCase().replaceAll('-', ':');
+      final macLower = macAddress.trim().toLowerCase().replaceAll('-', ':');
+      final cleanMac = macLower;
       final sectionsToDelete = <String>[];
 
-      // 1. Attempt to find all matching sections via UCI ubus call
+      // 1. Attempt to find all matching host sections via UCI ubus call
       try {
         final getRes = await callWithContext(
           ipAddress,
@@ -4237,17 +4239,24 @@ echo "\$DENY_MACS \$WIFI_UCI" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^F
           valuesMap.forEach((key, val) {
             if (val is Map && val['.type'] == 'host') {
               final macVal = val['mac'];
+              bool isMatch = false;
               if (macVal is String) {
-                if (macVal.toLowerCase().contains(cleanMac)) {
-                  sectionsToDelete.add(key.toString());
+                final norm = macVal.toLowerCase().replaceAll('-', ':');
+                if (norm.contains(cleanMac) || cleanMac.contains(norm)) {
+                  isMatch = true;
                 }
               } else if (macVal is List) {
                 for (final item in macVal) {
-                  if (item.toString().toLowerCase().contains(cleanMac)) {
-                    sectionsToDelete.add(key.toString());
+                  final norm =
+                      item.toString().toLowerCase().replaceAll('-', ':');
+                  if (norm.contains(cleanMac) || cleanMac.contains(norm)) {
+                    isMatch = true;
                     break;
                   }
                 }
+              }
+              if (isMatch) {
+                sectionsToDelete.add(key.toString());
               }
             }
           });
@@ -4286,8 +4295,25 @@ echo "\$DENY_MACS \$WIFI_UCI" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^F
         }
       }
 
-      // 2. Fallback to shell execution if ubus delete failed or sections were not matched via ubus
-      if (!deleteSuccess) {
+      // 2. Subshell script executed detached with redirected streams (>/dev/null 2>&1 </dev/null &)
+      // This ensures OpenWrt ubus file.exec returns IMMEDIATELY without waiting on stdout pipe EOF.
+      final cleanScript = '''
+(
+for sec in \$(uci show dhcp 2>/dev/null | grep -i '$cleanMac' | cut -d. -f2 | sort -u); do
+  uci delete dhcp.\$sec 2>/dev/null || true
+done
+uci commit dhcp 2>/dev/null || true
+for f in /tmp/dhcp.leases /var/dhcp.leases /tmp/dnsmasq.leases /var/run/odhcpd.leases /tmp/odhcpd.leases /tmp/hosts/odhcpd; do
+  if [ -f "\$f" ]; then
+    sed -i "/$macUpper/d; /$macLower/d" "\$f" 2>/dev/null || true
+  fi
+done
+/etc/init.d/dnsmasq reload 2>/dev/null || /etc/init.d/dnsmasq restart 2>/dev/null
+) >/dev/null 2>&1 </dev/null &
+exit 0
+''';
+
+      try {
         final shellRes = await callWithContext(
           ipAddress,
           sysauth,
@@ -4296,24 +4322,16 @@ echo "\$DENY_MACS \$WIFI_UCI" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^F
           method: 'exec',
           params: {
             'command': '/bin/sh',
-            'params': [
-              '-c',
-              "for sec in \$(uci show dhcp 2>/dev/null | grep -i '$cleanMac' | cut -d. -f2 | sort -u); do uci delete dhcp.\$sec 2>/dev/null || true; done; uci commit dhcp && /etc/init.d/dnsmasq restart",
-            ],
+            'params': ['-c', cleanScript],
           },
           context: mountedContext(context),
         );
-        deleteSuccess = _execSucceeded(shellRes);
-      } else {
-        // Restart dnsmasq service to apply change
-        await manageServiceAction(
-          ipAddress,
-          sysauth,
-          useHttps,
-          serviceName: 'dnsmasq',
-          action: 'restart',
-          context: mountedContext(context),
-        );
+
+        if (_execSucceeded(shellRes) || deleteSuccess) {
+          deleteSuccess = true;
+        }
+      } catch (e) {
+        Logger.warning('Background cleanScript shell execution failed: $e');
       }
 
       return deleteSuccess;
@@ -4335,25 +4353,39 @@ echo "\$DENY_MACS \$WIFI_UCI" | tr ' ' '\\n' | grep -vE "^00:00:00:00:00:00\$|^F
       final macUpper = macAddress.toUpperCase().replaceAll('-', ':');
       final macLower = macAddress.toLowerCase().replaceAll('-', ':');
 
-      final script =
-          '''
+      final script = '''
 MAC_U="$macUpper"
 MAC_L="$macLower"
 
-if [ -f /tmp/dhcp.leases ]; then
-  sed -i "/\$MAC_U/d; /\$MAC_L/d" /tmp/dhcp.leases 2>/dev/null || true
+# 1. Delete active DHCP lease records from all lease files
+for f in /tmp/dhcp.leases /var/dhcp.leases /tmp/dnsmasq.leases; do
+  if [ -f "\$f" ]; then
+    sed -i "/\${MAC_U}/d; /\${MAC_L}/d" "\$f" 2>/dev/null || true
+  fi
+done
+
+# 2. Reload dnsmasq so UCI static lease is immediately effective
+/etc/init.d/dnsmasq reload 2>/dev/null || true
+
+# 3. Send deauth with 3.5s ban window to force client OS to reset Wi-Fi link state
+#    and perform a fresh DHCP DISCOVER upon auto-reconnecting.
+DEAUTHED=0
+for obj in \$(ubus list 'hostapd.*' 2>/dev/null); do
+  if ubus call "\$obj" get_clients 2>/dev/null | grep -qi "\${MAC_L}"; then
+    ubus call "\$obj" del_client "{\\"addr\\":\\"\${MAC_L}\\",\\"reason\\":5,\\"deauth\\":true,\\"ban_time\\":3500}" 2>/dev/null && DEAUTHED=1 || true
+  fi
+done
+
+# 4. Fallback if client wasn't listed in hostapd get_clients
+if [ "\$DEAUTHED" = "0" ]; then
+  for obj in \$(ubus list 'hostapd.*' 2>/dev/null); do
+    ubus call "\$obj" del_client "{\\"addr\\":\\"\${MAC_L}\\",\\"reason\\":5,\\"deauth\\":true,\\"ban_time\\":3500}" 2>/dev/null || true
+  done
+  for dev in \$(iw dev 2>/dev/null | awk '\$1=="Interface"{print \$2}'); do
+    iw dev "\$dev" station del "\${MAC_L}" 2>/dev/null || true
+  done
 fi
 
-for obj in \$(ubus list 'hostapd.*' 2>/dev/null); do
-  ubus call "\$obj" del_client '{"addr":"'"\$MAC_U"'","reason":1,"deauth":true}' 2>/dev/null || true
-  ubus call "\$obj" del_client '{"addr":"'"\$MAC_L"'","reason":1,"deauth":true}' 2>/dev/null || true
-done
-for dev in \$(iw dev 2>/dev/null | awk '\$1=="Interface"{print \$2}'); do
-  iw dev "\$dev" station del "\$MAC_L" 2>/dev/null || true
-  iw dev "\$dev" station del "\$MAC_U" 2>/dev/null || true
-done
-
-/etc/init.d/dnsmasq reload 2>/dev/null || true
 exit 0
 ''';
 

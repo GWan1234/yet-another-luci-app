@@ -14,8 +14,8 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="32"/>
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation" tools:targetApi="33"/>
 
-    <!-- Explicitly Strip All In-App Purchase, Billing & Ad-Related Transitive Permissions -->
-    <uses-permission android:name="com.android.vending.BILLING" tools:node="remove"/>
+    <!-- Google Play Billing Permission for Voluntary Developer Support -->
+    <uses-permission android:name="com.android.vending.BILLING"/>
     <uses-permission android:name="com.android.vending.CHECK_LICENSE" tools:node="remove"/>
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove"/>
     <uses-permission android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION" tools:node="remove"/>
@@ -72,6 +72,11 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- Opt-out of restricted display cutout bounds on Android 15+ -->
+            <meta-data
+              android:name="android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_DISPLAY_CUTOUT"
+              android:value="false"
+              />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -90,16 +95,12 @@
         <meta-data
             android:name="com.google.android.play.app_distribution.auto_update"
             android:value="true" />
-        <meta-data
-            android:name="com.android.vending.splits.required"
-            android:value="false" />
     </application>
-    <!-- Required to query activities that can process text, see:
-         https://developer.android.com/training/package-visibility and
-         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
-
-         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <!-- Required for Play Billing Library 6.0+ Package Visibility on Android 11+ (API 30+) -->
     <queries>
+        <intent>
+            <action android:name="com.android.vending.billing.InAppBillingService.BIND"/>
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

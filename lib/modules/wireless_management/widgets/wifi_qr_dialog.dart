@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -242,13 +243,15 @@ class _WifiQrDialogState extends ConsumerState<WifiQrDialog> {
                               Expanded(
                                 child: Text(
                                   _showPassword ? _passphrase! : '••••••••••••',
-                                  style: TextStyle(
-                                    fontFamily: _showPassword
-                                        ? 'monospace'
-                                        : null,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                  ),
+                                  style: _showPassword
+                                      ? GoogleFonts.geistMono(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                        )
+                                      : const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                        ),
                                 ),
                               ),
                               IconButton(

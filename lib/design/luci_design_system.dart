@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// Standardized color tokens for throughput and data streams
 class LuciColors {
@@ -132,6 +133,46 @@ class LuciTextStyles {
   static TextStyle errorText(BuildContext context) {
     return Theme.of(context).textTheme.bodyMedium!.copyWith(
       color: Theme.of(context).colorScheme.onErrorContainer,
+    );
+  }
+}
+
+/// Centralized typography helpers for Geist and Geist Mono.
+///
+/// Use [LuciTypography.monoStyle] anywhere a monospace font is needed
+/// (IP addresses, config values, RPC output, SSH logs, etc.) instead of
+/// raw `fontFamily: 'monospace'` strings.
+class LuciTypography {
+  /// Returns a [TextStyle] using Geist Mono with optional overrides.
+  /// This is the single source of truth for all mono text in the app.
+  static TextStyle monoStyle({
+    double fontSize = 12,
+    FontWeight fontWeight = FontWeight.w400,
+    Color? color,
+    double? letterSpacing,
+    double? height,
+  }) {
+    return GoogleFonts.geistMono(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      letterSpacing: letterSpacing,
+      height: height,
+    );
+  }
+
+  /// Returns a [TextStyle] using Geist (UI font) with optional overrides.
+  static TextStyle uiStyle({
+    double fontSize = 14,
+    FontWeight fontWeight = FontWeight.w400,
+    Color? color,
+    double? letterSpacing,
+  }) {
+    return GoogleFonts.geist(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      letterSpacing: letterSpacing,
     );
   }
 }
