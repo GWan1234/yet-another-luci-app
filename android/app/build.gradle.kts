@@ -41,6 +41,10 @@ android {
         versionName = flutter.versionName
     }
 
+    configurations.all {
+        exclude(group = "com.google.android.play")
+    }
+
     flavorDimensions += "default"
 
     productFlavors {

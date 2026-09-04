@@ -3,9 +3,11 @@
 -keep class io.flutter.plugin.** { *; }
 -keep class io.flutter.util.** { *; }
 -keep class io.flutter.view.** { *; }
--keep class io.flutter.** { *; }
+-keep class io.flutter.embedding.engine.FlutterEngine { *; }
+-keep class io.flutter.embedding.engine.plugins.** { *; }
 -dontwarn io.flutter.embedding.**
 -dontwarn io.flutter.plugins.**
+-dontwarn com.google.android.play.**
 
 # App Main Activity & Generated Registrant (Narrowed for R8 obfuscation)
 -keep class com.nightcode.luci.MainActivity { *; }
@@ -18,7 +20,6 @@
 -keep class io.flutter.plugins.** { *; }
 
 # Anti-Decompilation, Obfuscation & APK Parser Protection
--keepnames class io.flutter.embedding.** { *; }
 -repackageclasses 'a'
 -allowaccessmodification
 -optimizationpasses 5
